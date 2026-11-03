@@ -675,7 +675,7 @@ function makeSupabaseApi() {
         sb.from("pools").select("*").eq("order_date", date).order("seq").then(must),
         sb.from("riders").select("*").order("name").then(must),
         sb.from("sites").select("*").order("name").then(must),
-        sb.from("kitchens").select("*").order("added_by_customer").order("name").then(must),
+        sb.from("kitchens").select("*").order("created_at").order("id").then(must),
         rpc("admin_wallets"),
         sb.from("menu_items").select("*").order("name").then(must),
         sb.from("admins").select("*").order("role", { ascending: false }).then(must)
@@ -685,7 +685,9 @@ function makeSupabaseApi() {
     },
     async updateOrder(id, patch) { must(await sb.from("orders").update(patch).eq("id", id)); },
     async updatePool(id, patch) { if (patch.status && stamp[patch.status]) patch[stamp[patch.status]] = new Date().toISOString(); must(await sb.from("pools").update(patch).eq("id", id)); },
-    async updateKitchen(id, patch) { must(await sb.from("kitchens").update(patch).eq("id", id)); },
+    async updateKitchen(id, patch) { const r = await sb.from("kitchens").update(patch).eq("id", id).select("id");
+      if (r.error && /lat|lng|column|schema cache/i.test(r.error.message)) throw new Error("Run update-6.sql in the Supabase SQL Editor once, then try again.");
+      if (!must(r).length) throw new Error("Not saved. Your account may not have permission to edit kitchens."); },
     async creditWallet(user_id, amount, reason) { must(await sb.from("wallet_entries").insert({ user_id, amount: Number(amount), reason, created_by: "coordinator" })); },
     myRole: () => rpc("my_role"),
     claimOwner: () => rpc("claim_owner"),
@@ -912,7 +914,7 @@ async function viewOrder() {
       <section id="kitchensList" class="stack"></section>
       <button class="invite-card" id="addVendor" style="border:none;text-align:left;color:inherit;font:inherit;cursor:pointer;width:100%">
         <span class="blob">${ICON.store}</span>
-        <span style="display:grid;gap:2px"><strong>Know a great food seller?</strong><span class="small muted">Add your waakye, gob3 or kenkey seller so neighbours can order together.</span></span>
+        <span style="display:grid;gap:2px"><strong>Know a great food seller?</strong><span class="small muted">Add your waakye, gob3 or kenkey seller so others in your building can order together.</span></span>
       </button>
     </section>
     <section id="tabOrders" class="stack hidden"></section>
@@ -1136,14 +1138,14 @@ function renderKitchens() {
   let rows = menusHere().map(k => ({ k, d: base && hasPin(k) ? distM(base, k) : null }));
   const far = rows.filter(r => r.d != null && r.d > NEAR_KITCHEN_M).length;
   rows = rows.filter(r => r.d == null || r.d <= NEAR_KITCHEN_M).sort((a, b) => (a.d ?? 1e12) - (b.d ?? 1e12));
-  $("#kitchensSub").textContent = "Delivering to " + (site.name || "your building") + ". Start a pool and neighbours can join it." + (far ? " " + far + " more kitchen" + (far > 1 ? "s are" : " is") + " too far to deliver here." : "");
+  $("#kitchensSub").textContent = "Delivering to " + (site.name || "your building") + ". Start a pool and others in your building can join it." + (far ? " " + far + " more kitchen" + (far > 1 ? "s are" : " is") + " too far to deliver here." : "");
   el.innerHTML = rows.map(({ k, d }) => {
     const st = menuState(k), p = currentPool(S.siteId, k.id), dishes = S.items.filter(it => it.kitchen_id === k.id), active = activeHere(k);
     const status = st.full ? pill("Fully booked today", "bad") : st.waiting ? pill("Waiting for the seller", "warn") : active ? pill(p.meals + " of " + max + " seats taken", "ok") : st.open ? pill("Cooking today", "ok") : pill("Not confirmed yet", "dim");
     const btn = st.full ? `<button class="btn wide" disabled>Fully booked today</button>` : st.waiting ? `<button class="btn wide" disabled>Waiting for the seller to confirm</button>`
       : active ? `<button class="btn wide" data-menu="${esc(k.id)}">Join the active pool</button>` : `<button class="btn wide" data-menu="${esc(k.id)}">Start a pool</button>`;
     return `<article class="kcard"><div class="head"><span class="tile" style="background:${tint(menuIndex(k.id))}">${art(dishKind(dishes[0]?.name))}</span>
-      <div style="flex:1;min-width:0"><strong>${esc(k.public_name)}</strong><p class="small muted">${esc(k.added_by_customer ? "A local seller added by a neighbour" : k.tagline || "")}</p>
+      <div style="flex:1;min-width:0"><strong>${esc(k.public_name)}</strong><p class="small muted">${esc(k.added_by_customer ? "A local seller added by a customer" : k.tagline || "")}</p>
         <div class="row" style="justify-content:flex-start;gap:6px;margin-top:4px">${status}${d != null ? pill(fmtDist(d) + " away", "dim") : ""}</div></div></div>
       <div class="dishline">${dishes.slice(0, 3).map(x => `<span>${esc(x.name)} · ${money(x.price)}</span>`).join("")}${dishes.length > 3 ? `<span>+${dishes.length - 3} more</span>` : ""}</div>${btn}</article>`;
   }).join("") || `<div class="empty">${ICON.store}<p>No kitchens deliver to ${esc(site.name || "this building")} yet. Add a seller you know below.</p></div>`;
@@ -1172,11 +1174,11 @@ function renderPools() {
       <div class="pool-art" style="background:${tint(i)}"><div class="tags">${tags}</div>${art(dishKind(dishes[0]?.name))}
         <div class="fee-tag"><b class="num">${money(share)}</b><span>${share < s.max_fee ? `<s>${money(s.max_fee)}</s>` : ""}delivery per meal</span></div></div>
       <div class="pool-body">
-        <div><h3>${esc(k.public_name)}</h3><p class="small muted">${esc(k.added_by_customer ? "A local seller added by a neighbour" : k.tagline || "")}</p></div>
+        <div><h3>${esc(k.public_name)}</h3><p class="small muted">${esc(k.added_by_customer ? "A local seller added by a customer" : k.tagline || "")}</p></div>
         ${seats}<p class="small">${line}</p>
         <div class="dishline">${dishes.slice(0, 2).map(d => `<span>${esc(d.name)}</span>`).join("")}${dishes.length > 2 ? `<span>+${dishes.length - 2} more</span>` : ""}</div>
         ${btn}</div></article>`;
-  }).join("") || `<div class="empty">${ICON.store}<p>No active pools at ${esc(siteOf(S.siteId).name || "your building")} yet today.</p><p class="small">Start one and your neighbours can join it.</p><button class="btn" data-gokitchens>Start a pool</button></div>`;
+  }).join("") || `<div class="empty">${ICON.store}<p>No active pools at ${esc(siteOf(S.siteId).name || "your building")} yet today.</p><p class="small">Start one and others in your building can join it.</p><button class="btn" data-gokitchens>Start a pool</button></div>`;
 }
 
 /* Alerts: someone at your building ordered (opt-in, capped per day) */
@@ -1268,7 +1270,7 @@ function openOrder(menuId) {
   const known = me.name && me.phone;
   openSheet(`
     ${sheetHead(esc(k.public_name), esc(site.name) + " · " + fmtDate(S.date) + ", " + fmtTime(s.delivery_time))}
-    ${k.added_by_customer ? `<p class="note">A local seller added by a neighbour. ChopPool doesn't inspect their kitchen.</p>` : ""}
+    ${k.added_by_customer ? `<p class="note">A local seller added by a customer. ChopPool doesn't inspect their kitchen.</p>` : ""}
     ${!st.open ? `<p class="note">You're first today. ${esc(k.public_name)} has ${s.accept_timeout_min} minutes to confirm before others can join. If they don't, you get your money back.</p>` : ""}
     <form id="orderForm" class="stack" novalidate>
       <div class="group"><p class="group-title">Choose your meal</p><div class="dishes">
@@ -1360,7 +1362,7 @@ function showConfirmation(r, k, site, special) {
     (drop ? " " + drop.more + " more and it drops to " + money(drop.fee) + "." : "") + " Order before " + fmtTime(s.cutoff) + ": " + baseUrl();
   const head = special ? "Request sent" : r.pool_status === "waiting" ? "We've asked them to cook" : "You're in the pool";
   const body = special ? `${esc(k.public_name)} will price your request before ${fmtTime(s.special_cutoff)}. You'll see the price under Orders, then pay to confirm.`
-    : r.pool_status === "waiting" ? `${esc(k.public_name)} has ${s.accept_timeout_min} minutes to confirm they're cooking today. Once they do, neighbours can join your pool. If they don't, you get your money back.`
+    : r.pool_status === "waiting" ? `${esc(k.public_name)} has ${s.accept_timeout_min} minutes to confirm they're cooking today. Once they do, others in your building can join your pool. If they don't, you get your money back.`
     : `${esc(collectLine(site))} ${r.meals} of ${s.max_meals} seats are taken and delivery is now ${money(fee)} a meal.`;
   openSheet(`
     <div class="top" style="justify-content:flex-end"><button class="closex" data-close aria-label="Close">${ICON.close}</button></div>
@@ -1401,7 +1403,7 @@ function openAddVendor() {
       <div><label for="vWa">Seller's WhatsApp</label><input id="vWa" inputmode="tel" placeholder="024 123 4567"></div></div>
       <div class="group"><p class="group-title">Their usual dishes</p><div id="vItems" class="stack"></div>
         <button type="button" class="linkbtn" id="vMore" style="justify-self:start">+ Add another dish</button></div>
-      <p class="note">ChopPool doesn't inspect sellers added by customers. Neighbours will see "Added by a customer".</p>
+      <p class="note">ChopPool doesn't inspect sellers added by customers. Others will see "Added by a customer".</p>
       <p class="err" id="vErr"></p><button class="btn wide" type="submit">Add seller</button>
     </form>`);
   const row = () => { const d = document.createElement("div"); d.className = "grid2"; d.innerHTML = `<input aria-label="Dish" placeholder="Waakye full"><input aria-label="Price in cedis" inputmode="decimal" placeholder="Price (GHS)">`; $("#vItems").appendChild(d); };
@@ -1635,9 +1637,9 @@ function openPinSheet(title, start, onSave) {
   let pin = start ? { lat: start.lat, lng: start.lng } : null, map, mk;
   openSheet(`${sheetHead(esc(title), "Search for the area, then tap the map on the exact spot.")}
     <div class="codebox" style="grid-template-columns:1fr auto"><input id="pSearch" placeholder="Osu, Oxford Street" aria-label="Search for an area"><button class="ghost" id="pGo" type="button">Search</button></div>
-    <div id="pResults" class="stack"></div><div id="pMap" class="map" style="height:280px"></div><p class="small muted" id="pTxt">${pin ? "Current pin shown. Tap to move it." : "Tap the map to drop the pin."}</p>
-    <button class="btn wide" id="pSave">Save location</button>`);
-  const set = (p, z) => { pin = p; const L = window.L; if (!mk) mk = L.marker([p.lat, p.lng], { icon: pinIcon(L, "on") }).addTo(map); else mk.setLatLng([p.lat, p.lng]); if (z) map.setView([p.lat, p.lng], z); $("#pTxt").textContent = "Pin placed."; };
+    <div id="pResults" class="stack"></div><div id="pMap" class="map" style="height:240px"></div>
+    <div class="sheet-foot"><p class="small muted" id="pTxt" style="flex:1">${pin ? "Current pin shown. Tap to move it." : "Tap the map to drop the pin."}</p><button class="btn" id="pSave">Save location</button></div>`);
+  const set = (p, z) => { pin = p; const L = window.L; if (!mk) mk = L.marker([p.lat, p.lng], { icon: pinIcon(L, "on") }).addTo(map); else mk.setLatLng([p.lat, p.lng]); if (z) map.setView([p.lat, p.lng], z); $("#pTxt").textContent = "Pin placed. Tap Save location."; };
   makeMap($("#pMap"), pin || ACCRA, pin ? 16 : 12).then(m => { map = m; if (pin) set(pin); m.on("click", e => set({ lat: e.latlng.lat, lng: e.latlng.lng })); }).catch(e => { $("#pMap").innerHTML = `<p class="err" style="padding:12px">${esc(cleanErr(e))}</p>`; });
   const go = async () => { try { const rs = await geocode($("#pSearch").value.trim()); $("#pResults").innerHTML = rs.map((r, n) => `<button type="button" class="ghost" style="text-align:left;font-weight:500" data-r="${n}">${esc(r.name)}</button>`).join("") || `<p class="small muted">Nothing found. Tap the map instead.</p>`;
     $("#pResults").onclick = e => { const b = e.target.closest("[data-r]"); if (b && map) { set(rs[+b.dataset.r], 17); $("#pResults").innerHTML = ""; } }; } catch (e) { toast(cleanErr(e)); } };
