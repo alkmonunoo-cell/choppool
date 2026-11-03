@@ -604,6 +604,8 @@ function makeDemoApi() {
     async updateSite(id, p) { Object.assign(sites.find(x => x.id === id), p); },
     async addTeam(email, role) { if (team.some(t => t.email === email)) throw new Error("That email is already on the team."); team.push({ email, role }); },
     async removeTeam(email) { team.splice(team.findIndex(t => t.email === email), 1); },
+    async removeKitchen(id) { const k = kitchens.find(x => x.id === id); if (orders.some(o => o.kitchen_id === id)) { k.archived = true; k.active = false; return "archived"; } kitchens.splice(kitchens.indexOf(k), 1); return "deleted"; },
+    async removeSite(id) { const x = sites.find(y => y.id === id); kitchens.filter(k => k.site_id === id).forEach(k => { k.archived = true; k.active = false; }); if (orders.some(o => o.site_id === id)) { x.archived = true; x.active = false; return "archived"; } sites.splice(sites.indexOf(x), 1); return "deleted"; },
     async updateTeam(email, role) { team.find(t => t.email === email).role = role; }
   };
 }
@@ -691,6 +693,8 @@ function makeSupabaseApi() {
     async updateSite(id, p) { must(await sb.from("sites").update(p).eq("id", id)); },
     async addTeam(email, role) { const u = await this.user(); must(await sb.from("admins").insert({ email, role, added_by: u ? u.email : null })); },
     async removeTeam(email) { must(await sb.from("admins").delete().eq("email", email)); },
+    removeKitchen: id => rpc("admin_remove_kitchen", { p_id: id }),
+    removeSite: id => rpc("admin_remove_site", { p_id: id }),
     async updateTeam(email, role) { must(await sb.from("admins").update({ role }).eq("email", email)); }
   };
 }
@@ -916,6 +920,7 @@ async function viewOrder() {
   $("#tabOrders").addEventListener("click", e => { const b = e.target.closest("button[data-pay]"); if (b) openPayQuote(b.dataset.pay); const h = e.target.closest("[data-gohome]"); if (h) setTab("home"); });
   renderWhen(); refreshUser(); await refreshBoard(); await refreshMine();
   setTab(S.tab);
+  if (!local.get("cp_site") && !S.pickedOnce) { S.pickedOnce = true; openSitePicker(true); }
   tickCountdown();
   every(tickCountdown, 1000);
   every(refreshBoard, DEMO ? 4000 : 15000);
@@ -965,17 +970,25 @@ function myPosition() {
 const osmLink = x => `https://www.openstreetmap.org/?mlat=${x.lat}&mlon=${x.lng}#map=18/${x.lat}/${x.lng}`;
 
 /* ---------- Building picker: list sorted by distance, map view, request a new building ---------- */
-function openSitePicker() {
-  let here = S.here || null, map = null;
+const NEAR_M = 5000;
+function openSitePicker(firstTime) {
+  let here = S.here || null, map = null, showAll = false, locating = false, locErr = "";
   openSheet(`${sheetHead("Where should lunch go?", "Choose your building. Pools are shared with people there.")}
     <div class="row" style="justify-content:flex-start;gap:8px"><button class="ghost" id="nearMe">${ICON.pin.replace('width="13" height="13"', 'width="16" height="16"')} Near me</button><button class="ghost" id="mapToggle">Show map</button></div>
     <div id="siteMap" class="map hidden" aria-label="Map of ChopPool buildings"></div>
+    <p class="small muted" id="siteHint"></p>
     <div class="dishes" id="siteList"></div>
     <button class="invite-card" id="addBuilding" style="border:none;text-align:left;color:inherit;font:inherit;cursor:pointer;width:100%">
       <span class="blob">${ICON.pin.replace('width="13" height="13"', 'width="24" height="24"')}</span>
       <span style="display:grid;gap:2px"><strong>Can't find your building?</strong><span class="small muted">Drop a pin on the map and ask us to add it.</span></span></button>`);
   const list = () => {
-    const rows = S.sites.map((x, i) => ({ x, i, d: here && hasPin(x) ? distM(here, x) : null })).sort((a, b) => (a.d ?? 1e12) - (b.d ?? 1e12));
+    let rows = S.sites.map((x, i) => ({ x, i, d: here && hasPin(x) ? distM(here, x) : null })).sort((a, b) => (a.d ?? 1e12) - (b.d ?? 1e12));
+    const total = rows.length;
+    if (here && !showAll) rows = rows.filter(r => r.d != null && r.d <= NEAR_M);
+    $("#siteHint").innerHTML = locating ? "Finding buildings near you…"
+      : here && !showAll ? (rows.length ? `Buildings within ${NEAR_M / 1000} km of you. ` : `No ChopPool buildings within ${NEAR_M / 1000} km of you yet. Add yours below. `) + (total > rows.length ? `<button class="linkbtn" id="showAll">Show all ${total}</button>` : "")
+      : (locErr ? esc(locErr) + " " : "Tap Near me to see buildings close to you. ") ;
+    $("#showAll")?.addEventListener("click", () => { showAll = true; list(); });
     $("#siteList").innerHTML = rows.map(({ x, i, d }) => `<label class="dish" style="grid-template-columns:44px 1fr auto"><input type="radio" name="site" value="${esc(x.id)}"${x.id === S.siteId ? " checked" : ""}>
       <span class="tile" style="width:44px;height:44px;background:${tint(i)};color:var(--accent)">${ICON.pin.replace('width="13" height="13"', 'width="22" height="22"')}</span>
       <span style="display:grid"><span>${esc(x.name)}</span><span class="small muted" style="font-weight:500">${esc(x.drop_point)} · ${x.handoff === "host" ? "collect from " + esc(x.host_label || "the desk") : "meet the rider"}</span></span>
@@ -984,9 +997,14 @@ function openSitePicker() {
   list();
   const pick = id => { S.siteId = id; local.set("cp_site", id); S.seen = null; renderWhen(); renderPools(); closeSheet(); toast("Delivering to " + siteOf(id).name); };
   $("#siteList").addEventListener("change", e => { if (e.target.name === "site") pick(e.target.value); });
-  $("#nearMe").addEventListener("click", async () => {
-    try { here = S.here = await myPosition(); list(); if (map) map.setView([here.lat, here.lng], 14); toast("Sorted by distance from you"); } catch (e) { toast(cleanErr(e)); }
-  });
+  const locate = async quiet => {
+    locating = true; locErr = ""; list();
+    try { here = S.here = await myPosition(); showAll = false; if (map) map.setView([here.lat, here.lng], 13); }
+    catch (e) { locErr = cleanErr(e); if (!quiet) toast(locErr); }
+    locating = false; list();
+  };
+  $("#nearMe").addEventListener("click", () => locate(false));
+  if (!here) locate(true);
   $("#mapToggle").addEventListener("click", async () => {
     const el = $("#siteMap"); el.classList.toggle("hidden");
     $("#mapToggle").textContent = el.classList.contains("hidden") ? "Show map" : "Hide map";
@@ -1435,6 +1453,7 @@ async function renderAdmin() {
   adminMaps.forEach(m => { try { m.remove(); } catch (e) {} }); adminMaps = [];
   const K = id => A.kitchens.find(k => k.id === id) || {}, sName = id => (A.sites.find(x => x.id === id) || {}).name || "";
   const body = $("#aBody");
+  A.kitchens = A.kitchens.filter(k => !k.archived); A.sites = A.sites.filter(x => !x.archived);
   const pending = A.sites.filter(x => x.status === "pending");
   const badge = document.querySelector('[data-atab="buildings"]'); if (badge) badge.textContent = "Buildings" + (pending.length ? " (" + pending.length + " new)" : "");
 
@@ -1462,6 +1481,7 @@ async function renderAdmin() {
             <div><label for="tr-${p.id}">Trip ref</label><input id="tr-${p.id}" data-f="trip_ref" value="${esc(p.trip_ref || "")}" placeholder="Booking code"></div>
             <div><label for="tc-${p.id}">Trip cost</label><input id="tc-${p.id}" data-f="trip_cost" inputmode="decimal" value="${esc(p.trip_cost ?? "")}" placeholder="GHS"></div>
             <button class="ghost" data-act="pool-save">Save</button></div>`}
+          ${p.status === "waiting" && k.whatsapp ? `<a class="wa" href="${wa(k.whatsapp)}?text=${encodeURIComponent("Hello " + k.name + ", a customer at " + sName(p.site_id) + " wants to order from you on ChopPool today. Please open your page and tap \"Yes, I'm cooking today\" within " + s.accept_timeout_min + " minutes: " + baseUrl() + "/#kitchen-" + k.token)}" target="_blank" rel="noopener">${ICON.wa} Ask ${esc(k.name)} to confirm</a>` : ""}
           <div class="row" style="justify-content:flex-start;gap:8px"><button class="ghost" data-act="ticket">Send ticket</button><button class="ghost" data-act="arrival">Arrival message</button>
             <select data-act="pool-status" aria-label="Set pool step" style="width:auto">${(p.status === "waiting" ? ["waiting"] : []).concat(STEPS).map(x => `<option value="${x}"${x === p.status ? " selected" : ""}>${STEP_LABEL[x]}</option>`).join("")}<option value="cancelled">Cancel pool</option></select></div></article>`; }).join("") || `<p class="card muted">No orders for this date yet.</p>`}
       <h2>Orders</h2>
@@ -1495,7 +1515,7 @@ async function renderAdmin() {
           <div><label>Delivery</label><select data-f="delivery_mode"><option value="rider"${k.delivery_mode === "rider" ? " selected" : ""}>ChopPool rider</option><option value="runner"${k.delivery_mode === "runner" ? " selected" : ""}>Own runner</option></select></div>
           <div><label>Meals</label><input data-f="capacity" inputmode="numeric" value="${esc(k.capacity)}"></div>
           <label class="choice" style="padding:8px 10px"><input type="checkbox" data-f="active"${k.active ? " checked" : ""}><span>Active</span></label></div>
-        <div class="row" style="justify-content:flex-start;gap:8px"><button class="ghost" data-act="kitchen-save">Save</button>${sendLink(k.whatsapp, "Your ChopPool order page: " + baseUrl() + "/#kitchen-" + k.token)}<button class="ghost" data-act="kitchen-copy">Copy link</button><button class="ghost" data-act="kitchen-reset">Reset link</button></div>
+        <div class="row" style="justify-content:flex-start;gap:8px"><button class="ghost" data-act="kitchen-save">Save</button>${sendLink(k.whatsapp, "Your ChopPool order page: " + baseUrl() + "/#kitchen-" + k.token)}<button class="ghost" data-act="kitchen-copy">Copy link</button><button class="ghost" data-act="kitchen-reset">Reset link</button><button class="ghost" data-act="kitchen-remove" style="color:var(--danger)">Remove</button></div>
         <p class="group-title">Menu</p><p class="small muted">Extras format: name:price, separated by commas. Example: Extra chicken:15, No shito:0</p>
         <div class="stack">${items.filter(i => i.kitchen_id === k.id).map(i => `<div class="menuedit" data-item="${esc(i.id)}"><input data-f="name" value="${esc(i.name)}" aria-label="Dish"><input data-f="price" inputmode="decimal" value="${esc(i.price)}" aria-label="Price GHS">
             <input data-f="addons" value="${esc(addonsToText(i.addons))}" placeholder="Extras" aria-label="Extras"><label class="choice" style="padding:6px 8px"><input type="checkbox" data-f="active"${i.active !== false ? " checked" : ""}><span>On</span></label><button class="ghost" data-act="item-save">Save</button></div>`).join("")}
@@ -1523,7 +1543,7 @@ async function renderAdmin() {
         <div class="grid2"><div><label>Name</label><input data-f="name" value="${esc(x.name)}"></div><div><label>Drop point</label><input data-f="drop_point" value="${esc(x.drop_point)}"></div></div>
         <div class="grid2"><div><label>Handoff</label><select data-f="handoff"><option value="host"${x.handoff === "host" ? " selected" : ""}>Drop-point host</option><option value="meet_rider"${x.handoff === "meet_rider" ? " selected" : ""}>Meet the rider</option></select></div><div><label>Host</label><input data-f="host_label" value="${esc(x.host_label || "")}"></div></div>
         <div class="row" style="justify-content:flex-start;gap:8px"><label class="choice" style="padding:8px 10px"><input type="checkbox" data-f="active"${x.active ? " checked" : ""}><span>Live</span></label><button class="ghost" data-act="site-save">Save</button>
-          ${x.handoff === "host" ? `<button class="ghost" data-act="host-copy">Copy host link</button>` : ""}${hasPin(x) ? `<a class="linkbtn" href="${osmLink(x)}" target="_blank" rel="noopener">Map</a>` : `<span class="small muted">No map pin</span>`}</div></article>`).join("")}`;
+          ${x.handoff === "host" ? `<button class="ghost" data-act="host-copy">Copy host link</button>` : ""}<button class="ghost" data-act="site-remove" style="color:var(--danger)">Remove</button>${hasPin(x) ? `<a class="linkbtn" href="${osmLink(x)}" target="_blank" rel="noopener">Map</a>` : `<span class="small muted">No map pin</span>`}</div></article>`).join("")}`;
     makeMap($("#adminMap"), ACCRA, 11).then(m => {
       adminMaps.push(m); const L = window.L, pts = [];
       A.sites.filter(x => hasPin(x) && x.status !== "declined").forEach(x => { pts.push([x.lat, x.lng]); L.marker([x.lat, x.lng], { icon: pinIcon(L, x.status === "pending" ? "" : "on") }).addTo(m).bindPopup(`<strong>${esc(x.name)}</strong><br>${esc(x.drop_point)}${x.status === "pending" ? "<br>Waiting for approval" : ""}`); });
@@ -1563,6 +1583,13 @@ async function renderAdmin() {
         <td>${isSuper && t.email !== me ? `<button class="ghost" data-act="team-remove">Remove</button>` : ""}</td></tr>`).join("")}</table></div>`;
   }
 }
+function confirmRemove(title, body, fn) {
+  openSheet(`${sheetHead(esc(title))}<p class="muted">${esc(body)}</p><div class="row" style="justify-content:flex-start;gap:8px"><button class="btn" id="yesRemove" style="background:var(--danger);box-shadow:none">Yes, remove</button><button class="ghost" data-close>Keep it</button></div>`);
+  $("#yesRemove").addEventListener("click", async () => {
+    try { const r = await fn(); closeSheet(); toast(r === "archived" ? "Removed. It had past orders, so it's archived and your records are kept." : "Removed"); Object.assign(S, await api.load()); renderAdmin(); }
+    catch (e) { toast(cleanErr(e)); }
+  });
+}
 const fval = (root, f) => { const el = root.querySelector(`[data-f="${f}"]`); return !el ? undefined : el.type === "checkbox" ? el.checked : el.value.trim(); };
 async function adminClick(e) {
   const t = e.target.closest("[data-act], [data-refunded]"); if (!t || t.tagName === "SELECT") return;
@@ -1600,6 +1627,7 @@ async function adminClick(e) {
       if (w && !/^0\d{9}$/.test(w)) return toast("Enter a 10-digit WhatsApp number starting with 0.");
       return run(() => api.updateKitchen(k.id, { whatsapp: w || null, delivery_mode: fval(kc, "delivery_mode"), capacity: Number(fval(kc, "capacity")) || k.capacity, active: fval(kc, "active") }), "Saved");
     }
+    if (act === "kitchen-remove") return confirmRemove("Remove " + k.name + "?", "Customers will no longer see this menu. If it has past orders, it's archived so your records stay complete.", () => api.removeKitchen(k.id));
     if (act === "kitchen-reset") { const b = new Uint8Array(9); crypto.getRandomValues(b); return run(() => api.updateKitchen(k.id, { token: [...b].map(x => x.toString(16).padStart(2, "0")).join("") }), "New link made. The old one no longer works."); }
     if (act === "item-save") {
       const row = t.closest("[data-item]"), id = row.dataset.item, name = fval(row, "name"), price = Number(fval(row, "price"));
@@ -1615,6 +1643,7 @@ async function adminClick(e) {
     if (act === "site-decline") return run(() => api.updateSite(x.id, { status: "declined", active: false }), "Request declined");
     if (act === "site-save") return run(() => api.updateSite(x.id, { name: fval(sc, "name"), drop_point: fval(sc, "drop_point"), handoff: fval(sc, "handoff"), host_label: fval(sc, "host_label") || null, active: fval(sc, "active") }), "Building saved");
     if (act === "host-copy") return copy(baseUrl() + "/#host-" + x.host_token, "Host link copied");
+    if (act === "site-remove") return confirmRemove("Remove " + x.name + "?", "Customers will no longer be able to deliver here, and sellers added only for this building are removed too. Past orders stay in your records.", () => api.removeSite(x.id));
   }
   const rc = t.closest("[data-rider]");
   if (rc) {
