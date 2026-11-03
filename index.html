@@ -346,10 +346,17 @@ function applyTheme(t) {
 applyTheme(local.get("cp_theme") || "auto");
 
 /* ---------- Pool maths: delivery is split per meal ---------- */
-const feeFor = (meals, s) => meals <= 0 ? Number(s.max_fee) : Math.min(Number(s.max_fee), Math.ceil(Number(s.trip_cost) / meals * 2) / 2);
-function nextDrop(meals, s) {
-  const cur = feeFor(Math.max(meals, 1), s);
-  for (let m = meals + 1; m <= s.max_meals; m++) { const f = feeFor(m, s); if (f < cur) return { more: m - meals, fee: f }; }
+const ROAD_FACTOR = 1.3;   // road distance is roughly 1.3 x the straight line
+// Estimated rider trip cost from the kitchen to the building: base fare + rate per km. Falls back to the flat trip cost when either has no pin.
+function tripFor(k, site, s) {
+  if (!hasPin(k) || !hasPin(site) || s.per_km == null || s.base_fare == null) return Number(s.trip_cost);
+  return Math.round(Number(s.base_fare) + Number(s.per_km) * distM(k, site) / 1000 * ROAD_FACTOR);
+}
+const roadKm = (k, site) => distM(k, site) / 1000 * ROAD_FACTOR;
+const feeFor = (meals, s, trip) => meals <= 0 ? Number(s.max_fee) : Math.min(Number(s.max_fee), Math.ceil(Number(trip ?? s.trip_cost) / meals * 2) / 2);
+function nextDrop(meals, s, trip) {
+  const cur = feeFor(Math.max(meals, 1), s, trip);
+  for (let m = meals + 1; m <= s.max_meals; m++) { const f = feeFor(m, s, trip); if (f < cur) return { more: m - meals, fee: f }; }
   return null;
 }
 
@@ -375,7 +382,7 @@ const addonText = list => (list || []).map(a => a.name).join(", ");
    DEMO DATA LAYER: in-memory copy of the database logic, with simulated customers
    ===================================================================================== */
 function makeDemoApi() {
-  const settings = { cutoff: "10:30", special_cutoff: "10:00", delivery_time: "12:30", trip_cost: 60, max_fee: 10, service_fee: 2, min_pool: 6, max_meals: 15,
+  const settings = { cutoff: "10:30", special_cutoff: "10:00", delivery_time: "12:30", trip_cost: 60, base_fare: 20, per_km: 6, max_fee: 10, service_fee: 2, min_pool: 6, max_meals: 15,
     commission_rate: 0.15, accept_timeout_min: 20, arrival_window_min: 10, notify_daily_cap: 5, momo_number: "024 000 0000", momo_name: "ChopPool Pilot" };
   const sites = [
     { id: "s1", name: "Heritage Tower, Ridge", drop_point: "Lobby security desk", handoff: "host", host_label: "the security desk in the lobby", host_token: "demoh1", lat: 5.5640, lng: -0.2010, status: "active", active: true },
@@ -411,10 +418,11 @@ function makeDemoApi() {
   const pastCutoff = d => new Date() >= at(d, settings.cutoff);
   const dueOf = o => (Number(o.quote_price ?? o.unit_price) + o.addons_total) * o.qty + settings.max_fee * o.qty + settings.service_fee;
 
+  const tripOf = pid => { const pl = pools.find(p => p.id === pid) || {}; return tripFor(kitchens.find(k => k.id === pl.kitchen_id), sites.find(x => x.id === pl.site_id), settings); };
   function balance(user) {
     const led = ledger.filter(e => e.user_id === user).reduce((t, e) => t + e.amount, 0);
     const cb = orders.filter(o => o.user_id === user && ["paid", "collected"].includes(o.status) && pastCutoff(o.order_date) && pools.find(p => p.id === o.pool_id).status !== "cancelled")
-      .reduce((t, o) => t + Math.max(0, (o.max_fee - feeFor(meals(o.pool_id), settings)) * o.qty), 0);
+      .reduce((t, o) => t + Math.max(0, (o.max_fee - feeFor(meals(o.pool_id), settings, tripOf(o.pool_id))) * o.qty), 0);
     return Math.round((led + cb) * 100) / 100;
   }
   function settle(o, ref, useWallet) {
@@ -521,12 +529,15 @@ function makeDemoApi() {
     async signIn(email, pw) { const u = users.find(x => x.email === email && x.pw === pw); if (!u) throw new Error("Wrong email or password."); me = { id: u.id, email, name: u.name }; return me; },
     async signInGoogle() { throw new Error("Google sign-in works once the app is live. In the demo, use email and password."); },
     async signOut() { me = null; },
+    async updateName(name) { if (!me) throw new Error("Sign in first."); me.name = name; const u = users.find(x => x.id === me.id); if (u) u.name = name; return me; },
+    async accountStats() { const since = Date.now() - 30 * 864e5; return { accounts: users.length, active: new Set(orders.filter(o => o.user_id && new Date(o.created_at).getTime() >= since).map(o => o.user_id)).size }; },
+    async updateSettings(patch) { Object.assign(settings, patch); },
     async saveProfile(p) { const ex = profiles.find(x => x.user_id === me.id); if (ex) Object.assign(ex, p); else profiles.push({ user_id: me.id, email: me.email, ...p }); },
     async claimOrders(ids) { let n = 0; orders.forEach(o => { if (me && ids.includes(o.id) && !o.user_id) { o.user_id = me.id; n++; } }); return n; },
     async wallet() {
       if (!me) throw new Error("Sign in to see your wallet.");
-      const cb = orders.filter(o => o.user_id === me.id && ["paid", "collected"].includes(o.status) && pastCutoff(o.order_date) && o.max_fee > feeFor(meals(o.pool_id), settings))
-        .map(o => ({ at: at(o.order_date, settings.cutoff).toISOString(), amount: Math.round((o.max_fee - feeFor(meals(o.pool_id), settings)) * o.qty * 100) / 100, reason: "Delivery cashback, code " + o.code }));
+      const cb = orders.filter(o => o.user_id === me.id && ["paid", "collected"].includes(o.status) && pastCutoff(o.order_date) && o.max_fee > feeFor(meals(o.pool_id), settings, tripOf(o.pool_id)))
+        .map(o => ({ at: at(o.order_date, settings.cutoff).toISOString(), amount: Math.round((o.max_fee - feeFor(meals(o.pool_id), settings, tripOf(o.pool_id))) * o.qty * 100) / 100, reason: "Delivery cashback, code " + o.code }));
       return { balance: balance(me.id), entries: ledger.filter(e => e.user_id === me.id).map(e => ({ at: e.created_at, amount: e.amount, reason: e.reason })).concat(cb).sort((a, b) => a.at < b.at ? 1 : -1) };
     },
     async kitchenView(token, date) {
@@ -655,6 +666,11 @@ function makeSupabaseApi() {
     async signIn(email, password) { const d = must(await sb.auth.signInWithPassword({ email, password })); return { id: d.user.id, email, name: (d.user.user_metadata && d.user.user_metadata.name) || null }; },
     async signInGoogle() { must(await sb.auth.signInWithOAuth({ provider: "google", options: { redirectTo: baseUrl() } })); },
     async signOut() { await sb.auth.signOut(); },
+    async updateName(name) { const d = must(await sb.auth.updateUser({ data: { name } })); try { await this.saveProfile({ name }); } catch (e) {} return { id: d.user.id, email: d.user.email, name }; },
+    async accountStats() { const r = await sb.rpc("admin_account_stats"); if (r.error && /function|schema cache/i.test(r.error.message)) throw new Error("Run update-7.sql in the Supabase SQL Editor once."); return must(r); },
+    async updateSettings(patch) { const r = await sb.from("settings").update(patch).eq("id", 1).select("id");
+      if (r.error && /base_fare|per_km|column|schema cache/i.test(r.error.message)) throw new Error("Run update-7.sql in the Supabase SQL Editor once, then try again.");
+      if (!must(r).length) throw new Error("Not saved. Your account may not have permission to change settings."); },
     async saveProfile(p) { const u = await this.user(); if (u) must(await sb.from("profiles").upsert({ user_id: u.id, email: u.email, ...p })); },
     claimOrders: ids => rpc("claim_orders", { p_ids: ids }),
     wallet: () => rpc("my_wallet"),
@@ -807,6 +823,17 @@ async function refreshUser() {
   }
   if (S.tab === "wallet") renderWallet();
 }
+function openChangeName() {
+  openSheet(`${sheetHead("Change your name", "This is the name in your greeting and on your orders.")}
+    <form id="nameForm" class="stack" novalidate><div><label for="newName">Your name</label><input id="newName" autocomplete="name" maxlength="60" value="${esc(S.user?.name || "")}"></div>
+    <p class="err" id="nameErr"></p><button class="btn wide">Save name</button></form>`);
+  $("#nameForm").addEventListener("submit", async e => {
+    e.preventDefault(); const name = $("#newName").value.trim().replace(/\s+/g, " ");
+    if (name.length < 2) { $("#nameErr").textContent = "Enter your name."; return; }
+    try { S.user = await api.updateName(name); closeSheet(); toast("Name saved"); await refreshUser(); renderWallet(); }
+    catch (err) { $("#nameErr").textContent = cleanErr(err); }
+  });
+}
 function openAccount(reason) {
   let mode = "signup";
   const draw = () => openSheet(`
@@ -863,7 +890,9 @@ async function renderWallet() {
       <p class="small" style="opacity:.85">Used first at checkout. Credit can't be withdrawn as cash.</p></div>
     <div class="section-title"><h2>Activity</h2></div>
     <div class="ledger">${(w.entries || []).map(e => `<div><span>${esc(e.reason)}</span><strong class="num" style="color:${e.amount < 0 ? "var(--muted)" : "var(--ok)"}">${e.amount < 0 ? "−" : "+"}${money(Math.abs(e.amount))}</strong></div>`).join("") || `<div><span class="muted">No activity yet. Order from a pool to start earning cashback.</span></div>`}</div>
+    <div class="card" style="display:grid;gap:4px"><span class="small muted">Your name</span><div class="row"><strong>${esc(S.user.name || "Not set")}</strong><button class="ghost" id="chName" style="padding:6px 12px">Change</button></div></div>
     <p class="small muted center">Signed in as ${esc(S.user.email)} · <button class="linkbtn" id="signOut">Sign out</button></p>`;
+  $("#chName").addEventListener("click", openChangeName);
   $("#signOut").addEventListener("click", async () => { await api.signOut(); S.user = null; await refreshUser(); refreshMine(); renderWallet(); toast("Signed out"); });
 }
 
@@ -876,6 +905,10 @@ function currentPool(siteId, kid) {
   return open || { seq: (ps.at(-1)?.seq || 0) + 1, meals: 0, status: "new" };
 }
 const menusHere = () => S.menus.filter(k => !k.site_id || k.site_id === S.siteId);
+// Customer-added sellers sit at the building they were added for
+const kPin = (k, site) => hasPin(k) ? k : k.added_by_customer && hasPin(site) ? site : null;
+const tripTo = (k, site) => tripFor(kPin(k, site) || {}, site, S.settings);
+const poolTrip = p => tripTo(S.menus.find(k => k.id === p.kitchen_id) || {}, siteOf(p.site_id));
 function menuState(k) {
   return { full: (S.board.load[k.id] || 0) >= k.capacity, open: S.board.open.includes(k.id), waiting: S.board.pools.some(p => p.kitchen_id === k.id && p.status === "waiting") };
 }
@@ -1104,7 +1137,7 @@ function renderHero() {
   const s = S.settings, site = siteOf(S.siteId);
   const here = S.board.pools.filter(p => p.site_id === S.siteId);
   const meals = here.reduce((t, p) => t + p.meals, 0);
-  const best = here.filter(p => p.status === "collecting" && p.meals > 0).reduce((m, p) => Math.min(m, feeFor(p.meals, s)), Number(s.max_fee));
+  const best = here.filter(p => p.status === "collecting" && p.meals > 0).reduce((m, p) => Math.min(m, feeFor(p.meals, s, poolTrip(p))), Number(s.max_fee));
   const name = firstName();
   const dl = dayLabel(S.date);
   el.innerHTML = `<div style="position:relative;z-index:1;display:grid;gap:6px"><p class="small">${greeting()}${name ? ", " + esc(name) : ""}</p>
@@ -1135,18 +1168,21 @@ const NEAR_KITCHEN_M = 10000;
 function renderKitchens() {
   const el = $("#kitchensList"); if (!el) return;
   const site = siteOf(S.siteId), base = hasPin(site) ? site : S.here || null, s = S.settings, max = Number(s.max_meals);
-  let rows = menusHere().map(k => ({ k, d: base && hasPin(k) ? distM(base, k) : null }));
+  // Only kitchens with a map pin show here, so this is always a true "near you" list
+  let rows = menusHere().map(k => ({ k, pin: kPin(k, site) })).filter(r => r.pin).map(r => ({ k: r.k, d: base ? distM(base, r.pin) : null }));
   const far = rows.filter(r => r.d != null && r.d > NEAR_KITCHEN_M).length;
   rows = rows.filter(r => r.d == null || r.d <= NEAR_KITCHEN_M).sort((a, b) => (a.d ?? 1e12) - (b.d ?? 1e12));
   $("#kitchensSub").textContent = "Delivering to " + (site.name || "your building") + ". Start a pool and others in your building can join it." + (far ? " " + far + " more kitchen" + (far > 1 ? "s are" : " is") + " too far to deliver here." : "");
   el.innerHTML = rows.map(({ k, d }) => {
     const st = menuState(k), p = currentPool(S.siteId, k.id), dishes = S.items.filter(it => it.kitchen_id === k.id), active = activeHere(k);
+    const trip = tripTo(k, site), from = feeFor(max, s, trip), km = hasPin(site) ? roadKm(kPin(k, site), site) : null;
+    const priceLine = (km != null ? "About " + (km < 1 ? "1" : km.toFixed(1)) + " km by road · " : "") + "delivery from " + money(from) + " a meal when the pool fills";
     const status = st.full ? pill("Fully booked today", "bad") : st.waiting ? pill("Waiting for the seller", "warn") : active ? pill(p.meals + " of " + max + " seats taken", "ok") : st.open ? pill("Cooking today", "ok") : pill("Not confirmed yet", "dim");
     const btn = st.full ? `<button class="btn wide" disabled>Fully booked today</button>` : st.waiting ? `<button class="btn wide" disabled>Waiting for the seller to confirm</button>`
       : active ? `<button class="btn wide" data-menu="${esc(k.id)}">Join the active pool</button>` : `<button class="btn wide" data-menu="${esc(k.id)}">Start a pool</button>`;
     return `<article class="kcard"><div class="head"><span class="tile" style="background:${tint(menuIndex(k.id))}">${art(dishKind(dishes[0]?.name))}</span>
       <div style="flex:1;min-width:0"><strong>${esc(k.public_name)}</strong><p class="small muted">${esc(k.added_by_customer ? "A local seller added by a customer" : k.tagline || "")}</p>
-        <div class="row" style="justify-content:flex-start;gap:6px;margin-top:4px">${status}${d != null ? pill(fmtDist(d) + " away", "dim") : ""}</div></div></div>
+        <div class="row" style="justify-content:flex-start;gap:6px;margin-top:4px">${status}</div><p class="small" style="margin-top:4px;color:var(--hint)">${esc(priceLine)}</p></div></div>
       <div class="dishline">${dishes.slice(0, 3).map(x => `<span>${esc(x.name)} · ${money(x.price)}</span>`).join("")}${dishes.length > 3 ? `<span>+${dishes.length - 3} more</span>` : ""}</div>${btn}</article>`;
   }).join("") || `<div class="empty">${ICON.store}<p>No kitchens deliver to ${esc(site.name || "this building")} yet. Add a seller you know below.</p></div>`;
 }
@@ -1156,7 +1192,7 @@ function renderPools() {
   if (S.tab === "kitchens") renderKitchens();
   $("#pools").innerHTML = list.map(k => {
     const i = menuIndex(k.id), st = menuState(k), p = currentPool(S.siteId, k.id);
-    const share = feeFor(Math.max(p.meals, 1), s), drop = nextDrop(p.meals, s);
+    const trip = poolTrip(p), share = feeFor(Math.max(p.meals, 1), s, trip), drop = nextDrop(p.meals, s, trip);
     const dishes = S.items.filter(it => it.kitchen_id === k.id);
     const tags = [p.seq > 1 && st.open ? `<span class="chip dim">Pool ${p.seq}</span>` : "", k.added_by_customer ? `<span class="chip dim">Added by a customer</span>` : "",
       st.full ? `<span class="chip bad">Fully booked</span>` : st.waiting ? `<span class="chip warn">Confirming today</span>` : !st.open ? `<span class="chip dim">Not confirmed yet</span>` : ""].join("");
@@ -1203,7 +1239,7 @@ function announceActivity() {
   const key = "cp_alert_count_" + today(), n = local.get(key) || 0;
   if (n >= S.settings.notify_daily_cap) return;
   const a = fresh.at(-1), p = S.board.pools.find(x => x.id === a.pool_id) || { meals: 1, seq: 1 };
-  const msg = "Someone at " + siteOf(a.site_id).name + " just ordered " + a.item_name + ". " + p.meals + " of " + S.settings.max_meals + " seats taken, delivery now " + money(feeFor(p.meals, S.settings)) + ".";
+  const msg = "Someone at " + siteOf(a.site_id).name + " just ordered " + a.item_name + ". " + p.meals + " of " + S.settings.max_meals + " seats taken, delivery now " + money(feeFor(p.meals, S.settings, poolTrip(p))) + ".";
   local.set(key, n + 1); toast(msg); sysNotify("ChopPool", msg);
 }
 
@@ -1357,7 +1393,7 @@ function openOrder(menuId) {
   });
 }
 function showConfirmation(r, k, site, special) {
-  const s = S.settings, fee = feeFor(r.meals, s), drop = nextDrop(r.meals, s);
+  const s = S.settings, trip = tripTo(k, site), fee = feeFor(r.meals, s, trip), drop = nextDrop(r.meals, s, trip);
   const invite = "Lunch pool at " + site.name + " from " + k.public_name + ": " + r.meals + " of " + s.max_meals + " seats taken, delivery now " + money(fee) + " a meal." +
     (drop ? " " + drop.more + " more and it drops to " + money(drop.fee) + "." : "") + " Order before " + fmtTime(s.cutoff) + ": " + baseUrl();
   const head = special ? "Request sent" : r.pool_status === "waiting" ? "We've asked them to cook" : "You're in the pool";
@@ -1464,6 +1500,7 @@ async function viewAdmin() {
   S.role = role; S.adminTab = S.adminTab || "today";
   const day = S.adminDate || opsDate();
   $("#view").innerHTML = `
+    <div class="row small" style="justify-content:space-between;gap:8px;flex-wrap:wrap"><span class="muted">Signed in as <strong style="color:var(--ink)">${esc(S.user?.email || "")}</strong> · ${role === "super" ? "Owner" : "Coordinator"}</span><button class="ghost" id="aSignOut" style="padding:6px 14px">Sign out</button></div>
     <header class="row"><div><p class="brand" style="font-size:16px">ChopPool ${role === "super" ? "owner" : "coordinator"}</p><h1>Operations</h1></div>
       <div class="row" style="gap:8px"><input id="aDate" type="date" value="${day}" aria-label="Delivery date" style="width:auto"><button class="ghost" id="aRefresh">Refresh</button></div></header>
     <nav class="admintabs" aria-label="Team sections">${ADMIN_TABS.map(([k, l]) => `<button data-atab="${k}">${l}</button>`).join("")}</nav>
@@ -1471,6 +1508,7 @@ async function viewAdmin() {
   document.querySelectorAll("[data-atab]").forEach(b => b.addEventListener("click", () => { S.adminTab = b.dataset.atab; renderAdmin(); }));
   $("#aDate").addEventListener("change", e => { S.adminDate = e.target.value; renderAdmin(); });
   $("#aRefresh").addEventListener("click", renderAdmin);
+  $("#aSignOut").addEventListener("click", async () => { await api.signOut(); S.user = null; S.role = null; S.admin = null; try { await refreshUser(); } catch (e) {} toast("Signed out"); viewAdmin(); });
   $("#aBody").addEventListener("click", adminClick);
   $("#aBody").addEventListener("change", adminChange);
   $("#aBody").addEventListener("submit", adminSubmit);
@@ -1499,6 +1537,7 @@ async function renderAdmin() {
   S.admin = A;
   adminMaps.forEach(m => { try { m.remove(); } catch (e) {} }); adminMaps = [];
   const K = id => A.kitchens.find(k => k.id === id) || {}, sName = id => (A.sites.find(x => x.id === id) || {}).name || "";
+  const aTrip = p => { const k = K(p.kitchen_id), st = A.sites.find(x => x.id === p.site_id) || {}; return tripFor(hasPin(k) ? k : k.added_by_customer ? st : {}, st, s); };
   const body = $("#aBody");
   A.kitchens = A.kitchens.filter(k => !k.archived); A.sites = A.sites.filter(x => !x.archived);
   const pending = A.sites.filter(x => x.status === "pending");
@@ -1515,6 +1554,7 @@ async function renderAdmin() {
       .concat(pending.length ? [pending.length + " building request" + (pending.length > 1 ? "s" : "") + " waiting for approval (see Buildings)"] : []);
     const ST = ["quote_requested", "quoted", "pending", "paid", "collected", "cancelled"];
     body.innerHTML = `
+      ${S.role === "super" ? `<div id="acctStats" class="row small muted" style="justify-content:flex-start;gap:8px;flex-wrap:wrap">Loading customer accounts…</div>` : ""}
       <div class="row" style="justify-content:flex-end"><button class="ghost" data-act="csv">Copy orders as CSV</button></div>
       <div class="tiles">${[["Meals", meals], ["Orders", live.length], ["Food value", money(food)], ["Payments to check", live.filter(o => o.status === "pending").length]].map(([l, v]) => `<div class="tile"><b>${v}</b><span>${l}</span></div>`).join("")}</div>
       ${flags.length ? `<div class="flags"><strong>Needs attention</strong>${flags.map(f => `<span>${esc(f)}</span>`).join("")}</div>` : ""}
@@ -1522,7 +1562,7 @@ async function renderAdmin() {
       ${pools.map(p => { const k = K(p.kitchen_id), fl = poolFlags(p, s, d);
         return `<article class="card" data-pool="${esc(p.id)}">
           <div class="top" style="align-items:flex-start"><div><h3>${esc(sName(p.site_id))}</h3><p class="small muted">${esc(k.public_name)} Pool ${p.seq} · ${k.added_by_customer ? "seller added by a customer" : "cooked by " + esc(k.name)}${p.runner ? " · own runner" : ""}</p></div>
-            <div class="fee"><b class="num" style="font-size:22px">${p.meals}/${s.max_meals}</b><span>${money(feeFor(p.meals, s))} a meal</span></div></div>
+            <div class="fee"><b class="num" style="font-size:22px">${p.meals}/${s.max_meals}</b><span>${money(feeFor(p.meals, s, aTrip(p)))} a meal · trip est. ${money(aTrip(p))}</span></div></div>
           ${stepsHtml(p.status)}${fl.length ? `<p class="small" style="color:var(--danger)">${fl.map(esc).join(" · ")}</p>` : ""}
           ${p.runner ? "" : `<div class="inline"><div><label for="rd-${p.id}">Rider</label><select id="rd-${p.id}" data-f="rider_id"><option value="">Bolt Send / Yango</option>${A.riders.filter(r => r.active).map(r => `<option value="${esc(r.id)}"${r.id === p.rider_id ? " selected" : ""}>${esc(r.name)}</option>`).join("")}</select></div>
             <div><label for="tr-${p.id}">Trip ref</label><input id="tr-${p.id}" data-f="trip_ref" value="${esc(p.trip_ref || "")}" placeholder="Booking code"></div>
@@ -1546,6 +1586,9 @@ async function renderAdmin() {
         : `<p class="small muted">No customer accounts yet. Wallets appear when customers create accounts.</p>`}`;
   }
 
+  if (S.adminTab === "today" && S.role === "super") api.accountStats().then(st => {
+    const el = $("#acctStats"); if (el) el.classList.remove("muted"); if (el) el.innerHTML = `<div class="tiles" style="width:100%">${[["Customer accounts", st.accounts], ["Active in last 30 days", st.active]].map(([l, v]) => `<div class="tile"><b>${v}</b><span>${l}</span></div>`).join("")}</div>`;
+  }).catch(e => { const el = $("#acctStats"); if (el) el.textContent = cleanErr(e); });
   if (S.adminTab === "menus") {
     const items = A.items || [];
     body.innerHTML = `
@@ -1607,7 +1650,16 @@ async function renderAdmin() {
   }
 
   if (S.adminTab === "riders") {
+    const ex = (km) => Math.round(Number(s.base_fare ?? 0) + Number(s.per_km ?? 0) * km);
     body.innerHTML = `
+      <form class="card" data-form="pricing"><h2>Delivery pricing</h2>
+        <p class="small muted">Each trip is priced by distance, like Bolt and Yango: base fare + rate per km of road from the kitchen to the building. The trip is then shared across the meals in the pool. Check a few real Bolt or Yango quotes and match them.</p>
+        <div class="grid2"><div><label for="pfBase">Base fare (GHS)</label><input id="pfBase" name="base_fare" inputmode="decimal" value="${esc(s.base_fare ?? "")}"></div>
+          <div><label for="pfKm">Rate per km (GHS)</label><input id="pfKm" name="per_km" inputmode="decimal" value="${esc(s.per_km ?? "")}"></div>
+          <div><label for="pfMax">Most a person pays per meal (GHS)</label><input id="pfMax" name="max_fee" inputmode="decimal" value="${esc(s.max_fee)}"></div>
+          <div><label for="pfFlat">Flat trip cost if a pin is missing (GHS)</label><input id="pfFlat" name="trip_cost" inputmode="decimal" value="${esc(s.trip_cost)}"></div></div>
+        ${s.base_fare != null ? `<p class="small" style="color:var(--hint)">Examples: 2 km trip ${money(ex(2))} · 5 km ${money(ex(5))} · 10 km ${money(ex(10))}</p>` : ""}
+        <p class="err" data-err></p><button class="btn">Save pricing</button></form>
       <form class="card" data-form="rider"><h2>Add a rider</h2><div class="grid2"><div><label for="nrName">Name</label><input id="nrName" name="name" placeholder="Kwame Asare"></div><div><label for="nrPhone">Phone / WhatsApp</label><input id="nrPhone" name="phone" inputmode="tel" placeholder="024 123 4567"></div></div>
         <p class="err" data-err></p><button class="btn">Add rider</button></form>
       <p class="small muted">While you use Bolt Send or Yango, you don't need riders here. Log those trips on each pool under Today.</p>
@@ -1734,6 +1786,11 @@ async function adminSubmit(e) {
   const v = n => (f.querySelector(`[name="${n}"]`)?.value || "").trim(), err = f.querySelector("[data-err]");
   const fail = m => { if (err) err.textContent = m; else toast(m); };
   try {
+    if (f.dataset.form === "pricing") {
+      const vals = ["base_fare", "per_km", "max_fee", "trip_cost"].map(n => [n, Number(v(n))]);
+      if (vals.some(([, x]) => !isFinite(x) || x < 0) || !Number(v("max_fee")) || !Number(v("per_km"))) return fail("Enter numbers for all four boxes.");
+      await api.updateSettings(Object.fromEntries(vals)); Object.assign(S, await api.load()); toast("Pricing saved");
+    }
     if (f.dataset.form === "credit") {
       const amt = Number(v("amt")); if (!v("user") || !amt || v("why").length < 3) return fail("Pick a customer, an amount and a reason.");
       await api.creditWallet(v("user"), amt, v("why")); toast("Wallet updated");
