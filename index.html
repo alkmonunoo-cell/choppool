@@ -1177,7 +1177,7 @@ function renderKitchens() {
     const st = menuState(k), p = currentPool(S.siteId, k.id), dishes = S.items.filter(it => it.kitchen_id === k.id), active = activeHere(k);
     const trip = tripTo(k, site), from = feeFor(max, s, trip), km = hasPin(site) ? roadKm(kPin(k, site), site) : null;
     const priceLine = (km != null ? "About " + (km < 1 ? "1" : km.toFixed(1)) + " km by road · " : "") + "delivery from " + money(from) + " a meal when the pool fills";
-    const status = st.full ? pill("Fully booked today", "bad") : st.waiting ? pill("Waiting for the seller", "warn") : active ? pill(p.meals + " of " + max + " seats taken", "ok") : st.open ? pill("Cooking today", "ok") : pill("Not confirmed yet", "dim");
+    const status = st.full ? pill("Fully booked " + dayLabel(S.date), "bad") : st.waiting ? pill("Waiting for the seller", "warn") : active ? pill(p.meals + " of " + max + " seats taken", "ok") : st.open ? pill("Cooking " + dayLabel(S.date), "ok") : pill("Not confirmed yet", "dim");
     const btn = st.full ? `<button class="btn wide" disabled>Fully booked today</button>` : st.waiting ? `<button class="btn wide" disabled>Waiting for the seller to confirm</button>`
       : active ? `<button class="btn wide" data-menu="${esc(k.id)}">Join the active pool</button>` : `<button class="btn wide" data-menu="${esc(k.id)}">Start a pool</button>`;
     return `<article class="kcard"><div class="head"><span class="tile" style="background:${tint(menuIndex(k.id))}">${art(dishKind(dishes[0]?.name))}</span>
@@ -1568,7 +1568,7 @@ async function renderAdmin() {
             <div><label for="tr-${p.id}">Trip ref</label><input id="tr-${p.id}" data-f="trip_ref" value="${esc(p.trip_ref || "")}" placeholder="Booking code"></div>
             <div><label for="tc-${p.id}">Trip cost</label><input id="tc-${p.id}" data-f="trip_cost" inputmode="decimal" value="${esc(p.trip_cost ?? "")}" placeholder="GHS"></div>
             <button class="ghost" data-act="pool-save">Save</button></div>`}
-          ${p.status === "waiting" && k.whatsapp ? `<a class="wa" href="${wa(k.whatsapp)}?text=${encodeURIComponent("Hello " + k.name + ", a customer at " + sName(p.site_id) + " wants to order from you on ChopPool today. Please open your page and tap \"Yes, I'm cooking today\" within " + s.accept_timeout_min + " minutes: " + baseUrl() + "/#kitchen-" + k.token)}" target="_blank" rel="noopener">${ICON.wa} Ask ${esc(k.name)} to confirm</a>` : ""}
+          ${p.status === "waiting" && k.whatsapp ? `<a class="wa" href="${wa(k.whatsapp)}?text=${encodeURIComponent("Hello " + k.name + ", a customer at " + sName(p.site_id) + " wants to order from you on ChopPool for " + dayLabel(d) + ". Please open your page and tap \"Yes, I'm cooking " + dayLabel(d) + "\" within " + s.accept_timeout_min + " minutes: " + baseUrl() + "/#kitchen-" + k.token)}" target="_blank" rel="noopener">${ICON.wa} Ask ${esc(k.name)} to confirm</a>` : ""}
           <div class="row" style="justify-content:flex-start;gap:8px"><button class="ghost" data-act="ticket">Send ticket</button><button class="ghost" data-act="arrival">Arrival message</button>
             <select data-act="pool-status" aria-label="Set pool step" style="width:auto">${(p.status === "waiting" ? ["waiting"] : []).concat(STEPS).map(x => `<option value="${x}"${x === p.status ? " selected" : ""}>${STEP_LABEL[x]}</option>`).join("")}<option value="cancelled">Cancel pool</option></select></div></article>`; }).join("") || `<p class="card muted">No orders for this date yet.</p>`}
       <h2>Orders</h2>
@@ -1833,19 +1833,33 @@ function ordersCsv() {
    SELLER / KITCHEN VIEW (#kitchen-TOKEN): confirm today, price requests, labels by code
    ===================================================================================== */
 async function viewKitchen(token) {
-  const d = opsDate();
+  // Two days can be live at once: today's deliveries, and (after the cut-off) tomorrow's orders coming in.
+  const dToday = opsDate(), dNext = orderDate(S.settings);
+  let d = dToday, picked = false;
   const draw = async () => {
-    let K; try { K = await api.kitchenView(token, d); } catch (e) { $("#view").innerHTML = `<p class="card err">${esc(cleanErr(e))}</p>`; return; }
+    let K, N = null;
+    try {
+      K = await api.kitchenView(token, d);
+      if (dNext !== dToday) {
+        N = await api.kitchenView(token, d === dNext ? dToday : dNext);
+        // First load: jump to the day where customers are waiting for the seller to confirm
+        if (!picked && d === dToday && N.pools.some(p => p.status === "waiting") && !K.pools.some(p => p.status === "waiting")) { picked = true; d = dNext; [K, N] = [N, K]; }
+      }
+      picked = true;
+    } catch (e) { $("#view").innerHTML = `<p class="card err">${esc(cleanErr(e))}</p>`; return; }
+    const other = d === dToday ? dNext : dToday, otherWaiting = N && N.pools.some(p => p.status === "waiting");
+    const dayTabs = dNext !== dToday ? `<nav class="admintabs" aria-label="Day">${[[dToday, "Today's deliveries"], [dNext, "Orders for " + dayLabel(dNext)]].map(([x, l]) => `<button data-kday="${x}"${x === d ? ' aria-current="page"' : ""}>${esc(l)}${x !== d && otherWaiting ? " (waiting for you)" : ""}</button>`).join("")}</nav>` : "";
     const k = K.kitchen, used = K.pools.reduce((t, p) => t + p.orders.reduce((a, o) => a + o.qty, 0), 0);
     const waiting = K.pools.filter(p => p.status === "waiting");
     const afterCut = new Date() >= at(d, S.settings.cutoff);
     $("#view").innerHTML = `
       <header><p class="brand" style="font-size:18px">ChopPool ${k.added_by_customer ? "seller" : "kitchen"}</p><h1>${esc(k.name)}</h1>
         <p class="muted">${fmtDate(d)} · ready by ${minus(S.settings.delivery_time, 30)} · ${used} of ${k.capacity} meals · ${k.delivery_mode === "runner" ? "you deliver with your own runner" : "a ChopPool rider collects"}</p></header>
-      ${k.open ? `<p><span class="chip ok">You're taking orders today</span></p>`
-        : `<section class="card" style="border-color:var(--accent)"><h2>${waiting.length ? "Customers are waiting for you" : "Are you cooking today?"}</h2>
+      ${dayTabs}
+      ${k.open ? `<p><span class="chip ok">You're taking orders for ${dayLabel(d)}</span></p>`
+        : `<section class="card" style="border-color:var(--accent)"><h2>${waiting.length ? "Customers are waiting for you" : "Are you cooking " + dayLabel(d) + "?"}</h2>
           <p>${waiting.length ? waiting.map(p => esc(p.site)).join(", ") + " want" + (waiting.length > 1 ? "" : "s") + " to order. Confirm within " + S.settings.accept_timeout_min + " minutes so the pool can open." : "Confirm so people can start ordering from you."}</p>
-          <button class="btn wide" id="openDay">Yes, I'm cooking today</button></section>`}
+          <button class="btn wide" id="openDay">Yes, I'm cooking ${dayLabel(d)}</button></section>`}
       ${K.pools.map(p => {
         const tally = {}; p.orders.filter(o => !o.special_request || o.status !== "quote_requested").forEach(o => { const key = o.special_request ? "Special: " + o.special_request : o.item_name + (o.addons?.length ? " (" + addonText(o.addons) + ")" : ""); tally[key] = (tally[key] || 0) + o.qty; });
         const n = p.orders.reduce((a, o) => a + o.qty, 0), quotes = p.orders.filter(o => ["quote_requested", "quoted"].includes(o.status));
@@ -1870,13 +1884,14 @@ async function viewKitchen(token) {
         <div id="menuRows" class="stack">${K.menu.map(i => `<div class="menurow" data-id="${esc(i.id)}"><input aria-label="Dish" value="${esc(i.name)}"><input aria-label="Price" inputmode="decimal" value="${esc(i.price)}"><span class="small muted">GHS</span></div>`).join("")}
         <div class="menurow"><input aria-label="New dish" placeholder="New dish"><input aria-label="Price" inputmode="decimal" placeholder="Price"><span class="small muted">GHS</span></div></div>
         <button class="ghost" id="saveMenu">Save menu</button></section>` : ""}`;
-    $("#openDay")?.addEventListener("click", async () => { try { await api.kitchenOpenDay(token, d); toast("Thank you. Customers can now order from you today."); draw(); } catch (e) { toast(cleanErr(e)); } });
+    $("#openDay")?.addEventListener("click", async () => { try { await api.kitchenOpenDay(token, d); toast("Thank you. Customers can now order from you for " + dayLabel(d) + "."); draw(); } catch (e) { toast(cleanErr(e)); } });
     $("#saveMenu")?.addEventListener("click", async () => {
       const list = [...document.querySelectorAll("#menuRows .menurow")].map(r => ({ id: r.dataset.id || null, name: r.children[0].value.trim(), price: r.children[1].value.trim(), active: r.dataset.id ? !!r.children[1].value.trim() : true }));
       try { await api.vendorSetMenu(token, list); toast("Menu saved"); draw(); } catch (e) { toast(cleanErr(e)); }
     });
   };
   $("#view").addEventListener("click", async e => {
+    const day = e.target.closest("[data-kday]"); if (day) { d = day.dataset.kday; return draw(); }
     const b = e.target.closest("button[data-k]"); if (!b) return;
     b.disabled = true;
     try { await api.kitchenUpdate(token, b.dataset.pool, b.dataset.k); toast({ accepted: "Batch confirmed. Thank you.", ready: "Marked packed.", picked_up: "On the way.", arriving: "Customers have been told you're 5 minutes away.", delivered: "Arrived. Hand over meals against codes." }[b.dataset.k]); draw(); }
@@ -1887,7 +1902,7 @@ async function viewKitchen(token) {
     e.preventDefault();
     try { await api.kitchenQuote(token, f.dataset.quote, f.querySelector("input").value); toast("Price sent. The customer will pay to confirm."); draw(); } catch (err) { toast(cleanErr(err)); }
   });
-  wireCodes(token, d, draw);
+  wireCodes(token, () => d, draw);
   await draw(); every(() => { if (!document.activeElement?.matches("#view input")) draw(); }, 30000);
 }
 
@@ -1904,7 +1919,7 @@ function wireCodes(token, d, redraw) {
     const input = f.querySelector("input"), code = input.value.trim();
     if (!/^\d{4}$/.test(code)) return toast("Enter the customer's 4-digit code.");
     try {
-      const r = await api.collectCode(token, code, d);
+      const r = await api.collectCode(token, code, typeof d === "function" ? d() : d);
       toast("Give " + r.qty + " × " + r.item_name + " to " + r.name + "." + (r.was_paid ? "" : " Note: payment was not yet confirmed."));
       input.value = ""; redraw();
     } catch (err) { toast(cleanErr(err)); }
