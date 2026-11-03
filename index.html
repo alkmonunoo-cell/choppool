@@ -268,6 +268,17 @@ td select { padding: 6px 8px; width: auto; }
 .choice { display: flex; align-items: center; gap: 10px; background: var(--surface-2); border-radius: 14px; padding: 10px 12px; margin: 0; font-size: 15px; font-weight: 600; color: var(--ink); cursor: pointer; }
 .choice input { width: 18px; height: 18px; accent-color: var(--accent); flex: none; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.map { height: 240px; border-radius: 18px; overflow: hidden; position: relative; z-index: 0; background: var(--surface-2); }
+.mpin { display: block; width: 24px; height: 24px; border-radius: 50% 50% 50% 0; background: var(--muted); transform: rotate(-45deg); border: 3px solid #fff; box-shadow: 0 2px 6px rgba(0,0,0,.3); }
+.mpin.on { background: var(--accent); }
+.mpin.me { background: #2563EB; border-radius: 50%; transform: none; }
+.leaflet-container { font-family: var(--font-body); }
+.leaflet-popup-content { font-size: 14px; }
+.admintabs { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
+.admintabs button { white-space: nowrap; background: var(--surface); box-shadow: var(--shadow); border: none; color: var(--ink); border-radius: 999px; padding: 8px 14px; font-size: 14px; }
+.admintabs button[aria-current="page"] { background: var(--ink); color: var(--bg); }
+.menuedit { display: grid; grid-template-columns: 1.4fr .6fr 1.6fr auto auto; gap: 8px; align-items: center; }
+@media (max-width: 560px) { .menuedit { grid-template-columns: 1fr 90px; } .menuedit [data-f="addons"] { grid-column: 1 / -1; } }
 .hidden { display: none !important; }
 @media (max-width: 560px) {
   .tiles { grid-template-columns: repeat(2, 1fr); }
@@ -299,13 +310,13 @@ td select { padding: 6px 8px; width: auto; }
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4/dist/umd/supabase.min.js" onerror="var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js';document.head.appendChild(s);"></script>
 <script>
 /* ===== CONFIG: paste your Supabase project URL and anon key to go live. Leave blank for demo mode. ===== */
 const CONFIG = {
-  SUPABASE_URL: "",
-  SUPABASE_ANON_KEY: "",
-  PUBLIC_URL: "",          // the link you share, e.g. https://choppool.netlify.app
+  SUPABASE_URL: "https://urdodbvwgujqrlqziain.supabase.co",
+  SUPABASE_ANON_KEY: "sb_publishable_N2WBi5WTRlnGZnHukWysuQ_1zd6p4_S",   // publishable key (safe to be public)
+  PUBLIC_URL: "https://alkmonunoo-cell.github.io/choppool",
   GOOGLE_SIGN_IN: false    // set to true after enabling Google in Supabase (see SETUP.md)
 };
 /* ======================================================================================================= */
@@ -363,9 +374,10 @@ function makeDemoApi() {
   const settings = { cutoff: "10:30", special_cutoff: "10:00", delivery_time: "12:30", trip_cost: 60, max_fee: 10, service_fee: 2, min_pool: 6, max_meals: 15,
     commission_rate: 0.15, accept_timeout_min: 20, arrival_window_min: 10, notify_daily_cap: 5, momo_number: "024 000 0000", momo_name: "ChopPool Pilot" };
   const sites = [
-    { id: "s1", name: "Heritage Tower, Ridge", drop_point: "Lobby security desk", handoff: "host", host_label: "the security desk in the lobby", host_token: "demoh1", active: true },
-    { id: "s2", name: "Pent Hostel, Legon", drop_point: "Porters' lodge", handoff: "host", host_label: "the porter on duty", host_token: "demoh2", active: true },
-    { id: "s3", name: "Avenue Apartments, East Legon", drop_point: "Main gate", handoff: "meet_rider", host_label: null, host_token: "demoh3", active: true }
+    { id: "s1", name: "Heritage Tower, Ridge", drop_point: "Lobby security desk", handoff: "host", host_label: "the security desk in the lobby", host_token: "demoh1", lat: 5.5640, lng: -0.2010, status: "active", active: true },
+    { id: "s2", name: "Pent Hostel, Legon", drop_point: "Porters' lodge", handoff: "host", host_label: "the porter on duty", host_token: "demoh2", lat: 5.6505, lng: -0.1870, status: "active", active: true },
+    { id: "s3", name: "Avenue Apartments, East Legon", drop_point: "Main gate", handoff: "meet_rider", host_label: null, host_token: "demoh3", lat: 5.6360, lng: -0.1610, status: "active", active: true },
+    { id: "s4", name: "Silver Star Tower, Airport City", drop_point: "Reception", handoff: "meet_rider", host_label: null, host_token: "demoh4", lat: 5.6052, lng: -0.1718, status: "pending", request_note: "About 300 people work here", created_at: new Date(Date.now() - 40 * 60000).toISOString(), active: true }
   ];
   const kitchens = [
     { id: "k1", name: "Auntie Akos Kitchen", public_name: "Local favourites", tagline: "Ghanaian classics, cooked fresh each morning", address: "Osu, Oxford Street", whatsapp: "0240000001", capacity: 60, delivery_mode: "rider", site_id: null, added_by_customer: false, token: "demok1", active: true },
@@ -384,6 +396,7 @@ function makeDemoApi() {
   ];
   const riders = [{ id: "r1", name: "Kwame (example rider)", phone: "0240000003", token: "demor1", active: true }];
   const pools = [], orders = [], days = [], ledger = [], users = [], profiles = [];
+  const team = [{ email: "you@choppool.demo", role: "super" }, { email: "ops@choppool.demo", role: "coordinator" }];
   let me = null;
   const names = ["Ama", "Kofi", "Esi", "Yaw", "Akua", "Kwame", "Efua", "Kojo", "Adwoa", "Kwesi", "Abena", "Nana", "Selorm", "Dzifa", "Fiifi", "Naa"];
   const pick = a => a[Math.floor(Math.random() * a.length)];
@@ -472,7 +485,7 @@ function makeDemoApi() {
 
   return {
     demo: true,
-    async load() { return { settings, sites, menus: kitchens.filter(k => k.active).map(k => ({ id: k.id, public_name: k.public_name, tagline: k.tagline, capacity: k.capacity, site_id: k.site_id, added_by_customer: k.added_by_customer })), items: items.filter(i => i.active !== false) }; },
+    async load() { return { settings, sites: sites.filter(x => x.status === "active" && x.active), menus: kitchens.filter(k => k.active).map(k => ({ id: k.id, public_name: k.public_name, tagline: k.tagline, capacity: k.capacity, site_id: k.site_id, added_by_customer: k.added_by_customer })), items: items.filter(i => i.active !== false) }; },
     async board(date) {
       housekeeping();
       const load = {}; orders.filter(o => o.order_date === date && o.status !== "cancelled").forEach(o => { load[o.kitchen_id] = (load[o.kitchen_id] || 0) + o.qty; });
@@ -568,12 +581,30 @@ function makeDemoApi() {
     async adminData(date) {
       housekeeping();
       return { orders: orders.filter(o => o.order_date === date), pools: pools.filter(p => p.order_date === date).map(p => ({ ...p, meals: meals(p.id) })), riders, sites, kitchens,
-        wallets: profiles.map(p => ({ ...p, balance: balance(p.user_id) })) };
+        wallets: profiles.map(p => ({ ...p, balance: balance(p.user_id) })), items, team };
     },
     async updateOrder(id, patch) { Object.assign(orders.find(o => o.id === id), patch); },
     async updatePool(id, patch) { const p = pools.find(x => x.id === id); Object.assign(p, patch); if (patch.status && stamp[patch.status]) p[stamp[patch.status]] = nowIso(); },
     async updateKitchen(id, patch) { Object.assign(kitchens.find(k => k.id === id), patch); },
-    async creditWallet(user_id, amount, reason) { ledger.push({ user_id, amount: Number(amount), reason, created_at: nowIso(), created_by: "coordinator" }); }
+    async creditWallet(user_id, amount, reason) { ledger.push({ user_id, amount: Number(amount), reason, created_at: nowIso(), created_by: "coordinator" }); },
+    async myRole() { return "super"; },
+    async claimOwner() { return "super"; },
+    async requestSite(r) {
+      if (!r.name || r.name.trim().length < 3) throw new Error("Add the building's name.");
+      if (!r.drop_point || r.drop_point.trim().length < 3) throw new Error('Say where the food should be dropped, like "Main gate".');
+      if (r.lat == null) throw new Error("Drop a pin on the map first.");
+      const si = { id: "s" + uid(), name: r.name.trim(), drop_point: r.drop_point.trim(), handoff: "meet_rider", host_label: null, host_token: "demo" + uid(), lat: r.lat, lng: r.lng, status: "pending", request_note: (r.note || "").trim() || null, created_at: nowIso(), active: true };
+      sites.push(si); return { id: si.id, name: si.name, status: "pending" };
+    },
+    async addKitchen(k) { const x = { id: "k" + uid(), token: "demo" + uid(), active: true, added_by_customer: false, site_id: null, ...k }; kitchens.push(x); return x; },
+    async saveItem(it) { if (it.id) Object.assign(items.find(i => i.id === it.id), it); else items.push({ id: "i" + uid(), addons: [], active: true, ...it }); },
+    async addRider(r) { riders.push({ id: "r" + uid(), token: "demo" + uid(), active: true, ...r }); },
+    async updateRider(id, p) { Object.assign(riders.find(r => r.id === id), p); },
+    async addSite(si) { sites.push({ id: "s" + uid(), host_token: "demo" + uid(), status: "active", active: true, created_at: nowIso(), ...si }); },
+    async updateSite(id, p) { Object.assign(sites.find(x => x.id === id), p); },
+    async addTeam(email, role) { if (team.some(t => t.email === email)) throw new Error("That email is already on the team."); team.push({ email, role }); },
+    async removeTeam(email) { team.splice(team.findIndex(t => t.email === email), 1); },
+    async updateTeam(email, role) { team.find(t => t.email === email).role = role; }
   };
 }
 
@@ -632,25 +663,39 @@ function makeSupabaseApi() {
     isAdmin: () => rpc("is_admin"),
     async adminData(date) {
       await sb.rpc("housekeeping");
-      const [orders, pools, riders, sites, kitchens, wallets] = await Promise.all([
+      const [orders, pools, riders, sites, kitchens, wallets, items, team] = await Promise.all([
         sb.from("orders").select("*").eq("order_date", date).order("created_at").then(must),
         sb.from("pools").select("*").eq("order_date", date).order("seq").then(must),
-        sb.from("riders").select("*").eq("active", true).order("name").then(must),
+        sb.from("riders").select("*").order("name").then(must),
         sb.from("sites").select("*").order("name").then(must),
         sb.from("kitchens").select("*").order("added_by_customer").order("name").then(must),
-        rpc("admin_wallets")
+        rpc("admin_wallets"),
+        sb.from("menu_items").select("*").order("name").then(must),
+        sb.from("admins").select("*").order("role", { ascending: false }).then(must)
       ]);
       const m = {}; orders.forEach(o => { if (o.status !== "cancelled") m[o.pool_id] = (m[o.pool_id] || 0) + o.qty; });
-      return { orders, pools: pools.map(p => ({ ...p, meals: m[p.id] || 0 })), riders, sites, kitchens, wallets };
+      return { orders, pools: pools.map(p => ({ ...p, meals: m[p.id] || 0 })), riders, sites, kitchens, wallets, items, team };
     },
     async updateOrder(id, patch) { must(await sb.from("orders").update(patch).eq("id", id)); },
     async updatePool(id, patch) { if (patch.status && stamp[patch.status]) patch[stamp[patch.status]] = new Date().toISOString(); must(await sb.from("pools").update(patch).eq("id", id)); },
     async updateKitchen(id, patch) { must(await sb.from("kitchens").update(patch).eq("id", id)); },
-    async creditWallet(user_id, amount, reason) { must(await sb.from("wallet_entries").insert({ user_id, amount: Number(amount), reason, created_by: "coordinator" })); }
+    async creditWallet(user_id, amount, reason) { must(await sb.from("wallet_entries").insert({ user_id, amount: Number(amount), reason, created_by: "coordinator" })); },
+    myRole: () => rpc("my_role"),
+    claimOwner: () => rpc("claim_owner"),
+    requestSite: r => rpc("request_site", { p_name: r.name, p_drop_point: r.drop_point, p_lat: r.lat, p_lng: r.lng, p_note: r.note || null }),
+    async addKitchen(k) { return must(await sb.from("kitchens").insert(k).select().single()); },
+    async saveItem(it) { if (it.id) { const { id, ...p } = it; must(await sb.from("menu_items").update(p).eq("id", id)); } else must(await sb.from("menu_items").insert(it)); },
+    async addRider(r) { must(await sb.from("riders").insert(r)); },
+    async updateRider(id, p) { must(await sb.from("riders").update(p).eq("id", id)); },
+    async addSite(si) { must(await sb.from("sites").insert(si)); },
+    async updateSite(id, p) { must(await sb.from("sites").update(p).eq("id", id)); },
+    async addTeam(email, role) { const u = await this.user(); must(await sb.from("admins").insert({ email, role, added_by: u ? u.email : null })); },
+    async removeTeam(email) { must(await sb.from("admins").delete().eq("email", email)); },
+    async updateTeam(email, role) { must(await sb.from("admins").update({ role }).eq("email", email)); }
   };
 }
 
-const api = DEMO ? makeDemoApi() : makeSupabaseApi();
+let api = DEMO ? makeDemoApi() : null;
 const S = { settings: null, sites: [], menus: [], items: [], board: { pools: [], load: {}, activity: [], open: [] }, siteId: null, date: null, timers: [], user: null, balance: 0 };
 
 /* ---------- Shared UI helpers ---------- */
@@ -876,15 +921,139 @@ async function viewOrder() {
   every(refreshBoard, DEMO ? 4000 : 15000);
   every(refreshMine, DEMO ? 4000 : 20000);
 }
+/* ---------- Maps (OpenStreetMap via Leaflet, loaded only when a map is opened) ---------- */
+let leafletP;
+function loadLeaflet() {
+  if (window.L) return Promise.resolve(window.L);
+  if (!leafletP) leafletP = new Promise((res, rej) => {
+    const css = document.createElement("link"); css.rel = "stylesheet"; css.href = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"; document.head.appendChild(css);
+    const s = document.createElement("script"); s.src = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js";
+    s.onload = () => res(window.L); s.onerror = () => { leafletP = null; rej(new Error("The map couldn't load. Check your connection and try again.")); };
+    document.head.appendChild(s);
+  });
+  return leafletP;
+}
+const ACCRA = { lat: 5.6037, lng: -0.1870 };
+async function makeMap(el, center, zoom) {
+  const L = await loadLeaflet();
+  const m = L.map(el).setView([(center || ACCRA).lat, (center || ACCRA).lng], zoom || 12);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "&copy; OpenStreetMap contributors" }).addTo(m);
+  setTimeout(() => m.invalidateSize(), 200);
+  return m;
+}
+const pinIcon = (L, kind) => L.divIcon({ className: "", html: `<span class="mpin ${kind || ""}"></span>`, iconSize: [24, 24], iconAnchor: [12, 24] });
+function distM(a, b) {
+  const R = 6371000, r = x => x * Math.PI / 180, dLat = r(b.lat - a.lat), dLng = r(b.lng - a.lng);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(r(a.lat)) * Math.cos(r(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+const fmtDist = m => m < 1000 ? Math.max(10, Math.round(m / 10) * 10) + " m" : (m / 1000).toFixed(1) + " km";
+const hasPin = x => x && x.lat != null && x.lng != null;
+async function geocode(q) {
+  let r;
+  try { r = await fetch("https://nominatim.openstreetmap.org/search?format=json&limit=5&countrycodes=gh&q=" + encodeURIComponent(q)); } catch (e) { r = null; }
+  if (!r || !r.ok) throw new Error("Search isn't available right now. Tap the map to drop the pin instead.");
+  return (await r.json()).map(x => ({ name: x.display_name, lat: +x.lat, lng: +x.lon }));
+}
+function myPosition() {
+  return new Promise((res, rej) => {
+    if (!navigator.geolocation) return rej(new Error("Location isn't available on this device. Search for your area instead."));
+    navigator.geolocation.getCurrentPosition(p => res({ lat: p.coords.latitude, lng: p.coords.longitude }),
+      () => rej(new Error("Allow location access, or search for your area instead.")), { enableHighAccuracy: true, timeout: 10000 });
+  });
+}
+const osmLink = x => `https://www.openstreetmap.org/?mlat=${x.lat}&mlon=${x.lng}#map=18/${x.lat}/${x.lng}`;
+
+/* ---------- Building picker: list sorted by distance, map view, request a new building ---------- */
 function openSitePicker() {
-  openSheet(`${sheetHead("Where should lunch go?", "Pick your building. Pools are shared with people there.")}
-    <div class="dishes">${S.sites.map((x, i) => `<label class="dish" style="grid-template-columns:44px 1fr"><input type="radio" name="site" value="${esc(x.id)}"${x.id === S.siteId ? " checked" : ""}>
-      <span class="tile" style="width:44px;height:44px;background:${tint(i)};color:var(--accent)">${ICON.pin.replace(/width="13" height="13"/, 'width="22" height="22"')}</span>
-      <span style="display:grid"><span>${esc(x.name)}</span><span class="small muted" style="font-weight:500">${esc(x.drop_point)} · ${x.handoff === "host" ? "collect from " + esc(x.host_label || "the desk") : "meet the rider"}</span></span></label>`).join("")}</div>`);
-  $("#sheet").addEventListener("change", e => {
-    if (e.target.name !== "site") return;
-    S.siteId = e.target.value; local.set("cp_site", S.siteId); S.seen = null; renderWhen(); renderPools(); closeSheet();
-  }, { once: true });
+  let here = S.here || null, map = null;
+  openSheet(`${sheetHead("Where should lunch go?", "Choose your building. Pools are shared with people there.")}
+    <div class="row" style="justify-content:flex-start;gap:8px"><button class="ghost" id="nearMe">${ICON.pin.replace('width="13" height="13"', 'width="16" height="16"')} Near me</button><button class="ghost" id="mapToggle">Show map</button></div>
+    <div id="siteMap" class="map hidden" aria-label="Map of ChopPool buildings"></div>
+    <div class="dishes" id="siteList"></div>
+    <button class="invite-card" id="addBuilding" style="border:none;text-align:left;color:inherit;font:inherit;cursor:pointer;width:100%">
+      <span class="blob">${ICON.pin.replace('width="13" height="13"', 'width="24" height="24"')}</span>
+      <span style="display:grid;gap:2px"><strong>Can't find your building?</strong><span class="small muted">Drop a pin on the map and ask us to add it.</span></span></button>`);
+  const list = () => {
+    const rows = S.sites.map((x, i) => ({ x, i, d: here && hasPin(x) ? distM(here, x) : null })).sort((a, b) => (a.d ?? 1e12) - (b.d ?? 1e12));
+    $("#siteList").innerHTML = rows.map(({ x, i, d }) => `<label class="dish" style="grid-template-columns:44px 1fr auto"><input type="radio" name="site" value="${esc(x.id)}"${x.id === S.siteId ? " checked" : ""}>
+      <span class="tile" style="width:44px;height:44px;background:${tint(i)};color:var(--accent)">${ICON.pin.replace('width="13" height="13"', 'width="22" height="22"')}</span>
+      <span style="display:grid"><span>${esc(x.name)}</span><span class="small muted" style="font-weight:500">${esc(x.drop_point)} · ${x.handoff === "host" ? "collect from " + esc(x.host_label || "the desk") : "meet the rider"}</span></span>
+      <span class="small muted num">${d != null ? fmtDist(d) : ""}</span></label>`).join("");
+  };
+  list();
+  const pick = id => { S.siteId = id; local.set("cp_site", id); S.seen = null; renderWhen(); renderPools(); closeSheet(); toast("Delivering to " + siteOf(id).name); };
+  $("#siteList").addEventListener("change", e => { if (e.target.name === "site") pick(e.target.value); });
+  $("#nearMe").addEventListener("click", async () => {
+    try { here = S.here = await myPosition(); list(); if (map) map.setView([here.lat, here.lng], 14); toast("Sorted by distance from you"); } catch (e) { toast(cleanErr(e)); }
+  });
+  $("#mapToggle").addEventListener("click", async () => {
+    const el = $("#siteMap"); el.classList.toggle("hidden");
+    $("#mapToggle").textContent = el.classList.contains("hidden") ? "Show map" : "Hide map";
+    if (map || el.classList.contains("hidden")) return;
+    try {
+      map = await makeMap(el, here || (hasPin(siteOf(S.siteId)) ? siteOf(S.siteId) : ACCRA), 12);
+      const L = window.L, pts = [];
+      S.sites.filter(hasPin).forEach(x => { pts.push([x.lat, x.lng]); L.marker([x.lat, x.lng], { icon: pinIcon(L, x.id === S.siteId ? "on" : "") }).addTo(map).bindPopup(`<strong>${esc(x.name)}</strong><br>${esc(x.drop_point)}<br><button class="btn" style="margin-top:6px;padding:6px 12px" data-pick="${esc(x.id)}">Deliver here</button>`); });
+      if (here) L.marker([here.lat, here.lng], { icon: pinIcon(L, "me") }).addTo(map);
+      if (pts.length > 1 && !here) map.fitBounds(pts, { padding: [30, 30] });
+      el.addEventListener("click", e => { const b = e.target.closest("[data-pick]"); if (b) pick(b.dataset.pick); });
+    } catch (e) { el.innerHTML = `<p class="err" style="padding:12px">${esc(cleanErr(e))}</p>`; }
+  });
+  $("#addBuilding").addEventListener("click", () => openRequestSite(here));
+}
+function openRequestSite(here) {
+  let pin = here || null, map = null, marker = null;
+  openSheet(`${sheetHead("Add your building", "Drop a pin where the rider should come. We check every request and usually add it the same day.")}
+    <div class="codebox" style="grid-template-columns:1fr auto"><input id="bSearch" placeholder="Search: Airport City, Spintex, Legon…" aria-label="Search for an area"><button class="ghost" id="bGo" type="button">Search</button></div>
+    <div id="bResults" class="stack"></div>
+    <div id="bMap" class="map" aria-label="Map: tap to drop the pin"></div>
+    <p class="small muted" id="bPinTxt">Tap the map to drop the pin on your building's entrance.</p>
+    <div id="bNear"></div>
+    <form id="bForm" class="stack" novalidate>
+      <div><label for="bName">Building name</label><input id="bName" placeholder="Silver Star Tower, Airport City"></div>
+      <div><label for="bDrop">Where should food be dropped?</label><input id="bDrop" placeholder="Main gate, reception, porters' lodge"></div>
+      <div><label for="bNote">Anything else? (optional)</label><input id="bNote" placeholder="About 200 people work here; security at the gate"></div>
+      <p class="err" id="bErr"></p><button class="btn wide" type="submit">Send request</button>
+    </form>`);
+  const near = () => {
+    if (!pin) return;
+    const close = S.sites.filter(hasPin).map(x => ({ x, d: distM(pin, x) })).filter(o => o.d <= 600).sort((a, b) => a.d - b.d);
+    $("#bPinTxt").textContent = "Pin set. Drag it or tap the map to adjust.";
+    $("#bNear").innerHTML = close.length ? `<div class="note"><strong>Already on ChopPool nearby</strong><div class="stack" style="margin-top:8px">${close.map(o =>
+      `<div class="row"><span>${esc(o.x.name)} <span class="muted small">· ${fmtDist(o.d)}</span></span><button class="ghost" type="button" data-use="${esc(o.x.id)}" style="padding:6px 12px">Use this</button></div>`).join("")}</div>
+      <p class="small muted" style="margin-top:8px">Joining a nearby building fills pools faster and makes delivery cheaper.</p></div>` : "";
+  };
+  const setPin = (p, zoom) => {
+    pin = p; const L = window.L;
+    if (!marker) { marker = L.marker([p.lat, p.lng], { draggable: true, icon: pinIcon(L, "on") }).addTo(map); marker.on("dragend", () => { const ll = marker.getLatLng(); pin = { lat: ll.lat, lng: ll.lng }; near(); }); }
+    else marker.setLatLng([p.lat, p.lng]);
+    if (zoom) map.setView([p.lat, p.lng], zoom);
+    near();
+  };
+  makeMap($("#bMap"), pin || ACCRA, pin ? 16 : 12).then(m => { map = m; if (pin) setPin(pin); map.on("click", e => setPin({ lat: e.latlng.lat, lng: e.latlng.lng })); })
+    .catch(e => { $("#bMap").innerHTML = `<p class="err" style="padding:12px">${esc(cleanErr(e))}</p>`; });
+  const search = async () => {
+    const q = $("#bSearch").value.trim(); if (q.length < 3) return;
+    try {
+      const rs = await geocode(q);
+      $("#bResults").innerHTML = rs.length ? rs.map((r, n) => `<button type="button" class="ghost" style="text-align:left;font-weight:500" data-r="${n}">${esc(r.name)}</button>`).join("") : `<p class="small muted">No places found. Try a nearby landmark, or tap the map.</p>`;
+      $("#bResults").onclick = e => { const b = e.target.closest("[data-r]"); if (!b || !map) return; setPin(rs[+b.dataset.r], 17); $("#bResults").innerHTML = ""; if (!$("#bName").value) $("#bName").value = rs[+b.dataset.r].name.split(",")[0]; };
+    } catch (e) { toast(cleanErr(e)); }
+  };
+  $("#bGo").addEventListener("click", search);
+  $("#bSearch").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); search(); } });
+  $("#bNear").addEventListener("click", e => { const b = e.target.closest("[data-use]"); if (!b) return; S.siteId = b.dataset.use; local.set("cp_site", S.siteId); S.seen = null; renderWhen(); renderPools(); closeSheet(); toast("Delivering to " + siteOf(S.siteId).name); });
+  $("#bForm").addEventListener("submit", async ev => {
+    ev.preventDefault();
+    if (!pin) return ($("#bErr").textContent = "Drop a pin on the map first.");
+    try {
+      const r = await api.requestSite({ name: $("#bName").value, drop_point: $("#bDrop").value, lat: pin.lat, lng: pin.lng, note: $("#bNote").value });
+      openSheet(`<div class="top" style="justify-content:flex-end"><button class="closex" data-close aria-label="Close">${ICON.close}</button></div><span class="success">${ICON.check}</span>
+        <div class="center" style="display:grid;gap:6px"><h2 id="sheetTitle">Request sent</h2><p class="muted">We'll check ${esc(r.name)} and add it to ChopPool, usually the same day. Until then, you can order to the nearest building.</p></div>
+        <button class="btn wide" data-close>OK</button>`);
+    } catch (e) { $("#bErr").textContent = cleanErr(e); }
+  });
 }
 function renderWhen() {
   const site = siteOf(S.siteId);
@@ -1192,57 +1361,56 @@ function openAddVendor() {
 }
 
 /* =====================================================================================
-   COORDINATOR VIEW (#admin)
+   COORDINATOR VIEW (#admin): Today, Menus, Buildings, Riders, Team
    ===================================================================================== */
+const ADMIN_TABS = [["today", "Today"], ["menus", "Kitchens & menus"], ["buildings", "Buildings"], ["riders", "Riders"], ["team", "Team"]];
 async function viewAdmin() {
   await refreshUser();
   if (!S.user && !DEMO) {
-    $("#view").innerHTML = `<section class="card"><h2>Coordinator sign-in</h2><div><label for="email">Email</label><input id="email" type="email" autocomplete="username"></div>
-      <div><label for="pw">Password</label><input id="pw" type="password" autocomplete="current-password"></div><p class="err" id="loginErr"></p><button class="btn wide" id="loginBtn">Sign in</button></section>`;
-    $("#loginBtn").addEventListener("click", async () => { try { await api.signIn($("#email").value.trim(), $("#pw").value); viewAdmin(); } catch (e) { $("#loginErr").textContent = cleanErr(e); } });
+    let mode = "signin";
+    const draw = () => {
+      $("#view").innerHTML = `<section class="card"><p class="brand" style="font-size:18px">ChopPool team</p><h1>${mode === "signin" ? "Sign in" : "Create your team account"}</h1>
+        <p class="muted small">${mode === "signin" ? "For the owner and coordinators." : "Use the email the owner added you with. The very first account can become the owner."}</p>
+        <div><label for="email">Email</label><input id="email" type="email" autocomplete="username" placeholder="name@company.com"></div>
+        <div><label for="pw">Password</label><input id="pw" type="password" autocomplete="${mode === "signin" ? "current-password" : "new-password"}" placeholder="At least 6 characters"></div>
+        <p class="err" id="loginErr"></p><button class="btn wide" id="loginBtn">${mode === "signin" ? "Sign in" : "Create account"}</button>
+        <p class="small center">${mode === "signin" ? "First time here?" : "Already have an account?"} <button class="linkbtn" id="swapMode">${mode === "signin" ? "Create an account" : "Sign in"}</button></p></section>`;
+      $("#swapMode").addEventListener("click", () => { mode = mode === "signin" ? "signup" : "signin"; draw(); });
+      $("#loginBtn").addEventListener("click", async () => {
+        const email = $("#email").value.trim().toLowerCase(), pw = $("#pw").value;
+        try { mode === "signin" ? await api.signIn(email, pw) : await api.signUp(email, pw); viewAdmin(); } catch (e) { $("#loginErr").textContent = cleanErr(e); }
+      });
+    };
+    draw(); return;
+  }
+  let role; try { role = await api.myRole(); } catch (e) { role = "none"; }
+  if (role === "unclaimed") {
+    $("#view").innerHTML = `<section class="card"><p class="brand" style="font-size:18px">ChopPool team</p><h1>Set up your ChopPool</h1>
+      <p class="muted">Nobody runs this ChopPool yet. Make <strong>${esc(S.user.email)}</strong> the owner. As owner you can add coordinators, kitchens, riders and buildings. This only works once.</p>
+      <p class="err" id="ownErr"></p><button class="btn wide" id="claim">Make me the owner</button></section>`;
+    $("#claim").addEventListener("click", async () => { try { await api.claimOwner(); toast("You're the owner of this ChopPool."); viewAdmin(); } catch (e) { $("#ownErr").textContent = cleanErr(e); } });
     return;
   }
-  if (!(await api.isAdmin())) {
-    $("#view").innerHTML = `<section class="card"><h2>Not a coordinator account</h2><p class="muted">${esc(S.user?.email || "")} can order lunch but can't open the coordinator page.</p><button class="ghost" id="so">Sign out</button></section>`;
+  if (role === "none") {
+    $("#view").innerHTML = `<section class="card"><h2>Not on the ChopPool team yet</h2><p class="muted">${esc(S.user?.email || "")} can order lunch but can't open the team pages. Ask the owner to add this email under Team, then refresh.</p><button class="ghost" id="so">Sign out</button></section>`;
     $("#so").addEventListener("click", async () => { await api.signOut(); viewAdmin(); });
     return;
   }
+  S.role = role; S.adminTab = S.adminTab || "today";
   const day = S.adminDate || opsDate();
   $("#view").innerHTML = `
-    <header class="row"><h1>Coordinator</h1><div class="row" style="gap:8px"><input id="aDate" type="date" value="${day}" aria-label="Delivery date" style="width:auto">
-      <button class="ghost" id="aRefresh">Refresh</button><button class="ghost" id="aCsv">Copy CSV</button></div></header>
-    <div class="tiles" id="aTiles"></div><div id="aFlags"></div><section id="aPools" class="stack"></section>
-    <h2>Orders</h2><div class="table-wrap"><table id="aOrders"></table></div>
-    <h2>Kitchens and sellers</h2><p class="small muted">Each seller's link opens their order page without a login. Reset a link if it is shared with the wrong person.</p><div id="aKitchens" class="stack"></div>
-    <h2>Wallets</h2><div id="aWallets" class="stack"></div>
-    <h2>Rider and host links</h2><div id="aLinks" class="stack"></div>`;
+    <header class="row"><div><p class="brand" style="font-size:16px">ChopPool ${role === "super" ? "owner" : "coordinator"}</p><h1>Operations</h1></div>
+      <div class="row" style="gap:8px"><input id="aDate" type="date" value="${day}" aria-label="Delivery date" style="width:auto"><button class="ghost" id="aRefresh">Refresh</button></div></header>
+    <nav class="admintabs" aria-label="Team sections">${ADMIN_TABS.map(([k, l]) => `<button data-atab="${k}">${l}</button>`).join("")}</nav>
+    <div id="aBody" class="stack"></div>`;
+  document.querySelectorAll("[data-atab]").forEach(b => b.addEventListener("click", () => { S.adminTab = b.dataset.atab; renderAdmin(); }));
   $("#aDate").addEventListener("change", e => { S.adminDate = e.target.value; renderAdmin(); });
   $("#aRefresh").addEventListener("click", renderAdmin);
-  $("#aCsv").addEventListener("click", () => copy(ordersCsv(), "Orders copied. Paste them into Excel or Google Sheets."));
-  $("#aPools").addEventListener("click", adminPoolClick);
-  $("#aPools").addEventListener("change", async e => {
-    const sel = e.target.closest("select[data-act=status]"); if (!sel) return;
-    try { await api.updatePool(sel.closest("[data-pool]").dataset.pool, { status: sel.value }); toast("Pool updated"); renderAdmin(); } catch (err) { toast(cleanErr(err)); }
-  });
-  $("#aOrders").addEventListener("change", async e => {
-    const sel = e.target.closest("select[data-order]"); if (!sel) return;
-    try { await api.updateOrder(sel.dataset.order, { status: sel.value, ...(sel.value === "collected" ? { collected_at: new Date().toISOString(), collected_by: "coordinator" } : {}) }); renderAdmin(); }
-    catch (err) { toast(cleanErr(err)); }
-  });
-  $("#aOrders").addEventListener("click", async e => {
-    const b = e.target.closest("button[data-refunded]"); if (!b) return;
-    try { await api.updateOrder(b.dataset.refunded, { refund_needed: false }); toast("Marked refunded"); renderAdmin(); } catch (err) { toast(cleanErr(err)); }
-  });
-  $("#aKitchens").addEventListener("click", adminKitchenClick);
-  $("#aWallets").addEventListener("submit", async e => {
-    e.preventDefault();
-    const f = e.target, user = f.querySelector("select").value, amt = Number(f.querySelector("[name=amt]").value), why = f.querySelector("[name=why]").value.trim();
-    if (!user || !amt || why.length < 3) return toast("Pick a customer, an amount and a reason.");
-    try { await api.creditWallet(user, amt, why); toast("Wallet updated"); renderAdmin(); } catch (err) { toast(cleanErr(err)); }
-  });
-  $("#aLinks").addEventListener("click", e => { const b = e.target.closest("button[data-copy]"); if (b) copy(b.dataset.copy, "Link copied"); });
+  $("#aBody").addEventListener("click", adminClick);
+  $("#aBody").addEventListener("change", adminChange);
+  $("#aBody").addEventListener("submit", adminSubmit);
   await renderAdmin();
-  every(() => { if (!$("#sheetBg").classList.contains("open") && !document.activeElement?.closest("#view input, #view select")) renderAdmin(); }, 30000);
+  every(() => { if (S.adminTab === "today" && !$("#sheetBg").classList.contains("open") && !document.activeElement?.closest("#view input, #view select, #view textarea")) renderAdmin(); }, 30000);
 }
 function poolFlags(p, s, d, now = new Date()) {
   const f = [], cut = at(d, s.cutoff), del = at(d, s.delivery_time), i = STEPS.indexOf(p.status);
@@ -1254,111 +1422,260 @@ function poolFlags(p, s, d, now = new Date()) {
   if (now > cut && p.meals > 0 && p.meals < s.min_pool) f.push("Small pool (" + p.meals + " meals)");
   return f;
 }
+const addonsToText = list => (list || []).map(a => a.name + ":" + Number(a.price || 0)).join(", ");
+const textToAddons = t => String(t || "").split(",").map(x => x.trim()).filter(Boolean).map(x => { const [n, p] = x.split(":"); return { name: n.trim(), price: Number(p) || 0 }; }).filter(a => a.name.length > 1);
+const sendLink = (num, msg) => num ? `<a class="wa quiet" style="padding:8px 12px" href="${wa(num)}?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener">${ICON.wa} Send link</a>` : "";
+const pill = (txt, cls) => `<span class="chip ${cls || ""}">${esc(txt)}</span>`;
+let adminMaps = [];
 async function renderAdmin() {
   const d = S.adminDate || opsDate(), s = S.settings;
+  document.querySelectorAll("[data-atab]").forEach(b => { if (b.dataset.atab === S.adminTab) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
   let A; try { A = await api.adminData(d); } catch (e) { toast("Couldn't load: " + cleanErr(e)); return; }
   S.admin = A;
+  adminMaps.forEach(m => { try { m.remove(); } catch (e) {} }); adminMaps = [];
   const K = id => A.kitchens.find(k => k.id === id) || {}, sName = id => (A.sites.find(x => x.id === id) || {}).name || "";
-  A.pools.forEach(p => { p.runner = K(p.kitchen_id).delivery_mode === "runner"; });
-  const live = A.orders.filter(o => o.status !== "cancelled"), meals = live.reduce((t, o) => t + o.qty, 0);
-  const food = live.reduce((t, o) => t + (Number(o.quote_price ?? o.unit_price) + Number(o.addons_total || 0)) * o.qty, 0);
-  const pend = live.filter(o => o.status === "pending").length;
-  $("#aTiles").innerHTML = [["Meals", meals], ["Orders", live.length], ["Food value", money(food)], ["Payments to check", pend]].map(([l, v]) => `<div class="tile"><b>${v}</b><span>${l}</span></div>`).join("");
-  const pools = A.pools.filter(p => p.status !== "cancelled" && p.meals > 0).sort((a, b) => sName(a.site_id).localeCompare(sName(b.site_id)) || a.seq - b.seq);
-  const flags = pools.flatMap(p => poolFlags(p, s, d).map(f => sName(p.site_id) + ", " + K(p.kitchen_id).public_name + " Pool " + p.seq + ": " + f))
-    .concat(A.orders.filter(o => o.status === "quote_requested" && minsAgo(o.created_at) >= 15).map(o => "Special request " + o.code + " not priced by " + K(o.kitchen_id).name + " (" + minsAgo(o.created_at) + " min)"))
-    .concat(A.orders.filter(o => o.refund_needed).map(o => "Refund needed: " + o.customer_name + ", code " + o.code + ", MoMo ref " + (o.momo_ref || "")));
-  $("#aFlags").innerHTML = flags.length ? `<div class="flags"><strong>Needs attention</strong>${flags.map(f => `<span>${esc(f)}</span>`).join("")}</div>` : "";
-  $("#aPools").innerHTML = `<h2>Pools for ${fmtDate(d)}</h2>` + (pools.map(p => {
-    const k = K(p.kitchen_id), fl = poolFlags(p, s, d);
-    return `<article class="card" data-pool="${esc(p.id)}">
-      <div class="top" style="align-items:flex-start"><div><h3>${esc(sName(p.site_id))}</h3><p class="small muted">${esc(k.public_name)} Pool ${p.seq} · ${k.added_by_customer ? "seller added by a customer" : "cooked by " + esc(k.name)}${p.runner ? " · own runner" : ""}</p></div>
-        <div class="fee"><b class="num" style="font-size:22px">${p.meals}/${s.max_meals}</b><span>${money(feeFor(p.meals, s))} a meal</span></div></div>
-      ${stepsHtml(p.status)}${fl.length ? `<p class="small" style="color:var(--danger)">${fl.map(esc).join(" · ")}</p>` : ""}
-      ${p.runner ? "" : `<div class="inline"><div><label for="rd-${p.id}">Rider</label><select id="rd-${p.id}" data-f="rider_id"><option value="">Bolt Send / Yango</option>${A.riders.map(r => `<option value="${esc(r.id)}"${r.id === p.rider_id ? " selected" : ""}>${esc(r.name)}</option>`).join("")}</select></div>
-        <div><label for="tr-${p.id}">Trip ref</label><input id="tr-${p.id}" data-f="trip_ref" value="${esc(p.trip_ref || "")}" placeholder="Booking code"></div>
-        <div><label for="tc-${p.id}">Trip cost</label><input id="tc-${p.id}" data-f="trip_cost" inputmode="decimal" value="${esc(p.trip_cost ?? "")}" placeholder="GHS"></div>
-        <button class="ghost" data-act="save">Save</button></div>`}
-      <div class="row" style="justify-content:flex-start;gap:8px"><button class="ghost" data-act="ticket">Send ticket</button><button class="ghost" data-act="arrival">Arrival message</button>
-        <select data-act="status" aria-label="Set pool step" style="width:auto">${(p.status === "waiting" ? ["waiting"] : []).concat(STEPS).map(x => `<option value="${x}"${x === p.status ? " selected" : ""}>${STEP_LABEL[x]}</option>`).join("")}<option value="cancelled">Cancel pool</option></select></div></article>`;
-  }).join("") || `<p class="muted">No orders for this date yet.</p>`);
-  const ST = ["quote_requested", "quoted", "pending", "paid", "collected", "cancelled"];
-  $("#aOrders").innerHTML = `<tr><th>Time</th><th>Name</th><th>MoMo no.</th><th>Drop point</th><th>Order</th><th>Extras and requests</th><th>Paid by</th><th>Code</th><th>Status</th></tr>` +
-    (A.orders.map(o => {
-      const p = A.pools.find(x => x.id === o.pool_id) || {}, k = K(o.kitchen_id);
-      const extras = [addonText(o.addons), o.note ? "Note: " + o.note : "", o.special_request ? "Special: " + o.special_request + (o.quote_price ? " (" + money(o.quote_price) + ")" : " (not priced)") : ""].filter(Boolean).join(" · ");
-      const paid = [o.wallet_used > 0 ? "Wallet " + money(o.wallet_used) : "", o.momo_ref ? "MoMo " + o.momo_ref : ""].filter(Boolean).join(" + ");
-      return `<tr><td class="num">${clock(o.created_at)}</td><td>${esc(o.customer_name)}</td><td class="num">${esc(o.phone)}</td><td>${esc(sName(o.site_id))}</td>
-        <td>${o.qty} × ${esc(o.item_name)}<br><span class="small muted">${esc(k.public_name)} Pool ${p.seq || ""}</span></td><td style="white-space:normal;min-width:180px">${esc(extras)}</td><td class="num">${esc(paid || "—")}</td><td class="num">${esc(o.code)}</td>
-        <td><select data-order="${esc(o.id)}" aria-label="Order status">${ST.map(x => `<option${x === o.status ? " selected" : ""}>${x}</option>`).join("")}</select>${o.refund_needed ? ` <button class="ghost" data-refunded="${esc(o.id)}">Refunded</button>` : ""}</td></tr>`;
-    }).join("") || `<tr><td colspan="9" class="muted">No orders yet.</td></tr>`);
-  $("#aKitchens").innerHTML = A.kitchens.map(k => `<article class="card" data-kitchen="${esc(k.id)}">
-      <div class="top"><div><h3>${esc(k.name)}</h3><p class="small muted">${k.added_by_customer ? "Added by a customer for " + esc(sName(k.site_id)) : "ChopPool partner · menu name " + esc(k.public_name)}${k.active ? "" : " · paused"}</p></div></div>
-      <div class="inline" style="grid-template-columns:1fr 1fr auto auto"><div><label for="kw-${k.id}">WhatsApp number</label><input id="kw-${k.id}" data-f="whatsapp" inputmode="tel" value="${esc(k.whatsapp || "")}"></div>
-        <div><label for="km-${k.id}">Delivery</label><select id="km-${k.id}" data-f="delivery_mode"><option value="rider"${k.delivery_mode === "rider" ? " selected" : ""}>ChopPool rider / Bolt / Yango</option><option value="runner"${k.delivery_mode === "runner" ? " selected" : ""}>Seller's own runner (close by)</option></select></div>
-        <label class="choice" style="padding:8px 10px"><input type="checkbox" data-f="active"${k.active ? " checked" : ""}><span>Active</span></label>
-        <button class="ghost" data-k="save">Save</button></div>
-      <div class="row" style="justify-content:flex-start;gap:8px"><a class="wa quiet" style="padding:8px 12px" href="${wa(k.whatsapp)}?text=${encodeURIComponent("Your ChopPool order page: " + baseUrl() + "/#kitchen-" + k.token)}" target="_blank" rel="noopener">Send link on WhatsApp</a>
-        <button class="ghost" data-k="copy">Copy link</button><button class="ghost" data-k="reset">Reset link</button></div></article>`).join("");
-  $("#aWallets").innerHTML = (A.wallets || []).length ? `<div class="table-wrap"><table><tr><th>Customer</th><th>Phone</th><th>Balance</th></tr>${A.wallets.map(w => `<tr><td>${esc(w.name || "")} <span class="muted small">${esc(w.email || "")}</span></td><td class="num">${esc(w.phone || "")}</td><td class="num">${money(w.balance)}</td></tr>`).join("")}</table></div>
-    <form class="card inline" style="grid-template-columns:1.4fr .7fr 1.4fr auto"><div><label for="wUser">Customer</label><select id="wUser">${A.wallets.map(w => `<option value="${esc(w.user_id)}">${esc(w.name || w.email)}</option>`).join("")}</select></div>
-      <div><label for="wAmt">Amount</label><input id="wAmt" name="amt" inputmode="decimal" placeholder="10 or −5"></div><div><label for="wWhy">Reason</label><input id="wWhy" name="why" placeholder="Late delivery on Mon"></div><button class="btn">Apply</button></form>`
-    : `<p class="small muted">No customer accounts yet. Wallets appear when customers create accounts.</p>`;
-  const link = (label, who, hash) => `<div class="row card" style="padding:10px 12px"><div><strong>${esc(label)}</strong><p class="small muted">${esc(who)}</p></div><button class="ghost" data-copy="${esc(baseUrl() + "/#" + hash)}">Copy link</button></div>`;
-  $("#aLinks").innerHTML = A.riders.map(r => link(r.name, "Rider", "rider-" + r.token)).join("") +
-    A.sites.filter(x => x.handoff === "host").map(x => link(x.name, "Drop-point host: " + (x.host_label || x.drop_point), "host-" + x.host_token)).join("");
+  const body = $("#aBody");
+  const pending = A.sites.filter(x => x.status === "pending");
+  const badge = document.querySelector('[data-atab="buildings"]'); if (badge) badge.textContent = "Buildings" + (pending.length ? " (" + pending.length + " new)" : "");
+
+  if (S.adminTab === "today") {
+    A.pools.forEach(p => { p.runner = K(p.kitchen_id).delivery_mode === "runner"; });
+    const live = A.orders.filter(o => o.status !== "cancelled"), meals = live.reduce((t, o) => t + o.qty, 0);
+    const food = live.reduce((t, o) => t + (Number(o.quote_price ?? o.unit_price) + Number(o.addons_total || 0)) * o.qty, 0);
+    const pools = A.pools.filter(p => p.status !== "cancelled" && p.meals > 0).sort((a, b) => sName(a.site_id).localeCompare(sName(b.site_id)) || a.seq - b.seq);
+    const flags = pools.flatMap(p => poolFlags(p, s, d).map(f => sName(p.site_id) + ", " + K(p.kitchen_id).public_name + " Pool " + p.seq + ": " + f))
+      .concat(A.orders.filter(o => o.status === "quote_requested" && minsAgo(o.created_at) >= 15).map(o => "Special request " + o.code + " not priced by " + K(o.kitchen_id).name + " (" + minsAgo(o.created_at) + " min)"))
+      .concat(A.orders.filter(o => o.refund_needed).map(o => "Refund needed: " + o.customer_name + ", code " + o.code + ", MoMo ref " + (o.momo_ref || "")))
+      .concat(pending.length ? [pending.length + " building request" + (pending.length > 1 ? "s" : "") + " waiting for approval (see Buildings)"] : []);
+    const ST = ["quote_requested", "quoted", "pending", "paid", "collected", "cancelled"];
+    body.innerHTML = `
+      <div class="row" style="justify-content:flex-end"><button class="ghost" data-act="csv">Copy orders as CSV</button></div>
+      <div class="tiles">${[["Meals", meals], ["Orders", live.length], ["Food value", money(food)], ["Payments to check", live.filter(o => o.status === "pending").length]].map(([l, v]) => `<div class="tile"><b>${v}</b><span>${l}</span></div>`).join("")}</div>
+      ${flags.length ? `<div class="flags"><strong>Needs attention</strong>${flags.map(f => `<span>${esc(f)}</span>`).join("")}</div>` : ""}
+      <h2>Pools for ${fmtDate(d)}</h2>
+      ${pools.map(p => { const k = K(p.kitchen_id), fl = poolFlags(p, s, d);
+        return `<article class="card" data-pool="${esc(p.id)}">
+          <div class="top" style="align-items:flex-start"><div><h3>${esc(sName(p.site_id))}</h3><p class="small muted">${esc(k.public_name)} Pool ${p.seq} · ${k.added_by_customer ? "seller added by a customer" : "cooked by " + esc(k.name)}${p.runner ? " · own runner" : ""}</p></div>
+            <div class="fee"><b class="num" style="font-size:22px">${p.meals}/${s.max_meals}</b><span>${money(feeFor(p.meals, s))} a meal</span></div></div>
+          ${stepsHtml(p.status)}${fl.length ? `<p class="small" style="color:var(--danger)">${fl.map(esc).join(" · ")}</p>` : ""}
+          ${p.runner ? "" : `<div class="inline"><div><label for="rd-${p.id}">Rider</label><select id="rd-${p.id}" data-f="rider_id"><option value="">Bolt Send / Yango</option>${A.riders.filter(r => r.active).map(r => `<option value="${esc(r.id)}"${r.id === p.rider_id ? " selected" : ""}>${esc(r.name)}</option>`).join("")}</select></div>
+            <div><label for="tr-${p.id}">Trip ref</label><input id="tr-${p.id}" data-f="trip_ref" value="${esc(p.trip_ref || "")}" placeholder="Booking code"></div>
+            <div><label for="tc-${p.id}">Trip cost</label><input id="tc-${p.id}" data-f="trip_cost" inputmode="decimal" value="${esc(p.trip_cost ?? "")}" placeholder="GHS"></div>
+            <button class="ghost" data-act="pool-save">Save</button></div>`}
+          <div class="row" style="justify-content:flex-start;gap:8px"><button class="ghost" data-act="ticket">Send ticket</button><button class="ghost" data-act="arrival">Arrival message</button>
+            <select data-act="pool-status" aria-label="Set pool step" style="width:auto">${(p.status === "waiting" ? ["waiting"] : []).concat(STEPS).map(x => `<option value="${x}"${x === p.status ? " selected" : ""}>${STEP_LABEL[x]}</option>`).join("")}<option value="cancelled">Cancel pool</option></select></div></article>`; }).join("") || `<p class="card muted">No orders for this date yet.</p>`}
+      <h2>Orders</h2>
+      <div class="table-wrap"><table><tr><th>Time</th><th>Name</th><th>MoMo no.</th><th>Building</th><th>Order</th><th>Extras and requests</th><th>Paid by</th><th>Code</th><th>Status</th></tr>
+      ${A.orders.map(o => { const p = A.pools.find(x => x.id === o.pool_id) || {}, k = K(o.kitchen_id);
+        const extras = [addonText(o.addons), o.note ? "Note: " + o.note : "", o.special_request ? "Special: " + o.special_request + (o.quote_price ? " (" + money(o.quote_price) + ")" : " (not priced)") : ""].filter(Boolean).join(" · ");
+        const paid = [o.wallet_used > 0 ? "Wallet " + money(o.wallet_used) : "", o.momo_ref ? "MoMo " + o.momo_ref : ""].filter(Boolean).join(" + ");
+        return `<tr><td class="num">${clock(o.created_at)}</td><td>${esc(o.customer_name)}</td><td class="num">${esc(o.phone)}</td><td>${esc(sName(o.site_id))}</td>
+          <td>${o.qty} × ${esc(o.item_name)}<br><span class="small muted">${esc(k.public_name || "")} Pool ${p.seq || ""}</span></td><td style="white-space:normal;min-width:180px">${esc(extras)}</td><td class="num">${esc(paid || "—")}</td><td class="num">${esc(o.code)}</td>
+          <td><select data-order="${esc(o.id)}" aria-label="Order status">${ST.map(x => `<option${x === o.status ? " selected" : ""}>${x}</option>`).join("")}</select>${o.refund_needed ? ` <button class="ghost" data-refunded="${esc(o.id)}">Refunded</button>` : ""}</td></tr>`; }).join("") || `<tr><td colspan="9" class="muted">No orders yet.</td></tr>`}</table></div>
+      <h2>Wallets</h2>
+      ${(A.wallets || []).length ? `<div class="table-wrap"><table><tr><th>Customer</th><th>Phone</th><th>Balance</th></tr>${A.wallets.map(w => `<tr><td>${esc(w.name || "")} <span class="muted small">${esc(w.email || "")}</span></td><td class="num">${esc(w.phone || "")}</td><td class="num">${money(w.balance)}</td></tr>`).join("")}</table></div>
+        <form class="card inline" data-form="credit" style="grid-template-columns:1.4fr .7fr 1.4fr auto"><div><label for="wUser">Customer</label><select id="wUser" name="user">${A.wallets.map(w => `<option value="${esc(w.user_id)}">${esc(w.name || w.email)}</option>`).join("")}</select></div>
+          <div><label for="wAmt">Amount</label><input id="wAmt" name="amt" inputmode="decimal" placeholder="10 or −5"></div><div><label for="wWhy">Reason</label><input id="wWhy" name="why" placeholder="Late delivery on Mon"></div><button class="btn">Apply</button></form>`
+        : `<p class="small muted">No customer accounts yet. Wallets appear when customers create accounts.</p>`}`;
+  }
+
+  if (S.adminTab === "menus") {
+    const items = A.items || [];
+    body.innerHTML = `
+      <form class="card" data-form="kitchen"><h2>Add a kitchen or seller</h2>
+        <div class="grid2"><div><label for="nkName">Real name</label><input id="nkName" name="name" placeholder="Auntie Akos Kitchen"></div><div><label for="nkPub">Menu name customers see</label><input id="nkPub" name="public_name" placeholder="Local favourites"></div></div>
+        <div><label for="nkTag">Short description</label><input id="nkTag" name="tagline" placeholder="Ghanaian classics, cooked fresh each morning"></div>
+        <div class="grid2"><div><label for="nkAddr">Pickup address</label><input id="nkAddr" name="address" placeholder="Osu, Oxford Street"></div><div><label for="nkWa">WhatsApp number</label><input id="nkWa" name="whatsapp" inputmode="tel" placeholder="024 123 4567"></div></div>
+        <div class="grid2"><div><label for="nkCap">Meals per lunch</label><input id="nkCap" name="capacity" inputmode="numeric" value="45"></div><div><label for="nkDel">Delivery</label><select id="nkDel" name="delivery_mode"><option value="rider">ChopPool rider / Bolt / Yango</option><option value="runner">Seller's own runner (close by)</option></select></div></div>
+        <p class="err" data-err></p><button class="btn">Add kitchen</button></form>
+      ${A.kitchens.map(k => `<article class="card" data-kitchen="${esc(k.id)}">
+        <div class="top" style="align-items:flex-start"><div><h3>${esc(k.name)}</h3><p class="small muted">Shown as "${esc(k.public_name)}"${k.added_by_customer ? " · added by a customer for " + esc(sName(k.site_id)) : ""}</p></div>
+          <div>${k.active ? pill("Active", "ok") : pill("Paused", "dim")}</div></div>
+        <div class="inline" style="grid-template-columns:1fr 1fr .6fr auto"><div><label>WhatsApp</label><input data-f="whatsapp" inputmode="tel" value="${esc(k.whatsapp || "")}"></div>
+          <div><label>Delivery</label><select data-f="delivery_mode"><option value="rider"${k.delivery_mode === "rider" ? " selected" : ""}>ChopPool rider</option><option value="runner"${k.delivery_mode === "runner" ? " selected" : ""}>Own runner</option></select></div>
+          <div><label>Meals</label><input data-f="capacity" inputmode="numeric" value="${esc(k.capacity)}"></div>
+          <label class="choice" style="padding:8px 10px"><input type="checkbox" data-f="active"${k.active ? " checked" : ""}><span>Active</span></label></div>
+        <div class="row" style="justify-content:flex-start;gap:8px"><button class="ghost" data-act="kitchen-save">Save</button>${sendLink(k.whatsapp, "Your ChopPool order page: " + baseUrl() + "/#kitchen-" + k.token)}<button class="ghost" data-act="kitchen-copy">Copy link</button><button class="ghost" data-act="kitchen-reset">Reset link</button></div>
+        <p class="group-title">Menu</p><p class="small muted">Extras format: name:price, separated by commas. Example: Extra chicken:15, No shito:0</p>
+        <div class="stack">${items.filter(i => i.kitchen_id === k.id).map(i => `<div class="menuedit" data-item="${esc(i.id)}"><input data-f="name" value="${esc(i.name)}" aria-label="Dish"><input data-f="price" inputmode="decimal" value="${esc(i.price)}" aria-label="Price GHS">
+            <input data-f="addons" value="${esc(addonsToText(i.addons))}" placeholder="Extras" aria-label="Extras"><label class="choice" style="padding:6px 8px"><input type="checkbox" data-f="active"${i.active !== false ? " checked" : ""}><span>On</span></label><button class="ghost" data-act="item-save">Save</button></div>`).join("")}
+          <div class="menuedit" data-item=""><input data-f="name" placeholder="New dish" aria-label="New dish"><input data-f="price" inputmode="decimal" placeholder="GHS" aria-label="Price GHS"><input data-f="addons" placeholder="Extras" aria-label="Extras"><span></span><button class="btn" data-act="item-save">Add</button></div></div>
+      </article>`).join("")}`;
+  }
+
+  if (S.adminTab === "buildings") {
+    const active = A.sites.filter(x => x.status !== "pending" && x.status !== "declined");
+    body.innerHTML = `
+      ${pending.length ? `<h2>New building requests</h2>${pending.map(x => { const n = active.filter(hasPin).map(a => ({ a, d: hasPin(x) ? distM(x, a) : 1e12 })).sort((p, q) => p.d - q.d)[0];
+        return `<article class="card" data-site="${esc(x.id)}" style="border:2px solid var(--hint)"><div class="top" style="align-items:flex-start"><div><h3>${esc(x.name)}</h3><p class="small muted">Drop: ${esc(x.drop_point)}${x.request_note ? " · " + esc(x.request_note) : ""} · asked ${minsAgo(x.created_at) < 120 ? minsAgo(x.created_at) + " min ago" : fmtDate(String(x.created_at).slice(0, 10))}</p></div>${pill("Pending", "warn")}</div>
+          ${n && n.d < 1e12 ? `<p class="small">${n.d <= 600 ? `<strong>Close to ${esc(n.a.name)} (${fmtDist(n.d)}).</strong> Consider declining and pointing them there so pools stay full.` : `Nearest ChopPool building: ${esc(n.a.name)}, ${fmtDist(n.d)} away.`}</p>` : ""}
+          ${hasPin(x) ? `<a class="linkbtn" href="${osmLink(x)}" target="_blank" rel="noopener">See the pin on the map</a>` : ""}
+          <div class="grid2"><div><label>Handoff</label><select data-f="handoff"><option value="meet_rider">Meet the rider</option><option value="host">Drop-point host</option></select></div><div><label>Host (if any)</label><input data-f="host_label" placeholder="the security guard at the gate"></div></div>
+          <div class="row" style="justify-content:flex-start;gap:8px"><button class="btn" data-act="site-approve">Approve</button><button class="ghost" data-act="site-decline">Decline</button></div></article>`; }).join("")}` : ""}
+      <h2>Map</h2><div id="adminMap" class="map" style="height:300px"></div><p class="small muted">Orange: live buildings. Grey: waiting for approval.</p>
+      <form class="card" data-form="site"><h2>Add a building</h2>
+        <div class="grid2"><div><label for="nsName">Building name</label><input id="nsName" name="name" placeholder="Heritage Tower, Ridge"></div><div><label for="nsDrop">Drop point</label><input id="nsDrop" name="drop_point" placeholder="Lobby security desk"></div></div>
+        <div class="grid2"><div><label for="nsHand">Handoff</label><select id="nsHand" name="handoff"><option value="host">Drop-point host</option><option value="meet_rider">Meet the rider</option></select></div><div><label for="nsHost">Host</label><input id="nsHost" name="host_label" placeholder="the security desk in the lobby"></div></div>
+        <div id="newSiteMap" class="map" style="height:220px"></div><p class="small muted" id="nsPin">Tap the map to place the building's pin.</p>
+        <p class="err" data-err></p><button class="btn">Add building</button></form>
+      <h2>Live buildings</h2>
+      ${active.map(x => `<article class="card" data-site="${esc(x.id)}"><div class="top"><h3>${esc(x.name)}</h3>${x.active ? pill("Live", "ok") : pill("Paused", "dim")}</div>
+        <div class="grid2"><div><label>Name</label><input data-f="name" value="${esc(x.name)}"></div><div><label>Drop point</label><input data-f="drop_point" value="${esc(x.drop_point)}"></div></div>
+        <div class="grid2"><div><label>Handoff</label><select data-f="handoff"><option value="host"${x.handoff === "host" ? " selected" : ""}>Drop-point host</option><option value="meet_rider"${x.handoff === "meet_rider" ? " selected" : ""}>Meet the rider</option></select></div><div><label>Host</label><input data-f="host_label" value="${esc(x.host_label || "")}"></div></div>
+        <div class="row" style="justify-content:flex-start;gap:8px"><label class="choice" style="padding:8px 10px"><input type="checkbox" data-f="active"${x.active ? " checked" : ""}><span>Live</span></label><button class="ghost" data-act="site-save">Save</button>
+          ${x.handoff === "host" ? `<button class="ghost" data-act="host-copy">Copy host link</button>` : ""}${hasPin(x) ? `<a class="linkbtn" href="${osmLink(x)}" target="_blank" rel="noopener">Map</a>` : `<span class="small muted">No map pin</span>`}</div></article>`).join("")}`;
+    makeMap($("#adminMap"), ACCRA, 11).then(m => {
+      adminMaps.push(m); const L = window.L, pts = [];
+      A.sites.filter(x => hasPin(x) && x.status !== "declined").forEach(x => { pts.push([x.lat, x.lng]); L.marker([x.lat, x.lng], { icon: pinIcon(L, x.status === "pending" ? "" : "on") }).addTo(m).bindPopup(`<strong>${esc(x.name)}</strong><br>${esc(x.drop_point)}${x.status === "pending" ? "<br>Waiting for approval" : ""}`); });
+      if (pts.length > 1) m.fitBounds(pts, { padding: [30, 30] });
+    }).catch(e => { $("#adminMap").innerHTML = `<p class="err" style="padding:12px">${esc(cleanErr(e))}</p>`; });
+    S.newSitePin = null;
+    makeMap($("#newSiteMap"), ACCRA, 12).then(m => {
+      adminMaps.push(m); let mk;
+      m.on("click", e => { S.newSitePin = { lat: e.latlng.lat, lng: e.latlng.lng }; if (!mk) mk = window.L.marker(e.latlng, { icon: pinIcon(window.L, "on") }).addTo(m); else mk.setLatLng(e.latlng); $("#nsPin").textContent = "Pin placed."; });
+    }).catch(() => {});
+  }
+
+  if (S.adminTab === "riders") {
+    body.innerHTML = `
+      <form class="card" data-form="rider"><h2>Add a rider</h2><div class="grid2"><div><label for="nrName">Name</label><input id="nrName" name="name" placeholder="Kwame Asare"></div><div><label for="nrPhone">Phone / WhatsApp</label><input id="nrPhone" name="phone" inputmode="tel" placeholder="024 123 4567"></div></div>
+        <p class="err" data-err></p><button class="btn">Add rider</button></form>
+      <p class="small muted">While you use Bolt Send or Yango, you don't need riders here. Log those trips on each pool under Today.</p>
+      ${A.riders.map(r => `<article class="card" data-rider="${esc(r.id)}"><div class="top"><h3>${esc(r.name)}</h3>${r.active ? pill("Active", "ok") : pill("Off", "dim")}</div>
+        <div class="grid2"><div><label>Name</label><input data-f="name" value="${esc(r.name)}"></div><div><label>Phone</label><input data-f="phone" value="${esc(r.phone || "")}"></div></div>
+        <div class="row" style="justify-content:flex-start;gap:8px"><label class="choice" style="padding:8px 10px"><input type="checkbox" data-f="active"${r.active ? " checked" : ""}><span>Active</span></label><button class="ghost" data-act="rider-save">Save</button>
+          ${sendLink(r.phone, "Your ChopPool rider page: " + baseUrl() + "/#rider-" + r.token)}<button class="ghost" data-act="rider-copy">Copy link</button></div></article>`).join("") || `<p class="muted">No riders yet.</p>`}`;
+  }
+
+  if (S.adminTab === "team") {
+    const team = A.team || [], me = (S.user?.email || "").toLowerCase(), isSuper = S.role === "super";
+    body.innerHTML = `
+      <section class="card"><h2>Who does what</h2><div class="stack small">
+        <p><strong>Owner</strong> · everything, including adding and removing team members.</p>
+        <p><strong>Coordinator</strong> · runs each day: payments, pools, kitchens, buildings, riders, wallets.</p>
+        <p><strong>Kitchens, riders and building hosts</strong> · no login. They use their own private link, sent from Kitchens & menus, Riders or Buildings.</p>
+        <p><strong>Customers</strong> · order from the main link; an account is optional.</p></div></section>
+      ${isSuper ? `<form class="card" data-form="team"><h2>Add a team member</h2><div class="grid2"><div><label for="ntEmail">Email</label><input id="ntEmail" name="email" type="email" placeholder="ops@yourcompany.com"></div>
+        <div><label for="ntRole">Role</label><select id="ntRole" name="role"><option value="coordinator">Coordinator</option><option value="super">Owner</option></select></div></div>
+        <p class="small muted">They then open ${esc(baseUrl())}/#admin, choose "Create an account" with this email, and sign in.</p><p class="err" data-err></p><button class="btn">Add to team</button></form>` : `<p class="note">Only the owner can add or remove team members.</p>`}
+      <div class="table-wrap"><table><tr><th>Email</th><th>Role</th><th></th></tr>${team.map(t => `<tr data-member="${esc(t.email)}"><td>${esc(t.email)}${t.email === me ? ' <span class="muted small">(you)</span>' : ""}</td>
+        <td>${isSuper && t.email !== me ? `<select data-act="team-role"><option value="coordinator"${t.role === "coordinator" ? " selected" : ""}>Coordinator</option><option value="super"${t.role === "super" ? " selected" : ""}>Owner</option></select>` : (t.role === "super" ? "Owner" : "Coordinator")}</td>
+        <td>${isSuper && t.email !== me ? `<button class="ghost" data-act="team-remove">Remove</button>` : ""}</td></tr>`).join("")}</table></div>`;
+  }
 }
-async function adminPoolClick(e) {
-  const card = e.target.closest("[data-pool]"), act = e.target.dataset.act; if (!card || !act || act === "status") return;
-  const id = card.dataset.pool, A = S.admin, p = A.pools.find(x => x.id === id), s = S.settings, d = p.order_date;
-  const k = A.kitchens.find(x => x.id === p.kitchen_id), site = A.sites.find(x => x.id === p.site_id);
-  const os = A.orders.filter(o => o.pool_id === id && !["cancelled", "quote_requested", "quoted"].includes(o.status));
-  if (act === "save") {
-    const v = f => card.querySelector(`[data-f="${f}"]`).value.trim();
-    try { await api.updatePool(id, { rider_id: v("rider_id") || null, trip_ref: v("trip_ref") || null, trip_cost: v("trip_cost") ? Number(v("trip_cost")) : null }); toast("Pool saved"); renderAdmin(); }
-    catch (err) { toast(cleanErr(err)); }
+const fval = (root, f) => { const el = root.querySelector(`[data-f="${f}"]`); return !el ? undefined : el.type === "checkbox" ? el.checked : el.value.trim(); };
+async function adminClick(e) {
+  const t = e.target.closest("[data-act], [data-refunded]"); if (!t || t.tagName === "SELECT") return;
+  const A = S.admin, s = S.settings, act = t.dataset.act;
+  const run = async (fn, ok) => { try { await fn(); if (ok) toast(ok); renderAdmin(); } catch (err) { toast(cleanErr(err)); } };
+  if (t.dataset.refunded) return run(() => api.updateOrder(t.dataset.refunded, { refund_needed: false }), "Marked refunded");
+  if (act === "csv") return copy(ordersCsv(), "Orders copied. Paste them into Excel or Google Sheets.");
+  const poolCard = t.closest("[data-pool]");
+  if (poolCard) {
+    const id = poolCard.dataset.pool, p = A.pools.find(x => x.id === id), d = p.order_date;
+    const k = A.kitchens.find(x => x.id === p.kitchen_id), site = A.sites.find(x => x.id === p.site_id);
+    const os = A.orders.filter(o => o.pool_id === id && !["cancelled", "quote_requested", "quoted"].includes(o.status));
+    if (act === "pool-save") return run(() => api.updatePool(id, { rider_id: fval(poolCard, "rider_id") || null, trip_ref: fval(poolCard, "trip_ref") || null, trip_cost: fval(poolCard, "trip_cost") ? Number(fval(poolCard, "trip_cost")) : null }), "Pool saved");
+    if (act === "ticket") {
+      const tally = {}; os.forEach(o => { const key = o.item_name + (o.addons?.length ? " (" + addonText(o.addons) + ")" : ""); tally[key] = (tally[key] || 0) + o.qty; });
+      const text = "ChopPool order for " + fmtDate(d) + ". Ready by " + minus(s.delivery_time, 30) + ".\n" + site.name + ", Pool " + p.seq + " (" + p.meals + " meals):\n" +
+        Object.entries(tally).map(([n, q]) => "- " + q + " × " + n).join("\n") + "\nLabel codes: " + os.map(o => o.code + (o.qty > 1 ? " (×" + o.qty + ")" : "")).join(", ") +
+        "\nOpen your page to confirm: " + baseUrl() + "/#kitchen-" + k.token;
+      return openSheet(`${sheetHead("Ticket for " + esc(k.name))}<textarea rows="10" aria-label="Kitchen ticket">${esc(text)}</textarea>
+        ${k.whatsapp ? `<a class="wa" href="${wa(k.whatsapp)}?text=${encodeURIComponent(text)}" target="_blank" rel="noopener">${ICON.wa} Send on WhatsApp</a>` : `<p class="err">Add this seller's WhatsApp number under Kitchens & menus.</p>`}`);
+    }
+    if (act === "arrival") {
+      const text = site.handoff === "host" ? "Your ChopPool lunch has arrived at " + site.name + ". Collect it from " + (site.host_label || site.drop_point) + " with your 4-digit code."
+        : "Your ChopPool lunch arrives at " + site.name + ", " + site.drop_point + ", in about 5 minutes. Bring your 4-digit code. Delivery waits " + s.arrival_window_min + " minutes.";
+      return openSheet(`${sheetHead("Arrival message", "Customers with the app open get this automatically. Message the others:")}<textarea rows="4" aria-label="Message">${esc(text)}</textarea>
+        ${os.map(o => `<a class="wa quiet" href="${wa(o.phone)}?text=${encodeURIComponent(text + " Your code: " + o.code)}" target="_blank" rel="noopener">${esc(o.customer_name)} · ${esc(o.code)}</a>`).join("")}`);
+    }
   }
-  if (act === "ticket") {
-    const tally = {}; os.forEach(o => { const key = o.item_name + (o.addons?.length ? " (" + addonText(o.addons) + ")" : ""); tally[key] = (tally[key] || 0) + o.qty; });
-    const text = "ChopPool order for " + fmtDate(d) + ". Ready by " + minus(s.delivery_time, 30) + ".\n" + site.name + ", Pool " + p.seq + " (" + p.meals + " meals):\n" +
-      Object.entries(tally).map(([n, q]) => "- " + q + " × " + n).join("\n") + "\nLabel codes: " + os.map(o => o.code + (o.qty > 1 ? " (×" + o.qty + ")" : "")).join(", ") +
-      "\nOpen your page to confirm: " + baseUrl() + "/#kitchen-" + k.token;
-    openSheet(`<h2 id="sheetTitle">Ticket for ${esc(k.name)}</h2><textarea rows="10" aria-label="Kitchen ticket">${esc(text)}</textarea>
-      ${k.whatsapp ? `<a class="wa" href="${wa(k.whatsapp)}?text=${encodeURIComponent(text)}" target="_blank" rel="noopener">Send on WhatsApp</a>` : `<p class="err">Add this seller's WhatsApp number under Kitchens and sellers.</p>`}<button class="ghost" data-close>Close</button>`);
+  const kc = t.closest("[data-kitchen]");
+  if (kc) {
+    const k = A.kitchens.find(x => x.id === kc.dataset.kitchen);
+    if (act === "kitchen-copy") return copy(baseUrl() + "/#kitchen-" + k.token, "Link copied");
+    if (act === "kitchen-save") {
+      const w = (fval(kc, "whatsapp") || "").replace(/\D/g, "");
+      if (w && !/^0\d{9}$/.test(w)) return toast("Enter a 10-digit WhatsApp number starting with 0.");
+      return run(() => api.updateKitchen(k.id, { whatsapp: w || null, delivery_mode: fval(kc, "delivery_mode"), capacity: Number(fval(kc, "capacity")) || k.capacity, active: fval(kc, "active") }), "Saved");
+    }
+    if (act === "kitchen-reset") { const b = new Uint8Array(9); crypto.getRandomValues(b); return run(() => api.updateKitchen(k.id, { token: [...b].map(x => x.toString(16).padStart(2, "0")).join("") }), "New link made. The old one no longer works."); }
+    if (act === "item-save") {
+      const row = t.closest("[data-item]"), id = row.dataset.item, name = fval(row, "name"), price = Number(fval(row, "price"));
+      if (name.length < 2 || !(price > 0)) return toast("Add the dish name and a price above 0.");
+      const item = { name, price, addons: textToAddons(fval(row, "addons")), active: id ? fval(row, "active") : true };
+      return run(() => api.saveItem(id ? { id, ...item } : { kitchen_id: k.id, ...item }), id ? "Dish saved" : "Dish added");
+    }
   }
-  if (act === "arrival") {
-    const text = site.handoff === "host"
-      ? "Your ChopPool lunch has arrived at " + site.name + ". Collect it from " + (site.host_label || site.drop_point) + " with your 4-digit code."
-      : "Your ChopPool lunch arrives at " + site.name + ", " + site.drop_point + ", in about 5 minutes. Bring your 4-digit code. Delivery waits " + s.arrival_window_min + " minutes.";
-    openSheet(`<h2 id="sheetTitle">Arrival message</h2><textarea rows="4" aria-label="Message">${esc(text)}</textarea><p class="small muted">Customers with the app open get this automatically. Message the others:</p>
-      ${os.map(o => `<a class="wa quiet" href="${wa(o.phone)}?text=${encodeURIComponent(text + " Your code: " + o.code)}" target="_blank" rel="noopener">${esc(o.customer_name)} · ${esc(o.code)}</a>`).join("")}<button class="ghost" data-close>Close</button>`);
+  const sc = t.closest("[data-site]");
+  if (sc) {
+    const x = A.sites.find(y => y.id === sc.dataset.site);
+    if (act === "site-approve") return run(() => api.updateSite(x.id, { status: "active", handoff: fval(sc, "handoff"), host_label: fval(sc, "host_label") || null }), x.name + " is now live");
+    if (act === "site-decline") return run(() => api.updateSite(x.id, { status: "declined", active: false }), "Request declined");
+    if (act === "site-save") return run(() => api.updateSite(x.id, { name: fval(sc, "name"), drop_point: fval(sc, "drop_point"), handoff: fval(sc, "handoff"), host_label: fval(sc, "host_label") || null, active: fval(sc, "active") }), "Building saved");
+    if (act === "host-copy") return copy(baseUrl() + "/#host-" + x.host_token, "Host link copied");
   }
+  const rc = t.closest("[data-rider]");
+  if (rc) {
+    const r = A.riders.find(y => y.id === rc.dataset.rider);
+    if (act === "rider-copy") return copy(baseUrl() + "/#rider-" + r.token, "Link copied");
+    if (act === "rider-save") return run(() => api.updateRider(r.id, { name: fval(rc, "name"), phone: (fval(rc, "phone") || "").replace(/\D/g, "") || null, active: fval(rc, "active") }), "Rider saved");
+  }
+  const mr = t.closest("[data-member]");
+  if (mr && act === "team-remove") return run(() => api.removeTeam(mr.dataset.member), "Removed from the team");
 }
-async function adminKitchenClick(e) {
-  const card = e.target.closest("[data-kitchen]"), act = e.target.dataset.k; if (!card || !act) return;
-  const k = S.admin.kitchens.find(x => x.id === card.dataset.kitchen);
-  if (act === "copy") return copy(baseUrl() + "/#kitchen-" + k.token, "Link copied");
-  if (act === "save") {
-    const wa_ = card.querySelector("[data-f=whatsapp]").value.replace(/\D/g, "");
-    if (wa_ && !/^0\d{9}$/.test(wa_)) return toast("Enter a 10-digit WhatsApp number starting with 0.");
-    try { await api.updateKitchen(k.id, { whatsapp: wa_ || null, delivery_mode: card.querySelector("[data-f=delivery_mode]").value, active: card.querySelector("[data-f=active]").checked }); toast("Saved"); renderAdmin(); }
-    catch (err) { toast(cleanErr(err)); }
-  }
-  if (act === "reset") {
-    const bytes = new Uint8Array(9); crypto.getRandomValues(bytes);
-    const token = [...bytes].map(b => b.toString(16).padStart(2, "0")).join("");
-    try { await api.updateKitchen(k.id, { token }); toast("New link made. The old link no longer works. Send the new one."); renderAdmin(); } catch (err) { toast(cleanErr(err)); }
-  }
+async function adminChange(e) {
+  const t = e.target;
+  const run = async (fn, ok) => { try { await fn(); toast(ok); renderAdmin(); } catch (err) { toast(cleanErr(err)); } };
+  if (t.matches("select[data-act=pool-status]")) return run(() => api.updatePool(t.closest("[data-pool]").dataset.pool, { status: t.value }), "Pool updated");
+  if (t.matches("select[data-order]")) return run(() => api.updateOrder(t.dataset.order, { status: t.value, ...(t.value === "collected" ? { collected_at: new Date().toISOString(), collected_by: "coordinator" } : {}) }), "Order updated");
+  if (t.matches("select[data-act=team-role]")) return run(() => api.updateTeam(t.closest("[data-member]").dataset.member, t.value), "Role updated");
+}
+async function adminSubmit(e) {
+  const f = e.target.closest("[data-form]"); if (!f) return;
+  e.preventDefault();
+  const v = n => (f.querySelector(`[name="${n}"]`)?.value || "").trim(), err = f.querySelector("[data-err]");
+  const fail = m => { if (err) err.textContent = m; else toast(m); };
+  try {
+    if (f.dataset.form === "credit") {
+      const amt = Number(v("amt")); if (!v("user") || !amt || v("why").length < 3) return fail("Pick a customer, an amount and a reason.");
+      await api.creditWallet(v("user"), amt, v("why")); toast("Wallet updated");
+    }
+    if (f.dataset.form === "kitchen") {
+      const w = v("whatsapp").replace(/\D/g, "");
+      if (v("name").length < 2 || v("public_name").length < 2) return fail("Add the real name and the menu name customers see.");
+      if (w && !/^0\d{9}$/.test(w)) return fail("Enter a 10-digit WhatsApp number starting with 0.");
+      await api.addKitchen({ name: v("name"), public_name: v("public_name"), tagline: v("tagline") || null, address: v("address") || null, whatsapp: w || null, capacity: Number(v("capacity")) || 45, delivery_mode: v("delivery_mode") });
+      toast("Kitchen added. Now add its dishes below.");
+    }
+    if (f.dataset.form === "site") {
+      if (v("name").length < 3 || v("drop_point").length < 3) return fail("Add the building name and the drop point.");
+      const pin = S.newSitePin || {};
+      await api.addSite({ name: v("name"), drop_point: v("drop_point"), handoff: v("handoff"), host_label: v("host_label") || null, lat: pin.lat ?? null, lng: pin.lng ?? null });
+      toast("Building added");
+    }
+    if (f.dataset.form === "rider") {
+      if (v("name").length < 2) return fail("Add the rider's name.");
+      await api.addRider({ name: v("name"), phone: v("phone").replace(/\D/g, "") || null });
+      toast("Rider added. Send them their link.");
+    }
+    if (f.dataset.form === "team") {
+      if (!/^\S+@\S+\.\S+$/.test(v("email"))) return fail("Enter a valid email address.");
+      await api.addTeam(v("email").toLowerCase(), v("role")); toast("Added to the team");
+    }
+    Object.assign(S, await api.load());
+    renderAdmin();
+  } catch (x) { fail(cleanErr(x)); }
 }
 function ordersCsv() {
   const A = S.admin || { orders: [], pools: [], sites: [], kitchens: [] };
   const cols = ["created_at", "order_date", "customer_name", "phone", "site", "kitchen", "pool", "item_name", "qty", "unit_price", "addons", "note", "special_request", "quote_price", "wallet_used", "momo_ref", "code", "status", "refund_needed", "collected_at"];
-  const q = v => '"' + String(v ?? "").replace(/"/g, '""') + '"';
+  const q = x => '"' + String(x ?? "").replace(/"/g, '""') + '"';
   const val = (o, c) => c === "site" ? (A.sites.find(x => x.id === o.site_id) || {}).name : c === "kitchen" ? (A.kitchens.find(x => x.id === o.kitchen_id) || {}).name
     : c === "pool" ? (A.pools.find(x => x.id === o.pool_id) || {}).seq : c === "addons" ? addonText(o.addons) : o[c];
   return [cols.join(",")].concat(A.orders.map(o => cols.map(c => q(val(o, c))).join(","))).join("\n");
 }
-
 /* =====================================================================================
    SELLER / KITCHEN VIEW (#kitchen-TOKEN): confirm today, price requests, labels by code
    ===================================================================================== */
@@ -1498,6 +1815,11 @@ async function route() {
 }
 async function start() {
   if (DEMO) $("#demoBar").classList.remove("hidden");
+  if (!DEMO) {
+    for (let i = 0; i < 80 && !window.supabase; i++) await new Promise(r => setTimeout(r, 100));
+    if (!window.supabase) { $("#view").innerHTML = `<p class="card err">ChopPool couldn't connect. Check your internet connection and refresh.</p>`; return; }
+    api = makeSupabaseApi();
+  }
   try { Object.assign(S, await api.load()); }
   catch (e) { $("#view").innerHTML = `<p class="err">We couldn't load the menu: ${esc(cleanErr(e))}. Refresh to try again.</p>`; return; }
   S.date = orderDate(S.settings);
