@@ -416,9 +416,9 @@ function makeDemoApi() {
   const isOpen = (kid, d) => days.some(x => x.kitchen_id === kid && x.order_date === d);
   const nowIso = () => new Date().toISOString();
   const pastCutoff = d => new Date() >= at(d, settings.cutoff);
-  const dueOf = o => (Number(o.quote_price ?? o.unit_price) + o.addons_total) * o.qty + settings.max_fee * o.qty + settings.service_fee;
+  const dueOf = o => (Number(o.quote_price ?? o.unit_price) + o.addons_total) * o.qty + Number(o.max_fee) * o.qty + settings.service_fee;
 
-  const tripOf = pid => { const pl = pools.find(p => p.id === pid) || {}; return tripFor(kitchens.find(k => k.id === pl.kitchen_id), sites.find(x => x.id === pl.site_id), settings); };
+  const tripOf = pid => { const pl = pools.find(p => p.id === pid) || {}; const k = kitchens.find(x => x.id === pl.kitchen_id) || {}, st = sites.find(x => x.id === pl.site_id) || {}; return tripFor(hasPin(k) ? k : k.added_by_customer ? st : {}, st, settings); };
   function balance(user) {
     const led = ledger.filter(e => e.user_id === user).reduce((t, e) => t + e.amount, 0);
     const cb = orders.filter(o => o.user_id === user && ["paid", "collected"].includes(o.status) && pastCutoff(o.order_date) && pools.find(p => p.id === o.pool_id).status !== "cancelled")
@@ -464,7 +464,7 @@ function makeDemoApi() {
     let code; do { code = String(1000 + Math.floor(Math.random() * 9000)); } while (orders.some(o => o.order_date === d && o.code === code));
     const o = { id: "o" + uid(), created_at: nowIso(), order_date: d, pool_id: pl.id, site_id: si.id, kitchen_id: k.id, item_id: m.id, user_id: sim ? null : (me ? me.id : null),
       item_name: m.name, unit_price: m.price, qty: r.qty, addons: add, addons_total: addT, note: (r.note || "").trim() || null, special_request: special, quote_price: null,
-      customer_name: r.name, phone: r.phone, momo_ref: null, wallet_used: 0, code, max_fee: settings.max_fee, service_fee: settings.service_fee,
+      customer_name: r.name, phone: r.phone, momo_ref: null, wallet_used: 0, code, max_fee: feeFor(meals(pl.id) + r.qty, settings, tripOf(pl.id)), service_fee: settings.service_fee,
       status: special ? "quote_requested" : "pending", cancel_reason: null, refund_needed: false, collected_at: null };
     orders.push(o);
     let payment = null;
@@ -1371,11 +1371,13 @@ function openOrder(menuId) {
     }
     $("#saveTxt").classList.remove("hidden");
     const addT = (item.addons || []).filter(a => extras.has(a.name)).reduce((t, a) => t + Number(a.price), 0);
-    const total = (Number(item.price) + addT) * qty + Number(s.max_fee) * qty + Number(s.service_fee);
+    // Most you'll pay for delivery = the pool's fee once your meals are in (by distance), capped at the set maximum. It can only go down from here.
+    const cp = currentPool(S.siteId, k.id), inPool = cp && cp.meals + qty <= Number(s.max_meals) ? cp.meals : 0, dFee = feeFor(inPool + qty, s, tripTo(k, site));
+    const total = (Number(item.price) + addT) * qty + dFee * qty + Number(s.service_fee);
     const useW = $("#fWallet")?.checked ? Math.min(S.balance, total) : 0, due = total - useW;
     $("#sum").innerHTML = `<div><span>${qty} × ${esc(item.name)}</span><span class="num">${money(item.price * qty)}</span></div>` +
       (addT ? `<div><span>Extras</span><span class="num">${money(addT * qty)}</span></div>` : "") +
-      `<div><span>Delivery (most you'll pay)</span><span class="num">${money(s.max_fee * qty)}</span></div><div><span>Service fee</span><span class="num">${money(s.service_fee)}</span></div>` +
+      `<div><span>Delivery (most you'll pay${qty > 1 ? ", " + money(dFee) + " a meal" : ""})</span><span class="num">${money(dFee * qty)}</span></div><div><span>Service fee</span><span class="num">${money(s.service_fee)}</span></div>` +
       (useW ? `<div><span>From wallet</span><span class="num">−${money(useW)}</span></div>` : "");
     $("#payPart").classList.toggle("hidden", due <= 0);
     $("#dueTxt").textContent = money(due);
