@@ -383,7 +383,7 @@ const addonText = list => (list || []).map(a => a.name).join(", ");
    ===================================================================================== */
 function makeDemoApi() {
   const settings = { cutoff: "10:30", special_cutoff: "10:00", delivery_time: "12:30", trip_cost: 60, base_fare: 20, per_km: 6, max_fee: 10, service_fee: 2, min_pool: 6, max_meals: 15,
-    commission_rate: 0.15, accept_timeout_min: 20, arrival_window_min: 10, notify_daily_cap: 5, momo_number: "024 000 0000", momo_name: "ChopPool Pilot" };
+    commission_rate: 0.15, accept_timeout_min: 20, arrival_window_min: 10, notify_daily_cap: 5, momo_number: "024 000 0000", momo_name: "ChopPool Pilot", momo_network: "MTN" };
   const sites = [
     { id: "s1", name: "Heritage Tower, Ridge", drop_point: "Lobby security desk", handoff: "host", host_label: "the security desk in the lobby", host_token: "demoh1", lat: 5.5640, lng: -0.2010, status: "active", active: true },
     { id: "s2", name: "Pent Hostel, Legon", drop_point: "Porters' lodge", handoff: "host", host_label: "the porter on duty", host_token: "demoh2", lat: 5.6505, lng: -0.1870, status: "active", active: true },
@@ -464,7 +464,7 @@ function makeDemoApi() {
     let code; do { code = String(1000 + Math.floor(Math.random() * 9000)); } while (orders.some(o => o.order_date === d && o.code === code));
     const o = { id: "o" + uid(), created_at: nowIso(), order_date: d, pool_id: pl.id, site_id: si.id, kitchen_id: k.id, item_id: m.id, user_id: sim ? null : (me ? me.id : null),
       item_name: m.name, unit_price: m.price, qty: r.qty, addons: add, addons_total: addT, note: (r.note || "").trim() || null, special_request: special, quote_price: null,
-      customer_name: r.name, phone: r.phone, momo_ref: null, wallet_used: 0, code, max_fee: feeFor(meals(pl.id) + r.qty, settings, tripOf(pl.id)), service_fee: settings.service_fee,
+      customer_name: r.name, phone: r.phone, momo_ref: null, wallet_used: 0, code, max_fee: feeFor(1, settings, tripOf(pl.id)), service_fee: settings.service_fee,
       status: special ? "quote_requested" : "pending", cancel_reason: null, refund_needed: false, collected_at: null };
     orders.push(o);
     let payment = null;
@@ -511,7 +511,9 @@ function makeDemoApi() {
         const p = pools.find(x => x.id === o.pool_id);
         return { id: o.id, order_date: o.order_date, code: o.code, status: o.status, qty: o.qty, item_name: o.item_name, site_id: o.site_id, kitchen_id: o.kitchen_id, pool_seq: p.seq, pool_status: p.status,
           special_request: o.special_request, quote_price: o.quote_price, amount_due: dueOf(o) - o.wallet_used, cancel_reason: o.cancel_reason,
-          unit_price: o.unit_price, addons: o.addons, addons_total: o.addons_total, max_fee: o.max_fee, service_fee: o.service_fee, wallet_used: o.wallet_used };
+          unit_price: o.unit_price, addons: o.addons, addons_total: o.addons_total, max_fee: o.max_fee, service_fee: o.service_fee, wallet_used: o.wallet_used,
+          saving: ["pending", "paid", "collected"].includes(o.status) && p.status !== "cancelled" ? Math.round(Math.max(0, (o.max_fee - feeFor(meals(o.pool_id), settings, tripOf(o.pool_id))) * o.qty) * 100) / 100 : 0,
+          has_account: !!o.user_id, refund_needed: !!o.refund_needed };
       });
     },
     async addVendor(r) {
@@ -568,6 +570,21 @@ function makeDemoApi() {
       const k = byToken(kitchens, "token", token); const o = orders.find(x => x.id === oid && x.kitchen_id === k.id);
       if (!o || !["quote_requested", "quoted"].includes(o.status)) throw new Error("That request has already been paid or closed.");
       o.status = "cancelled"; o.cancel_reason = "The seller can't do this request" + (String(reason || "").trim() ? ": " + String(reason).trim() : "");
+    },
+    async cancelOrder(id, reason, refund) {
+      const o = orders.find(x => x.id === id); if (!o) throw new Error("Order not found.");
+      if (o.user_id && (!me || me.id !== o.user_id)) throw new Error("Sign in with the account that placed this order.");
+      if (!["pending", "paid", "quote_requested", "quoted"].includes(o.status)) throw new Error("This order can no longer be cancelled.");
+      if (pastCutoff(o.order_date)) throw new Error("Orders close at " + settings.cutoff + ". The kitchen is already cooking, so it can't be cancelled now.");
+      const momo = Math.max(0, dueOf(o) - o.wallet_used); let to, credit = 0;
+      if (["quote_requested", "quoted"].includes(o.status)) to = "nothing";
+      else if (o.status === "paid" && momo > 0 && o.user_id && (refund || "wallet") === "wallet") { to = "wallet"; credit = momo; }
+      else if (momo > 0) to = "momo"; else to = "wallet";
+      credit += o.wallet_used;
+      o.status = "cancelled"; o.cancel_reason = "You cancelled" + (String(reason || "").trim() ? " (" + String(reason).trim() + ")" : ""); o.refund_needed = to === "momo";
+      if (credit > 0 && o.user_id) ledger.push({ user_id: o.user_id, amount: credit, reason: "Refund: cancelled order " + o.code, created_at: nowIso(), order_id: o.id });
+      const pl = pools.find(p => p.id === o.pool_id); if (pl && pl.status === "waiting" && !meals(pl.id)) pl.status = "cancelled";
+      return { refund: to, wallet_credit: o.user_id ? credit : 0, momo: to === "momo" ? momo : 0 };
     },
     async waitingPools(date) { return pools.filter(p => p.order_date === date && p.status === "waiting" && meals(p.id) > 0); },
     async vendorSetMenu(token, list) {
@@ -676,6 +693,7 @@ function makeSupabaseApi() {
     async updateName(name) { const d = must(await sb.auth.updateUser({ data: { name } })); try { await this.saveProfile({ name }); } catch (e) {} return { id: d.user.id, email: d.user.email, name }; },
     async accountStats() { const r = await sb.rpc("admin_account_stats"); if (r.error && /function|schema cache/i.test(r.error.message)) throw new Error("Run update-7.sql in the Supabase SQL Editor once."); return must(r); },
     async updateSettings(patch) { const r = await sb.from("settings").update(patch).eq("id", 1).select("id");
+      if (r.error && /momo_network/i.test(r.error.message)) throw new Error("Run update-10.sql in the Supabase SQL Editor once, then try again.");
       if (r.error && /base_fare|per_km|column|schema cache/i.test(r.error.message)) throw new Error("Run update-7.sql in the Supabase SQL Editor once, then try again.");
       if (!must(r).length) throw new Error("Not saved. Your account may not have permission to change settings."); },
     async saveProfile(p) { const u = await this.user(); if (u) must(await sb.from("profiles").upsert({ user_id: u.id, email: u.email, ...p })); },
@@ -687,6 +705,8 @@ function makeSupabaseApi() {
     kitchenQuote: (t, o, price) => rpc("kitchen_quote", { p_token: t, p_order: o, p_price: Number(price) }),
     async kitchenDecline(t, o, reason) { const r = await sb.rpc("kitchen_decline", { p_token: t, p_order: o, p_reason: reason || null });
       if (r.error && /function|schema cache/i.test(r.error.message)) throw new Error("ChopPool needs a quick update before you can decline. Please tell ChopPool."); return must(r); },
+    async cancelOrder(id, reason, refund) { const r = await sb.rpc("cancel_order", { p_order: id, p_reason: reason || null, p_refund: refund || "wallet" });
+      if (r.error && /function|schema cache/i.test(r.error.message)) throw new Error("Cancelling isn't switched on yet. Please contact ChopPool."); return must(r); },
     async waitingPools(date) { const ps = must(await sb.from("public_pools").select("*").eq("order_date", date).eq("status", "waiting")); return ps.filter(p => p.meals > 0); },
     vendorSetMenu: (t, items) => rpc("vendor_set_menu", { p_token: t, p_items: items }),
     riderView: (t, d) => rpc("rider_view", { p_token: t, p_date: d }),
@@ -981,7 +1001,7 @@ async function viewOrder() {
   $("#addVendor").addEventListener("click", openAddVendor);
   $("#pools").addEventListener("click", e => { const b = e.target.closest("button[data-menu]"); if (b) openOrder(b.dataset.menu); const g = e.target.closest("[data-gokitchens]"); if (g) setTab("kitchens"); });
   $("#kitchensList").addEventListener("click", e => { const b = e.target.closest("button[data-menu]"); if (b) openOrder(b.dataset.menu); });
-  $("#tabOrders").addEventListener("click", e => { const b = e.target.closest("button[data-pay]"); if (b) openPayQuote(b.dataset.pay); const ro = e.target.closest("[data-reorder]"); if (ro) openOrder(ro.dataset.reorder); const h = e.target.closest("[data-gohome]"); if (h) setTab("home"); });
+  $("#tabOrders").addEventListener("click", e => { const b = e.target.closest("button[data-pay]"); if (b) openPayQuote(b.dataset.pay); const ro = e.target.closest("[data-reorder]"); if (ro) openOrder(ro.dataset.reorder); const cx = e.target.closest("[data-cancel]"); if (cx) openCancel(cx.dataset.cancel); if (e.target.closest("[data-keepcb]")) openAccount("Your cashback moves into your new wallet."); const h = e.target.closest("[data-gohome]"); if (h) setTab("home"); });
   renderWhen(); refreshUser(); await refreshBoard(); await refreshMine();
   setTab(S.tab);
   if (!local.get("cp_site") && !S.pickedOnce) { S.pickedOnce = true; openSitePicker(true); }
@@ -1256,6 +1276,7 @@ function announceActivity() {
 /* Orders tab */
 function statusLine(o) {
   const site = siteOf(o.site_id), st = o.pool_status, seller = menuOf(o.kitchen_id).public_name || "The seller";
+  if (o.status === "cancelled" && /^You cancelled/.test(o.cancel_reason || "")) return o.cancel_reason + "." + (o.refund_needed ? " ChopPool will refund your MoMo payment." : o.has_account && Number(o.max_fee) ? " Your money is back in your wallet." : "");
   if (o.status === "cancelled" && /^The seller can't/.test(o.cancel_reason || "")) return o.cancel_reason + ". Nothing was charged. You can still order the standard meal.";
   if (o.status === "cancelled") return (o.cancel_reason || "Cancelled") + ". " + (S.user ? "Any wallet payment is back in your wallet; MoMo payments are refunded by ChopPool." : "ChopPool will refund your MoMo payment.");
   if (o.status === "collected") return "Collected. Enjoy your lunch.";
@@ -1294,16 +1315,51 @@ async function refreshMine() {
   $("#ordBadge").textContent = active; $("#ordBadge").classList.toggle("hidden", !active);
   if (S.tab === "orders") renderOrders();
 }
+// Customers can cancel until the cut-off; after that the kitchen is cooking
+const canCancel = o => ["pending", "paid", "quote_requested", "quoted"].includes(o.status) && new Date() < at(o.order_date, S.settings.cutoff);
+// What the pool has saved on this order's delivery: shown as cashback, and as a reason for guests to create an account
+function savingLine(o) {
+  const v = Number(o.saving) || 0; if (!v || o.status === "cancelled") return "";
+  const closed = new Date() >= at(o.order_date, S.settings.cutoff);
+  if (!closed) return `<p class="small" style="color:var(--ok)">Delivery saved so far: ${money(v)}. It comes back to your wallet after ${fmtTime(S.settings.cutoff)}.</p>`;
+  if (o.has_account) return `<p class="small" style="color:var(--ok)">${o.status === "pending" ? money(v) + " delivery cashback goes to your wallet once your payment is confirmed." : money(v) + " delivery cashback added to your wallet."}</p>`;
+  return `<div class="note" style="display:grid;gap:8px"><span><strong>${money(v)} cashback is waiting for you.</strong> Create a free account on this phone to keep it in your wallet for your next lunch.</span><button class="btn" data-keepcb>Create an account and keep ${money(v)}</button></div>`;
+}
+function openCancel(id) {
+  const o = (S.mine || []).find(x => x.id === id); if (!o) return;
+  const paidMomo = o.status === "paid" && Number(o.amount_due) > 0, special = ["quote_requested", "quoted"].includes(o.status);
+  const R = ["Changed my plans", "Ordered by mistake", "Ordered the wrong meal", "Other"];
+  openSheet(`${sheetHead("Cancel order " + esc(o.code) + "?", "You can cancel until " + fmtTime(S.settings.cutoff) + ". After that the kitchen is cooking.")}
+    <form id="cancelForm" class="stack" novalidate><p class="group-title">Why are you cancelling?</p>
+      <div class="stack" style="gap:6px">${R.map((r, n) => `<label class="choice"><input type="radio" name="why" value="${esc(r)}"${n === 0 ? " checked" : ""}><span>${esc(r)}</span></label>`).join("")}</div>
+      ${special ? `<p class="note">You haven't paid for this request, so nothing is charged.</p>`
+        : paidMomo && o.has_account ? `<p class="group-title">Your refund (${money(o.amount_due)})</p><div class="stack" style="gap:6px">
+          <label class="choice"><input type="radio" name="to" value="wallet" checked><span>To my ChopPool wallet, straight away</span></label>
+          <label class="choice"><input type="radio" name="to" value="momo"><span>Back to my MoMo (ChopPool sends it, usually the same day)</span></label></div>`
+        : paidMomo ? `<p class="note">ChopPool will refund ${money(o.amount_due)} to your MoMo, usually the same day.</p>`
+        : o.status === "pending" && Number(o.amount_due) > 0 ? `<p class="note">Your MoMo payment is still being checked. Once it's confirmed, ChopPool refunds it to your MoMo.</p>`
+        : `<p class="note">Your wallet payment goes straight back to your wallet.</p>`}
+      <p class="err" id="cancelErr"></p>
+      <div class="row" style="justify-content:flex-start;gap:8px"><button class="btn" style="background:var(--danger);box-shadow:none">Cancel order</button><button class="ghost" type="button" data-close>Keep it</button></div></form>`);
+  $("#cancelForm").addEventListener("submit", async e => {
+    e.preventDefault(); const f = e.target, why = f.querySelector("[name=why]:checked")?.value, to = f.querySelector("[name=to]:checked")?.value || "wallet";
+    try {
+      const r = await api.cancelOrder(id, why, to); closeSheet();
+      toast(r.refund === "nothing" ? "Request cancelled. Nothing was charged." : r.refund === "momo" ? "Cancelled. ChopPool will refund " + money(r.momo) + " to your MoMo." : r.wallet_credit ? "Cancelled. " + money(r.wallet_credit) + " is back in your wallet." : "Order cancelled.");
+      await refreshMine(); refreshBoard(); if (S.user) renderWallet();
+    } catch (err) { $("#cancelErr").textContent = cleanErr(err); }
+  });
+}
 // Full bill for a priced special request, so the customer sees exactly what they pay for
 function quoteBreakdown(o) {
   const q = Number(o.qty) || 1, rows = [[q + " × " + o.item_name + " with your request (seller's price " + money(o.quote_price) + ")", Number(o.quote_price) * q]];
   if (Number(o.addons_total)) rows.push(["Add-ons: " + addonText(o.addons), Number(o.addons_total) * q]);
-  if (o.max_fee != null) rows.push(["Delivery (the most it can be)", Number(o.max_fee) * q]);
+  if (o.max_fee != null) rows.push(["Delivery, full price", Number(o.max_fee) * q]);
   if (o.service_fee != null) rows.push(["Service fee", Number(o.service_fee)]);
   if (Number(o.wallet_used)) rows.push(["Wallet credit used", -Number(o.wallet_used)]);
   return `<div class="ledger" style="margin:4px 0 8px">${rows.map(([l, v]) => `<div><span>${esc(l)}</span><strong class="num">${v < 0 ? "−" : ""}${money(Math.abs(v))}</strong></div>`).join("")}
     <div><span><strong>Total to pay</strong></span><strong class="num">${money(o.amount_due)}</strong></div></div>
-    <p class="small muted">Delivery drops as more people join the pool. The difference comes back to your wallet as cashback after ${fmtTime(S.settings.cutoff)}.</p>`;
+    <p class="small muted">What the pool saves on delivery comes back to your wallet as cashback after ${fmtTime(S.settings.cutoff)}.</p>`;
 }
 function renderOrders() {
   const el = $("#tabOrders"), rows = S.mine || [];
@@ -1315,6 +1371,8 @@ function renderOrders() {
       ${o.status === "cancelled" ? "" : `<div class="track" aria-label="Progress ${step} of 5">${[1, 2, 3, 4, 5].map(n => `<i class="${n <= step ? "on" : ""}"></i>`).join("")}</div>`}
       <p class="status-text">${esc(statusLine(o))}</p>
       ${o.status === "quoted" ? quoteBreakdown(o) + `<button class="btn wide" data-pay="${esc(o.id)}">Pay ${money(o.amount_due)}</button>` : ""}
+      ${savingLine(o)}
+      ${canCancel(o) ? `<button class="linkbtn" data-cancel="${esc(o.id)}" style="justify-self:start;color:var(--danger)">Cancel order</button>` : ""}
       ${o.status === "cancelled" && /^The seller can't/.test(o.cancel_reason || "") && S.menus.some(m => m.id === o.kitchen_id) ? `<button class="ghost wide" data-reorder="${esc(o.kitchen_id)}">Order the standard meal instead</button>` : ""}</article>`;
   }).join("") || `<div class="empty">${ICON.receipt}<p>No orders yet today.</p><button class="btn" data-gohome>See today's pools</button></div>`);
 }
@@ -1350,10 +1408,10 @@ function openOrder(menuId) {
         ${S.user && S.balance > 0 ? `<label class="switch"><span>Use wallet <span class="muted num">(${money(S.balance)})</span></span><input type="checkbox" id="fWallet" checked></label>` : ""}
       </div>
       <div class="group" id="payGroup"><p class="group-title">Payment</p><div class="sum" id="sum"></div>
-        <div class="pay" id="payPart"><div class="momo"><span class="logo">MoMo</span><span style="flex:1;display:grid"><span class="small muted">Send <strong id="dueTxt"></strong> to</span><strong class="num">${esc(s.momo_number)}</strong><span class="small muted">${esc(s.momo_name)}</span></span>
+        <div class="pay" id="payPart"><div class="momo"><span class="logo">MoMo</span><span style="flex:1;display:grid"><span class="small muted">Send <strong id="dueTxt"></strong> to</span><strong class="num">${esc(s.momo_number)}</strong><span class="small muted">${esc(s.momo_name)}${s.momo_network ? " · " + esc(s.momo_network) : ""}</span></span>
           <button type="button" class="ghost" id="copyNum" style="padding:8px 10px" aria-label="Copy MoMo number">${ICON.copy}</button></div>
           <div><label for="fRef">Transaction ID from your MoMo SMS</label><input id="fRef" placeholder="e.g. 51234567890"></div></div>
-        <p class="small muted" id="saveTxt">What the pool saves on delivery goes back to your ChopPool wallet.</p>
+        <p class="small muted" id="saveTxt">What the pool saves on delivery comes back to your ChopPool wallet after ${fmtTime(s.cutoff)}.</p>
       </div>
       <p class="err" id="formErr"></p>
       <div class="sheet-foot"><div class="tot"><b class="num" id="totTxt"></b><span id="totSub"></span></div><button class="btn" type="submit" id="submitBtn">Join the pool</button></div>
@@ -1371,13 +1429,13 @@ function openOrder(menuId) {
     }
     $("#saveTxt").classList.remove("hidden");
     const addT = (item.addons || []).filter(a => extras.has(a.name)).reduce((t, a) => t + Number(a.price), 0);
-    // Most you'll pay for delivery = the pool's fee once your meals are in (by distance), capped at the set maximum. It can only go down from here.
-    const cp = currentPool(S.siteId, k.id), inPool = cp && cp.meals + qty <= Number(s.max_meals) ? cp.meals : 0, dFee = feeFor(inPool + qty, s, tripTo(k, site));
+    // Full delivery at checkout: the lower of the max per meal and the whole trip by distance. What the pool saves comes back as cashback after the cut-off.
+    const dFee = feeFor(1, s, tripTo(k, site));
     const total = (Number(item.price) + addT) * qty + dFee * qty + Number(s.service_fee);
     const useW = $("#fWallet")?.checked ? Math.min(S.balance, total) : 0, due = total - useW;
     $("#sum").innerHTML = `<div><span>${qty} × ${esc(item.name)}</span><span class="num">${money(item.price * qty)}</span></div>` +
       (addT ? `<div><span>Extras</span><span class="num">${money(addT * qty)}</span></div>` : "") +
-      `<div><span>Delivery (most you'll pay${qty > 1 ? ", " + money(dFee) + " a meal" : ""})</span><span class="num">${money(dFee * qty)}</span></div><div><span>Service fee</span><span class="num">${money(s.service_fee)}</span></div>` +
+      `<div><span>Delivery, full price${qty > 1 ? " (" + money(dFee) + " a meal)" : ""}</span><span class="num">${money(dFee * qty)}</span></div><div><span>Service fee</span><span class="num">${money(s.service_fee)}</span></div>` +
       (useW ? `<div><span>From wallet</span><span class="num">−${money(useW)}</span></div>` : "");
     $("#payPart").classList.toggle("hidden", due <= 0);
     $("#dueTxt").textContent = money(due);
@@ -1444,7 +1502,7 @@ function openPayQuote(id) {
     ${sheetHead("Confirm your special request", esc(menuOf(o.kitchen_id).public_name) + " priced it at " + money(o.quote_price) + " a meal.")}
     <div class="sum"><div><span>Total with delivery and service</span><span class="num">${money(o.amount_due)}</span></div></div>
     ${S.user && S.balance > 0 ? `<label class="switch"><span>Use wallet <span class="muted num">(${money(S.balance)})</span></span><input type="checkbox" id="qWallet" checked></label>` : ""}
-    <div class="pay"><div class="momo"><span class="logo">MoMo</span><span style="flex:1;display:grid"><span class="small muted">Send the rest to</span><strong class="num">${esc(s.momo_number)}</strong><span class="small muted">${esc(s.momo_name)} · before ${fmtTime(s.cutoff)}</span></span></div>
+    <div class="pay"><div class="momo"><span class="logo">MoMo</span><span style="flex:1;display:grid"><span class="small muted">Send the rest to</span><strong class="num">${esc(s.momo_number)}</strong><span class="small muted">${esc(s.momo_name)}${s.momo_network ? " · " + esc(s.momo_network) : ""} · before ${fmtTime(s.cutoff)}</span></span></div>
       <div><label for="qRef">Transaction ID from your MoMo SMS</label><input id="qRef" placeholder="e.g. 51234567890"></div></div>
     <p class="err" id="qErr"></p><button class="btn wide" id="qPay">Confirm payment</button>`);
   $("#qPay").addEventListener("click", async () => {
@@ -1716,6 +1774,11 @@ async function renderAdmin() {
         <p><strong>Coordinator</strong> · runs each day: payments, pools, kitchens, buildings, riders, wallets.</p>
         <p><strong>Kitchens, riders and building hosts</strong> · no login. They use their own private link, sent from Kitchens & menus, Riders or Buildings.</p>
         <p><strong>Customers</strong> · order from the main link; an account is optional.</p></div></section>
+      ${isSuper ? `<form class="card" data-form="payment"><h2>Payment details</h2><p class="small muted">Customers send MoMo here. Use the number registered to ChopPool.</p>
+        <div class="grid2"><div><label for="pmNum">MoMo number</label><input id="pmNum" name="momo_number" inputmode="tel" value="${esc(s.momo_number || "")}"></div>
+          <div><label for="pmName">Account name</label><input id="pmName" name="momo_name" value="${esc(s.momo_name || "")}"></div>
+          <div><label for="pmNet">Network</label><select id="pmNet" name="momo_network">${["MTN", "Telecel", "AirtelTigo"].map(n => `<option${(s.momo_network || "MTN") === n ? " selected" : ""}>${n}</option>`).join("")}</select></div></div>
+        <p class="err" data-err></p><button class="btn">Save payment details</button></form>` : ""}
       ${isSuper ? `<form class="card" data-form="team"><h2>Add a team member</h2><div class="grid2"><div><label for="ntEmail">Email</label><input id="ntEmail" name="email" type="email" placeholder="ops@yourcompany.com"></div>
         <div><label for="ntRole">Role</label><select id="ntRole" name="role"><option value="coordinator">Coordinator</option><option value="super">Owner</option></select></div></div>
         <p class="small muted">They then open ${esc(baseUrl())}/#admin, choose "Create an account" with this email, and sign in.</p><p class="err" data-err></p><button class="btn">Add to team</button></form>` : `<p class="note">Only the owner can add or remove team members.</p>`}
@@ -1825,6 +1888,12 @@ async function adminSubmit(e) {
   const v = n => (f.querySelector(`[name="${n}"]`)?.value || "").trim(), err = f.querySelector("[data-err]");
   const fail = m => { if (err) err.textContent = m; else toast(m); };
   try {
+    if (f.dataset.form === "payment") {
+      const num = v("momo_number").replace(/[^\d ]/g, "").trim(), name = v("momo_name"), net = f.querySelector("[name=momo_network]").value;
+      if (!/^0\d{9}$/.test(num.replace(/\s/g, ""))) return fail("Enter the 10-digit MoMo number, like 024 123 4567.");
+      if (name.length < 2) return fail("Enter the name on the MoMo account.");
+      await api.updateSettings({ momo_number: num, momo_name: name, momo_network: net }); Object.assign(S, await api.load()); toast("Payment details saved");
+    }
     if (f.dataset.form === "pricing") {
       const vals = ["base_fare", "per_km", "max_fee", "trip_cost"].map(n => [n, Number(v(n))]);
       if (vals.some(([, x]) => !isFinite(x) || x < 0) || !Number(v("max_fee")) || !Number(v("per_km"))) return fail("Enter numbers for all four boxes.");
