@@ -41,6 +41,9 @@ async function poolEvents(poolId: string, opened = false) {
   const cust = () => customerSubs(live), url = APP + "/#order";
   if (p.status === "waiting" && await once("new_pool:" + p.id))
     await send(await kitchenSubs(k.id), "New pool at " + site.name, "Customers want to order from you. Confirm you're cooking within " + s.accept_timeout_min + " minutes.", APP + "/#kitchen-" + k.token, "pool-" + p.id);
+  // "Always cooking" vendors: the pool opened by itself, so tell them it started
+  if (p.status === "collecting" && (k.auto_days || []).length && meals && await once("auto_start:" + p.id))
+    await send(await kitchenSubs(k.id), "New pool at " + site.name, meals + " meal" + (meals > 1 ? "s" : "") + " so far. Orders close at " + String(s.cutoff).slice(0, 5) + "; you'll get the final count then.", APP + "/#kitchen-" + k.token, "pool-" + p.id);
   if (opened && p.status === "collecting" && meals && await once("pool_open:" + p.id))
     await send(await cust(), k.public_name + " is cooking", "Your pool at " + site.name + " is open. Share it so delivery gets cheaper.", url, "pool-" + p.id);
   if (p.status === "collecting" && meals === s.max_meals - 1 && await once("seat1:" + p.id))
@@ -66,10 +69,53 @@ async function orderEvents(orderId: string) {
   await poolEvents(o.pool_id);
 }
 
+// Runs every minute (Supabase schedule) and whenever a vendor or team page is open:
+// reminds vendors who haven't confirmed, tells customers when a pool is cancelled, and sends each vendor a cut-off summary.
+async function tick() {
+  await db.rpc("housekeeping");
+  const { data: s } = await db.from("settings").select("*").eq("id", 1).single(); if (!s) return;
+  const now = new Date(), today = now.toISOString().slice(0, 10), since = new Date(now.getTime() - 2 * 864e5).toISOString().slice(0, 10);
+  const { data: pools } = await db.from("pools").select("*").gte("order_date", since);
+  for (const p of pools || []) {
+    if (p.status === "waiting") {
+      const mins = (now.getTime() - Date.parse(p.created_at)) / 6e4, left = Math.max(0, Math.round(s.accept_timeout_min - mins));
+      for (const t of [5, 10, 15]) if (mins >= t && t < s.accept_timeout_min && await once("remind" + t + ":" + p.id)) {
+        const [{ data: k }, { data: site }, { data: os }] = await Promise.all([db.from("kitchens").select("*").eq("id", p.kitchen_id).single(), db.from("sites").select("*").eq("id", p.site_id).single(),
+          db.from("orders").select("qty").eq("pool_id", p.id).neq("status", "cancelled")]);
+        const n = (os || []).reduce((a: number, o: any) => a + o.qty, 0);
+        if (k && n) await send(await kitchenSubs(k.id), "Customers are waiting", n + " meal" + (n > 1 ? "s" : "") + " for " + site.name + ". Confirm you're cooking: " + left + " minutes left.", APP + "/#kitchen-" + k.token, "pool-" + p.id);
+        break;
+      }
+    }
+    if (p.status === "cancelled" && await once("expired_check:" + p.id)) {
+      const { data: os } = await db.from("orders").select("*").eq("pool_id", p.id).eq("cancel_reason", "The seller did not confirm in time");
+      if (os && os.length) {
+        const { data: k } = await db.from("kitchens").select("public_name").eq("id", p.kitchen_id).single();
+        await send(await customerSubs(os), (k ? k.public_name : "The vendor") + " didn't confirm", "Your money is back. Tap Order again if they start cooking later.", APP + "/#order", "pool-" + p.id);
+      }
+    }
+  }
+  // Cut-off summary for each vendor with orders today
+  const cut = new Date(today + "T" + String(s.cutoff).slice(0, 5) + ":00Z");
+  if (now >= cut && now.getTime() - cut.getTime() < 3 * 3600e3) {
+    const live = (pools || []).filter((p: any) => p.order_date === today && !["cancelled", "waiting"].includes(p.status));
+    const byK: Record<string, any[]> = {}; live.forEach((p: any) => { (byK[p.kitchen_id] = byK[p.kitchen_id] || []).push(p); });
+    for (const kid of Object.keys(byK)) {
+      if (!await once("summary:" + kid + ":" + today)) continue;
+      const [{ data: k }, { data: os }] = await Promise.all([db.from("kitchens").select("*").eq("id", kid).single(),
+        db.from("orders").select("qty,special_request,status").in("pool_id", byK[kid].map((p: any) => p.id)).in("status", ["pending", "paid", "collected"])]);
+      const n = (os || []).reduce((a: number, o: any) => a + o.qty, 0), sp = (os || []).filter((o: any) => o.special_request).length;
+      const [h, m] = String(s.delivery_time).slice(0, 5).split(":").map(Number), ready = new Date(Date.UTC(2000, 0, 1, h, m - 30)).toISOString().slice(11, 16);
+      if (k && n) await send(await kitchenSubs(k.id), "Orders closed: " + n + " meals", byK[kid].length + " pool" + (byK[kid].length > 1 ? "s" : "") + (sp ? ", " + sp + " special request" + (sp > 1 ? "s" : "") : "") + ". Ready by " + ready + ". Confirm the final batch on your page.", APP + "/#kitchen-" + k.token, "summary-" + kid);
+    }
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   try {
     const b = await req.json().catch(() => ({}));
+    if (b.tick) await tick();
     if (b.order_id) await orderEvents(String(b.order_id));
     if (b.pool_id) await poolEvents(String(b.pool_id));
     if (b.kitchen_token && b.date) {   // a seller just confirmed: tell every pool that opened
