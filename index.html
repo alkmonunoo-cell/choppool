@@ -153,6 +153,10 @@ p { margin: 0; }
 .homemini.show { opacity: 1; transform: none; }
 .homemini b { font-family: var(--font-display); font-size: 15px; font-weight: 800; margin-right: 2px; }
 .homemini span { white-space: nowrap; }
+.minebtns { display: grid; grid-template-columns: 1fr 52px; gap: 8px; }
+.minebtns .btn { display: flex; align-items: center; justify-content: center; gap: 6px; }
+.sharebtn { display: grid; place-items: center; padding: 0; border-radius: 15px; }
+.mine-note { margin: 0; color: var(--muted); }
 .waitbox { display: grid; gap: 12px; padding: 14px; border-radius: 20px; background: linear-gradient(135deg, color-mix(in srgb, #F5B04A 18%, var(--surface)) 0%, color-mix(in srgb, #F5B04A 6%, var(--surface)) 100%); border: 1px solid color-mix(in srgb, #F5B04A 38%, transparent); box-shadow: inset 0 1px 0 rgba(255,255,255,.06); }
 .wb-row { display: flex; align-items: center; gap: 12px; }
 .wb-ring { position: relative; width: 56px; height: 56px; flex: none; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1; gap: 1px; }
@@ -1472,9 +1476,11 @@ async function viewOrder() {
   $("#theme").addEventListener("click", cycleTheme);
   $("#acct").addEventListener("click", () => S.user ? setTab("wallet") : openAccount());
   $("#addVendor").addEventListener("click", openAddVendor);
-  $("#pools").addEventListener("click", e => { if (e.target.closest("[data-findb]")) { openSitePicker(); $("#fbQ")?.focus(); return; } const ws = e.target.closest("[data-site]"); if (ws) return setSite(ws.dataset.site);
+  const mineClick = e => { const ap = e.target.closest("[data-addplate]"); if (ap) { const o = (S.mine || []).find(x => x.id === ap.dataset.addplate); if (o) openOrder(o.kitchen_id, { join: o }); return true; }
+    const sh = e.target.closest("[data-share]"); if (sh) { const [a, c] = sh.dataset.share.split(","); sharePool(a, c); return true; } return false; };
+  $("#pools").addEventListener("click", e => { if (mineClick(e)) return; if (e.target.closest("[data-findb]")) { openSitePicker(); $("#fbQ")?.focus(); return; } const ws = e.target.closest("[data-site]"); if (ws) return setSite(ws.dataset.site);
     const b = e.target.closest("button[data-menu]"); if (b) openOrder(b.dataset.menu); const g = e.target.closest("[data-gokitchens]"); if (g) setTab("kitchens"); });
-  $("#kitchensList").addEventListener("click", e => { if (e.target.closest("[data-kjump]")) return openKJump(); const b = e.target.closest("button[data-menu]"); if (b) openOrder(b.dataset.menu); });
+  $("#kitchensList").addEventListener("click", e => { if (mineClick(e)) return; if (e.target.closest("[data-kjump]")) return openKJump(); const b = e.target.closest("button[data-menu]"); if (b) openOrder(b.dataset.menu); });
   $("#tabOrders").addEventListener("click", e => { const b = e.target.closest("button[data-pay]"); if (b) openPayQuote(b.dataset.pay); const ro = e.target.closest("[data-reorder]"); if (ro) openOrder(ro.dataset.reorder);
     const ap = e.target.closest("[data-addplate]"); if (ap) { const o = (S.mine || []).find(x => x.id === ap.dataset.addplate); if (o) openOrder(o.kitchen_id, { join: o }); }
     const ag = e.target.closest("[data-again]"); if (ag) { const o = (S.mine || []).find(x => x.id === ag.dataset.again); if (o) openOrder(o.kitchen_id, { preset: { item_id: o.item_id, qty: o.qty, addons: (o.addons || []).map(a => a.name), site_id: o.site_id } }); } const cx = e.target.closest("[data-cancel]"); if (cx) openCancel(cx.dataset.cancel); const sh = e.target.closest("[data-share]"); if (sh) { const [a, c] = sh.dataset.share.split(","); sharePool(a, c); } if (e.target.closest("[data-keepcb]")) openAccount("Your cashback moves into your new wallet."); const h = e.target.closest("[data-gohome]"); if (h) setTab("home"); });
@@ -1745,7 +1751,8 @@ function renderKitchens() {
     const trip = tripTo(k, site), from = feeFor(max, s, trip), km = hasPin(site) ? roadKm(kPin(k, site), site) : null;
     const priceLine = (km != null ? "About " + (km < 1 ? "1" : km.toFixed(1)) + " km by road · " : "") + (isLong(s, trip) ? "long-distance vendor: delivery shared at cost, " + money(from) + " a meal when the pool fills" : "delivery from " + money(from) + " a meal when the pool fills");
     const status = st.full ? pill("Fully booked " + dayLabel(S.date), "bad") : st.waiting ? "" : active ? pill(p.meals + " of " + max + " seats taken", "ok") : st.open ? pill("Cooking " + dayLabel(S.date), "ok") : pill("Not confirmed yet", "dim");
-    const btn = st.full ? `<button class="btn wide" disabled>Fully booked today</button>` : st.waiting ? waitBox(k)
+    const mo = myOrderIn(k);
+    const btn = st.full ? `<button class="btn wide" disabled>Fully booked today</button>` : st.waiting ? waitBox(k) : mo ? mineBtns(mo, k)
       : active ? `<button class="btn wide" data-menu="${esc(k.id)}">Join the active pool</button>` : `<button class="btn wide" data-menu="${esc(k.id)}">Start a pool</button>`;
     return `<article class="kcard">${photoHead(k, menuIndex(k.id), `<div class="ptitle"><strong>${esc(k.public_name)}</strong><span>${esc(k.added_by_customer ? "A local vendor added by a customer" : k.tagline || "")}</span></div>`, true)}
       <div class="kbody"><div class="row" style="justify-content:flex-start;gap:6px;flex-wrap:wrap">${status}${scoreLine(k)}</div><p class="small" style="color:var(--hint)">${esc(priceLine)}</p>
@@ -1796,15 +1803,20 @@ function photoHead(k, i, inner, small) {
   const ph = photoOf(k);
   return `<div class="pool-art g${i % 4}${small ? " small" : ""}">${ph ? `<img src="${esc(ph)}" alt="" loading="lazy" decoding="async">` : `<span class="illus">${art(dishKind(topDish(k.id)))}</span>`}<span class="shade"></span>${inner}</div>`;
 }
+// Your own live order in this vendor's pool here (then the card offers "Add to my order" instead of joining again)
+const myOrderIn = k => (S.mine || []).find(o => !o.parent_id && o.kitchen_id === k.id && o.site_id === S.siteId && o.order_date === S.date
+  && ["pending", "paid"].includes(o.status) && ["waiting", "collecting"].includes(o.pool_status));
+const SHARE = SV('<path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M12 3v13"/><path d="m7 8 5-5 5 5"/>', 20);
+const mineBtns = (o, k) => `<div class="minebtns"><button class="btn wide" data-addplate="${esc(o.id)}">${SV('<path d="M12 5v14M5 12h14"/>', 18)} Add to my order</button><button class="ghost sharebtn" data-share="${esc(o.site_id)},${esc(k.id)}" aria-label="Share this pool">${SHARE}</button></div>`;
 // Waiting for the vendor: status, time left and the button together in one box
 function waitBox(k) {
   const s = S.settings, wp = S.board.pools.find(x => x.site_id === S.siteId && x.kitchen_id === k.id && x.status === "waiting");
   const left = wp ? Math.max(0, s.accept_timeout_min - minsAgo(wp.created_at)) : s.accept_timeout_min, n = wp ? wp.meals : 0;
-  const C = 2 * Math.PI * 19, frac = Math.max(0, Math.min(1, left / s.accept_timeout_min)), first = !(S.seenWait = S.seenWait || new Set()).has(k.id); S.seenWait.add(k.id);
+  const mine = myOrderIn(k), C = 2 * Math.PI * 19, frac = Math.max(0, Math.min(1, left / s.accept_timeout_min)), first = !(S.seenWait = S.seenWait || new Set()).has(k.id); S.seenWait.add(k.id);
   return `<div class="waitbox${first ? " fresh" : ""}"><div class="wb-row">
       <span class="wb-ring" role="img" aria-label="${left} minutes left"><svg viewBox="0 0 44 44"><circle class="trk" cx="22" cy="22" r="19"/><circle class="arc" cx="22" cy="22" r="19" style="stroke-dasharray:${C.toFixed(1)};stroke-dashoffset:${(C * (1 - frac)).toFixed(1)};--c:${C.toFixed(1)}"/></svg><b class="num">${left}</b><small>min</small></span>
-      <span class="wb-text"><strong>Waiting for ${esc(k.public_name)} to confirm</strong><span>${n} ${n === 1 ? "meal" : "meals"} so far · full refund if they don't</span></span></div>
-    <button class="btn wide wb-btn" data-menu="${esc(k.id)}">Join anyway</button></div>`;
+      <span class="wb-text"><strong>Waiting for ${esc(k.public_name)} to confirm</strong><span>${mine ? "You're in · code " + esc(mine.code) + " · " + n + (n === 1 ? " meal" : " meals") + " so far" : n + " " + (n === 1 ? "meal" : "meals") + " so far · full refund if they don't"}</span></span></div>
+    ${mine ? mineBtns(mine, k) : `<button class="btn wide wb-btn" data-menu="${esc(k.id)}">Join anyway</button>`}</div>`;
 }
 // Busiest buildings today (most meals), for one-tap chips on the welcome card
 function busySites(n) {
@@ -1854,7 +1866,8 @@ function renderPools() {
       seats = `<div class="seats" aria-label="${p.meals} of ${max} seats taken">${Array.from({ length: max }, (_, n) => `<i class="${n < p.meals ? "on" : drop && n < p.meals + drop.more ? "next" : ""}"></i>`).join("")}</div>`;
       line = p.meals === 0 ? `<span class="hint">Start the pool. Delivery gets cheaper with every seat filled.</span>`
         : `<span class="seatline"><span><strong class="num">${p.meals} of ${max}</strong> seats taken</span>${drop ? `<span class="hint">${drop.more} more → ${money(drop.fee)}</span>` : ""}</span>`;
-      btn = `<button class="btn wide" data-menu="${esc(k.id)}">Join this pool</button>`;
+      const mo = myOrderIn(k);
+      btn = mo ? `<p class="small mine-note">You're in this pool · code <strong class="num">${esc(mo.code)}</strong></p>` + mineBtns(mo, k) : `<button class="btn wide" data-menu="${esc(k.id)}">Join this pool</button>`;
     }
     const site = siteOf(S.siteId), km = hasPin(site) && kPin(k, site) ? roadKm(kPin(k, site), site) : null;
     return `<article class="pool">
@@ -1953,6 +1966,7 @@ async function refreshMine() {
   const active = rows.filter(o => !["collected", "cancelled"].includes(o.status)).length;
   $("#ordBadge").textContent = active; $("#ordBadge").classList.toggle("hidden", !active);
   if (S.tab === "orders") renderOrders();
+  const sig = rows.map(o => o.id + o.status + o.pool_status).join(); if (sig !== S.mineSig) { S.mineSig = sig; if ($("#pools") && !S.noSite) renderPools(); }
 }
 // Customers can cancel until the cut-off; after that the kitchen is cooking
 const canCancel = o => ["pending", "paid", "quote_requested", "quoted"].includes(o.status) && new Date() < at(o.order_date, S.settings.cutoff);
