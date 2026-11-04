@@ -115,7 +115,7 @@ p { margin: 0; }
 .hero p { opacity: .92; position: relative; z-index: 1; }
 .hero-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; position: relative; z-index: 1; }
 .hero-stat { background: rgba(255,255,255,.16); border: 1px solid rgba(255,255,255,.22); border-radius: 16px; padding: 10px 12px; display: grid; align-content: start; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
-button.hero-stat { font: inherit; color: inherit; text-align: left; cursor: pointer; position: relative; }
+button.hero-stat { padding-right: 22px !important; font: inherit; color: inherit; text-align: left; cursor: pointer; position: relative; }
 button.hero-stat::after { content: "›"; position: absolute; right: 9px; top: 6px; font-weight: 700; font-size: 17px; opacity: .85; }
 .hero-stat b { font-family: var(--font-display); font-size: 18px; font-weight: 800; line-height: 1.15; white-space: nowrap; }
 .hero-stat span { font-size: 11.5px; opacity: .9; line-height: 1.3; }
@@ -782,6 +782,28 @@ body.on-home .topzone { position: relative; top: 0; }
 .nupd b { font-size: 14px; display: block; } .nupd p { font-size: 13px; color: var(--muted); line-height: 1.4; } .nupd small { font-size: 11.5px; color: var(--muted); }
 #bell { position: relative; }
 #bell .bdot { position: absolute; top: 7px; right: 8px; width: 8px; height: 8px; border-radius: 9px; background: var(--accent); border: 2px solid var(--bg); }
+.hero { transition: background .45s, box-shadow .45s; }
+:root[data-theme="dark"] .hero { background: radial-gradient(90% 70% at 100% 0%, rgba(255,106,43,.30) 0%, rgba(255,106,43,0) 60%), radial-gradient(130% 120% at 85% 0%, #232326 0%, #141416 70%); box-shadow: 0 0 0 1px #2A2A2E, 0 18px 40px -20px rgba(0,0,0,.8); }
+:root[data-theme="dark"] .hero::before { content: ""; position: absolute; left: 20px; right: 20px; top: 0; height: 2px; border-radius: 0 0 4px 4px; background: linear-gradient(90deg, transparent, #FF6A2B 30%, #FFB48A 60%, transparent); }
+:root[data-theme="dark"] .hero::after { background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22120%22%20height%3D%22120%22%20fill%3D%22none%22%20stroke%3D%22%23FF6A2B%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M10%2030h34a17%2017%200%200%201-34%200z%22/%3E%3Cpath%20d%3D%22M18%2024c0-4%204-4%204-8M27%2024c0-4%204-4%204-8%22/%3E%3Cpath%20d%3D%22M78%2012l14%2030M86%2010v14a4%204%200%200%200%208%200V10M90%2024v22%22/%3E%3Cpath%20d%3D%22M70%2080c6-10%2020-10%2026%200-6%2010-20%2010-26%200z%22/%3E%3Cpath%20d%3D%22M70%2080h26%22/%3E%3Cpath%20d%3D%22M14%2084c8-6%2014%202%2022-4%204%2010-8%2022-22%2014z%22/%3E%3Cpath%20d%3D%22M14%2094c6-4%2012-6%2022-14%22/%3E%3Ccircle%20cx%3D%2256%22%20cy%3D%2256%22%20r%3D%223%22/%3E%3Ccircle%20cx%3D%22104%22%20cy%3D%22104%22%20r%3D%222%22/%3E%3Ccircle%20cx%3D%2250%22%20cy%3D%22108%22%20r%3D%222%22/%3E%3C/svg%3E"); opacity: .22; }
+:root[data-theme="dark"] .hero p { color: #C9C4BF; opacity: 1; }
+:root[data-theme="dark"] .hero .hero-text p:first-child { color: #FF9B66; }
+:root[data-theme="dark"] .hero-stat { background: rgba(255,255,255,.04) !important; border-color: rgba(255,255,255,.08); }
+:root[data-theme="dark"] .hero-stat b { color: #fff; }
+:root[data-theme="dark"] #countdown { color: #FF8A4C; }
+:root[data-theme="dark"] button.hero-stat::after { color: #FF8A4C; opacity: 1; }
+@media (prefers-color-scheme: dark) {
+.hero { transition: background .45s, box-shadow .45s; }
+:root:not([data-theme="light"]) .hero { background: radial-gradient(90% 70% at 100% 0%, rgba(255,106,43,.30) 0%, rgba(255,106,43,0) 60%), radial-gradient(130% 120% at 85% 0%, #232326 0%, #141416 70%); box-shadow: 0 0 0 1px #2A2A2E, 0 18px 40px -20px rgba(0,0,0,.8); }
+:root:not([data-theme="light"]) .hero::before { content: ""; position: absolute; left: 20px; right: 20px; top: 0; height: 2px; border-radius: 0 0 4px 4px; background: linear-gradient(90deg, transparent, #FF6A2B 30%, #FFB48A 60%, transparent); }
+:root:not([data-theme="light"]) .hero::after { background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22120%22%20height%3D%22120%22%20fill%3D%22none%22%20stroke%3D%22%23FF6A2B%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M10%2030h34a17%2017%200%200%201-34%200z%22/%3E%3Cpath%20d%3D%22M18%2024c0-4%204-4%204-8M27%2024c0-4%204-4%204-8%22/%3E%3Cpath%20d%3D%22M78%2012l14%2030M86%2010v14a4%204%200%200%200%208%200V10M90%2024v22%22/%3E%3Cpath%20d%3D%22M70%2080c6-10%2020-10%2026%200-6%2010-20%2010-26%200z%22/%3E%3Cpath%20d%3D%22M70%2080h26%22/%3E%3Cpath%20d%3D%22M14%2084c8-6%2014%202%2022-4%204%2010-8%2022-22%2014z%22/%3E%3Cpath%20d%3D%22M14%2094c6-4%2012-6%2022-14%22/%3E%3Ccircle%20cx%3D%2256%22%20cy%3D%2256%22%20r%3D%223%22/%3E%3Ccircle%20cx%3D%22104%22%20cy%3D%22104%22%20r%3D%222%22/%3E%3Ccircle%20cx%3D%2250%22%20cy%3D%22108%22%20r%3D%222%22/%3E%3C/svg%3E"); opacity: .22; }
+:root:not([data-theme="light"]) .hero p { color: #C9C4BF; opacity: 1; }
+:root:not([data-theme="light"]) .hero .hero-text p:first-child { color: #FF9B66; }
+:root:not([data-theme="light"]) .hero-stat { background: rgba(255,255,255,.04) !important; border-color: rgba(255,255,255,.08); }
+:root:not([data-theme="light"]) .hero-stat b { color: #fff; }
+:root:not([data-theme="light"]) #countdown { color: #FF8A4C; }
+:root:not([data-theme="light"]) button.hero-stat::after { color: #FF8A4C; opacity: 1; }
+}
 </style>
 </head>
 <body>
@@ -2282,7 +2304,7 @@ function poolRow(k) {
   else if (st.waiting) {
     const wp = S.board.pools.find(x => x.site_id === S.siteId && x.kitchen_id === k.id && x.status === "waiting"), left = wp ? Math.max(0, s.accept_timeout_min - minsAgo(wp.created_at)) : s.accept_timeout_min;
     l2 = mo ? "Waiting for the vendor to confirm · " + left + " min left" : "Waiting for the vendor · " + left + " min left. Full refund if they don't confirm"; warn = true;
-  } else if (mo) l2 = "Delivery is " + money(now) + " a meal right now";
+  } else if (mo) l2 = j < now ? "Add and delivery drops to " + money(j) + " a meal" : "Delivery is " + money(now) + " a meal right now";
   else l2 = j < now ? "Join and delivery drops to " + money(j) + " a meal" : "Delivery " + money(j) + " a meal if you join";
   const act = mo ? `<button class="btn" data-addplate="${esc(mo.id)}">Add</button>` : st.full ? `<button class="btn" disabled>Full</button>` : `<button class="btn" data-vendor="${esc(k.id)}">Join</button>`;
   return `<article class="prow${mo ? " mine" : ""}"><span class="ptile" data-vendor="${esc(k.id)}" style="background:${tint(i)}">${art(dishKind(topDish(k.id)))}</span>
