@@ -430,13 +430,21 @@ button.dtile:not([disabled]):hover { outline: 2px solid var(--accent-soft); }
 .topzone.compact .hero-stat b { font-size: 15px; }
 .topzone.compact .hero-stat span { font-size: 10.5px; }
 .topzone.compact .section-title { margin-top: 0; }
-#kitchensSub { max-height: 80px; overflow: hidden; transition: max-height .32s cubic-bezier(.2,.8,.2,1), opacity .2s ease, margin .32s; }
-.topzone.compact #kitchensSub { max-height: 0; opacity: 0; margin: 0; }
 .kgroup { display: grid; gap: 12px; }
-.kghead { position: sticky; top: calc(var(--tzh, 120px) - 1px); z-index: 4; display: flex; align-items: center; justify-content: space-between; gap: 8px; width: calc(100% + 32px); margin: 0 -16px; padding: 10px 16px; border: none; text-align: left; cursor: pointer;
-  font: 700 17px var(--font-display); color: var(--ink); background: color-mix(in srgb, var(--bg) 88%, transparent); -webkit-backdrop-filter: blur(16px) saturate(150%); backdrop-filter: blur(16px) saturate(150%); }
+.kghead { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; padding: 4px 0; border: none; background: none; text-align: left; cursor: pointer; font: 700 17px var(--font-display); color: var(--ink); }
 .kghead .muted { font: 600 13px var(--font-body); margin-left: 4px; }
-.kghead svg { width: 18px; height: 18px; color: var(--muted); flex: none; }
+.kghead svg, .kcur svg { width: 18px; height: 18px; color: var(--muted); flex: none; }
+/* The current category rides under the top bar as an overlay: no layout shift, no jumping */
+[data-for="kitchens"] { position: relative; }
+.kcur { position: absolute; left: -16px; right: -16px; top: calc(100% + 10px); display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 16px; border: none; border-top: 1px solid color-mix(in srgb, var(--line) 70%, transparent); cursor: pointer; text-align: left;
+  font: 700 16px var(--font-display); color: var(--ink); background: color-mix(in srgb, var(--bg) 90%, transparent); -webkit-backdrop-filter: blur(18px) saturate(150%); backdrop-filter: blur(18px) saturate(150%);
+  opacity: 0; transform: translateY(-6px); pointer-events: none; transition: opacity .2s ease, transform .2s ease; box-shadow: 0 8px 16px -12px rgba(0,0,0,.35); }
+.kcur.show { opacity: 1; transform: none; pointer-events: auto; }
+.kcur span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.kcur.swap-up span { animation: kSwapUp .26s cubic-bezier(.2,.8,.2,1); }
+.kcur.swap-down span { animation: kSwapDown .26s cubic-bezier(.2,.8,.2,1); }
+@keyframes kSwapUp { from { transform: translateY(70%); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes kSwapDown { from { transform: translateY(-70%); opacity: 0; } to { transform: none; opacity: 1; } }
 .hero-stat, .hero-stat b, .hero-stat span { transition: padding .38s, font-size .38s; }
 /* Vendor, rider and host page headers */
 .pagetop { gap: 4px; }
@@ -488,8 +496,12 @@ html.standalone, html.standalone body { overscroll-behavior: none; }
 .splash { position: fixed; inset: 0; z-index: 100; background: var(--bg); display: grid; place-items: center; transition: opacity .35s cubic-bezier(.2,.8,.2,1); cursor: pointer; }
 .splash.out { opacity: 0; pointer-events: none; }
 .sp-in { display: grid; justify-items: center; gap: 12px; padding: 24px; text-align: center; }
-.sp-logo { animation: spScale .45s cubic-bezier(.2,.8,.2,1) both; }
-.sp-p { transform-box: fill-box; transform-origin: center; }
+.sp-logo { position: relative; width: 96px; height: 96px; border-radius: 23px; background: #D9480F; animation: spScale .45s cubic-bezier(.2,.8,.2,1) both; will-change: transform, opacity; }
+.sp-p { position: absolute; width: 56%; height: 15%; border-radius: 4px; will-change: transform, opacity; }
+.sp-p::before { content: ""; position: absolute; left: 0; right: 0; top: 46%; height: 2.4px; background: #D9480F; }
+.sp-p::after { content: ""; position: absolute; left: 43%; top: 33%; width: 14%; height: 33%; border-radius: 1.5px; background: #D9480F; }
+.splash.wait * { animation-play-state: paused !important; }
+.sp-word, .sp-tag span { will-change: transform, opacity; }
 .sp-p1 { animation: spDrop .42s cubic-bezier(.2,.8,.2,1) .08s both; }
 .sp-p3 { animation: spDrop .42s cubic-bezier(.2,.8,.2,1) .24s both; }
 .sp-p2 { animation: spSlide .48s cubic-bezier(.2,.9,.3,1.12) .44s both; }
@@ -1394,7 +1406,7 @@ function setTab(t) {
   if (t === "wallet") renderWallet();
   if (t === "kitchens") renderKitchens();
   window.scrollTo(0, 0);
-  requestAnimationFrame(() => { const tz = $("#topzone"); if (tz) document.documentElement.style.setProperty("--tzh", tz.offsetHeight + "px"); });
+  if ($("#kCur")) { $("#kCur").classList.remove("show"); $("#kCur").dataset.cur = ""; }
 }
 async function viewOrder() {
   S.tab = S.tab || "home";
@@ -1410,12 +1422,14 @@ async function viewOrder() {
     </header>
       <section class="hero" id="hero" data-for="home"></section>
       <div class="section-title" data-for="home"><h2 id="poolsTitle">Active pools</h2><span class="small muted" id="poolCount"></span></div>
-      <div data-for="kitchens" class="hidden"><h1>Menus near you</h1><p class="small muted" id="kitchensSub"></p></div>
+      <div data-for="kitchens" class="hidden"><h1>Menus near you</h1>
+        <button type="button" class="kcur" id="kCur" data-kjump aria-hidden="true" tabindex="-1"><span id="kCurT"></span>${ICON.chev}</button></div>
     </div>
     <section id="tabHome" class="stack">
       <section id="pools" class="stack"></section>
     </section>
     <section id="tabKitchens" class="stack hidden">
+      <p class="small muted" id="kitchensSub" style="margin-top:-8px"></p>
       <section id="kitchensList" class="stack"></section>
       <button class="invite-card" id="addVendor" style="border:none;text-align:left;color:inherit;font:inherit;cursor:pointer;width:100%">
         <span class="blob">${ICON.store}</span>
@@ -1438,6 +1452,7 @@ async function viewOrder() {
   $("#addVendor").addEventListener("click", openAddVendor);
   $("#pools").addEventListener("click", e => { if (e.target.closest("[data-findb]")) { openSitePicker(); $("#fbQ")?.focus(); return; } const ws = e.target.closest("[data-site]"); if (ws) return setSite(ws.dataset.site);
     const b = e.target.closest("button[data-menu]"); if (b) openOrder(b.dataset.menu); const g = e.target.closest("[data-gokitchens]"); if (g) setTab("kitchens"); });
+  $("#kCur").addEventListener("click", openKJump);
   $("#kitchensList").addEventListener("click", e => { if (e.target.closest("[data-kjump]")) return openKJump(); const b = e.target.closest("button[data-menu]"); if (b) openOrder(b.dataset.menu); });
   $("#tabOrders").addEventListener("click", e => { const b = e.target.closest("button[data-pay]"); if (b) openPayQuote(b.dataset.pay); const ro = e.target.closest("[data-reorder]"); if (ro) openOrder(ro.dataset.reorder);
     const ap = e.target.closest("[data-addplate]"); if (ap) { const o = (S.mine || []).find(x => x.id === ap.dataset.addplate); if (o) openOrder(o.kitchen_id, { join: o }); }
@@ -1724,7 +1739,17 @@ function openKJump() {
   openSheet(`${sheetHead("Go to", "")}<div class="stack" style="gap:6px">${groups.map(g => `<button type="button" class="place-row" data-kgo="${esc(g.id)}"><span class="pdot on">${ICON.store.replace(/width="\d+" height="\d+"/, 'width="18" height="18"')}</span><span><strong>${esc(g.dataset.ktitle)}</strong><span class="small muted">${g.querySelectorAll(".kcard").length} vendors</span></span></button>`).join("")}
     <button type="button" class="place-row" data-kgo="addVendor"><span class="pdot">${ICON.store.replace(/width="\d+" height="\d+"/, 'width="18" height="18"')}</span><span><strong>Add a vendor you know</strong><span class="small muted">Your waakye, gob3 or kenkey seller</span></span></button></div>`);
   $("#sheet").onclick = e => { const b = e.target.closest("[data-kgo]"); if (!b) return; $("#sheet").onclick = null; closeSheet();
-    setTimeout(() => { const t = document.getElementById(b.dataset.kgo); if (!t) return; const tz = $("#topzone"); window.scrollTo({ top: t.getBoundingClientRect().top + window.scrollY - (tz ? tz.offsetHeight : 0) + 2, behavior: "smooth" }); }, 380); };
+    setTimeout(() => { const t = document.getElementById(b.dataset.kgo); if (!t) return; const tz = $("#topzone"); window.scrollTo({ top: t.getBoundingClientRect().top + window.scrollY - (tz ? tz.offsetHeight : 0) + 10, behavior: "smooth" }); }, 380); };
+}
+// Menus: which category is under the top bar right now (shown in the bar, swaps as the next one arrives)
+function kCurrent(tz) {
+  const line = tz.getBoundingClientRect().bottom, groups = [...document.querySelectorAll("#tabKitchens .kgroup")];
+  let cur = null; groups.forEach(g => { if (g.querySelector(".kghead").getBoundingClientRect().top < line - 4) cur = g; });
+  const b = $("#kCur"); if (!b) return;
+  b.classList.toggle("show", !!cur);
+  const label = cur ? cur.dataset.ktitle + " · " + cur.querySelectorAll(".kcard").length : "";
+  if (cur && b.dataset.cur !== cur.id) { const down = !b.dataset.cur || groups.findIndex(g => g.id === b.dataset.cur) < groups.indexOf(cur); b.dataset.cur = cur.id; $("#kCurT").textContent = label; b.classList.remove("swap-up", "swap-down"); void b.offsetWidth; b.classList.add(down ? "swap-up" : "swap-down"); }
+  if (!cur) b.dataset.cur = "";
 }
 // Before a building is chosen: the best-rated vendors across Accra, without delivery prices
 function renderKitchensAnywhere(el) {
@@ -3182,15 +3207,19 @@ function splash() {
   const app = isStandalone(), key = app ? "cp_splash_s" : "cp_splash_v";
   try { if (app ? sessionStorage.getItem(key) : localStorage.getItem(key)) return; (app ? sessionStorage : localStorage).setItem(key, "1"); } catch (e) {}
   const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const pk = (cls, x, y, c) => `<g class="sp-p ${cls}"><rect x="${x}" y="${y}" width="56" height="15" rx="4" fill="${c}"/><path d="M${x} ${y + 7}h56" stroke="#D9480F" stroke-width="2.5"/><rect x="${x + 24}" y="${y + 5}" width="8" height="5" rx="1.5" fill="#D9480F"/></g>`;
-  const el = document.createElement("div"); el.className = "splash" + (still ? " still" : ""); el.setAttribute("aria-hidden", "true");
-  el.innerHTML = `<div class="sp-in"><svg class="sp-logo" width="96" height="96" viewBox="0 0 100 100"><rect width="100" height="100" rx="24" fill="#D9480F"/>${pk("sp-p1", 20, 61, "#FFF7EE")}${pk("sp-p3", 21, 27, "#FFF7EE")}${pk("sp-p2", 25, 44, "#F5B04A")}</svg>
+  const pk = (cls, x, y, c) => `<i class="sp-p ${cls}" style="left:${x}%;top:${y}%;background:${c}"></i>`;
+  const el = document.createElement("div"); el.className = "splash wait" + (still ? " still" : ""); el.setAttribute("aria-hidden", "true");
+  el.innerHTML = `<div class="sp-in"><div class="sp-logo">${pk("sp-p1", 20, 61, "#FFF7EE")}${pk("sp-p3", 21, 27, "#FFF7EE")}${pk("sp-p2", 25, 44, "#F5B04A")}</div>
     <div class="sp-word">chop<span>pool</span></div><p class="sp-tag"><span>Split delivery.</span><span>One order.</span><span>One building.</span></p></div>`;
-  document.body.appendChild(el);
-  let gone = false, minDone = false; const done = () => { if (gone) return; gone = true; el.classList.add("out"); setTimeout(() => el.remove(), 380); };
+  document.body.appendChild(el); S.splashing = true;
+  // Start the animation once the heading font is ready (at most 450 ms), so nothing swaps mid-animation
+  const go = () => { if (el.classList.contains("wait")) { el.classList.remove("wait"); startMin(); } };
+  try { document.fonts.load('800 40px "Bricolage Grotesque"').then(go, go); } catch (e) { go(); }
+  setTimeout(go, 450);
+  let gone = false, minDone = false; const done = () => { if (gone) return; gone = true; el.classList.add("out"); setTimeout(() => { el.remove(); S.splashing = false; revealScan(); }, 380); };
   const tryDone = () => { if (minDone && S.appReady) done(); };
   el.addEventListener("click", () => { if (S.appReady) done(); });
-  setTimeout(() => { minDone = true; tryDone(); }, still ? 600 : 1900);
+  function startMin() { setTimeout(() => { minDone = true; tryDone(); }, still ? 600 : 1900); }
   S.onReady = tryDone;
   setTimeout(done, 15000);   // never stay stuck
 }
@@ -3198,7 +3227,7 @@ function splash() {
 const seenCards = new Set();
 let revealObs = null;
 function revealScan() {
-  if (!document.body.classList.contains("is-app") || !("IntersectionObserver" in window)) return;
+  if (!document.body.classList.contains("is-app") || !("IntersectionObserver" in window) || S.splashing) return;
   revealObs = revealObs || new IntersectionObserver(es => { let n = 0; es.forEach(e => { if (!e.isIntersecting) return; const t = e.target; t.style.transitionDelay = Math.min(n++, 5) * 70 + "ms"; t.classList.add("in"); revealObs.unobserve(t); }); }, { rootMargin: "0px 0px -6% 0px" });
   document.querySelectorAll("#view article, #view .dtile, #view details.item, #view .kcard, #view .order-card, #view section.card").forEach(el => {
     if (el.dataset.rv) return; el.dataset.rv = "1";
@@ -3214,8 +3243,8 @@ window.addEventListener("scroll", () => {
   requestAnimationFrame(() => {
     topTick = false; const y = window.scrollY;
     document.querySelectorAll(".topzone").forEach(z => z.classList.toggle("scrolled", y > 4));
-    const tz = $("#topzone"); if (tz && ["home", "kitchens"].includes(S.tab)) { if (y > (S.tab === "home" ? 90 : 24)) tz.classList.add("compact"); else if (y < 16) tz.classList.remove("compact"); }
-    const st = tz ? tz.classList.contains("compact") : null; if (tz && st !== S.tzState) { S.tzState = st; setTimeout(() => document.documentElement.style.setProperty("--tzh", tz.offsetHeight + "px"), 360); }
+    const tz = $("#topzone"); if (tz && S.tab === "home") { if (y > 90) tz.classList.add("compact"); else if (y < 16) tz.classList.remove("compact"); }
+    if (tz && S.tab === "kitchens") kCurrent(tz);
   });
 }, { passive: true });
 function initMotion() {
