@@ -130,9 +130,10 @@ p { margin: 0; }
 .pool-art.g2 { background: linear-gradient(135deg, #1F3A26 0%, #3F6B3A 50%, #A99A38 100%); }
 .pool-art.g3 { background: linear-gradient(135deg, #3B1F3F 0%, #7A3A52 50%, #D2783C 100%); }
 .pool-art img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-.pool-art .illus { width: 118px; height: 118px; display: grid; place-items: center; border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,.22), rgba(255,255,255,0) 70%); transform: translate(76px, 34px); }
-.pool-art.small .illus { width: 96px; height: 96px; transform: translate(92px, 6px); }
-.pool-art .illus svg { width: 100%; height: 100%; filter: drop-shadow(0 10px 18px rgba(0,0,0,.28)); }
+.pool-art .illus { position: absolute; right: -14px; bottom: -42px; width: 172px; height: 172px; display: grid; place-items: center; }
+.pool-art .illus::before { content: ""; position: absolute; inset: -30px; border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,.26), rgba(255,255,255,0) 62%); }
+.pool-art.small .illus { width: 132px; height: 132px; right: -4px; bottom: -22px; }
+.pool-art .illus svg { position: relative; width: 100%; height: 100%; filter: drop-shadow(0 16px 22px rgba(0,0,0,.35)); }
 .pool-art .shade { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,0) 35%, rgba(0,0,0,.62) 100%); }
 .ptag { position: absolute; left: 14px; top: 14px; z-index: 1; font-size: 12px; font-weight: 800; border-radius: 999px; padding: 5px 10px; background: rgba(255,255,255,.92); color: #1F7A4A; }
 .ptag.warn { background: rgba(245,176,74,.95); color: #3A2008; }
@@ -360,6 +361,10 @@ td select { padding: 6px 8px; width: auto; }
 .admintabs button { white-space: nowrap; background: var(--surface); box-shadow: var(--shadow); border: none; color: var(--ink); border-radius: 999px; padding: 8px 14px; font-size: 14px; }
 .admintabs button[aria-current="page"] { background: var(--ink); color: var(--bg); }
 .medit { display: grid; gap: 10px; }
+.autopick { display: grid; gap: 8px; }
+form[data-form="kitchen"] [data-msave] { display: none; }
+.autopick .presets { display: grid; gap: 6px; }
+.autopick .choice { padding: 10px 12px; }
 .contactpick { display: inline-flex; align-items: center; gap: 4px; margin-top: 6px; font-size: 13px; }
 .mdish { display: grid; gap: 8px; padding: 10px; border-radius: 16px; background: var(--surface-2); }
 .mtop { display: grid; grid-template-columns: 52px minmax(0, 1fr) 84px 32px; gap: 8px; align-items: center; }
@@ -1234,49 +1239,154 @@ const ICON = {
 
 /* Food illustrations, drawn so the app needs no photos */
 /* ---------- Dish pictures: matched from the dish name, or picked by the team ---------- */
-const DISH_KINDS = [["jollof", "Jollof"], ["waakye", "Waakye"], ["friedrice", "Fried rice"], ["ricestew", "Rice and stew"], ["fufu", "Fufu and soup"], ["banku", "Banku and fish"], ["kenkey", "Kenkey and fish"], ["tuo", "Tuo zaafi / omo tuo"], ["soup", "Soup or stew"], ["redred", "Red red"], ["kelewele", "Kelewele / plantain"], ["gob3", "Gob3 (beans and gari)"], ["chicken", "Chicken / suya"], ["salad", "Salad"], ["wrap", "Wrap / shawarma"], ["pizza", "Pizza"], ["burger", "Burger"], ["bowl", "Other"]];
+const DISH_KINDS = [["jollof", "Jollof rice"], ["waakye", "Waakye"], ["friedrice", "Fried rice"], ["ricestew", "Rice and stew"], ["fufu", "Fufu and soup"], ["banku", "Banku and tilapia"], ["kenkey", "Kenkey and fish"], ["tuo", "Tuo zaafi"], ["omotuo", "Omo tuo and groundnut soup"], ["soup", "Soups and stews"], ["redred", "Red red"], ["gob3", "Gob3 (beans and gari)"], ["kelewele", "Kelewele"], ["ampesi", "Ampesi and kontomire"], ["yam", "Yam and eggs"], ["chicken", "Chicken and chips"], ["noodles", "Indomie and noodles"], ["spaghetti", "Spaghetti"], ["koko", "Hausa koko and koose"], ["salad", "Salad"], ["wrap", "Wraps and shawarma"], ["pizza", "Pizza"], ["burger", "Burger"], ["bowl", "Other meals"]];
 const iconSelect = v => `<select data-f="icon" aria-label="Dish picture"><option value="">Auto picture</option>${DISH_KINDS.map(([k, l]) => `<option value="${k}"${v === k ? " selected" : ""}>${l}</option>`).join("")}</select>`;
 function dishKind(x) {
   if (x && typeof x === "object") { if (x.icon) return x.icon; x = x.name; }
   const n = String(x || "").toLowerCase();
-  const rules = [[/salad/, "salad"], [/shawarma|wrap|sandwich|burrito/, "wrap"], [/pizza/, "pizza"], [/burger/, "burger"], [/waakye/, "waakye"], [/jollof/, "jollof"],
-    [/fried rice/, "friedrice"], [/kenkey|dokon|komi/, "kenkey"], [/banku|akple/, "banku"], [/fufu/, "fufu"], [/tuo|t\.?z\b|omo tuo|rice ball/, "tuo"],
-    [/red ?red|beans and plantain|beans & plantain/, "redred"], [/gob3|gobe|gari and beans|gari & beans|beans and gari/, "gob3"], [/kelewele|plantain|dodo|tatale/, "kelewele"],
-    [/plain rice|white rice|rice and stew|rice & stew|stew/, "ricestew"], [/soup|nkwan|abunabunu|palm ?nut|groundnut|okro|kontomire/, "soup"],
-    [/chicken|suya|kebab|chofi|grill|turkey|goat/, "chicken"], [/tilapia|fish/, "banku"], [/rice/, "friedrice"]];
+  const rules = [[/salad|coleslaw/, "salad"], [/shawarma|wrap|sandwich|burrito/, "wrap"], [/pizza/, "pizza"], [/burger/, "burger"], [/waakye/, "waakye"], [/jollof/, "jollof"],
+    [/fried rice/, "friedrice"], [/kenkey|dokon|komi/, "kenkey"], [/banku|akple/, "banku"], [/fufu/, "fufu"], [/omo ?tuo|rice ball/, "omotuo"], [/tuo|t\.?z\b|zaafi/, "tuo"],
+    [/koko|koose|porridge|tom ?brown|oats|hausa/, "koko"], [/indomie|noodle/, "noodles"], [/spaghetti|pasta|macaroni/, "spaghetti"],
+    [/ampesi|kontomire|abom|cocoyam|apem/, "ampesi"], [/yam|chips and egg|chips & egg/, "yam"], [/chips|fries|french/, "chicken"],
+    [/red ?red|beans and plantain|beans & plantain/, "redred"], [/gob3|gobe|gari and beans|gari & beans|beans and gari|beans/, "gob3"], [/kelewele|plantain|dodo|tatale/, "kelewele"],
+    [/plain rice|white rice|rice and stew|rice & stew|stew/, "ricestew"], [/soup|nkwan|abunabunu|palm ?nut|groundnut|okro|light soup/, "soup"],
+    [/chicken|suya|kebab|chofi|grill|turkey|goat|wings/, "chicken"], [/tilapia|fish/, "banku"], [/rice/, "friedrice"]];
   const hit = rules.find(([r]) => r.test(n)); return hit ? hit[1] : "bowl";
 }
 // The kitchen's picture is its most-ordered dish
 const topDish = kid => { const ds = S.items.filter(i => i.kitchen_id === kid), pop = S.pop || {}; return ds.slice().sort((a, b) => (pop[b.id] || 0) - (pop[a.id] || 0))[0]; };
+/* Rich dish illustrations (one per type of food): plate or bowl from above, same light and shadow on every one */
+const DISH_ART = (() => {
+// ChopPool rich dish icons (proposal). Each icon: 100x100, top-down plate/bowl with gradients, highlights and soft shadow.
+const uid = (() => { let n = 0; return p => p + (++n); })();
+function plate(inner, opts = {}) {
+  const id = uid("p");
+  const rim = opts.bowl
+    ? `<radialGradient id="${id}b" cx="50%" cy="40%" r="60%"><stop offset="0" stop-color="${opts.bowlA || "#3B2A22"}"/><stop offset="1" stop-color="${opts.bowlB || "#1E1511"}"/></radialGradient>`
+    : `<radialGradient id="${id}b" cx="45%" cy="35%" r="70%"><stop offset="0" stop-color="#FFFFFF"/><stop offset=".7" stop-color="#F3EEE8"/><stop offset="1" stop-color="#DCD3C9"/></radialGradient>`;
+  return `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><defs>${rim}
+      <radialGradient id="${id}s" cx="50%" cy="50%" r="50%"><stop offset=".6" stop-color="#000" stop-opacity=".28"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient>
+      <radialGradient id="${id}i" cx="50%" cy="45%" r="55%"><stop offset="0" stop-color="${opts.bowl ? "#000" : "#FFFFFF"}" stop-opacity="${opts.bowl ? ".0" : "1"}"/><stop offset="1" stop-color="${opts.bowl ? "#000" : "#EAE3DB"}" stop-opacity="${opts.bowl ? ".35" : "1"}"/></radialGradient>
+      ${opts.defs || ""}</defs>
+    <ellipse cx="51" cy="56" rx="45" ry="43" fill="url(#${id}s)"/>
+    <circle cx="50" cy="50" r="44" fill="url(#${id}b)"/>
+    <circle cx="50" cy="50" r="${opts.bowl ? 37 : 34}" fill="url(#${id}i)"/>
+    ${opts.bowl ? "" : `<circle cx="50" cy="50" r="34" fill="none" stroke="#000" stroke-opacity=".05" stroke-width="1.2"/>`}
+    ${inner}
+    <path d="M18 34 A36 36 0 0 1 40 12" fill="none" stroke="#fff" stroke-opacity="${opts.bowl ? ".18" : ".9"}" stroke-width="2.4" stroke-linecap="round"/>
+  </svg>`;
+}
+const grains = (cx, cy, r, col, n = 26, seed = 1) => { let s = seed, out = ""; const rnd = () => (s = (s * 9301 + 49297) % 233280) / 233280;
+  for (let i = 0; i < n; i++) { const a = rnd() * 6.283, d = Math.sqrt(rnd()) * r; const x = cx + Math.cos(a) * d, y = cy + Math.sin(a) * d * .9;
+    out += `<ellipse cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" rx="1.7" ry=".75" transform="rotate(${(rnd() * 180).toFixed(0)} ${x.toFixed(1)} ${y.toFixed(1)})" fill="${col}" opacity="${(.5 + rnd() * .5).toFixed(2)}"/>`; }
+  return out; };
+const G = (id, a, b, cx = "40%", cy = "35%") => `<radialGradient id="${id}" cx="${cx}" cy="${cy}" r="70%"><stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></radialGradient>`;
+const L = (id, a, b, x2 = "1", y2 = "1") => `<linearGradient id="${id}" x1="0" y1="0" x2="${x2}" y2="${y2}"><stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></linearGradient>`;
+const drum = (x, y, rot, id) => `<g transform="translate(${x} ${y}) rotate(${rot})"><defs>${G(id, "#E7A25A", "#8E4317", "35%", "30%")}</defs>
+  <path d="M-3 9 L-2 15 a3 3 0 1 0 4 0 L3 9 Z" fill="#F4E7D6"/><circle cx="-2.4" cy="16.5" r="2.4" fill="#F7EEE3"/><circle cx="2.4" cy="16.5" r="2.4" fill="#F7EEE3"/>
+  <ellipse cx="0" cy="0" rx="11" ry="13" fill="url(#${id})"/><path d="M-6 -6 q4 -5 10 -2" stroke="#fff" stroke-opacity=".45" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <path d="M-7 3 l5 -3 M-2 7 l6 -4" stroke="#6B2E0E" stroke-opacity=".5" stroke-width="1.6" stroke-linecap="round"/></g>`;
+const egg = (x, y, r = 8) => `<g transform="translate(${x} ${y})"><ellipse cx="0" cy="0" rx="${r}" ry="${r * .9}" fill="#FFFDF8"/><ellipse cx="0" cy="0" rx="${r}" ry="${r * .9}" fill="none" stroke="#E7DFD2" stroke-width="1"/><circle cx=".5" cy=".5" r="${r * .5}" fill="#F6B21A"/><circle cx="-1" cy="-1" r="${r * .18}" fill="#FFE08A"/></g>`;
+const plantain = (x, y, rot) => `<g transform="translate(${x} ${y}) rotate(${rot})"><ellipse rx="7" ry="4.6" fill="#D98A1E"/><ellipse rx="5.2" ry="3.2" fill="#F2B23B"/><ellipse cx="-1.5" cy="-1" rx="2" ry="1" fill="#FFE29A" opacity=".8"/><ellipse rx="7" ry="4.6" fill="none" stroke="#8E4A0E" stroke-opacity=".55" stroke-width="1"/></g>`;
+const leaf = (x, y, rot, c1 = "#5DB04A", c2 = "#2F7A2C", s = 1) => `<g transform="translate(${x} ${y}) rotate(${rot}) scale(${s})"><path d="M0 -8 C6 -4 6 4 0 8 C-6 4 -6 -4 0 -8Z" fill="${c1}"/><path d="M0 -7 V7" stroke="${c2}" stroke-width="1"/></g>`;
+const fish = (x, y, rot, id, body = ["#C7B39A", "#6E5640"]) => `<g transform="translate(${x} ${y}) rotate(${rot})"><defs>${L(id, body[0], body[1], "0", "1")}</defs>
+  <path d="M-22 0 C-12 -11 10 -11 18 0 C10 11 -12 11 -22 0Z" fill="url(#${id})"/><path d="M18 0 L28 -8 L26 0 L28 8Z" fill="${body[1]}"/>
+  <path d="M-8 -7 l-3 14 M-1 -8 l-3 16 M6 -8 l-3 16" stroke="#3B2A1C" stroke-opacity=".55" stroke-width="2.2" stroke-linecap="round"/>
+  <circle cx="-15" cy="-2" r="2.4" fill="#fff"/><circle cx="-15" cy="-2" r="1.2" fill="#1B120C"/><path d="M-10 -9 q8 -3 16 0" stroke="#fff" stroke-opacity=".5" stroke-width="1.6" fill="none"/></g>`;
+const onion = (x, y, r = 5) => `<circle cx="${x}" cy="${y}" r="${r}" fill="none" stroke="#C98FC7" stroke-width="1.6" opacity=".9"/><circle cx="${x}" cy="${y}" r="${r * .55}" fill="none" stroke="#E3B8E0" stroke-width="1.1"/>`;
+const dots = (cx, cy, r, cols, n, seed = 3, size = 1.6) => { let s = seed, out = ""; const rnd = () => (s = (s * 9301 + 49297) % 233280) / 233280;
+  for (let i = 0; i < n; i++) { const a = rnd() * 6.283, d = Math.sqrt(rnd()) * r; out += `<circle cx="${(cx + Math.cos(a) * d).toFixed(1)}" cy="${(cy + Math.sin(a) * d).toFixed(1)}" r="${(size * (.7 + rnd() * .6)).toFixed(1)}" fill="${cols[i % cols.length]}"/>`; } return out; };
+
+const ICONS = {
+  jollof: ["Jollof rice", plate(`<path d="M24 54 C22 34 44 24 58 28 C72 32 78 46 74 58 C70 70 30 72 24 54Z" fill="url(#jr)"/>${grains(48, 48, 22, "#FFD2A8", 48, 7)}
+      <path d="M32 40 q10 -10 24 -8" stroke="#fff" stroke-opacity=".35" stroke-width="3" fill="none" stroke-linecap="round"/>
+      ${drum(66, 60, -35, "jd")}${leaf(34, 66, 30, "#7CC35E", "#3D8A2E", .8)}<circle cx="40" cy="70" r="3.2" fill="#E8432B"/><circle cx="40" cy="70" r="1.6" fill="#FF8A6A"/>`,
+      { defs: G("jr", "#F98A3C", "#C7400F") })],
+  waakye: ["Waakye", plate(`<path d="M22 52 C20 32 42 22 56 26 C72 30 78 46 74 56 C70 70 26 70 22 52Z" fill="url(#wk)"/>${grains(48, 46, 22, "#9C6A6A", 44, 11)}
+      <path d="M58 56 c6 -4 10 2 16 -2 M56 62 c6 -4 10 2 16 -2" stroke="#E8C77A" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+      ${egg(34, 60, 9)}<path d="M50 30 c8 -4 16 2 14 10 c-2 8 -14 6 -16 0 c-1 -4 0 -8 2 -10Z" fill="#7A1A0E"/><path d="M52 32 c4 -2 8 0 9 3" stroke="#E0573A" stroke-width="1.6" fill="none"/>
+      ${dots(64, 44, 6, ["#F3E3C1", "#E9D3A8"], 22, 5, 1.1)}${leaf(30, 38, -20, "#4E9A3A", "#2C6A22", .7)}`, { defs: G("wk", "#7A3E3C", "#3B1818") })],
+  banku: ["Banku & tilapia", plate(`<defs>${G("bk", "#FFFFFF", "#D9D0BE", "35%", "30%")}</defs><circle cx="34" cy="38" r="12" fill="url(#bk)"/><circle cx="42" cy="56" r="11" fill="url(#bk)"/>
+      ${fish(64, 52, -55, "bt", ["#D8C2A0", "#6A4F35"])}<ellipse cx="30" cy="66" rx="9" ry="6" fill="#D2321B"/>${dots(30, 66, 6, ["#FF7B54", "#8E1A0B"], 10, 9, 1)}${onion(24, 52, 3.6)}<circle cx="31" cy="34" r="3" fill="#fff" opacity=".8"/>`)],
+  fufu: ["Fufu & soup", plate(`<circle cx="50" cy="50" r="35" fill="url(#fs)"/><circle cx="50" cy="50" r="35" fill="url(#fsh)"/>
+      <circle cx="47" cy="47" r="14" fill="url(#ff)"/><ellipse cx="43" cy="42" rx="5" ry="3" fill="#fff" opacity=".9"/>
+      <g fill="#7A3A1A"><rect x="64" y="46" width="11" height="9" rx="3"/><rect x="58" y="64" width="10" height="8" rx="3" transform="rotate(20 63 68)"/><rect x="28" y="62" width="10" height="8" rx="3" transform="rotate(-15 33 66)"/></g>
+      <g fill="#FFD27A" opacity=".85"><circle cx="70" cy="36" r="2.4"/><circle cx="32" cy="34" r="1.8"/><circle cx="66" cy="70" r="1.6"/><circle cx="36" cy="72" r="2"/></g>${leaf(72, 62, 40, "#5DB04A", "#2F7A2C", .6)}`,
+      { bowl: true, bowlA: "#4A3227", bowlB: "#1D130E", defs: G("fs", "#F2722D", "#B8340E") + `<radialGradient id="fsh" cx="40%" cy="30%" r="60%"><stop offset="0" stop-color="#fff" stop-opacity=".25"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>` + G("ff", "#FFFDF4", "#E6DCC4", "35%", "30%") })],
+  kenkey: ["Kenkey & fish", plate(`<defs>${L("kh", "#E9D9A6", "#B89A5A")}${G("kk", "#F7EFD8", "#D7C8A0")}</defs>
+      <g transform="rotate(-20 36 46)"><rect x="22" y="30" width="28" height="34" rx="10" fill="url(#kh)"/><path d="M26 36 h20 M25 44 h22 M25 52 h22 M26 60 h20" stroke="#8C7440" stroke-opacity=".45" stroke-width="1.4"/><path d="M36 30 l6 -8" stroke="#B89A5A" stroke-width="3" stroke-linecap="round"/></g>
+      ${fish(64, 40, 20, "kf", ["#F0B860", "#9A5A18"])}<circle cx="62" cy="66" r="7" fill="#2A140C"/><circle cx="62" cy="66" r="4" fill="#5A2414"/><ellipse cx="44" cy="70" rx="7" ry="5" fill="#E2381D"/>${onion(74, 60, 4)}`)],
+  friedrice: ["Fried rice", plate(`<path d="M24 54 C22 34 44 24 58 28 C72 32 78 46 74 58 C70 70 30 72 24 54Z" fill="url(#fr)"/>${grains(48, 48, 22, "#FFF6D8", 52, 13)}
+      ${dots(48, 48, 20, ["#3FA34D", "#F07A22", "#E2C12E"], 24, 21, 1.8)}${drum(68, 62, -40, "fd")}`, { defs: G("fr", "#F2D16B", "#C79A2C") })],
+  redred: ["Red red", plate(`<path d="M22 50 C20 32 44 22 58 26 C74 30 78 46 72 58 C64 70 26 68 22 50Z" fill="url(#rr)"/>${dots(48, 46, 22, ["#7A1E0E", "#A2311A", "#5E1608"], 60, 17, 2.2)}
+      <path d="M34 36 q10 -8 22 -6" stroke="#FFB070" stroke-opacity=".6" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+      ${plantain(66, 62, -20)}${plantain(56, 70, 15)}${plantain(74, 50, -60)}${dots(36, 66, 5, ["#F3E3C1"], 10, 3, 1)}`, { defs: G("rr", "#E0532A", "#9A2410") })],
+  ricestew: ["Rice & stew", plate(`<path d="M22 48 C20 30 40 22 52 26 C60 28 62 40 56 50 C50 60 24 62 22 48Z" fill="#FBF8F1"/>${grains(40, 42, 16, "#E9E1D2", 40, 29)}
+      <path d="M50 54 C52 42 66 38 74 46 C80 54 76 70 62 72 C52 72 48 62 50 54Z" fill="url(#st)"/>${dots(63, 58, 10, ["#FF8A55", "#7A1608"], 14, 31, 1.3)}${egg(66, 56, 7)}<path d="M54 50 q6 -6 14 -4" stroke="#fff" stroke-opacity=".35" stroke-width="2" fill="none"/>${leaf(30, 62, -30, "#5DB04A", "#2F7A2C", .7)}`,
+      { defs: G("st", "#E8461E", "#9C1C06") })],
+  tuo: ["Tuo zaafi", plate(`<circle cx="50" cy="50" r="35" fill="url(#ay)"/>${dots(50, 50, 32, ["#1F5A1C", "#4D9A3A", "#2C7228"], 50, 41, 1.8)}
+      <ellipse cx="46" cy="47" rx="16" ry="14" fill="url(#tzb)"/><ellipse cx="41" cy="42" rx="6" ry="3.2" fill="#fff" opacity=".85"/><g fill="#6A2F12"><rect x="66" y="56" width="9" height="8" rx="3"/><rect x="30" y="66" width="9" height="7" rx="3"/></g>`,
+      { bowl: true, bowlA: "#4A3227", bowlB: "#1D130E", defs: G("ay", "#5FA342", "#255A1E") + G("tzb", "#FFF8E6", "#E3D3A9", "35%", "30%") })],
+  salad: ["Salad", plate(`${leaf(38, 38, -30, "#7CC35E", "#3D8A2E", 2)}${leaf(60, 36, 25, "#5DB04A", "#2F7A2C", 2)}${leaf(46, 58, 70, "#8FD06A", "#3D8A2E", 2)}${leaf(64, 60, -50, "#4E9A3A", "#2C6A22", 1.7)}
+      <circle cx="34" cy="58" r="6" fill="#E8432B"/><circle cx="34" cy="58" r="3" fill="#FF8A6A"/><circle cx="68" cy="48" r="5.5" fill="#E8432B"/><circle cx="68" cy="48" r="2.6" fill="#FF8A6A"/>
+      ${egg(52, 46, 7)}<g transform="translate(56 68)"><ellipse rx="7" ry="5" fill="#7FB04A"/><ellipse rx="4.6" ry="3.2" fill="#E8EFA8"/></g>`)],
+  wrap: ["Wraps & shawarma", plate(`<g transform="rotate(-30 50 50)"><rect x="22" y="38" width="54" height="24" rx="12" fill="url(#wr)"/><path d="M30 40 q4 10 0 20 M44 39 q4 11 0 22" stroke="#B27A3A" stroke-opacity=".45" stroke-width="1.6" fill="none"/>
+      <ellipse cx="74" cy="50" rx="6" ry="12" fill="#F7EBD4"/>${dots(74, 50, 6, ["#5DB04A", "#E8432B", "#8E4317", "#F2D16B"], 16, 47, 1.6)}</g>
+      ${dots(30, 70, 5, ["#F2B23B", "#D98A1E"], 6, 51, 2.4)}<ellipse cx="70" cy="70" rx="6" ry="4" fill="#F4F0E6"/>`, { defs: L("wr", "#F2D7A6", "#C9954F", "0", "1") })],
+  kelewele: ["Kelewele", plate(`${[[40, 38, 10], [54, 34, -20], [64, 46, 35], [36, 54, -40], [50, 52, 20], [62, 62, -10], [44, 66, 45], [30, 44, 60]].map(([x, y, r]) =>
+      `<g transform="translate(${x} ${y}) rotate(${r})"><rect x="-6" y="-5" width="12" height="10" rx="3" fill="#C9661A"/><rect x="-4.6" y="-3.8" width="9.2" height="7.6" rx="2.4" fill="#EE9A2E"/><circle cx="-1.6" cy="-1.6" r="1.4" fill="#FFD27A"/></g>`).join("")}
+      ${dots(48, 50, 22, ["#7A3A12", "#B85A1A"], 20, 61, .9)}${dots(70, 66, 5, ["#E8C79A", "#C9A06A"], 8, 63, 2)}`)],
+  chicken: ["Chicken & chips", plate(`${[[30, 40, -20], [36, 34, 10], [42, 40, -5], [34, 48, 25], [28, 54, -10], [40, 52, 15], [46, 46, 0], [38, 60, -25], [30, 62, 5]].map(([x, y, r]) =>
+      `<g transform="translate(${x} ${y}) rotate(${r})"><rect x="-2.6" y="-9" width="5.2" height="18" rx="1.6" fill="#E9A23B"/><rect x="-1.4" y="-8" width="2" height="16" rx="1" fill="#FFD27A"/></g>`).join("")}
+      ${drum(64, 44, 30, "cd1")}${drum(60, 64, -20, "cd2")}<ellipse cx="44" cy="72" rx="6" ry="4" fill="#E8432B"/>`)],
+  yam: ["Yam & eggs", plate(`${[[34, 38, 20], [44, 32, -10], [30, 52, -30], [42, 48, 15], [36, 64, 5]].map(([x, y, r]) =>
+      `<g transform="translate(${x} ${y}) rotate(${r})"><rect x="-9" y="-5" width="18" height="10" rx="3" fill="#E7B65A"/><rect x="-7.5" y="-3.6" width="15" height="7.2" rx="2.4" fill="#FBE6A6"/><path d="M-6 -2 h9" stroke="#fff" stroke-opacity=".7" stroke-width="1.4" stroke-linecap="round"/></g>`).join("")}
+      <path d="M52 52 C52 38 70 34 76 44 C82 54 76 70 62 70 C54 70 52 60 52 52Z" fill="url(#ye)"/>${dots(64, 54, 9, ["#E8432B", "#5DB04A", "#FFF3C4"], 16, 71, 1.5)}<path d="M56 46 q6 -6 14 -4" stroke="#fff" stroke-opacity=".5" stroke-width="2" fill="none"/>`,
+      { defs: G("ye", "#FFE27A", "#E9A81E") })],
+  ampesi: ["Ampesi & kontomire", plate(`<path d="M46 52 C48 36 66 30 74 40 C82 50 78 68 62 70 C52 72 44 64 46 52Z" fill="url(#km)"/>${dots(62, 52, 12, ["#1F5A1C", "#E05A20", "#3E7F2A"], 26, 81, 1.6)}${egg(62, 50, 6.5)}
+      ${plantain(30, 40, 30)}${plantain(34, 54, -10)}<g transform="translate(32 68) rotate(15)"><rect x="-9" y="-5" width="18" height="10" rx="4" fill="#E9DFC9"/><rect x="-7" y="-3.4" width="14" height="6.8" rx="3" fill="#FBF6EA"/></g>`,
+      { defs: G("km", "#4E9A3A", "#1E4A18") })],
+  noodles: ["Indomie & noodles", plate(`<circle cx="50" cy="50" r="28" fill="url(#nd)"/>${Array.from({ length: 9 }, (_, i) => `<path d="M${28 + i * 2} ${36 + i * 4} q8 -6 16 0 t16 0 t12 -2" stroke="#F7D98A" stroke-width="2.2" fill="none" stroke-linecap="round" opacity=".9"/>`).join("")}
+      ${egg(64, 40, 8)}${dots(42, 60, 10, ["#3FA34D", "#F07A22", "#E8432B"], 12, 91, 1.8)}<path d="M30 64 l10 -4 M34 70 l9 -5" stroke="#B85A1A" stroke-width="3" stroke-linecap="round"/>`, { defs: G("nd", "#F2C25A", "#C98A1E") })],
+  spaghetti: ["Spaghetti", plate(`<circle cx="50" cy="50" r="27" fill="url(#sp)"/>${Array.from({ length: 10 }, (_, i) => `<path d="M${30 + (i % 3) * 3} ${34 + i * 3.4} c10 -8 22 8 34 -2" stroke="#FCE3A0" stroke-width="1.8" fill="none" stroke-linecap="round" opacity=".85"/>`).join("")}
+      <circle cx="50" cy="48" r="13" fill="url(#ss)"/>${dots(50, 48, 9, ["#7A1608", "#FF8A55"], 10, 95, 1.4)}<circle cx="44" cy="44" r="4" fill="#8E3A1A"/><circle cx="56" cy="52" r="4" fill="#8E3A1A"/>${leaf(62, 40, 30, "#5DB04A", "#2F7A2C", .7)}`,
+      { defs: G("sp", "#F7D98A", "#D9A63A") + G("ss", "#E8461E", "#A21E06") })],
+  pizza: ["Pizza", `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><defs>${G("pzc", "#E9B05A", "#A9611E")}${G("pzt", "#FFD36A", "#F09A2A")}<radialGradient id="pzs"><stop offset=".6" stop-color="#000" stop-opacity=".28"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient></defs>
+      <ellipse cx="51" cy="56" rx="45" ry="43" fill="url(#pzs)"/><circle cx="50" cy="50" r="43" fill="url(#pzc)"/><circle cx="50" cy="50" r="36" fill="url(#pzt)"/>
+      <path d="M50 14 V86 M14 50 H86 M24.5 24.5 L75.5 75.5 M75.5 24.5 L24.5 75.5" stroke="#C97A2A" stroke-width="1.4" opacity=".7"/>
+      ${[[36, 32], [60, 30], [70, 54], [42, 62], [56, 46], [30, 50], [54, 72], [66, 66]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="5.4" fill="#C8341C"/><circle cx="${x - 1.5}" cy="${y - 1.5}" r="1.8" fill="#F06A4A"/>`).join("")}
+      ${dots(50, 50, 30, ["#3E8A2E", "#FFF3C4"], 16, 101, 1.6)}<path d="M18 34 A36 36 0 0 1 40 12" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="2.4" stroke-linecap="round"/></svg>`],
+  burger: ["Burger", plate(`<ellipse cx="50" cy="56" rx="26" ry="20" fill="#7A3A16"/><ellipse cx="50" cy="54" rx="27" ry="19" fill="#5DB04A"/><ellipse cx="50" cy="51" rx="25" ry="18" fill="#F2C94C"/>
+      <ellipse cx="50" cy="48" rx="25" ry="18" fill="url(#bb)"/>${dots(50, 42, 16, ["#FFF6DF"], 14, 111, 1.1)}<path d="M36 38 q8 -8 20 -6" stroke="#fff" stroke-opacity=".45" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+      ${[[24, 70, 30], [30, 76, 10], [72, 72, -20]].map(([x, y, r]) => `<g transform="translate(${x} ${y}) rotate(${r})"><rect x="-2.4" y="-8" width="4.8" height="16" rx="1.5" fill="#E9A23B"/></g>`).join("")}`,
+      { defs: G("bb", "#F2B65E", "#B8661E", "40%", "30%") })],
+  omotuo: ["Omo tuo & groundnut soup", plate(`<circle cx="50" cy="50" r="35" fill="url(#gn)"/><circle cx="50" cy="50" r="35" fill="url(#gnh)"/>
+      <circle cx="42" cy="44" r="11" fill="url(#ob)"/><circle cx="58" cy="54" r="11" fill="url(#ob)"/><ellipse cx="38" cy="40" rx="4" ry="2.4" fill="#fff" opacity=".85"/><ellipse cx="54" cy="50" rx="4" ry="2.4" fill="#fff" opacity=".85"/>
+      <g fill="#6A2F12"><rect x="64" y="34" width="10" height="8" rx="3"/><rect x="30" y="62" width="10" height="8" rx="3"/></g><g fill="#FFD27A" opacity=".8"><circle cx="70" cy="66" r="2"/><circle cx="30" cy="36" r="1.6"/></g>`,
+      { bowl: true, bowlA: "#4A3227", bowlB: "#1D130E", defs: G("gn", "#C9773A", "#7E3A14") + `<radialGradient id="gnh" cx="40%" cy="30%" r="60%"><stop offset="0" stop-color="#fff" stop-opacity=".22"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>` + G("ob", "#FFFDF6", "#E3D8C0", "35%", "30%") })],
+  koko: ["Hausa koko & koose", plate(`<circle cx="50" cy="50" r="35" fill="url(#ko)"/><circle cx="50" cy="50" r="35" fill="url(#koh)"/>
+      ${dots(50, 50, 30, ["#7A3A12"], 18, 121, .9)}${[[40, 40], [58, 44], [48, 58]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="8.5" fill="#B8661E"/><circle cx="${x}" cy="${y}" r="7" fill="#E39A3A"/><circle cx="${x - 2.4}" cy="${y - 2.4}" r="2.2" fill="#FFD27A" opacity=".9"/>`).join("")}`,
+      { bowl: true, bowlA: "#4A3227", bowlB: "#1D130E", defs: G("ko", "#E7B98A", "#B8804A") + `<radialGradient id="koh" cx="40%" cy="30%" r="60%"><stop offset="0" stop-color="#fff" stop-opacity=".25"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>` })],
+  gob3: ["Gob3 (beans & gari)", plate(`<path d="M22 50 C20 32 44 22 58 26 C72 30 76 46 70 56 C62 68 26 66 22 50Z" fill="url(#gb)"/>${dots(46, 46, 20, ["#5E1608", "#8E2A12"], 40, 131, 2)}
+      <path d="M30 34 q10 -8 22 -6" stroke="#FFB070" stroke-opacity=".5" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+      <path d="M40 58 C40 50 56 48 60 56 C62 64 44 68 40 58Z" fill="#F3E3C1"/>${dots(50, 58, 8, ["#E2CC9A"], 14, 133, 1)}${plantain(68, 62, -20)}${plantain(74, 48, -70)}
+      <g transform="translate(30 66) rotate(-20)"><ellipse rx="8" ry="5" fill="#2E6A22"/><ellipse rx="6.4" ry="3.8" fill="#B9D46A"/></g>`, { defs: G("gb", "#C4471E", "#7E1E0A") })],
+  soup: ["Soups & stews", plate(`<circle cx="50" cy="50" r="35" fill="url(#ps)"/><circle cx="50" cy="50" r="35" fill="url(#psh)"/>
+      <g fill="#6A2F12"><rect x="36" y="38" width="12" height="10" rx="3.5"/><rect x="56" y="54" width="12" height="10" rx="3.5" transform="rotate(20 62 59)"/><rect x="34" y="58" width="10" height="9" rx="3" transform="rotate(-12 39 62)"/></g>
+      ${fish(60, 38, 30, "psf", ["#E0B070", "#8A5420"])}<g fill="#FFD27A" opacity=".85"><circle cx="66" cy="68" r="2.2"/><circle cx="28" cy="46" r="1.8"/><circle cx="48" cy="70" r="1.6"/></g>${leaf(46, 52, 20, "#5DB04A", "#2F7A2C", .6)}`,
+      { bowl: true, bowlA: "#4A3227", bowlB: "#1D130E", defs: G("ps", "#C8401A", "#7E1A06") + `<radialGradient id="psh" cx="40%" cy="30%" r="60%"><stop offset="0" stop-color="#fff" stop-opacity=".22"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>` })],
+  bowl: ["Other meals", plate(`<path d="M24 52 C22 34 44 24 58 28 C72 32 78 46 74 58 C70 70 30 72 24 54Z" fill="#FBF6EA"/>${grains(48, 48, 20, "#E9E1D2", 36, 141)}
+      <path d="M52 56 C54 46 66 44 72 50 C76 58 70 68 60 68 C54 68 50 62 52 56Z" fill="url(#ob2)"/>${dots(62, 57, 7, ["#7A1608", "#FF8A55"], 10, 143, 1.2)}
+      ${drum(36, 40, -30, "obd")}${leaf(34, 64, 30, "#7CC35E", "#3D8A2E", .8)}<circle cx="44" cy="68" r="3" fill="#E8432B"/>`, { defs: G("ob2", "#E8461E", "#9C1C06") })],
+};
+return ICONS;
+
+})();
+// Each use gets its own gradient ids, so icons never break when another copy is hidden
+let artN = 0;
 function art(kind) {
-  // Modern flat, seen from above: a plate or bowl centred in its tile, bold simple shapes, 2-3 colours
-  const svg = inner => `<svg viewBox="0 0 100 100" aria-hidden="true">${inner}</svg>`;
-  const plate = `<circle cx="50" cy="50" r="45" fill="var(--surface)"/><circle cx="50" cy="50" r="45" fill="none" stroke="var(--line)" stroke-width="1.5"/><circle cx="50" cy="50" r="35" fill="var(--surface-2)"/>`;
-  const bowl = (soup, rim) => `<circle cx="50" cy="50" r="45" fill="${rim || "var(--accent)"}"/><circle cx="50" cy="50" r="36" fill="${soup}"/>`;
-  const dots = (pts, c, r) => pts.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="${r || 2}" fill="${c}"/>`).join("");
-  const leg = (x, y, rot) => `<g transform="rotate(${rot} ${x} ${y})"><ellipse cx="${x}" cy="${y}" rx="12" ry="8.5" fill="#B4581F"/><ellipse cx="${x - 3}" cy="${y - 2}" rx="6" ry="3.5" fill="#D27A35"/><rect x="${x + 9}" y="${y - 2.2}" width="10" height="4.4" rx="2.2" fill="#F6EAD7"/><circle cx="${x + 19}" cy="${y - 2.4}" r="3" fill="#F6EAD7"/><circle cx="${x + 19}" cy="${y + 2.4}" r="3" fill="#F6EAD7"/></g>`;
-  const fish = (x, y, rot) => `<g transform="rotate(${rot || 0} ${x} ${y})"><ellipse cx="${x}" cy="${y}" rx="15" ry="8" fill="#B8571F"/><path d="M${x + 13} ${y}l9-7v14z" fill="#B8571F"/><circle cx="${x - 9}" cy="${y - 2}" r="1.8" fill="#FFF7EE"/><path d="M${x - 3} ${y - 6}v12M${x + 3} ${y - 6}v12" stroke="#8E3E12" stroke-width="1.6"/></g>`;
-  const plantain = pts => pts.map(([x, y, r]) => `<ellipse cx="${x}" cy="${y}" rx="8" ry="5" transform="rotate(${r} ${x} ${y})" fill="#F2A93B"/><ellipse cx="${x}" cy="${y}" rx="4.5" ry="2.4" transform="rotate(${r} ${x} ${y})" fill="#F7C46A"/>`).join("");
-  switch (kind) {
-    case "jollof": return svg(`${plate}<circle cx="44" cy="54" r="22" fill="#DE5B22"/>${dots([[36, 48], [44, 44], [50, 56], [40, 60], [52, 48]], "#F49A5B", 1.8)}${dots([[46, 62]], "#5DA35A", 2.2)}${leg(62, 36, -30)}`);
-    case "waakye": return svg(`${plate}<circle cx="44" cy="56" r="21" fill="#5A2424"/>${dots([[36, 52], [46, 50], [50, 62], [40, 64]], "#874239", 1.8)}<circle cx="63" cy="38" r="10" fill="#FFFBF2"/><circle cx="63" cy="38" r="4.8" fill="#F5B04A"/><path d="M28 36c4-4 8 4 12 0s8 4 12 0" stroke="#F1DBA9" stroke-width="2.6" fill="none" stroke-linecap="round"/><circle cx="67" cy="62" r="6" fill="#3A1D12"/>`);
-    case "friedrice": return svg(`${plate}<circle cx="50" cy="50" r="25" fill="#E8C266"/>${dots([[40, 42], [56, 40], [62, 54], [44, 58], [50, 48], [36, 52], [58, 62]], "#5DA35A", 2.3)}${dots([[46, 40], [60, 46], [40, 62], [54, 56]], "#E4572E", 2.3)}`);
-    case "ricestew": return svg(`${plate}<circle cx="41" cy="52" r="19" fill="#FBF7EC"/>${dots([[36, 48], [44, 46], [40, 56], [46, 58]], "#E7DCC6", 1.6)}<circle cx="64" cy="44" r="13" fill="#C2410C"/><circle cx="60" cy="41" r="4" fill="#E3672A"/><circle cx="68" cy="48" r="3.5" fill="#7A3110"/>`);
-    case "fufu": return svg(`${bowl("#D9541E")}<circle cx="50" cy="50" r="15" fill="#FBF7EC"/><circle cx="46" cy="46" r="5" fill="#FFFFFF" opacity=".7"/><circle cx="31" cy="44" r="5" fill="#7A3110"/><circle cx="68" cy="58" r="5.5" fill="#7A3110"/><circle cx="64" cy="34" r="3" fill="#F5B04A"/>`);
-    case "banku": return svg(`${plate}<circle cx="36" cy="48" r="14" fill="#EDE4D0"/><circle cx="32" cy="44" r="4" fill="#FFFFFF" opacity=".6"/>${fish(62, 52, -20)}${dots([[44, 68], [52, 70]], "#E4572E", 3)}${dots([[38, 66]], "#5DA35A", 3)}`);
-    case "kenkey": return svg(`${plate}<circle cx="37" cy="47" r="14" fill="#D9C27A"/><path d="M26 41q11 6 22 0M25 48q12 6 24 0M27 55q10 5 20 0" stroke="#B49646" stroke-width="1.6" fill="none"/>${fish(62, 55, -15)}<circle cx="44" cy="68" r="5.5" fill="#3A1D12"/>`);
-    case "tuo": return svg(`${bowl("#4E7D3A")}<circle cx="50" cy="50" r="15" fill="#FBF7EC"/><path d="M28 50l6-3M32 60l5-4M66 40l5-3M68 56l5 2" stroke="#2F5A24" stroke-width="2.4" stroke-linecap="round"/><circle cx="66" cy="62" r="4.5" fill="#7A3110"/>`);
-    case "soup": return svg(`${bowl("#B5651D")}<circle cx="38" cy="42" r="6" fill="#7A3110"/><circle cx="60" cy="58" r="6.5" fill="#7A3110"/><circle cx="60" cy="38" r="4.5" fill="#F5B04A"/><circle cx="40" cy="60" r="3.5" fill="#5DA35A"/><circle cx="52" cy="48" r="3" fill="#E58B3C"/>`);
-    case "redred": return svg(`${plate}<circle cx="42" cy="50" r="20" fill="#B03A1E"/>${dots([[36, 44], [44, 42], [48, 54], [38, 58], [46, 48]], "#D45A2C", 2)}${plantain([[66, 40, -30], [70, 54, 10], [62, 66, 40]])}`);
-    case "kelewele": return svg(`${plate}${[[36, 40, 12], [50, 36, -8], [62, 44, 18], [40, 54, -14], [54, 52, 6], [46, 66, 20], [60, 62, -10], [32, 62, 4]].map(([x, y, r]) => `<rect x="${x - 5.5}" y="${y - 5.5}" width="11" height="11" rx="3" transform="rotate(${r} ${x} ${y})" fill="#E8902C"/>`).join("")}${dots([[44, 46], [58, 56], [38, 48]], "#8E3E12", 1.5)}`);
-    case "gob3": return svg(`${plate}<circle cx="42" cy="50" r="20" fill="#874A29"/>${dots([[34, 44], [40, 40], [46, 46], [38, 52], [48, 56], [42, 60], [50, 44]], "#F2E2BD", 1.9)}${plantain([[67, 42, -25], [68, 58, 20]])}<circle cx="58" cy="70" r="4" fill="#C2410C"/>`);
-    case "chicken": return svg(`${plate}${leg(42, 42, -25)}${leg(46, 60, 15)}${dots([[66, 36], [70, 62]], "#5DA35A", 3)}${dots([[66, 48]], "#E4572E", 3)}`);
-    case "salad": return svg(`${bowl("#E9F3DF", "var(--ok)")}<ellipse cx="40" cy="42" rx="12" ry="7" transform="rotate(-25 40 42)" fill="#5DA35A"/><ellipse cx="60" cy="44" rx="12" ry="7" transform="rotate(30 60 44)" fill="#7DBE5E"/><ellipse cx="48" cy="60" rx="13" ry="7" fill="#4C8F4A"/><circle cx="62" cy="60" r="5" fill="#E4572E"/><circle cx="36" cy="56" r="4.5" fill="#E4572E"/><circle cx="52" cy="36" r="3.5" fill="#F5B04A"/>`);
-    case "wrap": return svg(`${plate}<g transform="rotate(-35 50 50)"><rect x="24" y="38" width="52" height="24" rx="12" fill="#E3B26A"/><circle cx="31" cy="50" r="9" fill="#D49A4C"/><circle cx="31" cy="50" r="6" fill="#B4581F"/><circle cx="29" cy="47" r="2" fill="#5DA35A"/><circle cx="33" cy="53" r="2" fill="#E4572E"/></g>`);
-    case "pizza": return svg(`<circle cx="50" cy="50" r="45" fill="#D49A4C"/><circle cx="50" cy="50" r="38" fill="#F4C35A"/><path d="M50 12v76M12 50h76M23 23l54 54M77 23L23 77" stroke="#D49A4C" stroke-width="1.6"/>${dots([[36, 34], [62, 32], [70, 56], [40, 64], [56, 50], [30, 52], [52, 72]], "#C2410C", 5)}${dots([[46, 40], [64, 66], [34, 44]], "#5DA35A", 2.2)}`);
-    case "burger": return svg(`<circle cx="50" cy="50" r="45" fill="#5DA35A"/><circle cx="50" cy="50" r="38" fill="#E3A857"/><circle cx="50" cy="50" r="30" fill="#EDB868"/>${dots([[40, 38], [52, 34], [62, 42], [44, 50], [58, 56], [36, 58], [50, 64], [64, 62]], "#FBF3E2", 1.8)}`);
-    default: return svg(`${bowl("#E98A3A")}<circle cx="50" cy="50" r="18" fill="#FBF7EC"/>${dots([[42, 44], [56, 48], [48, 58]], "#E7DCC6", 1.8)}<circle cx="68" cy="44" r="5" fill="#7A3110"/><circle cx="34" cy="58" r="4" fill="#5DA35A"/><circle cx="62" cy="64" r="3.5" fill="#C2410C"/>`);
-  }
+  const src = (DISH_ART[kind] || DISH_ART.bowl)[1], n = ++artN;
+  return src.replace(/id="([^"]+)"/g, (m, id) => `id="${id}_${n}"`).replace(/url\(#([^)]+)\)/g, (m, id) => `url(#${id}_${n})`).replace("<svg ", '<svg aria-hidden="true" ');
 }
 const tint = i => `var(--tint-${(i % 4) + 1})`;
 const menuIndex = id => Math.max(0, S.menus.findIndex(m => m.id === id));
@@ -2386,6 +2496,14 @@ function menuEditorClick(e) {
   if (t.closest("[data-photo]")) { const r = t.closest(".mdish"); if (!r.dataset.item) { toast("Save the dish first, then add its photo."); return true; } pickPhoto(root.dataset.medit, r); return true; }
   return false;
 }
+// The picture follows the dish as you type its name (or pick a type), unless the dish has a photo
+document.addEventListener("input", e => { const t = e.target; if (t.matches("[data-medit] [data-f=name]")) dishThumb(t.closest(".mdish")); });
+document.addEventListener("change", e => { const t = e.target; if (t.matches("[data-medit] [data-f=icon]")) dishThumb(t.closest(".mdish")); });
+function dishThumb(row) {
+  const pic = row && row.querySelector(".mphoto .dishpic"); if (!pic) return;
+  const name = (row.querySelector("[data-f=name]") || {}).value || "", icon = (row.querySelector("[data-f=icon]") || {}).value || "";
+  const k = dishKind({ name, icon }); if (pic.dataset.k !== k) { pic.dataset.k = k; pic.innerHTML = art(k); }
+}
 // Photos are shrunk on the phone before upload (max 1200 px, about 200 KB, WebP where the phone supports it)
 async function compressImage(file) {
   const url = URL.createObjectURL(file);
@@ -2603,9 +2721,20 @@ async function renderAdmin(cached) {
         <div><label for="nkTag">Short description</label><input id="nkTag" name="tagline" placeholder="Ghanaian classics, cooked fresh each morning"></div>
         <div class="grid2"><div><label for="nkAddr">Pickup address</label><input id="nkAddr" name="address" placeholder="Osu, Oxford Street"></div><div><label for="nkWa">WhatsApp number</label><input id="nkWa" name="whatsapp" inputmode="tel" placeholder="024 123 4567"></div></div>
         <div class="grid2"><div><label for="nkCap">Meals per lunch</label><input id="nkCap" name="capacity" inputmode="numeric" value="45"></div><div><label for="nkDel">Delivery</label><select id="nkDel" name="delivery_mode"><option value="rider">ChopPool rider / Bolt / Yango</option><option value="runner">Vendor's own runner (close by)</option></select></div></div>
-        <p class="small muted">After adding it, open the vendor in the list to set its map pin and menu.</p>
-        <p class="err" data-err></p><button class="btn">Add vendor</button></form>`;
-    S.addForm = addForm; S.addTitle = "Add a vendor"; S.addInit = null;
+        <div class="group"><p class="group-title">Where they cook</p>${searchRow("nkSearch", "Search the area or landmark")}<div id="nkResults" class="stack"></div>
+          <div id="newKitMap" class="map" style="height:220px"></div><p class="small muted" id="nkPin">Search above, or tap the map where they cook. Customers only see vendors with a pin.</p></div>
+        <div class="group"><p class="group-title">Always cooking (optional)</p>${autoPicker([])}</div>
+        <div class="group"><p class="group-title">Menu</p>${menuEditor([], "admin:new", true)}</div>
+        <p class="err" data-err></p><button class="btn wide">Add vendor</button></form>`;
+    S.addForm = addForm; S.addTitle = "Add a vendor";
+    S.addInit = () => {
+      S.newKitPin = null; let put = null;
+      $("#sheet").onclick = e => { menuEditorClick(e); };
+      makeMap($("#newKitMap"), ACCRA, 12).then(m => { adminMaps.push(m); let mk;
+        put = (p, z) => { S.newKitPin = { lat: p.lat, lng: p.lng }; if (!mk) { mk = window.L.marker([p.lat, p.lng], { draggable: true, icon: pinIcon(window.L, "on") }).addTo(m); mk.on("dragend", () => { const ll = mk.getLatLng(); S.newKitPin = { lat: ll.lat, lng: ll.lng }; }); } else mk.setLatLng([p.lat, p.lng]); if (z) m.setView([p.lat, p.lng], z); $("#nkPin").textContent = "Pin placed. Drag it or tap the map to adjust."; };
+        m.on("click", e => put(e.latlng)); }).catch(() => {});
+      placeSearch($("#nkSearch"), $("#nkResults"), r => { if (put) put(r, 16); else S.newKitPin = { lat: r.lat, lng: r.lng }; $("#nkResults").innerHTML = ""; $("#nkSearch").value = ""; $("#nkPin").textContent = "Pin placed at " + r.short + "."; if (!$("#nkAddr").value) $("#nkAddr").value = r.short; });
+    };
     if (sub === "list") {
       const list = sorted(A.kitchens, "k", liveK, k => k.name + " " + k.public_name, k => k.active ? "a" : "b");
       body.innerHTML = addBar("Add vendor") + listBar("k") + `<div class="stack" style="gap:8px">${list.map(k => { const m = livePools.filter(p => p.kitchen_id === k.id).reduce((t, p) => t + p.meals, 0);
@@ -2620,7 +2749,7 @@ async function renderAdmin(cached) {
           <div><label>Delivery</label><select data-f="delivery_mode"><option value="rider"${k.delivery_mode === "rider" ? " selected" : ""}>ChopPool rider</option><option value="runner"${k.delivery_mode === "runner" ? " selected" : ""}>Own runner</option></select></div>
           <div><label>Meals</label><input data-f="capacity" inputmode="numeric" value="${esc(k.capacity)}"></div>
           <label class="choice" style="padding:8px 10px"><input type="checkbox" data-f="active"${k.active ? " checked" : ""}><span>Active</span></label></div>
-        <div><label>Always cooking (pools open without confirming)</label><div class="chips" data-autodays>${DOW.map(([n, l]) => `<button type="button" class="tog" data-adow="${n}" aria-pressed="${(k.auto_days || []).includes(n)}">${l}</button>`).join("")}</div>
+        <div class="group"><p class="group-title">Always cooking (pools open without the vendor confirming)</p>${autoPicker(k.auto_days)}
           <p class="small muted" style="margin-top:4px">${(k.auto_days || []).length ? "On: " + daysText(k.auto_days) + ". Untick every day to switch it off for a vendor who lets pools down." : "Off: the vendor confirms each day."}${(k.paused_dates || []).filter(x => x >= today()).length ? " Paused: " + k.paused_dates.filter(x => x >= today()).map(fmtDate).join(", ") + "." : ""}</p></div>
         <div class="row" style="justify-content:flex-start;gap:8px;flex-wrap:wrap"><button class="ghost" data-act="kitchen-save">Save</button>${sendLink(k.whatsapp, "Your ChopPool order page: " + baseUrl() + "/#kitchen-" + k.token)}<button class="ghost" data-act="kitchen-copy">Copy link</button><button class="ghost" data-act="kitchen-reset">Reset link</button><button class="ghost" data-act="kitchen-remove" style="color:var(--danger)">Remove</button></div>
         <p class="group-title">Menu</p>
@@ -2787,7 +2916,7 @@ async function adminClick(e) {
       Object.assign(S, await api.load()); toast("Menu saved"); renderAdmin(); } catch (err) { toast(cleanErr(err)); } finally { ms.disabled = false; }
     return;
   }
-  const dw = e.target.closest("[data-adow]"); if (dw) { dw.setAttribute("aria-pressed", String(dw.getAttribute("aria-pressed") !== "true")); return; }
+  if (e.target.closest("[data-autopick]")) return;
   if (e.target.closest("[data-add]") && S.addForm) {
     openSheet(sheetHead(esc(S.addTitle || "Add")) + S.addForm.replace(/<form class="card"/g, '<form class="stack"').replace(/<section class="card">/g, '<section class="stack note">'));
     $("#sheet").querySelectorAll("form").forEach(f => f.addEventListener("submit", adminSubmit));
@@ -2845,7 +2974,7 @@ async function adminClick(e) {
       if ((fval(kc, "name") || "").length < 2 || (fval(kc, "public_name") || "").length < 2) return toast("Add both the real name and the menu name.");
       return run(() => api.updateKitchen(k.id, { name: fval(kc, "name"), public_name: fval(kc, "public_name"), tagline: fval(kc, "tagline") || null, address: fval(kc, "address") || null,
         whatsapp: w || null, delivery_mode: fval(kc, "delivery_mode"), capacity: Number(fval(kc, "capacity")) || k.capacity, active: fval(kc, "active"),
-        ...(kc.querySelector("[data-autodays]") ? { auto_days: [...kc.querySelectorAll("[data-adow][aria-pressed=true]")].map(b => +b.dataset.adow) } : {}) }).then(async () => Object.assign(S, await api.load())), "Saved");
+        ...(kc.querySelector("[data-autopick]") ? { auto_days: pickedDays(kc.querySelector("[data-autopick]")) } : {}) }).then(async () => Object.assign(S, await api.load())), "Saved");
     }
     if (act === "kitchen-pin") return openPinSheet("Where is " + k.name + "?", hasPin(k) ? k : null, pin => run(() => api.updateKitchen(k.id, { lat: pin.lat, lng: pin.lng }).then(async () => Object.assign(S, await api.load())), "Location saved"));
     if (act === "kitchen-remove") return confirmRemove("Remove " + k.name + "?", "Customers will no longer see this menu. If it has past orders, it's archived so your records stay complete.", () => api.removeKitchen(k.id));
@@ -2919,8 +3048,13 @@ async function adminSubmit(e) {
       const w = v("whatsapp").replace(/\D/g, "");
       if (v("name").length < 2 || v("public_name").length < 2) return fail("Add the real name and the menu name customers see.");
       if (w && !/^0\d{9}$/.test(w)) return fail("Enter a 10-digit WhatsApp number starting with 0.");
-      await api.addKitchen({ name: v("name"), public_name: v("public_name"), tagline: v("tagline") || null, address: v("address") || null, whatsapp: w || null, capacity: Number(v("capacity")) || 45, delivery_mode: v("delivery_mode") });
-      toast("Vendor added. Now add its dishes below.");
+      const menu = f.querySelector("[data-medit]") ? readMenu(f.querySelector("[data-medit]")).filter(d => !d.removed) : [];
+      if (menu.some(d => d.name.length < 2 || !(Number(d.price) > 0))) return fail("Each dish needs a name and a price above 0.");
+      const pick = f.querySelector("[data-autopick]"), pin = S.newKitPin || {};
+      const x = await api.addKitchen({ name: v("name"), public_name: v("public_name"), tagline: v("tagline") || null, address: v("address") || null, whatsapp: w || null, capacity: Number(v("capacity")) || 45, delivery_mode: v("delivery_mode"),
+        ...(pin.lat != null ? { lat: pin.lat, lng: pin.lng } : {}), ...(pick && pickedDays(pick).length ? { auto_days: pickedDays(pick) } : {}) });
+      for (const d of menu) await api.saveItem({ kitchen_id: x.id, name: d.name, price: Number(d.price), addons: d.addons, icon: d.icon, active: true });
+      toast(menu.length ? "Vendor added with " + menu.length + " dish" + (menu.length > 1 ? "es" : "") + "." : "Vendor added. Open it in the list to add dishes.");
     }
     if (f.dataset.form === "site") {
       if (v("name").length < 3 || v("drop_point").length < 3) return fail("Add the building name and the drop point.");
@@ -3054,7 +3188,7 @@ async function viewKitchen(token) {
     // Always cooking: weekdays that open automatically; one-tap pause for a single day
     const saveAuto = async list => { try { await api.kitchenSetAuto(token, list); notifyServer({ kitchen_token: token, date: d }); toast(list.length ? "Always cooking on " + daysText(list) + "." : "Always cooking is off. Confirm each day instead."); draw(); } catch (e) { toast(cleanErr(e)); } };
     $("#autoOn")?.addEventListener("change", e => saveAuto(e.target.checked ? [1, 2, 3, 4, 5] : []));
-    $("#autoDays")?.addEventListener("click", e => { const b = e.target.closest("[data-dow]"); if (!b) return; const cur = new Set(k.auto_days || []), n = +b.dataset.dow; cur.has(n) ? cur.delete(n) : cur.add(n); saveAuto([...cur].sort()); });
+    let autoT = null; $("#autoDays")?.addEventListener("autochange", e => { const days = pickedDays(e.target.closest("[data-autopick]")); clearTimeout(autoT); autoT = setTimeout(() => saveAuto(days), 700); });
     $("#pauseDay")?.addEventListener("click", async () => { try { await api.kitchenPause(token, d, true); toast("Paused. Customers can't order from you for " + fmtDate(d) + "."); draw(); } catch (e) { toast(cleanErr(e)); } });
     $("#unpause")?.addEventListener("click", async () => { try { await api.kitchenPause(token, d, false); if (!(k.auto_days || []).includes(isoDow(d))) await api.kitchenOpenDay(token, d); notifyServer({ kitchen_token: token, date: d }); toast("You're taking orders for " + dayLabel(d) + "."); draw(); } catch (e) { toast(cleanErr(e)); } });
     $("#openDay")?.addEventListener("click", async () => { try { await api.kitchenOpenDay(token, d); notifyServer({ kitchen_token: token, date: d }); toast("Thank you. Customers can now order from you for " + dayLabel(d) + "."); draw(); } catch (e) { toast(cleanErr(e)); } });
@@ -3094,11 +3228,33 @@ async function viewKitchen(token) {
 }
 
 const DOW = [[1, "Mon"], [2, "Tue"], [3, "Wed"], [4, "Thu"], [5, "Fri"], [6, "Sat"], [7, "Sun"]];
+const DAYSETS = { all: [1, 2, 3, 4, 5, 6, 7], wk: [1, 2, 3, 4, 5], we: [6, 7] };
+function autoPicker(days) {
+  const on = new Set(days || []), has = l => l.every(d => on.has(d));
+  return `<div class="autopick" data-autopick>
+    <div class="presets">${[["all", "Cooking every day"], ["wk", "Cooking weekdays (Mon–Fri)"], ["we", "Cooking weekends (Sat–Sun)"]].map(([k, l]) => `<label class="choice"><input type="checkbox" data-preset="${k}"${has(DAYSETS[k]) ? " checked" : ""}><span>${l}</span></label>`).join("")}</div>
+    <p class="small muted" style="margin:2px 0 0">Or choose the days:</p>
+    <div class="chips">${DOW.map(([n, l]) => `<button type="button" class="tog" data-adow="${n}" aria-pressed="${on.has(n)}">${l}</button>`).join("")}</div></div>`;
+}
+const pickedDays = root => [...root.querySelectorAll("[data-adow][aria-pressed=true]")].map(b => +b.dataset.adow).sort();
+function syncPicker(root) { const on = new Set(pickedDays(root)); root.querySelectorAll("[data-preset]").forEach(c => { c.checked = DAYSETS[c.dataset.preset].every(d => on.has(d)); }); }
+// One handler for every picker in the app (vendor page, admin edit, admin add)
+document.addEventListener("click", e => {
+  const b = e.target.closest("[data-autopick] [data-adow]"); if (!b) return;
+  const root = b.closest("[data-autopick]"); b.setAttribute("aria-pressed", String(b.getAttribute("aria-pressed") !== "true")); syncPicker(root);
+  root.dispatchEvent(new CustomEvent("autochange", { bubbles: true }));
+});
+document.addEventListener("change", e => {
+  const c = e.target.closest("[data-autopick] [data-preset]"); if (!c) return;
+  const root = c.closest("[data-autopick]"), set = DAYSETS[c.dataset.preset];
+  root.querySelectorAll("[data-adow]").forEach(b => { if (set.includes(+b.dataset.adow)) b.setAttribute("aria-pressed", String(c.checked)); });
+  syncPicker(root); root.dispatchEvent(new CustomEvent("autochange", { bubbles: true }));
+});
 const daysText = list => { const l = [...list].sort(); if (l.join() === "1,2,3,4,5") return "Mon–Fri"; if (l.join() === "1,2,3,4,5,6,7") return "every day"; return l.map(n => DOW[n - 1][1]).join(", "); };
 function autoCard(k, d) {
   const on = (k.auto_days || []).length > 0, today_ = (k.auto_days || []).includes(isoDow(d));
   return `<section class="card stack" style="gap:10px"><label class="switch" style="background:none;padding:0"><span style="display:grid;gap:2px"><span>Always cooking</span><span class="small muted" style="font-weight:500">Pools open straight away on these days. No need to confirm each morning.</span></span><input type="checkbox" id="autoOn"${on ? " checked" : ""}></label>
-    ${on ? `<div class="chips" id="autoDays">${DOW.map(([n, l]) => `<button type="button" class="tog" data-dow="${n}" aria-pressed="${(k.auto_days || []).includes(n)}">${l}</button>`).join("")}</div>
+    ${on ? `<div id="autoDays">${autoPicker(k.auto_days)}</div>
       <p class="small muted">You get an alert when a pool starts and a summary at ${fmtTime(S.settings.cutoff)} with the final meals.</p>` : ""}
     ${k.open && !k.paused && (today_ || k.confirmed) ? `<button class="linkbtn" id="pauseDay" style="justify-self:start;color:var(--danger)">Not cooking ${dayLabel(d)}? Pause ${fmtDate(d)}</button>` : ""}</section>`;
 }
