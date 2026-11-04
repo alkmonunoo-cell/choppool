@@ -153,13 +153,26 @@ p { margin: 0; }
 .homemini.show { opacity: 1; transform: none; }
 .homemini b { font-family: var(--font-display); font-size: 15px; font-weight: 800; margin-right: 2px; }
 .homemini span { white-space: nowrap; }
-.waitbox { display: grid; gap: 8px; padding: 12px; border-radius: 18px; background: color-mix(in srgb, #F5B04A 14%, var(--surface)); border: 1.5px solid color-mix(in srgb, #F5B04A 55%, transparent); }
-.wb-top { display: flex; align-items: center; gap: 8px; font-size: 14.5px; }
-.wb-top strong { color: var(--ink); }
-.wb-left { margin-left: auto; font-size: 13px; font-weight: 700; color: var(--hint); white-space: nowrap; }
-.wb-dot { width: 9px; height: 9px; border-radius: 50%; background: #F5B04A; flex: none; box-shadow: 0 0 0 0 rgba(245,176,74,.6); animation: wbPulse 1.6s ease-out infinite; }
-@keyframes wbPulse { 70% { box-shadow: 0 0 0 7px rgba(245,176,74,0); } 100% { box-shadow: 0 0 0 0 rgba(245,176,74,0); } }
-.waitbox .small { margin: 0; color: var(--muted); }
+.waitbox { display: grid; gap: 12px; padding: 14px; border-radius: 20px; background: linear-gradient(135deg, color-mix(in srgb, #F5B04A 18%, var(--surface)) 0%, color-mix(in srgb, #F5B04A 6%, var(--surface)) 100%); border: 1px solid color-mix(in srgb, #F5B04A 38%, transparent); box-shadow: inset 0 1px 0 rgba(255,255,255,.06); }
+.wb-row { display: flex; align-items: center; gap: 12px; }
+.wb-ring { position: relative; width: 56px; height: 56px; flex: none; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1; gap: 1px; }
+.wb-ring svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+.wb-ring circle { fill: none; stroke-width: 4; }
+.wb-ring .trk { stroke: color-mix(in srgb, #F5B04A 22%, transparent); }
+.wb-ring .arc { stroke: #F5B04A; stroke-linecap: round; transition: stroke-dashoffset .9s cubic-bezier(.16,1,.3,1); }
+.wb-ring b { position: relative; font: 800 17px var(--font-display); color: var(--ink); }
+.wb-ring small { position: relative; font-size: 9px; font-weight: 700; color: var(--muted); letter-spacing: .04em; }
+.wb-text { display: grid; gap: 2px; min-width: 0; }
+.wb-text strong { font: 700 15.5px var(--font-display); color: var(--ink); line-height: 1.25; }
+.wb-text span { font-size: 13px; color: var(--muted); }
+.wb-btn { height: 50px; border-radius: 15px; }
+/* First time it appears: the ring draws in and the box settles */
+.waitbox.fresh { animation: wbIn .55s cubic-bezier(.16,1,.3,1) both; }
+.waitbox.fresh .arc { animation: wbDraw 1.1s cubic-bezier(.16,1,.3,1) .1s both; }
+@keyframes wbIn { from { opacity: 0; transform: translateY(8px) scale(.985); } to { opacity: 1; transform: none; } }
+@keyframes wbDraw { from { stroke-dashoffset: var(--c); } }
+.wb-ring::after { content: ""; position: absolute; inset: -3px; border-radius: 50%; box-shadow: 0 0 0 0 rgba(245,176,74,.35); animation: wbBreathe 2.4s ease-in-out infinite; }
+@keyframes wbBreathe { 50% { box-shadow: 0 0 0 5px rgba(245,176,74,0); } }
 .seatline { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
 .seatline .hint { font-weight: 700; }
 .dishtext { margin: 0; font-size: 13.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -524,7 +537,7 @@ html.standalone, html.standalone body { overscroll-behavior: none; }
 @keyframes paneIn { from { opacity: 0; transform: translateX(var(--dx, 24px)); } to { opacity: 1; transform: none; } }
 .is-app .tabbar button[aria-current="page"] svg { animation: tabPop .22s ease-out; }
 @keyframes tabPop { 50% { transform: scale(1.12); } }
-.is-app .rv { opacity: 0; transform: translateY(24px); transition: opacity .42s cubic-bezier(.2,.8,.2,1), transform .42s cubic-bezier(.2,.8,.2,1); will-change: transform, opacity; }
+.is-app .rv { opacity: 0; transform: translateY(18px) scale(.985); transition: opacity .5s cubic-bezier(.16,1,.3,1), transform .6s cubic-bezier(.16,1,.3,1); will-change: transform, opacity; }
 .is-app .rv.in { opacity: 1; transform: none; }
 .is-app button, .is-app .btn, .is-app .ghost { transition: transform .12s cubic-bezier(.2,.8,.2,1); }
 .is-app button:active, .is-app .btn:active { transform: scale(.96); }
@@ -715,8 +728,11 @@ function makeDemoApi() {
     pools.filter(p => p.status === "waiting" && minsAgo(p.created_at) >= settings.accept_timeout_min).forEach(p => {
       p.status = "cancelled";
       orders.filter(o => o.pool_id === p.id && o.status !== "cancelled").forEach(o => {
-        o.status = "cancelled"; o.cancel_reason = "The seller did not confirm in time"; o.refund_needed = !!o.momo_ref;
+        const wasPaid = ["paid", "collected"].includes(o.status);
+        o.refund_due = wasPaid ? Math.max(0, dueOf(o) - o.wallet_used) : 0;
+        o.status = "cancelled"; o.cancel_reason = "The seller did not confirm in time"; o.refund_needed = !!o.momo_ref && !(o.user_id && wasPaid);
         if (o.wallet_used > 0 && o.user_id) ledger.push({ user_id: o.user_id, amount: o.wallet_used, reason: "Refund: seller did not confirm", order_id: o.id, created_at: nowIso() });
+        if (o.refund_due > 0 && o.user_id && !o.refund_needed) ledger.push({ user_id: o.user_id, amount: o.refund_due, reason: "Money back: the vendor didn't confirm, code " + o.code, order_id: o.id, created_at: nowIso() });
       });
     });
     orders.filter(o => ["quote_requested", "quoted"].includes(o.status) && pastCutoff(o.order_date)).forEach(o => { o.status = "cancelled"; o.cancel_reason = "Special request not paid before cut-off"; });
@@ -809,7 +825,7 @@ function makeDemoApi() {
           special_request: o.special_request, quote_price: o.quote_price, amount_due: dueOf(o) - o.wallet_used, cancel_reason: o.cancel_reason,
           unit_price: o.unit_price, addons: o.addons, addons_total: o.addons_total, max_fee: o.max_fee, service_fee: o.service_fee, wallet_used: o.wallet_used,
           saving: ["pending", "paid", "collected"].includes(o.status) && p.status !== "cancelled" ? cashOf(o) : 0,
-          has_account: !!o.user_id, refund_needed: !!o.refund_needed, parent_id: o.parent_id || null, fee_per_meal: !!o.fee_per_meal, item_id: o.item_id, pool_id: o.pool_id, created_at: o.created_at };
+          has_account: !!o.user_id, refund_needed: !!o.refund_needed, refund_due: o.refund_due || 0, parent_id: o.parent_id || null, fee_per_meal: !!o.fee_per_meal, item_id: o.item_id, pool_id: o.pool_id, created_at: o.created_at };
       });
     },
     async addVendor(r) {
@@ -834,7 +850,8 @@ function makeDemoApi() {
     async savePayMethod(p) { if (p.is_main) payMethods.forEach(x => { x.is_main = false; }); if (p.id) Object.assign(payMethods.find(x => x.id === p.id), p); else payMethods.push({ id: "pm" + uid(), sort: payMethods.length + 1, created_at: nowIso(), ...p }); },
     async removePayMethod(id) { payMethods.splice(payMethods.findIndex(x => x.id === id), 1); return "deleted"; },
     async saveProfile(p) { const ex = profiles.find(x => x.user_id === me.id); if (ex) Object.assign(ex, p); else profiles.push({ user_id: me.id, email: me.email, ...p }); },
-    async claimOrders(ids) { let n = 0; orders.forEach(o => { if (me && ids.includes(o.id) && !o.user_id) { o.user_id = me.id; n++; } }); return n; },
+    async claimOrders(ids) { let n = 0; orders.forEach(o => { if (me && ids.includes(o.id) && !o.user_id) { o.user_id = me.id; n++;
+        if (o.status === "cancelled" && o.refund_due > 0 && o.refund_needed) { o.refund_needed = false; ledger.push({ user_id: me.id, amount: o.refund_due, reason: "Money back: the vendor didn't confirm, code " + o.code, order_id: o.id, created_at: nowIso() }); } } }); return n; },
     async wallet() {
       if (!me) throw new Error("Sign in to see your wallet.");
       const cb = orders.filter(o => o.user_id === me.id && ["paid", "collected"].includes(o.status) && pastCutoff(o.order_date) && cashOf(o) > 0)
@@ -1782,9 +1799,11 @@ function photoHead(k, i, inner, small) {
 function waitBox(k) {
   const s = S.settings, wp = S.board.pools.find(x => x.site_id === S.siteId && x.kitchen_id === k.id && x.status === "waiting");
   const left = wp ? Math.max(0, s.accept_timeout_min - minsAgo(wp.created_at)) : s.accept_timeout_min, n = wp ? wp.meals : 0;
-  return `<div class="waitbox"><div class="wb-top"><span class="wb-dot"></span><strong>Vendor yet to confirm</strong><span class="wb-left num">${left} min left</span></div>
-    <p class="small">${n} ${n === 1 ? "meal" : "meals"} so far. Join now: if they don't confirm, everyone gets their money back.</p>
-    <button class="btn wide" data-menu="${esc(k.id)}">Join anyway</button></div>`;
+  const C = 2 * Math.PI * 19, frac = Math.max(0, Math.min(1, left / s.accept_timeout_min)), first = !(S.seenWait = S.seenWait || new Set()).has(k.id); S.seenWait.add(k.id);
+  return `<div class="waitbox${first ? " fresh" : ""}"><div class="wb-row">
+      <span class="wb-ring" role="img" aria-label="${left} minutes left"><svg viewBox="0 0 44 44"><circle class="trk" cx="22" cy="22" r="19"/><circle class="arc" cx="22" cy="22" r="19" style="stroke-dasharray:${C.toFixed(1)};stroke-dashoffset:${(C * (1 - frac)).toFixed(1)};--c:${C.toFixed(1)}"/></svg><b class="num">${left}</b><small>min</small></span>
+      <span class="wb-text"><strong>Waiting for ${esc(k.public_name)} to confirm</strong><span>${n} ${n === 1 ? "meal" : "meals"} so far · full refund if they don't</span></span></div>
+    <button class="btn wide wb-btn" data-menu="${esc(k.id)}">Join anyway</button></div>`;
 }
 // Busiest buildings today (most meals), for one-tap chips on the welcome card
 function busySites(n) {
@@ -1839,10 +1858,9 @@ function renderPools() {
     const site = siteOf(S.siteId), km = hasPin(site) && kPin(k, site) ? roadKm(kPin(k, site), site) : null;
     return `<article class="pool">
       ${photoHead(k, i, `${tag}<div class="fee-tag"><b class="num">${money(share)}</b><span>${share < feeFor(1, s, trip) ? `<s>${money(feeFor(1, s, trip))}</s> ` : ""}delivery a meal</span></div>
-        <div class="ptitle"><h3>${esc(k.public_name)}</h3><span>${esc(k.added_by_customer ? "Local vendor" : k.tagline || "")}${km != null ? " · " + (km < 1 ? "under 1" : km.toFixed(1)) + " km" : ""}</span></div>`)}
+        <div class="ptitle"><h3>${esc(k.public_name)}</h3><span>${esc(k.added_by_customer ? "Local vendor added by a customer" : k.tagline || "")}${km != null ? " · " + (km < 1 ? "under 1" : km.toFixed(1)) + " km" : ""}</span></div>`)}
       <div class="pool-body">
         ${seats}${line ? `<p class="small">${line}</p>` : ""}
-        ${k.added_by_customer ? `<p class="small muted">A local vendor added by a customer</p>` : ""}
         <p class="dishtext">${dishes.slice(0, 2).map(d => esc(d.name)).join(" · ")}${dishes.length > 2 ? ` · +${dishes.length - 2} more` : ""}</p>
         ${btn}</div></article>`;
   }).join("") || `<div class="empty">${ICON.store}<p>No active pools at ${esc(siteOf(S.siteId).name || "your building")} yet today.</p><p class="small">Start one and others in your building can join it.</p><button class="btn" data-gokitchens>Start a pool</button></div>`;
@@ -1891,6 +1909,13 @@ function statusLine0(o) {
   const site = siteOf(o.site_id), st = o.pool_status, seller = menuOf(o.kitchen_id).public_name || "The vendor";
   if (o.status === "cancelled" && /^You cancelled/.test(o.cancel_reason || "")) return o.cancel_reason + "." + (o.refund_needed ? " ChopPool will refund your MoMo payment." : o.has_account && Number(o.max_fee) ? " Your money is back in your wallet." : "");
   if (o.status === "cancelled" && /^The seller can't/.test(o.cancel_reason || "")) return o.cancel_reason + ". Nothing was charged. You can still order the standard meal.";
+  if (o.status === "cancelled" && /did not confirm/.test(o.cancel_reason || "")) {
+    const back = Number(o.refund_due || 0) + Number(o.wallet_used || 0);
+    if (o.has_account && !o.refund_needed && back > 0) return "The vendor didn't confirm in time. " + money(back) + " is back in your wallet, ready for your next order.";
+    if (o.refund_needed && Number(o.refund_due) > 0) return "The vendor didn't confirm in time. ChopPool will refund " + money(o.refund_due) + " to your MoMo, or create an account to get it in your wallet straight away.";
+    if (o.refund_needed) return "The vendor didn't confirm in time. ChopPool will check your MoMo payment and refund it.";
+    return "The vendor didn't confirm in time. Nothing was charged.";
+  }
   if (o.status === "cancelled") return (o.cancel_reason || "Cancelled") + ". " + (S.user ? "Any wallet payment is back in your wallet; MoMo payments are refunded by ChopPool." : "ChopPool will refund your MoMo payment.");
   if (o.status === "collected") return "Collected. Enjoy your lunch.";
   if (o.status === "quote_requested") return "Waiting for " + seller + " to price your special request.";
@@ -1998,6 +2023,7 @@ function renderOrders() {
       ${savingLine(o)}
       ${canAddPlate(o) ? `<button class="ghost wide" data-addplate="${esc(o.id)}">${SV('<path d="M12 5v14M5 12h14"/>', 18)} Add another plate</button>` : ""}
       ${shareablePool(o) ? `<button class="ghost wide" data-share="${esc(o.site_id)},${esc(o.kitchen_id)}">Share this pool</button>` : ""}
+      ${o.status === "cancelled" && o.refund_needed && Number(o.refund_due) > 0 && !o.has_account ? `<button class="ghost wide" data-keepcb>Create an account and get ${money(o.refund_due)} in your wallet</button>` : ""}
       ${canOrderAgain(o) ? `<button class="btn wide" data-again="${esc(o.id)}">Order again</button>` : ""}
       ${canCancel(o) || liveKids.some(canCancel) ? `<div class="row" style="justify-content:flex-start;gap:14px;flex-wrap:wrap">${canCancel(o) ? `<button class="linkbtn" data-cancel="${esc(o.id)}" style="color:var(--danger)">Cancel order</button>` : ""}${liveKids.filter(canCancel).map(c => `<button class="linkbtn" data-cancel="${esc(c.id)}" style="color:var(--danger)">Remove ${esc(c.item_name.split(" with ")[0])}</button>`).join("")}</div>` : ""}
       ${o.status === "cancelled" && /^The seller can't/.test(o.cancel_reason || "") && S.menus.some(m => m.id === o.kitchen_id) ? `<button class="ghost wide" data-reorder="${esc(o.kitchen_id)}">Order the standard meal instead</button>` : ""}</article>`;
@@ -2756,7 +2782,7 @@ async function adminClick(e) {
   const t = e.target.closest("[data-act], [data-refunded]"); if (!t || t.tagName === "SELECT") return;
   const A = S.admin, s = S.settings, act = t.dataset.act;
   const run = async (fn, ok) => { try { await fn(); if (ok) toast(ok); renderAdmin(); } catch (err) { toast(cleanErr(err)); } };
-  if (t.dataset.refunded) return run(() => api.updateOrder(t.dataset.refunded, { refund_needed: false }), "Marked refunded");
+  if (t.dataset.refunded) return run(() => api.updateOrder(t.dataset.refunded, { refund_needed: false, refund_due: 0 }), "Marked refunded");
   if (act === "csv") return copy(ordersCsv(), "Orders copied. Paste them into Excel or Google Sheets.");
   if (act === "report-copy" && S.report) return copy(reportCsv(S.report, S.role === "super"), "Report copied. Paste it into Excel or Google Sheets.");
   if (act === "report-csv" && S.report) { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([reportCsv(S.report, S.role === "super")], { type: "text/csv" })); a.download = "choppool-week-" + S.report.week_start + ".csv"; document.body.appendChild(a); a.click(); a.remove(); return; }

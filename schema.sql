@@ -1,5 +1,5 @@
 -- =====================================================================
--- ChopPool pilot database, version 14
+-- ChopPool pilot database, version 15
 -- Run once in Supabase: SQL Editor > New query > paste everything > Run.
 -- If you ran an earlier version, run the RESET block at the very bottom
 -- first (it deletes pilot test data), then run this whole file.
@@ -2122,5 +2122,86 @@ grant execute on function admin_weekly_report(date) to authenticated;
 
 grant execute on function kitchen_set_auto(text, int[]), kitchen_pause(text, date, boolean), vendor_set_photo(text, uuid, text),
   vendor_set_menu(text, jsonb), kitchen_view(text, date), kitchen_open_day(text, date) to anon, authenticated;
+
+notify pgrst, 'reload schema';
+
+-- =====================================================================
+-- Update 15: when a vendor doesn't confirm in time, paid money goes straight to the customer's wallet
+-- (guests get a MoMo refund, or the wallet credit if they create an account first)
+-- =====================================================================
+alter table orders add column if not exists refund_due numeric not null default 0;   -- confirmed payment to return when a vendor doesn't confirm
+
+create or replace function housekeeping() returns void
+language plpgsql volatile security definer set search_path = public as $$
+declare s settings;
+begin
+  select * into s from settings where id = 1;
+
+  -- Vendors who didn't confirm in time: confirmed payments come back to the wallet (account holders) or by MoMo (guests)
+  with expired as (
+    update pools set status = 'cancelled'
+    where status = 'waiting' and created_at < now() - make_interval(mins => s.accept_timeout_min)
+    returning id)
+  update orders o set status = 'cancelled', cancel_reason = 'The seller did not confirm in time',
+                      refund_due = case when o.status in ('paid', 'collected') then greatest(0, order_total(o) - o.wallet_used) else 0 end,
+                      refund_needed = (o.momo_ref is not null and not (o.user_id is not null and o.status in ('paid', 'collected')))
+  from expired e where o.pool_id = e.id and o.status <> 'cancelled';
+
+  -- Wallet part of any cancelled order goes back to the wallet
+  insert into wallet_entries (user_id, amount, reason, order_id)
+  select o.user_id, o.wallet_used, 'Refund: ' || coalesce(o.cancel_reason, 'order cancelled'), o.id
+  from orders o
+  where o.status = 'cancelled' and o.wallet_used > 0 and o.user_id is not null
+    and not exists (select 1 from wallet_entries w where w.order_id = o.id and w.amount > 0 and w.reason like 'Refund:%');
+
+  -- MoMo part of a confirmed payment, for account holders, once (never when ChopPool refunds the MoMo instead)
+  insert into wallet_entries (user_id, amount, reason, order_id)
+  select o.user_id, o.refund_due, 'Money back: the vendor didn''t confirm, code ' || o.code, o.id
+  from orders o
+  where o.status = 'cancelled' and o.refund_due > 0 and o.user_id is not null and not o.refund_needed
+    and not exists (select 1 from wallet_entries w where w.order_id = o.id and w.reason like 'Money back:%');
+
+  update orders set status = 'cancelled', cancel_reason = 'Special request not paid before cut-off'
+  where status in ('quote_requested', 'quoted')
+    and (now() at time zone 'utc') >= order_date + s.cutoff;
+end $$;
+
+-- A guest who creates an account: money waiting for a MoMo refund goes to the new wallet instead
+create or replace function claim_orders(p_ids uuid[]) returns int
+language plpgsql volatile security definer set search_path = public as $$
+declare n int;
+begin
+  if auth.uid() is null then return 0; end if;
+  update orders set user_id = auth.uid() where id = any(p_ids) and user_id is null;
+  get diagnostics n = row_count;
+  update orders set refund_needed = false
+   where id = any(p_ids) and user_id = auth.uid() and status = 'cancelled' and refund_due > 0 and refund_needed;
+  perform housekeeping();
+  return n;
+end $$;
+grant execute on function claim_orders(uuid[]) to authenticated;
+
+-- Orders now say how much came (or can come) back to the wallet
+drop function if exists my_orders(uuid[]);
+create function my_orders(p_ids uuid[])
+returns table (id uuid, order_date date, code text, status text, qty int, item_name text, site_id uuid,
+               kitchen_id uuid, pool_seq int, pool_status text, special_request text, quote_price numeric,
+               amount_due numeric, cancel_reason text, unit_price numeric, addons jsonb, addons_total numeric,
+               max_fee numeric, service_fee numeric, wallet_used numeric, saving numeric, has_account boolean,
+               refund_needed boolean, parent_id uuid, fee_per_meal boolean, item_id uuid, pool_id uuid, created_at timestamptz,
+               refund_due numeric)
+language sql stable security definer set search_path = public as $$
+  select o.id, o.order_date, o.code, o.status, o.qty, o.item_name, o.site_id, o.kitchen_id, p.seq, p.status,
+         o.special_request, o.quote_price,
+         order_total(o) - o.wallet_used,
+         o.cancel_reason, o.unit_price, o.addons, o.addons_total, o.max_fee, o.service_fee, o.wallet_used,
+         case when o.status in ('pending', 'paid', 'collected') and p.status <> 'cancelled' then order_cashback(o.id) else 0 end,
+         o.user_id is not null, o.refund_needed, o.parent_id, o.fee_per_meal, o.item_id, o.pool_id, o.created_at, o.refund_due
+  from orders o join pools p on p.id = o.pool_id
+  where (o.id = any(p_ids) or o.parent_id = any(p_ids) or (auth.uid() is not null and o.user_id = auth.uid()))
+    and o.order_date >= (now() at time zone 'utc')::date - 1
+  order by o.created_at desc;
+$$;
+grant execute on function my_orders(uuid[]) to anon, authenticated;
 
 notify pgrst, 'reload schema';
