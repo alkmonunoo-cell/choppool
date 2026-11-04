@@ -69,7 +69,7 @@
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { margin: 0; }
 body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15.5px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
-.wrap { max-width: 640px; margin: 0 auto; padding: calc(12px + env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) calc(112px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); display: grid; gap: 18px; }
+.wrap { max-width: 640px; margin: 0 auto; padding: calc(12px + env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) calc(112px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); display: grid; gap: 18px; align-content: start; }
 .stack { display: grid; gap: 14px; }
 h1, h2, h3 { font-family: var(--font-display); margin: 0; text-wrap: balance; letter-spacing: -0.01em; }
 h1 { font-size: 28px; font-weight: 800; line-height: 1.1; }
@@ -470,12 +470,12 @@ input, select, textarea { font-size: 16px; min-width: 0; max-width: 100%; }
 .collapse > div { overflow: hidden; min-height: 0; }
 .ledger-day { margin: 6px 0 0; font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
 /* Frosted tab bar: mostly solid, blurred behind, fine edge */
-.tabbar { background: color-mix(in srgb, var(--surface) 82%, transparent) !important; -webkit-backdrop-filter: blur(20px) saturate(160%); backdrop-filter: blur(20px) saturate(160%); border: 1px solid color-mix(in srgb, var(--line) 70%, transparent); bottom: calc(12px + env(safe-area-inset-bottom)) !important; }
+.tabbar { background: color-mix(in srgb, var(--surface) 82%, transparent) !important; -webkit-backdrop-filter: blur(20px) saturate(160%); backdrop-filter: blur(20px) saturate(160%); border: 1px solid color-mix(in srgb, var(--line) 70%, transparent); bottom: max(10px, calc(env(safe-area-inset-bottom) - 12px)) !important; }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { .tabbar, .topzone.scrolled, .sheet-foot, .statusglass { background: var(--surface) !important; } }
-.toast { bottom: calc(92px + env(safe-area-inset-bottom)); }
+.toast { bottom: calc(82px + max(10px, calc(env(safe-area-inset-bottom) - 12px))); }
 /* Installed on iPhone, pages shorter than the screen put the tab bar too high (an iOS bug); pages that scroll are fine.
    So every page is at least a touch taller than the screen. */
-html.standalone .wrap { min-height: calc(100vh + 1px); min-height: calc(100lvh + 1px); }
+html.standalone body { min-height: calc(100vh + 1px); min-height: calc(100lvh + 1px); }
 html.standalone, html.standalone body { overscroll-behavior: none; }
 /* Launch animation: the packs stack, the name rises, the tagline lands in three beats */
 .splash { position: fixed; inset: 0; z-index: 100; background: var(--bg); display: grid; place-items: center; transition: opacity .35s cubic-bezier(.2,.8,.2,1); cursor: pointer; }
