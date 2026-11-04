@@ -109,8 +109,8 @@ p { margin: 0; }
 
 /* Hero */
 .hero { position: relative; overflow: hidden; border-radius: 28px; padding: 20px; background: radial-gradient(130% 120% at 85% 0%, #F7853C 0%, #E2561A 40%, #B93A0C 100%); color: #fff; display: grid; gap: 14px; box-shadow: 0 16px 36px rgba(185,58,12,.32); }
-.hero::after { content: ""; position: absolute; right: -40px; top: -50px; width: 180px; height: 180px; border-radius: 50%; background: rgba(255,255,255,.12); }
-.hero::before { content: ""; position: absolute; right: 40px; bottom: -70px; width: 140px; height: 140px; border-radius: 50%; background: rgba(255,255,255,.08); }
+.hero::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22120%22%20height%3D%22120%22%20fill%3D%22none%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M10%2030h34a17%2017%200%200%201-34%200z%22/%3E%3Cpath%20d%3D%22M18%2024c0-4%204-4%204-8M27%2024c0-4%204-4%204-8%22/%3E%3Cpath%20d%3D%22M78%2012l14%2030M86%2010v14a4%204%200%200%200%208%200V10M90%2024v22%22/%3E%3Cpath%20d%3D%22M70%2080c6-10%2020-10%2026%200-6%2010-20%2010-26%200z%22/%3E%3Cpath%20d%3D%22M70%2080h26%22/%3E%3Cpath%20d%3D%22M14%2084c8-6%2014%202%2022-4%204%2010-8%2022-22%2014z%22/%3E%3Cpath%20d%3D%22M14%2094c6-4%2012-6%2022-14%22/%3E%3Ccircle%20cx%3D%2256%22%20cy%3D%2256%22%20r%3D%223%22/%3E%3Ccircle%20cx%3D%22104%22%20cy%3D%22104%22%20r%3D%222%22/%3E%3Ccircle%20cx%3D%2250%22%20cy%3D%22108%22%20r%3D%222%22/%3E%3C/svg%3E") 0 0 / 120px repeat; opacity: .14; -webkit-mask-image: linear-gradient(100deg, transparent 25%, #000 80%); mask-image: linear-gradient(100deg, transparent 25%, #000 80%); }
+.hero::before { content: none; }
 .hero h1 { color: inherit; position: relative; z-index: 1; }
 .hero p { opacity: .92; position: relative; z-index: 1; }
 .hero-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; position: relative; z-index: 1; }
@@ -1859,14 +1859,24 @@ function renderWhen() {
   if ($("#placeName")) $("#placeName").textContent = S.noSite ? "Choose your building" : site.name || "Choose your building";
   renderHero();
 }
+// Home card delivery figure: the cheapest per-meal price in a live pool here (what you'd pay to join now),
+// or, with no live pool, the nearest vendor's full trip estimate (no per-meal cap: it is shared as people join).
+function heroDelivery(here, site) {
+  const s = S.settings, opts = [];
+  here.filter(p => p.status === "collecting" && p.meals > 0 && p.meals < s.max_meals)
+    .forEach(p => opts.push({ fee: feeFor(p.meals + 1, s, poolTrip(p)), label: "a meal in a live pool" }));
+  if (hasPin(site)) {
+    const near = menusHere().filter(k => hasPin(k)).sort((a, b) => distM(a, site) - distM(b, site))[0];
+    if (near) opts.push({ fee: tripFor(near, site, s), label: "delivery from nearest vendor" });
+  }
+  return opts.sort((a, b) => a.fee - b.fee)[0] || null;
+}
 function renderHero() {
   const el = $("#hero"); if (!el) return;
   const s = S.settings, site = siteOf(S.siteId);
   const here = S.board.pools.filter(p => S.noSite || p.site_id === S.siteId);
   const meals = here.reduce((t, p) => t + p.meals, 0);
-  // Best delivery: the cheapest live pool share, or else the cheapest full delivery from a nearby kitchen (never above the cap)
-  const fullFrom = menusHere().filter(k => kPin(k, site)).reduce((m, k) => Math.min(m, feeFor(1, s, tripTo(k, site))), Number(s.max_fee));
-  const best = here.filter(p => p.status === "collecting" && p.meals > 0).reduce((m, p) => Math.min(m, feeFor(p.meals, s, poolTrip(p))), fullFrom);
+  const dlv = heroDelivery(here, site);
   const name = firstName();
   const dl = dayLabel(S.date);
   el.innerHTML = `<div class="hero-text"><p class="small">${greeting()}${name ? ", " + esc(name) : ""}</p>
@@ -1875,8 +1885,8 @@ function renderHero() {
       <p class="small" style="opacity:.8">Ghana time (GMT) now <span class="num" id="ghNow">${ghanaNow()}</span></p></div>
     <div class="hero-stats"><div class="hero-stat"><b class="num" id="countdown">--</b><span>until orders close</span></div>
       <div class="hero-stat"><b class="num">${meals}</b><span>meals ordered</span></div>
-      ${S.noSite ? `<div class="hero-stat"><b class="num">${here.filter(p => p.status === "collecting" && p.meals > 0).length}</b><span>pools open</span></div>` : `<div class="hero-stat"><b class="num">${money(best)}</b><span>best delivery</span></div>`}</div>`;
-  if ($("#homeMini")) $("#homeMini").innerHTML = `<span><b class="num" id="countdownMini">--</b> to order</span><span><b class="num">${meals}</b> meals</span>${S.noSite ? "" : `<span><b class="num">${money(best)}</b> best</span>`}`;
+      ${S.noSite ? `<div class="hero-stat"><b class="num">${here.filter(p => p.status === "collecting" && p.meals > 0).length}</b><span>pools open</span></div>` : (dlv ? `<div class="hero-stat"><b class="num">${Number.isInteger(dlv.fee) ? "GHS " + dlv.fee : money(dlv.fee)}</b><span>${esc(dlv.label)}</span></div>` : `<div class="hero-stat"><b class="num">${menusHere().length}</b><span>vendors cooking</span></div>`)}</div>`;
+  if ($("#homeMini")) $("#homeMini").innerHTML = `<span><b class="num" id="countdownMini">--</b> to order</span><span><b class="num">${meals}</b> meals</span>${S.noSite || !dlv ? "" : `<span><b class="num">${money(dlv.fee)}</b> ${dlv.label.startsWith("a meal") ? "a meal" : "delivery"}</span>`}`;
   tickCountdown();
 }
 function tickCountdown() {
