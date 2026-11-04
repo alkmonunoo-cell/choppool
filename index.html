@@ -4,7 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#F8F4EF">
-<title>ChopPool Lunch Pilot</title>
+<title>ChopPool · Split delivery. One order. One building.</title>
+<meta name="description" content="Split delivery. One order. One building. Order lunch with people in your building and share one delivery.">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Crect%20width%3D%22100%22%20height%3D%22100%22%20rx%3D%2224%22%20fill%3D%22%23D9480F%22/%3E%3Crect%20x%3D%2220%22%20y%3D%2261%22%20width%3D%2256%22%20height%3D%2215%22%20rx%3D%224%22%20fill%3D%22%23FFF7EE%22/%3E%3Cpath%20d%3D%22M20%2068h56%22%20stroke%3D%22%23D9480F%22%20stroke-width%3D%222.5%22/%3E%3Crect%20x%3D%2244%22%20y%3D%2266%22%20width%3D%228%22%20height%3D%225%22%20rx%3D%221.5%22%20fill%3D%22%23D9480F%22/%3E%3Crect%20x%3D%2225%22%20y%3D%2244%22%20width%3D%2256%22%20height%3D%2215%22%20rx%3D%224%22%20fill%3D%22%23F5B04A%22/%3E%3Cpath%20d%3D%22M25%2051h56%22%20stroke%3D%22%23D9480F%22%20stroke-width%3D%222.5%22/%3E%3Crect%20x%3D%2249%22%20y%3D%2249%22%20width%3D%228%22%20height%3D%225%22%20rx%3D%221.5%22%20fill%3D%22%23D9480F%22/%3E%3Crect%20x%3D%2221%22%20y%3D%2227%22%20width%3D%2256%22%20height%3D%2215%22%20rx%3D%224%22%20fill%3D%22%23FFF7EE%22/%3E%3Cpath%20d%3D%22M21%2034h56%22%20stroke%3D%22%23D9480F%22%20stroke-width%3D%222.5%22/%3E%3Crect%20x%3D%2245%22%20y%3D%2232%22%20width%3D%228%22%20height%3D%225%22%20rx%3D%221.5%22%20fill%3D%22%23D9480F%22/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -281,8 +283,53 @@ td select { padding: 6px 8px; width: auto; }
 .admintabs { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
 .admintabs button { white-space: nowrap; background: var(--surface); box-shadow: var(--shadow); border: none; color: var(--ink); border-radius: 999px; padding: 8px 14px; font-size: 14px; }
 .admintabs button[aria-current="page"] { background: var(--ink); color: var(--bg); }
-.menuedit { display: grid; grid-template-columns: 1.4fr .6fr 1.6fr auto auto; gap: 8px; align-items: center; }
-@media (max-width: 560px) { .menuedit { grid-template-columns: 1fr 90px; } .menuedit [data-f="addons"] { grid-column: 1 / -1; } }
+.menuedit { display: grid; grid-template-columns: 40px 1.4fr .6fr 1.5fr 1fr auto auto; gap: 8px; align-items: center; }
+.dishpic { width: 40px; height: 40px; border-radius: 12px; background: var(--surface-2); display: grid; place-items: center; }
+.dishpic svg { width: 34px; height: 34px; }
+@media (max-width: 720px) { .menuedit { grid-template-columns: 40px 1fr 90px; } .menuedit [data-f="addons"], .menuedit [data-f="icon"] { grid-column: 2 / -1; } }
+/* Admin: wide on laptops, one column on phones */
+body.is-admin .wrap { max-width: 1240px; }
+.aframe { display: grid; gap: 14px; }
+.asub { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
+.asub:empty { display: none; }
+.asub button { white-space: nowrap; background: transparent; border: 1px solid var(--line); color: var(--ink); border-radius: 999px; padding: 7px 12px; font-size: 13.5px; font-weight: 600; }
+.asub button[aria-current="page"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-2); }
+.listbar { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+.listbar select { width: auto; }
+details.item { background: var(--surface); border-radius: 18px; box-shadow: var(--shadow); }
+details.item > summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 16px; flex-wrap: wrap; min-height: 44px; }
+details.item > summary::-webkit-details-marker { display: none; }
+details.item > summary::after { content: ""; width: 9px; height: 9px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(45deg); margin-left: 4px; transition: transform .15s; flex: none; }
+details.item[open] > summary::after { transform: rotate(-135deg); }
+details.item[open] > summary { border-bottom: 1px solid var(--line); }
+.ititle { display: grid; gap: 2px; min-width: 0; flex: 1 1 220px; }
+.imeta { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.ibody { padding: 14px 16px 16px; display: grid; gap: 12px; }
+.dash-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.dtile { background: var(--surface); border: none; border-radius: 18px; box-shadow: var(--shadow); padding: 14px 16px; display: grid; gap: 4px; text-align: left; color: var(--ink); font: inherit; align-content: start; }
+button.dtile:not([disabled]) { cursor: pointer; }
+button.dtile:not([disabled]):hover { outline: 2px solid var(--accent-soft); }
+.dtile b { font-family: var(--font-display); font-size: 26px; font-weight: 800; line-height: 1.1; }
+.dtile span { font-size: 14px; font-weight: 600; }
+.dtile small { font-size: 12.5px; color: var(--muted); }
+.dtile.bad { box-shadow: inset 4px 0 0 var(--danger), var(--shadow); } .dtile.bad b { color: var(--danger); }
+.dtile.warn { box-shadow: inset 4px 0 0 var(--hint), var(--shadow); } .dtile.warn b { color: var(--hint); }
+.dtile.wide { grid-column: 1 / -1; }
+.stagebar { display: flex; gap: 8px 14px; flex-wrap: wrap; font-size: 14px; }
+.capline { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; font-size: 14px; }
+.capline i { grid-column: 1 / -1; height: 6px; border-radius: 3px; background: linear-gradient(90deg, var(--accent) var(--w), var(--surface-2) var(--w)); }
+.cards2 { display: grid; gap: 14px; }
+.payalts { font-size: 14px; } .payalts summary { cursor: pointer; color: var(--accent-2); font-weight: 600; padding: 4px 0; }
+.payalt { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 0; border-top: 1px solid var(--line); }
+@media (min-width: 900px) {
+  .aframe.has-sub { grid-template-columns: 200px minmax(0, 1fr); align-items: start; }
+  .aframe.has-sub .asub { flex-direction: column; position: sticky; top: 12px; overflow: visible; }
+  .aframe.has-sub .asub button { text-align: left; border-radius: 12px; white-space: normal; }
+  .dash-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .dtile.wide { grid-column: span 3; }
+  .cards2 { grid-template-columns: repeat(auto-fill, minmax(440px, 1fr)); }
+  body.is-admin .tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
 .hidden { display: none !important; }
 @media (max-width: 560px) {
   .tiles { grid-template-columns: repeat(2, 1fr); }
@@ -406,7 +453,9 @@ function makeDemoApi() {
     { id: "i8", kitchen_id: "v1", name: "Gob3 with plantain", price: 25, addons: [] }
   ];
   const riders = [{ id: "r1", name: "Kwame (example rider)", phone: "0240000003", token: "demor1", active: true }];
+  [...sites, ...kitchens, ...riders].forEach((x, n) => { if (!x.created_at) x.created_at = new Date(Date.now() - (40 - n * 3) * 864e5).toISOString(); });
   const pools = [], orders = [], days = [], ledger = [], users = [], profiles = [];
+  const payMethods = [{ id: "pm1", network: "MTN", number: "024 000 0000", name: "ChopPool Pilot", is_main: true, active: true, sort: 1, created_at: new Date().toISOString() }];
   const team = [{ email: "you@choppool.demo", role: "super" }, { email: "ops@choppool.demo", role: "coordinator" }];
   let me = null;
   const names = ["Ama", "Kofi", "Esi", "Yaw", "Akua", "Kwame", "Efua", "Kojo", "Adwoa", "Kwesi", "Abena", "Nana", "Selorm", "Dzifa", "Fiifi", "Naa"];
@@ -497,7 +546,8 @@ function makeDemoApi() {
 
   return {
     demo: true,
-    async load() { return { settings, sites: sites.filter(x => x.status === "active" && x.active), menus: kitchens.filter(k => k.active).map(k => ({ id: k.id, public_name: k.public_name, tagline: k.tagline, capacity: k.capacity, site_id: k.site_id, added_by_customer: k.added_by_customer, lat: k.lat ?? null, lng: k.lng ?? null })), items: items.filter(i => i.active !== false) }; },
+    async load() { const pop = {}; orders.filter(o => o.status !== "cancelled").forEach(o => { pop[o.item_id] = (pop[o.item_id] || 0) + o.qty; });
+      return { pop, payMethods: payMethods.filter(p => p.active), settings, sites: sites.filter(x => x.status === "active" && x.active), menus: kitchens.filter(k => k.active).map(k => ({ id: k.id, public_name: k.public_name, tagline: k.tagline, capacity: k.capacity, site_id: k.site_id, added_by_customer: k.added_by_customer, lat: k.lat ?? null, lng: k.lng ?? null })), items: items.filter(i => i.active !== false) }; },
     async board(date) {
       housekeeping();
       const load = {}; orders.filter(o => o.order_date === date && o.status !== "cancelled").forEach(o => { load[o.kitchen_id] = (load[o.kitchen_id] || 0) + o.qty; });
@@ -535,6 +585,8 @@ function makeDemoApi() {
     async updateName(name) { if (!me) throw new Error("Sign in first."); me.name = name; const u = users.find(x => x.id === me.id); if (u) u.name = name; return me; },
     async accountStats() { const since = Date.now() - 30 * 864e5; return { accounts: users.length, active: new Set(orders.filter(o => o.user_id && new Date(o.created_at).getTime() >= since).map(o => o.user_id)).size }; },
     async updateSettings(patch) { Object.assign(settings, patch); },
+    async savePayMethod(p) { if (p.is_main) payMethods.forEach(x => { x.is_main = false; }); if (p.id) Object.assign(payMethods.find(x => x.id === p.id), p); else payMethods.push({ id: "pm" + uid(), sort: payMethods.length + 1, created_at: nowIso(), ...p }); },
+    async removePayMethod(id) { payMethods.splice(payMethods.findIndex(x => x.id === id), 1); return "deleted"; },
     async saveProfile(p) { const ex = profiles.find(x => x.user_id === me.id); if (ex) Object.assign(ex, p); else profiles.push({ user_id: me.id, email: me.email, ...p }); },
     async claimOrders(ids) { let n = 0; orders.forEach(o => { if (me && ids.includes(o.id) && !o.user_id) { o.user_id = me.id; n++; } }); return n; },
     async wallet() {
@@ -621,7 +673,7 @@ function makeDemoApi() {
     async adminData(date) {
       housekeeping();
       return { orders: orders.filter(o => o.order_date === date), pools: pools.filter(p => p.order_date === date).map(p => ({ ...p, meals: meals(p.id) })), riders, sites, kitchens,
-        wallets: profiles.map(p => ({ ...p, balance: balance(p.user_id) })), items, team };
+        wallets: profiles.map(p => ({ ...p, balance: balance(p.user_id) })), items, team, payment_methods: payMethods };
     },
     async updateOrder(id, patch) { Object.assign(orders.find(o => o.id === id), patch); },
     async updatePool(id, patch) { const p = pools.find(x => x.id === id); Object.assign(p, patch); if (patch.status && stamp[patch.status]) p[stamp[patch.status]] = nowIso(); },
@@ -636,9 +688,9 @@ function makeDemoApi() {
       const si = { id: "s" + uid(), name: r.name.trim(), drop_point: r.drop_point.trim(), handoff: "meet_rider", host_label: null, host_token: "demo" + uid(), lat: r.lat, lng: r.lng, status: "pending", request_note: (r.note || "").trim() || null, created_at: nowIso(), active: true };
       sites.push(si); return { id: si.id, name: si.name, status: "pending" };
     },
-    async addKitchen(k) { const x = { id: "k" + uid(), token: "demo" + uid(), active: true, added_by_customer: false, site_id: null, ...k }; kitchens.push(x); return x; },
+    async addKitchen(k) { const x = { id: "k" + uid(), token: "demo" + uid(), active: true, added_by_customer: false, site_id: null, created_at: nowIso(), ...k }; kitchens.push(x); return x; },
     async saveItem(it) { if (it.id) Object.assign(items.find(i => i.id === it.id), it); else items.push({ id: "i" + uid(), addons: [], active: true, ...it }); },
-    async addRider(r) { riders.push({ id: "r" + uid(), token: "demo" + uid(), active: true, ...r }); },
+    async addRider(r) { riders.push({ id: "r" + uid(), token: "demo" + uid(), active: true, created_at: nowIso(), ...r }); },
     async updateRider(id, p) { Object.assign(riders.find(r => r.id === id), p); },
     async addSite(si) { sites.push({ id: "s" + uid(), host_token: "demo" + uid(), status: "active", active: true, created_at: nowIso(), ...si }); },
     async updateSite(id, p) { Object.assign(sites.find(x => x.id === id), p); },
@@ -661,13 +713,16 @@ function makeSupabaseApi() {
   return {
     demo: false,
     async load() {
+      const soft = q => q.then(r => r.error ? null : r.data, () => null);   // optional tables: the app still works before the database update
+      const [payMethods, popRows] = await Promise.all([soft(sb.from("payment_methods").select("*").eq("active", true).order("sort")), soft(sb.from("dish_popularity").select("*"))]);
+      const pop = {}; (popRows || []).forEach(r => { pop[r.item_id] = r.n; });
       const [settings, sites, menus, items] = await Promise.all([
         sb.from("settings").select("*").eq("id", 1).single().then(must),
         sb.from("public_sites").select("*").order("name").then(must),
         sb.from("public_menus").select("*").order("public_name").then(must),
         sb.from("menu_items").select("*").eq("active", true).order("price").then(must)
       ]);
-      return { settings, sites, menus, items };
+      return { settings, sites, menus, items, payMethods: payMethods || [], pop };
     },
     async board(date) {
       await sb.rpc("housekeeping");
@@ -692,6 +747,13 @@ function makeSupabaseApi() {
     async signOut() { await sb.auth.signOut(); },
     async updateName(name) { const d = must(await sb.auth.updateUser({ data: { name } })); try { await this.saveProfile({ name }); } catch (e) {} return { id: d.user.id, email: d.user.email, name }; },
     async accountStats() { const r = await sb.rpc("admin_account_stats"); if (r.error && /function|schema cache/i.test(r.error.message)) throw new Error("Run update-7.sql in the Supabase SQL Editor once."); return must(r); },
+    async savePayMethod(p) {
+      const { id, ...f } = p, miss = e => e && /payment_methods|schema cache|relation/i.test(e.message) ? new Error("Run the latest choppool-update.sql in Supabase once, then try again.") : null;
+      if (f.is_main) { const r0 = await sb.from("payment_methods").update({ is_main: false }).neq("id", id || "00000000-0000-0000-0000-000000000000"); if (miss(r0.error)) throw miss(r0.error); }
+      const r = id ? await sb.from("payment_methods").update(f).eq("id", id).select("id") : await sb.from("payment_methods").insert(f).select("id");
+      if (miss(r.error)) throw miss(r.error); if (!must(r).length) throw new Error("Not saved. Only the owner can change payment options.");
+    },
+    async removePayMethod(id) { must(await sb.from("payment_methods").delete().eq("id", id)); return "deleted"; },
     async updateSettings(patch) { const r = await sb.from("settings").update(patch).eq("id", 1).select("id");
       if (r.error && /momo_network/i.test(r.error.message)) throw new Error("Run update-10.sql in the Supabase SQL Editor once, then try again.");
       if (r.error && /base_fare|per_km|column|schema cache/i.test(r.error.message)) throw new Error("Run update-7.sql in the Supabase SQL Editor once, then try again.");
@@ -716,7 +778,7 @@ function makeSupabaseApi() {
     isAdmin: () => rpc("is_admin"),
     async adminData(date) {
       await sb.rpc("housekeeping");
-      const [orders, pools, riders, sites, kitchens, wallets, items, team] = await Promise.all([
+      const [orders, pools, riders, sites, kitchens, wallets, items, team, payment_methods] = await Promise.all([
         sb.from("orders").select("*").eq("order_date", date).order("created_at").then(must),
         sb.from("pools").select("*").eq("order_date", date).order("seq").then(must),
         sb.from("riders").select("*").order("name").then(must),
@@ -724,10 +786,11 @@ function makeSupabaseApi() {
         sb.from("kitchens").select("*").order("created_at").order("id").then(must),
         rpc("admin_wallets"),
         sb.from("menu_items").select("*").order("name").then(must),
-        sb.from("admins").select("*").order("role", { ascending: false }).then(must)
+        sb.from("admins").select("*").order("role", { ascending: false }).then(must),
+        sb.from("payment_methods").select("*").order("sort").then(r => r.error ? [] : r.data, () => [])
       ]);
       const m = {}; orders.forEach(o => { if (o.status !== "cancelled") m[o.pool_id] = (m[o.pool_id] || 0) + o.qty; });
-      return { orders, pools: pools.map(p => ({ ...p, meals: m[p.id] || 0 })), riders, sites, kitchens, wallets, items, team };
+      return { orders, pools: pools.map(p => ({ ...p, meals: m[p.id] || 0 })), riders, sites, kitchens, wallets, items, team, payment_methods };
     },
     async updateOrder(id, patch) { must(await sb.from("orders").update(patch).eq("id", id)); },
     async updatePool(id, patch) { if (patch.status && stamp[patch.status]) patch[stamp[patch.status]] = new Date().toISOString(); must(await sb.from("pools").update(patch).eq("id", id)); },
@@ -801,32 +864,48 @@ const ICON = {
 };
 
 /* Food illustrations, drawn so the app needs no photos */
-function dishKind(name) {
-  const n = String(name || "").toLowerCase();
-  if (/salad/.test(n)) return "salad";
-  if (/wrap|shawarma|suya|sandwich/.test(n)) return "wrap";
-  if (/banku|kenkey|fufu|tilapia|fish|gob3|beans|red red|plantain/.test(n)) return "plate";
-  return "bowl";
+/* ---------- Dish pictures: matched from the dish name, or picked by the team ---------- */
+const DISH_KINDS = [["jollof", "Jollof"], ["waakye", "Waakye"], ["friedrice", "Fried rice"], ["ricestew", "Rice and stew"], ["fufu", "Fufu and soup"], ["banku", "Banku and fish"], ["kenkey", "Kenkey and fish"], ["tuo", "Tuo zaafi / omo tuo"], ["soup", "Soup or stew"], ["redred", "Red red"], ["kelewele", "Kelewele / plantain"], ["gob3", "Gob3 (beans and gari)"], ["chicken", "Chicken / suya"], ["salad", "Salad"], ["wrap", "Wrap / shawarma"], ["pizza", "Pizza"], ["burger", "Burger"], ["bowl", "Other"]];
+const iconSelect = v => `<select data-f="icon" aria-label="Dish picture"><option value="">Auto picture</option>${DISH_KINDS.map(([k, l]) => `<option value="${k}"${v === k ? " selected" : ""}>${l}</option>`).join("")}</select>`;
+function dishKind(x) {
+  if (x && typeof x === "object") { if (x.icon) return x.icon; x = x.name; }
+  const n = String(x || "").toLowerCase();
+  const rules = [[/salad/, "salad"], [/shawarma|wrap|sandwich|burrito/, "wrap"], [/pizza/, "pizza"], [/burger/, "burger"], [/waakye/, "waakye"], [/jollof/, "jollof"],
+    [/fried rice/, "friedrice"], [/kenkey|dokon|komi/, "kenkey"], [/banku|akple/, "banku"], [/fufu/, "fufu"], [/tuo|t\.?z\b|omo tuo|rice ball/, "tuo"],
+    [/red ?red|beans and plantain|beans & plantain/, "redred"], [/gob3|gobe|gari and beans|gari & beans|beans and gari/, "gob3"], [/kelewele|plantain|dodo|tatale/, "kelewele"],
+    [/plain rice|white rice|rice and stew|rice & stew|stew/, "ricestew"], [/soup|nkwan|abunabunu|palm ?nut|groundnut|okro|kontomire/, "soup"],
+    [/chicken|suya|kebab|chofi|grill|turkey|goat/, "chicken"], [/tilapia|fish/, "banku"], [/rice/, "friedrice"]];
+  const hit = rules.find(([r]) => r.test(n)); return hit ? hit[1] : "bowl";
 }
+// The kitchen's picture is its most-ordered dish
+const topDish = kid => { const ds = S.items.filter(i => i.kitchen_id === kid), pop = S.pop || {}; return ds.slice().sort((a, b) => (pop[b.id] || 0) - (pop[a.id] || 0))[0]; };
 function art(kind) {
-  const steam = `<path d="M40 14c-5 6 5 9 0 15M52 10c-5 6 5 9 0 15M64 14c-5 6 5 9 0 15" stroke="var(--muted)" stroke-width="3" stroke-linecap="round" fill="none" opacity=".45"/>`;
-  if (kind === "salad") return `<svg viewBox="0 0 100 100" aria-hidden="true">
-    <ellipse cx="38" cy="44" rx="13" ry="8" fill="#5DA35A" transform="rotate(-25 38 44)"/><ellipse cx="60" cy="40" rx="14" ry="8" fill="#7DBE5E" transform="rotate(20 60 40)"/>
-    <ellipse cx="50" cy="48" rx="12" ry="7" fill="#4C8F4A"/><circle cx="66" cy="50" r="6" fill="#E4572E"/><circle cx="34" cy="52" r="5" fill="#E4572E"/>
-    <path d="M14 52h72a36 30 0 0 1-72 0z" fill="var(--ok)"/><rect x="38" y="80" width="24" height="6" rx="3" fill="var(--ok)" opacity=".7"/></svg>`;
-  if (kind === "wrap") return `<svg viewBox="0 0 100 100" aria-hidden="true">${steam}
-    <g transform="rotate(-28 50 58)"><rect x="18" y="44" width="64" height="28" rx="14" fill="#E3B26A"/><rect x="18" y="44" width="20" height="28" rx="10" fill="#D49A4C"/>
-    <path d="M24 50c4 3 4 13 0 16" stroke="#9B5B2A" stroke-width="3" fill="none"/><circle cx="26" cy="58" r="4" fill="#E4572E"/><circle cx="31" cy="52" r="3" fill="#5DA35A"/></g></svg>`;
-  if (kind === "plate") return `<svg viewBox="0 0 100 100" aria-hidden="true">${steam}
-    <ellipse cx="50" cy="64" rx="42" ry="17" fill="var(--surface)"/><ellipse cx="50" cy="62" rx="34" ry="12" fill="var(--surface-2)"/>
-    <circle cx="38" cy="52" r="14" fill="#F2E6C7"/><circle cx="34" cy="48" r="4" fill="#fff" opacity=".6"/>
-    <path d="M52 60c6-10 22-10 28 0-6 6-22 6-28 0z" fill="var(--accent)"/><path d="M80 60l7-5v10z" fill="var(--accent)"/><circle cx="58" cy="58" r="1.6" fill="#fff"/>
-    <circle cx="60" cy="68" r="3" fill="#E4572E"/><circle cx="68" cy="69" r="3" fill="#E4572E"/></svg>`;
-  return `<svg viewBox="0 0 100 100" aria-hidden="true">${steam}
-    <ellipse cx="50" cy="52" rx="31" ry="13" fill="#E98A3A"/><circle cx="38" cy="47" r="3" fill="#C2410C"/><circle cx="56" cy="44" r="3" fill="#5DA35A"/><circle cx="64" cy="50" r="3" fill="#C2410C"/><circle cx="46" cy="52" r="2.5" fill="#FDE68A"/>
-    <path d="M30 46c8-8 30-10 42-2" stroke="#8B4A1C" stroke-width="5" stroke-linecap="round" fill="none"/>
-    <path d="M14 52h72a36 30 0 0 1-72 0z" fill="var(--accent)"/><path d="M22 60h56" stroke="#fff" stroke-width="3" opacity=".35" stroke-linecap="round"/>
-    <rect x="38" y="80" width="24" height="6" rx="3" fill="var(--accent-2)"/></svg>`;
+  const plate = `<ellipse cx="50" cy="68" rx="43" ry="15" fill="var(--surface)"/><ellipse cx="50" cy="66" rx="35" ry="10" fill="var(--surface-2)"/>`;
+  const bowl = (soup, extra) => `<ellipse cx="50" cy="50" rx="34" ry="9" fill="${soup}"/>${extra || ""}<path d="M14 52h72a36 30 0 0 1-72 0z" fill="var(--accent)"/><path d="M22 60h56" stroke="#fff" stroke-width="3" opacity=".3" stroke-linecap="round"/><rect x="38" y="80" width="24" height="6" rx="3" fill="var(--accent-2)"/>`;
+  const leg = (x, y, r) => `<g transform="rotate(${r || -30} ${x} ${y})"><ellipse cx="${x}" cy="${y}" rx="11" ry="8" fill="#A8541F"/><ellipse cx="${x - 2}" cy="${y - 2}" rx="7" ry="4" fill="#C8702E"/><rect x="${x + 9}" y="${y - 2}" width="10" height="4" rx="2" fill="#F3E3C8"/><circle cx="${x + 19}" cy="${y - 2}" r="3" fill="#F3E3C8"/><circle cx="${x + 19}" cy="${y + 2}" r="3" fill="#F3E3C8"/></g>`;
+  const fish = (x, y) => `<path d="M${x} ${y}c6-10 22-10 28 0-6 6-22 6-28 0z" fill="#B3541E"/><path d="M${x + 28} ${y}l7-5v10z" fill="#B3541E"/><circle cx="${x + 6}" cy="${y - 2}" r="1.6" fill="#fff"/><path d="M${x + 12} ${y - 4}v8M${x + 18} ${y - 4}v8" stroke="#8A3B12" stroke-width="1.5"/>`;
+  const svg = inner => `<svg viewBox="0 0 100 100" aria-hidden="true">${inner}</svg>`;
+  const steam = `<path d="M40 22c-4 5 4 8 0 13M52 18c-4 5 4 8 0 13M64 22c-4 5 4 8 0 13" stroke="var(--muted)" stroke-width="3" stroke-linecap="round" fill="none" opacity=".4"/>`;
+  switch (kind) {
+    case "jollof": return svg(`${plate}<path d="M20 64c3-20 44-22 50 0z" fill="#D9541E"/><circle cx="32" cy="56" r="1.8" fill="#F4A261"/><circle cx="44" cy="52" r="1.8" fill="#F4A261"/><circle cx="56" cy="56" r="1.8" fill="#F4A261"/><circle cx="38" cy="60" r="1.8" fill="#5DA35A"/>${leg(64, 56, -25)}`);
+    case "waakye": return svg(`${plate}<path d="M18 64c3-20 44-22 50 0z" fill="#5B2626"/><circle cx="30" cy="57" r="1.8" fill="#8A4B43"/><circle cx="46" cy="53" r="1.8" fill="#8A4B43"/><path d="M60 54c4-4 10 4 16 0M60 58c4-4 10 4 16 0" stroke="#F0D9A6" stroke-width="2.5" fill="none" stroke-linecap="round"/><ellipse cx="36" cy="48" rx="9" ry="7" fill="#FFF8EC"/><circle cx="36" cy="48" r="3.6" fill="#F5B04A"/><ellipse cx="70" cy="66" rx="7" ry="3" fill="#3A1F14"/>`);
+    case "friedrice": return svg(`${plate}<path d="M18 64c3-20 52-22 60 0z" fill="#E9C46A"/><circle cx="30" cy="58" r="2" fill="#5DA35A"/><circle cx="40" cy="53" r="2" fill="#E4572E"/><circle cx="52" cy="56" r="2" fill="#5DA35A"/><circle cx="62" cy="52" r="2" fill="#F08C2E"/><circle cx="68" cy="59" r="2" fill="#E4572E"/><circle cx="46" cy="60" r="2" fill="#5DA35A"/>`);
+    case "ricestew": return svg(`${plate}<path d="M18 64c3-18 34-20 40 0z" fill="#FBF6EA"/><circle cx="30" cy="56" r="1.4" fill="#E8DFCC"/><circle cx="40" cy="53" r="1.4" fill="#E8DFCC"/><ellipse cx="66" cy="62" rx="16" ry="7" fill="#C2410C"/><ellipse cx="62" cy="60" rx="5" ry="2" fill="#F08C2E" opacity=".8"/><circle cx="72" cy="60" r="3" fill="#8A3B12"/>`);
+    case "fufu": return svg(`${steam}${bowl("#D9541E", `<ellipse cx="46" cy="44" rx="15" ry="11" fill="#FBF6EA"/><ellipse cx="42" cy="40" rx="6" ry="3" fill="#fff" opacity=".7"/><circle cx="68" cy="48" r="5" fill="#8A3B12"/><circle cx="26" cy="49" r="3" fill="#F5B04A"/>`)}`);
+    case "banku": return svg(`${plate}<circle cx="34" cy="56" r="12" fill="#ECE3CF"/><circle cx="30" cy="52" r="4" fill="#fff" opacity=".6"/>${fish(50, 60)}<circle cx="62" cy="70" r="3" fill="#E4572E"/><circle cx="70" cy="70" r="3" fill="#5DA35A"/><circle cx="54" cy="71" r="2.5" fill="#E4572E"/>`);
+    case "kenkey": return svg(`${plate}<g transform="rotate(-15 34 56)"><rect x="18" y="46" width="32" height="20" rx="9" fill="#D8C27A"/><path d="M24 47v18M31 46v20M38 46v20M45 47v18" stroke="#B89B4A" stroke-width="1.6"/></g>${fish(52, 58)}<ellipse cx="66" cy="70" rx="7" ry="3" fill="#3A1F14"/>`);
+    case "tuo": return svg(`${steam}${bowl("#4E7D3A", `<ellipse cx="48" cy="44" rx="14" ry="10" fill="#FBF6EA"/><circle cx="68" cy="48" r="4.5" fill="#8A3B12"/><path d="M24 50l5-2M30 52l4-3" stroke="#2F5A24" stroke-width="2" stroke-linecap="round"/>`)}`);
+    case "soup": return svg(`${steam}${bowl("#B5651D", `<circle cx="36" cy="48" r="5" fill="#8A3B12"/><circle cx="56" cy="46" r="4" fill="#F5B04A"/><circle cx="66" cy="50" r="4.5" fill="#8A3B12"/><circle cx="46" cy="51" r="2.5" fill="#5DA35A"/>`)}`);
+    case "redred": return svg(`${plate}<path d="M18 64c3-18 38-20 44 0z" fill="#B23A1E"/><circle cx="28" cy="58" r="2" fill="#D9541E"/><circle cx="38" cy="54" r="2" fill="#D9541E"/><circle cx="48" cy="58" r="2" fill="#D9541E"/><g fill="#F2A93B" stroke="#C9701C" stroke-width="1.5"><ellipse cx="66" cy="58" rx="9" ry="5" transform="rotate(-20 66 58)"/><ellipse cx="74" cy="66" rx="9" ry="5" transform="rotate(-10 74 66)"/><ellipse cx="60" cy="68" rx="8" ry="4.5"/></g>`);
+    case "kelewele": return svg(`${plate}<g fill="#E8912D" stroke="#B9651A" stroke-width="1.2"><rect x="26" y="54" width="10" height="9" rx="2.5" transform="rotate(12 31 58)"/><rect x="38" y="50" width="10" height="9" rx="2.5" transform="rotate(-10 43 54)"/><rect x="50" y="55" width="10" height="9" rx="2.5" transform="rotate(20 55 59)"/><rect x="62" y="51" width="10" height="9" rx="2.5" transform="rotate(-6 67 55)"/><rect x="44" y="61" width="10" height="9" rx="2.5" transform="rotate(8 49 65)"/><rect x="32" y="62" width="10" height="9" rx="2.5"/></g><circle cx="58" cy="68" r="1.4" fill="#8A3B12"/><circle cx="40" cy="52" r="1.4" fill="#8A3B12"/><circle cx="68" cy="62" r="1.4" fill="#C2410C"/>`);
+    case "gob3": return svg(`${plate}<path d="M18 64c3-18 38-20 44 0z" fill="#8A4B2A"/><circle cx="26" cy="58" r="1.6" fill="#F3E3C0"/><circle cx="34" cy="53" r="1.6" fill="#F3E3C0"/><circle cx="42" cy="56" r="1.6" fill="#F3E3C0"/><circle cx="50" cy="59" r="1.6" fill="#F3E3C0"/><circle cx="38" cy="60" r="1.6" fill="#F3E3C0"/><ellipse cx="38" cy="50" rx="12" ry="3" fill="#F3E3C0" opacity=".9"/><g fill="#F2A93B" stroke="#C9701C" stroke-width="1.5"><ellipse cx="68" cy="60" rx="9" ry="5" transform="rotate(-20 68 60)"/><ellipse cx="66" cy="69" rx="8" ry="4.5"/></g><ellipse cx="78" cy="68" rx="4" ry="2.5" fill="#C2410C"/>`);
+    case "chicken": return svg(`${plate}${leg(36, 58, -20)}${leg(52, 66, 10)}<circle cx="72" cy="62" r="3" fill="#5DA35A"/><circle cx="76" cy="68" r="2.5" fill="#E4572E"/>`);
+    case "salad": return svg(`<ellipse cx="38" cy="44" rx="13" ry="8" fill="#5DA35A" transform="rotate(-25 38 44)"/><ellipse cx="60" cy="40" rx="14" ry="8" fill="#7DBE5E" transform="rotate(20 60 40)"/><ellipse cx="50" cy="48" rx="12" ry="7" fill="#4C8F4A"/><circle cx="66" cy="50" r="6" fill="#E4572E"/><circle cx="34" cy="52" r="5" fill="#E4572E"/><path d="M14 52h72a36 30 0 0 1-72 0z" fill="var(--ok)"/><rect x="38" y="80" width="24" height="6" rx="3" fill="var(--ok)" opacity=".7"/>`);
+    case "wrap": return svg(`<g transform="rotate(-28 50 58)"><rect x="18" y="44" width="64" height="28" rx="14" fill="#E3B26A"/><rect x="18" y="44" width="20" height="28" rx="10" fill="#D49A4C"/><path d="M24 50c4 3 4 13 0 16" stroke="#9B5B2A" stroke-width="3" fill="none"/><circle cx="26" cy="58" r="4" fill="#E4572E"/><circle cx="31" cy="52" r="3" fill="#5DA35A"/></g>`);
+    case "pizza": return svg(`<path d="M50 84L20 30c18-10 42-10 60 0z" fill="#F4C35A"/><path d="M20 30c18-10 42-10 60 0l-4 7c-16-8-36-8-52 0z" fill="#D49A4C"/><circle cx="44" cy="46" r="5" fill="#C2410C"/><circle cx="58" cy="52" r="4.5" fill="#C2410C"/><circle cx="50" cy="66" r="4" fill="#C2410C"/><circle cx="40" cy="58" r="2" fill="#5DA35A"/><circle cx="60" cy="40" r="2" fill="#5DA35A"/>`);
+    case "burger": return svg(`<path d="M20 50c0-20 60-20 60 0z" fill="#E3A857"/><circle cx="38" cy="40" r="1.5" fill="#FBF6EA"/><circle cx="50" cy="36" r="1.5" fill="#FBF6EA"/><circle cx="62" cy="40" r="1.5" fill="#FBF6EA"/><path d="M18 52c6 4 10-2 16 2s10-2 16 2 10-2 16 2 10-2 16 0v3H18z" fill="#5DA35A"/><rect x="18" y="56" width="64" height="10" rx="5" fill="#6B3A1E"/><rect x="20" y="66" width="60" height="4" fill="#F5B04A"/><path d="M20 70h60v4a8 8 0 0 1-8 8H28a8 8 0 0 1-8-8z" fill="#D49A4C"/>`);
+    default: return svg(`${bowl("#E98A3A", `<circle cx="38" cy="47" r="3" fill="#C2410C"/><circle cx="56" cy="44" r="3" fill="#5DA35A"/><circle cx="64" cy="50" r="3" fill="#C2410C"/><circle cx="46" cy="52" r="2.5" fill="#FDE68A"/><path d="M30 46c8-8 30-10 42-2" stroke="#8B4A1C" stroke-width="5" stroke-linecap="round" fill="none"/>`)}`);
+  }
 }
 const tint = i => `var(--tint-${(i % 4) + 1})`;
 const menuIndex = id => Math.max(0, S.menus.findIndex(m => m.id === id));
@@ -1060,7 +1139,7 @@ const osmLink = x => `https://www.openstreetmap.org/?mlat=${x.lat}&mlon=${x.lng}
 const NEAR_M = 5000;
 function openSitePicker(firstTime) {
   let here = S.here || null, map = null, showAll = false, locating = false, locErr = "";
-  openSheet(`${sheetHead("Where should lunch go?", "Choose your building. Pools are shared with people there.")}
+  openSheet(`${firstTime ? `<div class="row" style="gap:12px;justify-content:flex-start">${LOGO(48)}<div><p class="brand" style="font-size:20px">ChopPool</p><p class="small" style="color:var(--accent-2);font-weight:700">${TAGLINE}</p></div></div>` : ""}${sheetHead("Where should lunch go?", "Choose your building. Pools are shared with people there.")}
     <div class="row" style="justify-content:flex-start;gap:8px"><button class="ghost" id="nearMe">${ICON.pin.replace('width="13" height="13"', 'width="16" height="16"')} Near me</button><button class="ghost" id="mapToggle">Show map</button></div>
     <div id="siteMap" class="map hidden" aria-label="Map of ChopPool buildings"></div>
     <p class="small muted" id="siteHint"></p>
@@ -1215,7 +1294,7 @@ function renderKitchens() {
     const status = st.full ? pill("Fully booked " + dayLabel(S.date), "bad") : st.waiting ? pill("Waiting for the seller", "warn") : active ? pill(p.meals + " of " + max + " seats taken", "ok") : st.open ? pill("Cooking " + dayLabel(S.date), "ok") : pill("Not confirmed yet", "dim");
     const btn = st.full ? `<button class="btn wide" disabled>Fully booked today</button>` : st.waiting ? `<button class="btn wide" disabled>Waiting for the seller to confirm</button>`
       : active ? `<button class="btn wide" data-menu="${esc(k.id)}">Join the active pool</button>` : `<button class="btn wide" data-menu="${esc(k.id)}">Start a pool</button>`;
-    return `<article class="kcard"><div class="head"><span class="tile" style="background:${tint(menuIndex(k.id))}">${art(dishKind(dishes[0]?.name))}</span>
+    return `<article class="kcard"><div class="head"><span class="tile" style="background:${tint(menuIndex(k.id))}">${art(dishKind(topDish(k.id)))}</span>
       <div style="flex:1;min-width:0"><strong>${esc(k.public_name)}</strong><p class="small muted">${esc(k.added_by_customer ? "A local seller added by a customer" : k.tagline || "")}</p>
         <div class="row" style="justify-content:flex-start;gap:6px;margin-top:4px">${status}</div><p class="small" style="margin-top:4px;color:var(--hint)">${esc(priceLine)}</p></div></div>
       <div class="dishline">${dishes.slice(0, 3).map(x => `<span>${esc(x.name)} · ${money(x.price)}</span>`).join("")}${dishes.length > 3 ? `<span>+${dishes.length - 3} more</span>` : ""}</div>${btn}</article>`;
@@ -1242,7 +1321,7 @@ function renderPools() {
       btn = `<button class="btn wide" data-menu="${esc(k.id)}">Join this pool</button>`;
     }
     return `<article class="pool">
-      <div class="pool-art" style="background:${tint(i)}"><div class="tags">${tags}</div>${art(dishKind(dishes[0]?.name))}
+      <div class="pool-art" style="background:${tint(i)}"><div class="tags">${tags}</div>${art(dishKind(topDish(k.id)))}
         <div class="fee-tag"><b class="num">${money(share)}</b><span>${share < feeFor(1, s, trip) ? `<s>${money(feeFor(1, s, trip))}</s>` : ""}delivery per meal</span></div></div>
       <div class="pool-body">
         <div><h3>${esc(k.public_name)}</h3><p class="small muted">${esc(k.added_by_customer ? "A local seller added by a customer" : k.tagline || "")}</p></div>
@@ -1326,8 +1405,10 @@ const canCancel = o => ["pending", "paid", "quote_requested", "quoted"].includes
 function savingLine(o) {
   const v = Number(o.saving) || 0; if (!v || o.status === "cancelled") return "";
   const closed = new Date() >= at(o.order_date, S.settings.cutoff);
-  if (!closed) return `<p class="small" style="color:var(--ok)">Delivery saved so far: ${money(v)}. It comes back to your wallet after ${fmtTime(S.settings.cutoff)}.</p>`;
-  if (o.has_account) return `<p class="small" style="color:var(--ok)">${o.status === "pending" ? money(v) + " delivery cashback goes to your wallet once your payment is confirmed." : money(v) + " delivery cashback added to your wallet."}</p>`;
+  const now = Math.max(0, Number(o.max_fee) - v / Math.max(1, Number(o.qty) || 1));
+  const fare = `Delivery: <s>${money(o.max_fee)}</s> <strong>${money(now)} a meal</strong>`;
+  if (!closed) return `<p class="small" style="color:var(--ok)">${fare} · ${money(v)} back to your wallet</p>`;
+  if (o.has_account) return `<p class="small" style="color:var(--ok)">${fare} · ${o.status === "pending" ? money(v) + " to your wallet once your payment is confirmed" : money(v) + " added to your wallet"}</p>`;
   return `<div class="note" style="display:grid;gap:8px"><span><strong>${money(v)} cashback is waiting for you.</strong> Create a free account on this phone to keep it in your wallet for your next lunch.</span><button class="btn" data-keepcb>Create an account and keep ${money(v)}</button></div>`;
 }
 function openCancel(id) {
@@ -1370,7 +1451,7 @@ function renderOrders() {
   const el = $("#tabOrders"), rows = S.mine || [];
   el.innerHTML = `<div class="section-title"><h1>Your orders</h1></div>` + (rows.map(o => {
     const step = progressOf(o), k = menuOf(o.kitchen_id);
-    return `<article class="order-card"><div class="head"><span class="tile" style="background:${tint(menuIndex(o.kitchen_id))}">${art(dishKind(o.item_name))}</span>
+    return `<article class="order-card"><div class="head"><span class="tile" style="background:${tint(menuIndex(o.kitchen_id))}">${art(dishKind(S.items.find(i => i.kitchen_id === o.kitchen_id && i.name === o.item_name) || o.item_name))}</span>
       <div><strong>${o.qty} × ${esc(o.item_name)}</strong><p class="small muted">${esc(k.public_name || "")} · ${fmtDate(o.order_date)}</p></div>
       <div class="c"><span>Code</span><b class="num">${esc(o.code)}</b></div></div>
       ${o.status === "cancelled" ? "" : `<div class="track" aria-label="Progress ${step} of 5">${[1, 2, 3, 4, 5].map(n => `<i class="${n <= step ? "on" : ""}"></i>`).join("")}</div>`}
@@ -1397,7 +1478,7 @@ function openOrder(menuId) {
     ${!st.open ? `<p class="note">You're first today. ${esc(k.public_name)} has ${s.accept_timeout_min} minutes to confirm before others can join. If they don't, you get your money back.</p>` : ""}
     <form id="orderForm" class="stack" novalidate>
       <div class="group"><p class="group-title">Choose your meal</p><div class="dishes">
-        ${dishes.map((d, n) => `<label class="dish"><input type="radio" name="dish" value="${esc(d.id)}"${n === 0 ? " checked" : ""}><span class="tile" style="background:${tint(i0)}">${art(dishKind(d.name))}</span><span>${esc(d.name)}</span><span class="price num">${money(d.price)}</span></label>`).join("")}
+        ${dishes.map((d, n) => `<label class="dish"><input type="radio" name="dish" value="${esc(d.id)}"${n === 0 ? " checked" : ""}><span class="tile" style="background:${tint(i0)}">${art(dishKind(d))}</span><span>${esc(d.name)}</span><span class="price num">${money(d.price)}</span></label>`).join("")}
       </div></div>
       <div class="group" id="extrasGroup"></div>
       <div class="row"><p class="group-title">How many</p><div class="qty"><button type="button" id="minus" aria-label="One less">−</button><output id="q">1</output><button type="button" id="plus" aria-label="One more">+</button></div></div>
@@ -1414,8 +1495,8 @@ function openOrder(menuId) {
         ${S.user && S.balance > 0 ? `<label class="switch"><span>Use wallet <span class="muted num">(${money(S.balance)})</span></span><input type="checkbox" id="fWallet" checked></label>` : ""}
       </div>
       <div class="group" id="payGroup"><p class="group-title">Payment</p><div class="sum" id="sum"></div>
-        <div class="pay" id="payPart"><div class="momo"><span class="logo">MoMo</span><span style="flex:1;display:grid"><span class="small muted">Send <strong id="dueTxt"></strong> to</span><strong class="num">${esc(s.momo_number)}</strong><span class="small muted">${esc(s.momo_name)}${s.momo_network ? " · " + esc(s.momo_network) : ""}</span></span>
-          <button type="button" class="ghost" id="copyNum" style="padding:8px 10px" aria-label="Copy MoMo number">${ICON.copy}</button></div>
+        <div class="pay" id="payPart"><div class="momo"><span class="logo">MoMo</span><span style="flex:1;display:grid"><span class="small muted">Send <strong id="dueTxt"></strong> to</span><strong class="num">${esc(payList()[0].number)}</strong><span class="small muted">${esc(payList()[0].name)}${payList()[0].network ? " · " + esc(payList()[0].network) : ""}</span></span>
+          <button type="button" class="ghost" data-copynum="${esc(payList()[0].number)}" style="padding:8px 10px" aria-label="Copy MoMo number">${ICON.copy}</button></div>${payAlts()}
           <div><label for="fRef">Transaction ID from your MoMo SMS</label><input id="fRef" placeholder="e.g. 51234567890"></div></div>
         <p class="small muted" id="saveTxt">What the pool saves on delivery comes back to your ChopPool wallet after ${fmtTime(s.cutoff)}.</p>
       </div>
@@ -1455,7 +1536,6 @@ function openOrder(menuId) {
   $("#plus").addEventListener("click", () => { qty = Math.min(5, qty + 1); draw(); });
   $("#noteToggle").addEventListener("click", () => { $("#noteBox").classList.toggle("hidden"); $("#noteToggle").classList.add("hidden"); $("#fNote").focus(); });
   $("#meEdit")?.addEventListener("click", () => { $("#meRow").classList.add("hidden"); $("#meFields").classList.remove("hidden"); $("#fName").focus(); });
-  $("#copyNum").addEventListener("click", () => copy(s.momo_number.replace(/\s/g, ""), "MoMo number copied"));
   $("#specialToggle")?.addEventListener("click", () => {
     special = !special; $("#specialBox").classList.toggle("hidden", !special);
     $("#specialToggle").textContent = special ? "Order from the menu instead" : "+ Ask for something not on the menu"; draw();
@@ -1485,7 +1565,7 @@ function openOrder(menuId) {
 const joinLink = (siteId, kid) => baseUrl() + "/#join=" + siteId + "," + kid;
 function poolInvite(p, k, site) {
   const s = S.settings, trip = tripTo(k, site), fee = feeFor(Math.max(p.meals, 1), s, trip), drop = nextDrop(p.meals, s, trip);
-  return "Lunch pool at " + site.name + " from " + k.public_name + ": " + p.meals + " of " + s.max_meals + " seats taken, delivery now " + money(fee) + " a meal." +
+  return "ChopPool · " + TAGLINE + "\nLunch pool at " + site.name + " from " + k.public_name + ": " + p.meals + " of " + s.max_meals + " seats taken, delivery now " + money(fee) + " a meal." +
     (drop ? " " + drop.more + " more and it drops to " + money(drop.fee) + "." : "") + " Order before " + fmtTime(s.cutoff) + (dayLabel(S.date) === "today" ? "" : " " + dayLabel(S.date)) + ":";
 }
 async function sharePool(siteId, kid) {
@@ -1520,6 +1600,9 @@ function showConfirmation(r, k, site, special) {
   $("#toOrders").addEventListener("click", () => { closeSheet(); setTab("orders"); });
   $("#sharePool")?.addEventListener("click", async () => { await refreshBoard(); sharePool(site.id, k.id); });
 }
+/* ---------- Payment options: main MoMo account first, others one tap away ---------- */
+const payList = () => { const pm = (S.payMethods || []).slice().sort((a, b) => (b.is_main - a.is_main) || (a.sort || 0) - (b.sort || 0)); const s = S.settings; return pm.length ? pm : [{ network: s.momo_network || "", number: s.momo_number, name: s.momo_name }]; };
+const payAlts = () => { const o = payList().slice(1); return o.length ? `<details class="payalts"><summary class="small">Other ways to pay (${o.length})</summary>${o.map(p => `<div class="payalt"><span><strong class="num">${esc(p.number)}</strong> <span class="small muted">${esc(p.network)} · ${esc(p.name)}</span></span><button type="button" class="linkbtn" data-copynum="${esc(p.number)}">Copy</button></div>`).join("")}</details>` : ""; };
 function openPayQuote(id) {
   const o = (S.mine || []).find(x => x.id === id); if (!o) return;
   const s = S.settings;
@@ -1527,7 +1610,7 @@ function openPayQuote(id) {
     ${sheetHead("Confirm your special request", esc(menuOf(o.kitchen_id).public_name) + " priced it at " + money(o.quote_price) + " a meal.")}
     <div class="sum"><div><span>Total with delivery and service</span><span class="num">${money(o.amount_due)}</span></div></div>
     ${S.user && S.balance > 0 ? `<label class="switch"><span>Use wallet <span class="muted num">(${money(S.balance)})</span></span><input type="checkbox" id="qWallet" checked></label>` : ""}
-    <div class="pay"><div class="momo"><span class="logo">MoMo</span><span style="flex:1;display:grid"><span class="small muted">Send the rest to</span><strong class="num">${esc(s.momo_number)}</strong><span class="small muted">${esc(s.momo_name)}${s.momo_network ? " · " + esc(s.momo_network) : ""} · before ${fmtTime(s.cutoff)}</span></span></div>
+    <div class="pay"><div class="momo"><span class="logo">MoMo</span><span style="flex:1;display:grid"><span class="small muted">Send the rest to</span><strong class="num">${esc(payList()[0].number)}</strong><span class="small muted">${esc(payList()[0].name)}${payList()[0].network ? " · " + esc(payList()[0].network) : ""} · before ${fmtTime(s.cutoff)}</span></span><button type="button" class="ghost" data-copynum="${esc(payList()[0].number)}" style="padding:8px 10px" aria-label="Copy MoMo number">${ICON.copy}</button></div>${payAlts()}
       <div><label for="qRef">Transaction ID from your MoMo SMS</label><input id="qRef" placeholder="e.g. 51234567890"></div></div>
     <p class="err" id="qErr"></p><button class="btn wide" id="qPay">Confirm payment</button>`);
   $("#qPay").addEventListener("click", async () => {
@@ -1571,13 +1654,22 @@ function openAddVendor() {
 /* =====================================================================================
    COORDINATOR VIEW (#admin): Today, Menus, Buildings, Riders, Team
    ===================================================================================== */
-const ADMIN_TABS = [["today", "Today"], ["menus", "Kitchens & menus"], ["buildings", "Buildings"], ["riders", "Riders"], ["team", "Team"]];
+const ADMIN_TABS = [["dash", "Dashboard"], ["today", "Today"], ["menus", "Kitchens & menus"], ["buildings", "Buildings"], ["riders", "Riders"], ["team", "Team"]];
+// Sub-sections per tab; a third value marks owner-only sections
+const ADMIN_SUBS = {
+  today: [["pools", "Pools"], ["orders", "Orders & payments"], ["wallets", "Wallets & refunds"]],
+  menus: [["list", "Kitchens"], ["add", "Add a kitchen"]],
+  buildings: [["list", "Active"], ["requests", "Requests"], ["add", "Add a building"]],
+  riders: [["list", "Riders"], ["add", "Add a rider"], ["pricing", "Delivery pricing"]],
+  team: [["members", "Team members"], ["payments", "Payment options", true], ["accounts", "Customer accounts", true]]
+};
+const NETWORKS = ["MTN", "Telecel", "AirtelTigo"];
 async function viewAdmin() {
   await refreshUser();
   if (!S.user && !DEMO) {
     let mode = "signin";
     const draw = () => {
-      $("#view").innerHTML = `<section class="card"><p class="brand" style="font-size:18px">ChopPool team</p><h1>${mode === "signin" ? "Sign in" : "Create your team account"}</h1>
+      $("#view").innerHTML = `<section class="card"><div class="row" style="gap:10px;justify-content:flex-start">${LOGO(36)}<p class="brand" style="font-size:18px">ChopPool team</p></div><h1>${mode === "signin" ? "Sign in" : "Create your team account"}</h1>
         <p class="muted small">${mode === "signin" ? "For the owner and coordinators." : "Use the email the owner added you with. The very first account can become the owner."}</p>
         ${mode === "signup" ? `<div><label for="aname">Your name</label><input id="aname" autocomplete="name" placeholder="Albert Mensah"></div>` : ""}
         <div><label for="email">Email</label><input id="email" type="email" autocomplete="username" placeholder="name@company.com"></div>
@@ -1594,7 +1686,7 @@ async function viewAdmin() {
   }
   let role; try { role = await api.myRole(); } catch (e) { role = "none"; }
   if (role === "unclaimed") {
-    $("#view").innerHTML = `<section class="card"><p class="brand" style="font-size:18px">ChopPool team</p><h1>Set up your ChopPool</h1>
+    $("#view").innerHTML = `<section class="card"><div class="row" style="gap:10px;justify-content:flex-start">${LOGO(36)}<p class="brand" style="font-size:18px">ChopPool team</p></div><h1>Set up your ChopPool</h1>
       <p class="muted">Nobody runs this ChopPool yet. Make <strong>${esc(S.user.email)}</strong> the owner. As owner you can add coordinators, kitchens, riders and buildings. This only works once.</p>
       <p class="err" id="ownErr"></p><button class="btn wide" id="claim">Make me the owner</button></section>`;
     $("#claim").addEventListener("click", async () => { try { await api.claimOwner(); toast("You're the owner of this ChopPool."); viewAdmin(); } catch (e) { $("#ownErr").textContent = cleanErr(e); } });
@@ -1605,25 +1697,31 @@ async function viewAdmin() {
     $("#so").addEventListener("click", async () => { await api.signOut(); viewAdmin(); });
     return;
   }
-  S.role = role; S.adminTab = S.adminTab || "today";
+  S.role = role; S.adminTab = S.adminTab || "dash";
   const day = S.adminDate || opsDate();
+  document.body.classList.add("is-admin");
+  S.adminTab = ADMIN_TABS.some(t => t[0] === S.adminTab) ? S.adminTab : "dash";
   $("#view").innerHTML = `
     <div class="row small" style="justify-content:space-between;gap:8px;flex-wrap:wrap"><span class="muted">Signed in as <strong style="color:var(--ink)">${esc(S.user?.email || "")}</strong> · ${role === "super" ? "Owner" : "Coordinator"}</span><button class="ghost" id="aSignOut" style="padding:6px 14px">Sign out</button></div>
-    <header class="row"><div><p class="brand" style="font-size:16px">ChopPool ${role === "super" ? "owner" : "coordinator"}</p><h1>Operations</h1></div>
+    <header class="row" style="flex-wrap:wrap;gap:10px"><div class="row" style="gap:12px;justify-content:flex-start">${LOGO(44)}<div><p class="brand" style="font-size:16px">ChopPool ${role === "super" ? "owner" : "coordinator"}</p><h1>Operations</h1></div></div>
       <div class="row" style="gap:8px"><input id="aDate" type="date" value="${day}" aria-label="Delivery date" style="width:auto"><button class="ghost" id="aRefresh">Refresh</button></div></header>
     <div id="aDays"></div>
     <nav class="admintabs" aria-label="Team sections">${ADMIN_TABS.map(([k, l]) => `<button data-atab="${k}">${l}</button>`).join("")}</nav>
-    <div id="aBody" class="stack"></div>`;
+    <div class="aframe" id="aFrame"><nav class="asub" id="aSub" aria-label="Sub-sections"></nav><div id="aBody" class="stack"></div></div>`;
   $("#aDays").addEventListener("click", e => { const b = e.target.closest("[data-aday]"); if (!b) return; S.adminDate = b.dataset.aday; $("#aDate").value = S.adminDate; renderAdmin(); });
   document.querySelectorAll("[data-atab]").forEach(b => b.addEventListener("click", () => { S.adminTab = b.dataset.atab; renderAdmin(); }));
   $("#aDate").addEventListener("change", e => { S.adminDate = e.target.value; renderAdmin(); });
   $("#aRefresh").addEventListener("click", renderAdmin);
   $("#aSignOut").addEventListener("click", async () => { await api.signOut(); S.user = null; S.role = null; S.admin = null; try { await refreshUser(); } catch (e) {} toast("Signed out"); viewAdmin(); });
   $("#aBody").addEventListener("click", adminClick);
+  $("#aSub").addEventListener("click", e => { const b = e.target.closest("[data-asub]"); if (!b) return; S.adminSub[S.adminTab] = b.dataset.asub; renderAdmin(true); });
+  // Search and sort redraw from what's loaded; open items stay open
+  $("#aBody").addEventListener("input", e => { const q = e.target.closest("[data-lq]"); if (!q) return; (S.lq = S.lq || {})[q.dataset.lq] = q.value; const pos = q.selectionStart; renderAdmin(true); const n = document.querySelector(`[data-lq="${q.dataset.lq}"]`); if (n) { n.focus(); try { n.setSelectionRange(pos, pos); } catch (x) {} } });
+  $("#aBody").addEventListener("toggle", e => { const d = e.target; if (!d.matches || !d.matches("details[data-key]")) return; S.openItems = S.openItems || new Set(); if (d.open) S.openItems.add(d.dataset.key); else S.openItems.delete(d.dataset.key); }, true);
   $("#aBody").addEventListener("change", adminChange);
   $("#aBody").addEventListener("submit", adminSubmit);
   await renderAdmin();
-  every(() => { if (S.adminTab === "today" && !$("#sheetBg").classList.contains("open") && !document.activeElement?.closest("#view input, #view select, #view textarea")) renderAdmin(); }, 30000);
+  every(() => { if (["dash", "today"].includes(S.adminTab) && !$("#sheetBg").classList.contains("open") && !document.activeElement?.closest("#view input, #view select, #view textarea")) renderAdmin(); }, 30000);
 }
 function poolFlags(p, s, d, now = new Date()) {
   const f = [], cut = at(d, s.cutoff), del = at(d, s.delivery_time), i = STEPS.indexOf(p.status);
@@ -1638,50 +1736,113 @@ function poolFlags(p, s, d, now = new Date()) {
 const addonsToText = list => (list || []).map(a => a.name + ":" + Number(a.price || 0)).join(", ");
 const textToAddons = t => String(t || "").split(",").map(x => x.trim()).filter(Boolean).map(x => { const [n, p] = x.split(":"); return { name: n.trim(), price: Number(p) || 0 }; }).filter(a => a.name.length > 1);
 const sendLink = (num, msg) => num ? `<a class="wa quiet" style="padding:8px 12px" href="${wa(num)}?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener">${ICON.wa} Send link</a>` : "";
+const TAGLINE = "Split delivery. One order. One building.";
+// ChopPool mark: three takeaway packs travelling together, yours in amber
+const LOGO = (n, bg = "#D9480F") => `<svg width="${n}" height="${n}" viewBox="0 0 100 100" role="img" aria-label="ChopPool" style="flex:none"><rect width="100" height="100" rx="24" fill="${bg}"/>${[[20, 61, "#FFF7EE"], [25, 44, "#F5B04A"], [21, 27, "#FFF7EE"]].map(([x, y, c]) => `<rect x="${x}" y="${y}" width="56" height="15" rx="4" fill="${c}"/><path d="M${x} ${y + 7}h56" stroke="${bg}" stroke-width="2.5"/><rect x="${x + 24}" y="${y + 5}" width="8" height="5" rx="1.5" fill="${bg}"/>`).join("")}</svg>`;
 const pill = (txt, cls) => `<span class="chip ${cls || ""}">${esc(txt)}</span>`;
 let adminMaps = [];
-async function renderAdmin() {
+async function renderAdmin(cached) {
   const s = S.settings, dToday = opsDate(), dNext = orderDate(s);
   // Two days can be live at once: today's deliveries and (after the cut-off) tomorrow's orders
-  let otherWait = [];
-  if (dNext !== dToday) {
-    try {
-      if (!S.adminDate && !S.adminDayPicked) { S.adminDayPicked = true; const [wt, wn] = await Promise.all([api.waitingPools(dToday), api.waitingPools(dNext)]); if (wn.length && !wt.length) S.adminDate = dNext; }
-      const cur = S.adminDate || dToday; otherWait = [dToday, dNext].includes(cur) ? await api.waitingPools(cur === dToday ? dNext : dToday) : [];
-    } catch (e) {}
+  let otherWait = S.adminOtherWait || [];
+  if (!cached) {
+    otherWait = [];
+    if (dNext !== dToday) {
+      try {
+        if (!S.adminDate && !S.adminDayPicked) { S.adminDayPicked = true; const [wt, wn] = await Promise.all([api.waitingPools(dToday), api.waitingPools(dNext)]); if (wn.length && !wt.length) S.adminDate = dNext; }
+        const cur = S.adminDate || dToday; otherWait = [dToday, dNext].includes(cur) ? await api.waitingPools(cur === dToday ? dNext : dToday) : [];
+      } catch (e) {}
+    }
+    S.adminOtherWait = otherWait;
   }
-  const d = S.adminDate || dToday;
+  const d = S.adminDate || dToday, isSuper = S.role === "super";
   if ($("#aDate") && $("#aDate").value !== d) $("#aDate").value = d;
   if ($("#aDays")) $("#aDays").innerHTML = dNext !== dToday ? `<nav class="admintabs" aria-label="Day">${[[dToday, "Today's deliveries"], [dNext, "Orders for " + dayLabel(dNext)]].map(([x, l]) => `<button data-aday="${x}"${x === d ? ' aria-current="page"' : ""}>${esc(l)}${x !== d && otherWait.length ? " (" + otherWait.length + " waiting)" : ""}</button>`).join("")}</nav>` : "";
   document.querySelectorAll("[data-atab]").forEach(b => { if (b.dataset.atab === S.adminTab) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
-  let A; try { A = await api.adminData(d); } catch (e) { toast("Couldn't load: " + cleanErr(e)); return; }
-  S.admin = A;
+  let A = S.admin;
+  if (!cached || !A) { try { A = await api.adminData(d); } catch (e) { toast("Couldn't load: " + cleanErr(e)); return; } S.admin = A; A.kitchens = A.kitchens.filter(k => !k.archived); A.sites = A.sites.filter(x => !x.archived); }
   adminMaps.forEach(m => { try { m.remove(); } catch (e) {} }); adminMaps = [];
   const K = id => A.kitchens.find(k => k.id === id) || {}, sName = id => (A.sites.find(x => x.id === id) || {}).name || "";
   const aTrip = p => { const k = K(p.kitchen_id), st = A.sites.find(x => x.id === p.site_id) || {}; return tripFor(hasPin(k) ? k : k.added_by_customer ? st : {}, st, s); };
-  const body = $("#aBody");
-  A.kitchens = A.kitchens.filter(k => !k.archived); A.sites = A.sites.filter(x => !x.archived);
   const pending = A.sites.filter(x => x.status === "pending");
   const badge = document.querySelector('[data-atab="buildings"]'); if (badge) badge.textContent = "Buildings" + (pending.length ? " (" + pending.length + " new)" : "");
+  const livePools = A.pools.filter(p => p.status !== "cancelled" && p.meals > 0);
+  A.pools.forEach(p => { p.runner = K(p.kitchen_id).delivery_mode === "runner"; });
 
-  if (S.adminTab === "today") {
-    A.pools.forEach(p => { p.runner = K(p.kitchen_id).delivery_mode === "runner"; });
+  // Sub-sections: a second row of tabs on phones, a side menu on laptops
+  const tab = S.adminTab, subs = (ADMIN_SUBS[tab] || []).filter(x => !x[2] || isSuper);
+  S.adminSub = S.adminSub || {};
+  if (subs.length && !subs.some(x => x[0] === S.adminSub[tab])) S.adminSub[tab] = subs[0][0];
+  const sub = S.adminSub[tab];
+  const nav = $("#aSub"), frame = $("#aFrame");
+  if (nav) nav.innerHTML = subs.map(([k, l]) => `<button data-asub="${k}"${k === sub ? ' aria-current="page"' : ""}>${esc(l)}${tab === "buildings" && k === "requests" && pending.length ? " (" + pending.length + ")" : ""}</button>`).join("");
+  if (frame) frame.classList.toggle("has-sub", subs.length > 0);
+  const body = $("#aBody");
+
+  // Lists: live first, then A–Z; search and other sorts
+  const liveK = new Set(livePools.map(p => p.kitchen_id)), liveS = new Set(livePools.map(p => p.site_id)), liveR = new Set(livePools.map(p => p.rider_id).filter(Boolean));
+  const listBar = (key, extra) => `<div class="listbar"><input type="search" data-lq="${key}" value="${esc((S.lq || {})[key] || "")}" placeholder="Search" aria-label="Search"><select data-ls="${key}" aria-label="Sort">${[["live", "Live orders first"], ["az", "Name A–Z"], ["za", "Name Z–A"], ["new", "Newest"], ["old", "Oldest"], ["status", "Status"]].concat(extra || []).map(([v, l]) => `<option value="${v}"${((S.ls || {})[key] || "live") === v ? " selected" : ""}>${l}</option>`).join("")}</select></div>`;
+  const sorted = (list, key, live, name, status) => {
+    const q = ((S.lq || {})[key] || "").toLowerCase(), mode = (S.ls || {})[key] || "live", byName = (a, b) => name(a).localeCompare(name(b));
+    const created = x => String(x.created_at || "");
+    const cmp = { live: (a, b) => (live.has(b.id) - live.has(a.id)) || byName(a, b), az: byName, za: (a, b) => byName(b, a), new: (a, b) => created(b).localeCompare(created(a)) || byName(a, b), old: (a, b) => created(a).localeCompare(created(b)) || byName(a, b), status: (a, b) => status(a).localeCompare(status(b)) || byName(a, b), pending: (a, b) => ((b.status === "pending") - (a.status === "pending")) || byName(a, b) }[mode] || byName;
+    return list.filter(x => !q || name(x).toLowerCase().includes(q)).sort(cmp);
+  };
+  const added = x => x.created_at ? "Added " + fmtDate(String(x.created_at).slice(0, 10)) : "";
+  const isOpen = key => (S.openItems || new Set()).has(key) ? " open" : "";
+
+  /* ---------- Dashboard ---------- */
+  if (tab === "dash") {
     const live = A.orders.filter(o => o.status !== "cancelled"), meals = live.reduce((t, o) => t + o.qty, 0);
+    const waiting = livePools.filter(p => p.status === "waiting"), minsLeft = p => Math.max(0, s.accept_timeout_min - minsAgo(p.created_at));
+    const nearCut = new Date() > new Date(at(d, s.cutoff).getTime() - 60 * 6e4);
+    const small = livePools.filter(p => p.status === "collecting" && p.meals < s.min_pool && nearCut);
+    const acts = [
+      ["Payments to check", live.filter(o => o.status === "pending").length, "today:orders", "warn", "MoMo references waiting"],
+      ["Refunds due", A.orders.filter(o => o.refund_needed).length, "today:wallets", "bad", "Cancelled or seller no-show"],
+      ["Sellers not confirmed", waiting.length + otherWait.length, "today:pools", "bad", waiting.length ? "Least time left: " + Math.min(...waiting.map(minsLeft)) + " min" : otherWait.length ? "For " + dayLabel(d === dToday ? dNext : dToday) : ""],
+      ["Special requests to price", A.orders.filter(o => o.status === "quote_requested").length, "today:orders", "warn", "Sellers haven't priced yet"],
+      ["Building requests", pending.length, "buildings:requests", "warn", "Waiting for approval"],
+      ["Small pools", small.length, "today:pools", "warn", "Under " + s.min_pool + " meals near cut-off"]
+    ].filter(a => a[1] > 0);
+    const byStage = STEPS.map(st => [STEP_LABEL[st], livePools.filter(p => p.status === st).length]).filter(x => x[1]);
+    const kUse = A.kitchens.map(k => ({ k, m: livePools.filter(p => p.kitchen_id === k.id).reduce((t, p) => t + p.meals, 0) })).filter(x => x.m > 0).sort((a, b) => b.m - a.m);
     const food = live.reduce((t, o) => t + (Number(o.quote_price ?? o.unit_price) + Number(o.addons_total || 0)) * o.qty, 0);
-    const pools = A.pools.filter(p => p.status !== "cancelled" && p.meals > 0).sort((a, b) => sName(a.site_id).localeCompare(sName(b.site_id)) || a.seq - b.seq);
+    const paidOrders = A.orders.filter(o => ["paid", "collected"].includes(o.status));
+    const cashback = new Date() >= at(d, s.cutoff) ? paidOrders.reduce((t, o) => { const p = A.pools.find(x => x.id === o.pool_id); return p && p.status !== "cancelled" ? t + Math.max(0, (Number(o.max_fee) - feeFor(p.meals, s, aTrip(p))) * o.qty) : t; }, 0) : null;
+    const owed = (A.wallets || []).reduce((t, w) => t + Math.max(0, Number(w.balance) || 0), 0);
+    const tile = (label, val, go, cls, sub) => `<button class="dtile ${cls || ""}" ${go ? `data-go="${go}"` : "disabled"}><b class="num">${val}</b><span>${esc(label)}</span>${sub ? `<small>${esc(sub)}</small>` : ""}</button>`;
+    body.innerHTML = `
+      <section class="stack" style="gap:10px"><h2>Needs you now</h2>
+        ${acts.length ? `<div class="dash-grid">${acts.map(a => tile(a[0], a[1], a[2], a[3], a[4])).join("")}</div>` : `<div class="note" style="display:flex;gap:10px;align-items:center">${ICON.check}<span><strong>All clear.</strong> Nothing needs you right now.</span></div>`}</section>
+      <section class="stack" style="gap:10px"><h2>${d === today() ? "Today" : fmtDate(d)} at a glance</h2>
+        <div class="dash-grid">
+          ${tile("Meals ordered", meals, "today:orders")}${tile("Orders", live.length, "today:orders")}
+          ${tile("Live pools", livePools.length, "today:pools", "", livePools.length ? "Average " + Math.round(livePools.reduce((t, p) => t + p.meals, 0) / livePools.length) + " of " + s.max_meals + " seats" : "")}
+          <div class="dtile wide"><span>Deliveries by stage</span>${byStage.length ? `<div class="stagebar">${byStage.map(([l, n]) => `<span><b class="num">${n}</b> ${esc(l)}</span>`).join("")}</div>` : `<small>No pools yet</small>`}</div>
+          <div class="dtile wide"><span>Kitchen capacity used</span>${kUse.length ? kUse.map(({ k, m }) => `<div class="capline"><span>${esc(k.public_name)}</span><span class="num small">${m}/${k.capacity}</span><i style="--w:${Math.min(100, Math.round(m / Math.max(1, k.capacity) * 100))}%"></i></div>`).join("") : `<small>No kitchen has orders yet</small>`}</div>
+        </div></section>
+      ${isSuper ? `<section class="stack" style="gap:10px"><h2>Money and customers <span class="small muted">(owner only)</span></h2>
+        <div class="dash-grid">
+          ${tile("Food value", money(food), "today:orders")}${tile("ChopPool commission", money(food * Number(s.commission_rate || 0)), "", "", Math.round(Number(s.commission_rate || 0) * 100) + "% of food value")}
+          ${tile("Cashback for this day", cashback == null ? "After " + fmtTime(s.cutoff) : money(cashback), "today:wallets")}
+          ${tile("Wallet balances owed", money(owed), "today:wallets", "", "Money customers hold with ChopPool")}
+          <button class="dtile" data-go="team:accounts" id="dashAccts"><b class="num">…</b><span>Customer accounts</span></button>
+        </div></section>` : ""}`;
+    if (isSuper) api.accountStats().then(st => { const el = $("#dashAccts"); if (el) el.innerHTML = `<b class="num">${st.accounts}</b><span>Customer accounts</span><small>${st.active} active in the last 30 days</small>`; }).catch(e => { const el = $("#dashAccts"); if (el) el.innerHTML = `<span>Customer accounts</span><small>${esc(cleanErr(e))}</small>`; });
+  }
+
+  /* ---------- Today ---------- */
+  if (tab === "today") {
+    const live = A.orders.filter(o => o.status !== "cancelled");
+    const pools = livePools.slice().sort((a, b) => sName(a.site_id).localeCompare(sName(b.site_id)) || a.seq - b.seq);
     const flags = pools.flatMap(p => poolFlags(p, s, d).map(f => sName(p.site_id) + ", " + K(p.kitchen_id).public_name + " Pool " + p.seq + ": " + f))
-      .concat(A.orders.filter(o => o.status === "quote_requested" && minsAgo(o.created_at) >= 15).map(o => "Special request " + o.code + " not priced by " + K(o.kitchen_id).name + " (" + minsAgo(o.created_at) + " min)"))
-      .concat(A.orders.filter(o => o.refund_needed).map(o => "Refund needed: " + o.customer_name + ", code " + o.code + ", MoMo ref " + (o.momo_ref || "")))
-      .concat(pending.length ? [pending.length + " building request" + (pending.length > 1 ? "s" : "") + " waiting for approval (see Buildings)"] : [])
       .concat(otherWait.map(p => K(p.kitchen_id).public_name + " hasn't confirmed " + (A.sites.find(x => x.id === p.site_id) || {}).name + " Pool " + p.seq + " for " + dayLabel(d === dToday ? dNext : dToday) + " (open that day's tab)"));
     const ST = ["quote_requested", "quoted", "pending", "paid", "collected", "cancelled"];
-    body.innerHTML = `
-      ${S.role === "super" ? `<div id="acctStats" class="row small muted" style="justify-content:flex-start;gap:8px;flex-wrap:wrap">Loading customer accounts…</div>` : ""}
-      <div class="row" style="justify-content:flex-end"><button class="ghost" data-act="csv">Copy orders as CSV</button></div>
-      <div class="tiles">${[["Meals", meals], ["Orders", live.length], ["Food value", money(food)], ["Payments to check", live.filter(o => o.status === "pending").length]].map(([l, v]) => `<div class="tile"><b>${v}</b><span>${l}</span></div>`).join("")}</div>
+    if (sub === "pools") body.innerHTML = `
       ${flags.length ? `<div class="flags"><strong>Needs attention</strong>${flags.map(f => `<span>${esc(f)}</span>`).join("")}</div>` : ""}
       <h2>Pools for ${fmtDate(d)}</h2>
-      ${pools.map(p => { const k = K(p.kitchen_id), fl = poolFlags(p, s, d);
+      <div class="cards2">${pools.map(p => { const k = K(p.kitchen_id), fl = poolFlags(p, s, d);
         return `<article class="card" data-pool="${esc(p.id)}">
           <div class="top" style="align-items:flex-start"><div><h3>${esc(sName(p.site_id))}</h3><p class="small muted">${esc(k.public_name)} Pool ${p.seq} · ${k.added_by_customer ? "seller added by a customer" : "cooked by " + esc(k.name)}${p.runner ? " · own runner" : ""}</p></div>
             <div class="fee"><b class="num" style="font-size:22px">${p.meals}/${s.max_meals}</b><span>${money(feeFor(p.meals, s, aTrip(p)))} a meal · trip est. ${money(aTrip(p))}</span></div></div>
@@ -1691,89 +1852,114 @@ async function renderAdmin() {
             <div><label for="tc-${p.id}">Trip cost</label><input id="tc-${p.id}" data-f="trip_cost" inputmode="decimal" value="${esc(p.trip_cost ?? "")}" placeholder="GHS"></div>
             <button class="ghost" data-act="pool-save">Save</button></div>`}
           ${p.status === "waiting" && k.whatsapp ? `<a class="wa" href="${wa(k.whatsapp)}?text=${encodeURIComponent("Hello " + k.name + ", a customer at " + sName(p.site_id) + " wants to order from you on ChopPool for " + dayLabel(d) + ". Please open your page and tap \"Yes, I'm cooking " + dayLabel(d) + "\" within " + s.accept_timeout_min + " minutes: " + baseUrl() + "/#kitchen-" + k.token)}" target="_blank" rel="noopener">${ICON.wa} Ask ${esc(k.name)} to confirm</a>` : ""}
-          <div class="row" style="justify-content:flex-start;gap:8px"><button class="ghost" data-act="ticket">Send ticket</button><button class="ghost" data-act="arrival">Arrival message</button>
-            <select data-act="pool-status" aria-label="Set pool step" style="width:auto">${(p.status === "waiting" ? ["waiting"] : []).concat(STEPS).map(x => `<option value="${x}"${x === p.status ? " selected" : ""}>${STEP_LABEL[x]}</option>`).join("")}<option value="cancelled">Cancel pool</option></select></div></article>`; }).join("") || `<p class="card muted">No orders for this date yet.</p>`}
-      <h2>Orders</h2>
+          <div class="row" style="justify-content:flex-start;gap:8px;flex-wrap:wrap"><button class="ghost" data-act="ticket">Send ticket</button><button class="ghost" data-act="arrival">Arrival message</button>
+            <select data-act="pool-status" aria-label="Set pool step" style="width:auto">${(p.status === "waiting" ? ["waiting"] : []).concat(STEPS).map(x => `<option value="${x}"${x === p.status ? " selected" : ""}>${STEP_LABEL[x]}</option>`).join("")}<option value="cancelled">Cancel pool</option></select></div></article>`; }).join("") || `<p class="card muted">No pools for this date yet.</p>`}</div>`;
+    if (sub === "orders") {
+      const toCheck = live.filter(o => o.status === "pending").length;
+      body.innerHTML = `
+      <div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:8px"><h2>Orders for ${fmtDate(d)}</h2><button class="ghost" data-act="csv">Copy orders as CSV</button></div>
+      ${toCheck ? `<p class="note">${toCheck} MoMo payment${toCheck > 1 ? "s" : ""} to check. Find each reference on the MoMo statement, then set the order to <strong>paid</strong>.</p>` : ""}
       <div class="table-wrap"><table><tr><th>Time</th><th>Name</th><th>MoMo no.</th><th>Building</th><th>Order</th><th>Extras and requests</th><th>Paid by</th><th>Code</th><th>Status</th></tr>
       ${A.orders.map(o => { const p = A.pools.find(x => x.id === o.pool_id) || {}, k = K(o.kitchen_id);
         const extras = [addonText(o.addons), o.note ? "Note: " + o.note : "", o.special_request ? "Special: " + o.special_request + (o.quote_price ? " (" + money(o.quote_price) + ")" : " (not priced)") : ""].filter(Boolean).join(" · ");
         const paid = [o.wallet_used > 0 ? "Wallet " + money(o.wallet_used) : "", o.momo_ref ? "MoMo " + o.momo_ref : ""].filter(Boolean).join(" + ");
         return `<tr><td class="num">${clock(o.created_at)}</td><td>${esc(o.customer_name)}</td><td class="num">${esc(o.phone)}</td><td>${esc(sName(o.site_id))}</td>
           <td>${o.qty} × ${esc(o.item_name)}<br><span class="small muted">${esc(k.public_name || "")} Pool ${p.seq || ""}</span></td><td style="white-space:normal;min-width:180px">${esc(extras)}</td><td class="num">${esc(paid || "—")}</td><td class="num">${esc(o.code)}</td>
-          <td><select data-order="${esc(o.id)}" aria-label="Order status">${ST.map(x => `<option${x === o.status ? " selected" : ""}>${x}</option>`).join("")}</select>${o.refund_needed ? ` <button class="ghost" data-refunded="${esc(o.id)}">Refunded</button>` : ""}</td></tr>`; }).join("") || `<tr><td colspan="9" class="muted">No orders yet.</td></tr>`}</table></div>
+          <td><select data-order="${esc(o.id)}" aria-label="Order status">${ST.map(x => `<option${x === o.status ? " selected" : ""}>${x}</option>`).join("")}</select></td></tr>`; }).join("") || `<tr><td colspan="9" class="muted">No orders yet.</td></tr>`}</table></div>`;
+    }
+    if (sub === "wallets") {
+      const refunds = A.orders.filter(o => o.refund_needed);
+      body.innerHTML = `
+      <h2>Refunds due</h2>
+      ${refunds.length ? `<div class="table-wrap"><table><tr><th>Customer</th><th>MoMo no.</th><th>Code</th><th>Why</th><th>MoMo ref</th><th></th></tr>${refunds.map(o => `<tr><td>${esc(o.customer_name)}</td><td class="num">${esc(o.phone)}</td><td class="num">${esc(o.code)}</td><td style="white-space:normal">${esc(o.cancel_reason || "Cancelled")}</td><td class="num">${esc(o.momo_ref || "—")}</td><td><button class="ghost" data-refunded="${esc(o.id)}">Mark refunded</button></td></tr>`).join("")}</table></div>` : `<p class="muted small">No refunds due for ${fmtDate(d)}.</p>`}
       <h2>Wallets</h2>
       ${(A.wallets || []).length ? `<div class="table-wrap"><table><tr><th>Customer</th><th>Phone</th><th>Balance</th></tr>${A.wallets.map(w => `<tr><td>${esc(w.name || "")} <span class="muted small">${esc(w.email || "")}</span></td><td class="num">${esc(w.phone || "")}</td><td class="num">${money(w.balance)}</td></tr>`).join("")}</table></div>
         <form class="card inline" data-form="credit" style="grid-template-columns:1.4fr .7fr 1.4fr auto"><div><label for="wUser">Customer</label><select id="wUser" name="user">${A.wallets.map(w => `<option value="${esc(w.user_id)}">${esc(w.name || w.email)}</option>`).join("")}</select></div>
           <div><label for="wAmt">Amount</label><input id="wAmt" name="amt" inputmode="decimal" placeholder="10 or −5"></div><div><label for="wWhy">Reason</label><input id="wWhy" name="why" placeholder="Late delivery on Mon"></div><button class="btn">Apply</button></form>`
         : `<p class="small muted">No customer accounts yet. Wallets appear when customers create accounts.</p>`}`;
+    }
   }
 
-  if (S.adminTab === "today" && S.role === "super") api.accountStats().then(st => {
-    const el = $("#acctStats"); if (el) el.classList.remove("muted"); if (el) el.innerHTML = `<div class="tiles" style="width:100%">${[["Customer accounts", st.accounts], ["Active in last 30 days", st.active]].map(([l, v]) => `<div class="tile"><b>${v}</b><span>${l}</span></div>`).join("")}</div>`;
-  }).catch(e => { const el = $("#acctStats"); if (el) el.textContent = cleanErr(e); });
-  if (S.adminTab === "menus") {
+  /* ---------- Kitchens & menus ---------- */
+  if (tab === "menus") {
     const items = A.items || [];
-    body.innerHTML = `
+    if (sub === "add") body.innerHTML = `
       <form class="card" data-form="kitchen"><h2>Add a kitchen or seller</h2>
         <div class="grid2"><div><label for="nkName">Real name</label><input id="nkName" name="name" placeholder="Auntie Akos Kitchen"></div><div><label for="nkPub">Menu name customers see</label><input id="nkPub" name="public_name" placeholder="Local favourites"></div></div>
         <div><label for="nkTag">Short description</label><input id="nkTag" name="tagline" placeholder="Ghanaian classics, cooked fresh each morning"></div>
         <div class="grid2"><div><label for="nkAddr">Pickup address</label><input id="nkAddr" name="address" placeholder="Osu, Oxford Street"></div><div><label for="nkWa">WhatsApp number</label><input id="nkWa" name="whatsapp" inputmode="tel" placeholder="024 123 4567"></div></div>
         <div class="grid2"><div><label for="nkCap">Meals per lunch</label><input id="nkCap" name="capacity" inputmode="numeric" value="45"></div><div><label for="nkDel">Delivery</label><select id="nkDel" name="delivery_mode"><option value="rider">ChopPool rider / Bolt / Yango</option><option value="runner">Seller's own runner (close by)</option></select></div></div>
-        <p class="err" data-err></p><button class="btn">Add kitchen</button></form>
-      ${A.kitchens.map(k => `<article class="card" data-kitchen="${esc(k.id)}">
-        <div class="top" style="align-items:flex-start"><div><h3>${esc(k.name)}</h3><p class="small muted">Shown as "${esc(k.public_name)}"${k.added_by_customer ? " · added by a customer for " + esc(sName(k.site_id)) : ""}</p></div>
-          <div>${k.active ? pill("Active", "ok") : pill("Paused", "dim")}</div></div>
+        <p class="small muted">After adding it, open the kitchen under Kitchens to set its map pin and menu.</p>
+        <p class="err" data-err></p><button class="btn">Add kitchen</button></form>`;
+    if (sub === "list") {
+      const list = sorted(A.kitchens, "k", liveK, k => k.name + " " + k.public_name, k => k.active ? "a" : "b");
+      body.innerHTML = listBar("k") + `<div class="stack" style="gap:8px">${list.map(k => { const m = livePools.filter(p => p.kitchen_id === k.id).reduce((t, p) => t + p.meals, 0);
+        return `<details class="item" data-kitchen="${esc(k.id)}" data-key="k:${esc(k.id)}"${isOpen("k:" + k.id)}>
+        <summary><span class="ititle"><strong>${esc(k.name)}</strong><span class="small muted">"${esc(k.public_name)}"${k.added_by_customer ? " · added by a customer" : ""}</span></span>
+          <span class="imeta">${liveK.has(k.id) ? pill(m + " meals " + (d === today() ? "today" : fmtDate(d)), "ok") : ""}${k.active ? "" : pill("Paused", "dim")}${hasPin(k) ? "" : pill("No map pin", "warn")}<span class="small muted">${esc(added(k))}</span></span></summary>
+        <div class="ibody">
         <div class="grid2"><div><label>Real name</label><input data-f="name" value="${esc(k.name)}"></div><div><label>Menu name customers see</label><input data-f="public_name" value="${esc(k.public_name)}"></div></div>
         <div class="grid2"><div><label>Short description</label><input data-f="tagline" value="${esc(k.tagline || "")}"></div><div><label>Pickup address</label><input data-f="address" value="${esc(k.address || "")}"></div></div>
-        <div class="row" style="justify-content:flex-start;gap:10px"><span class="small ${hasPin(k) ? "" : "muted"}">${hasPin(k) ? "Location pinned on the map" : "No map pin yet. Customers see kitchens near them using this pin."}</span><button class="ghost" data-act="kitchen-pin" style="padding:6px 12px">${hasPin(k) ? "Move pin" : "Set on map"}</button></div>
+        <div class="row" style="justify-content:flex-start;gap:10px"><span class="small ${hasPin(k) ? "" : "muted"}">${hasPin(k) ? "Location pinned on the map" : "No map pin yet. Customers only see kitchens that have a pin."}</span><button class="ghost" data-act="kitchen-pin" style="padding:6px 12px">${hasPin(k) ? "Move pin" : "Set on map"}</button></div>
         <div class="inline" style="grid-template-columns:1fr 1fr .6fr auto"><div><label>WhatsApp</label><input data-f="whatsapp" inputmode="tel" value="${esc(k.whatsapp || "")}"></div>
           <div><label>Delivery</label><select data-f="delivery_mode"><option value="rider"${k.delivery_mode === "rider" ? " selected" : ""}>ChopPool rider</option><option value="runner"${k.delivery_mode === "runner" ? " selected" : ""}>Own runner</option></select></div>
           <div><label>Meals</label><input data-f="capacity" inputmode="numeric" value="${esc(k.capacity)}"></div>
           <label class="choice" style="padding:8px 10px"><input type="checkbox" data-f="active"${k.active ? " checked" : ""}><span>Active</span></label></div>
-        <div class="row" style="justify-content:flex-start;gap:8px"><button class="ghost" data-act="kitchen-save">Save</button>${sendLink(k.whatsapp, "Your ChopPool order page: " + baseUrl() + "/#kitchen-" + k.token)}<button class="ghost" data-act="kitchen-copy">Copy link</button><button class="ghost" data-act="kitchen-reset">Reset link</button><button class="ghost" data-act="kitchen-remove" style="color:var(--danger)">Remove</button></div>
-        <p class="group-title">Menu</p><p class="small muted">Extras format: name:price, separated by commas. Example: Extra chicken:15, No shito:0</p>
-        <div class="stack">${items.filter(i => i.kitchen_id === k.id).map(i => `<div class="menuedit" data-item="${esc(i.id)}"><input data-f="name" value="${esc(i.name)}" aria-label="Dish"><input data-f="price" inputmode="decimal" value="${esc(i.price)}" aria-label="Price GHS">
-            <input data-f="addons" value="${esc(addonsToText(i.addons))}" placeholder="Extras" aria-label="Extras"><label class="choice" style="padding:6px 8px"><input type="checkbox" data-f="active"${i.active !== false ? " checked" : ""}><span>On</span></label><button class="ghost" data-act="item-save">Save</button></div>`).join("")}
-          <div class="menuedit" data-item=""><input data-f="name" placeholder="New dish" aria-label="New dish"><input data-f="price" inputmode="decimal" placeholder="GHS" aria-label="Price GHS"><input data-f="addons" placeholder="Extras" aria-label="Extras"><span></span><button class="btn" data-act="item-save">Add</button></div></div>
-      </article>`).join("")}`;
+        <div class="row" style="justify-content:flex-start;gap:8px;flex-wrap:wrap"><button class="ghost" data-act="kitchen-save">Save</button>${sendLink(k.whatsapp, "Your ChopPool order page: " + baseUrl() + "/#kitchen-" + k.token)}<button class="ghost" data-act="kitchen-copy">Copy link</button><button class="ghost" data-act="kitchen-reset">Reset link</button><button class="ghost" data-act="kitchen-remove" style="color:var(--danger)">Remove</button></div>
+        <p class="group-title">Menu</p><p class="small muted">Extras format: name:price, separated by commas. Example: Extra chicken:15, No shito:0. The picture is chosen from the dish name; pick another if it's wrong.</p>
+        <div class="stack">${items.filter(i => i.kitchen_id === k.id).map(i => `<div class="menuedit" data-item="${esc(i.id)}"><span class="dishpic" aria-hidden="true">${art(dishKind(i))}</span><input data-f="name" value="${esc(i.name)}" aria-label="Dish"><input data-f="price" inputmode="decimal" value="${esc(i.price)}" aria-label="Price GHS">
+            <input data-f="addons" value="${esc(addonsToText(i.addons))}" placeholder="Extras" aria-label="Extras">${iconSelect(i.icon)}<label class="choice" style="padding:6px 8px"><input type="checkbox" data-f="active"${i.active !== false ? " checked" : ""}><span>On</span></label><button class="ghost" data-act="item-save">Save</button></div>`).join("")}
+          <div class="menuedit" data-item=""><span class="dishpic"></span><input data-f="name" placeholder="New dish" aria-label="New dish"><input data-f="price" inputmode="decimal" placeholder="GHS" aria-label="Price GHS"><input data-f="addons" placeholder="Extras" aria-label="Extras">${iconSelect("")}<span></span><button class="btn" data-act="item-save">Add</button></div></div>
+        </div></details>`; }).join("") || `<p class="muted">No kitchens match.</p>`}</div>`;
+    }
   }
 
-  if (S.adminTab === "buildings") {
+  /* ---------- Buildings ---------- */
+  if (tab === "buildings") {
     const active = A.sites.filter(x => x.status !== "pending" && x.status !== "declined");
-    body.innerHTML = `
-      ${pending.length ? `<h2>New building requests</h2>${pending.map(x => { const n = active.filter(hasPin).map(a => ({ a, d: hasPin(x) ? distM(x, a) : 1e12 })).sort((p, q) => p.d - q.d)[0];
+    if (sub === "requests") body.innerHTML = pending.length ? `<h2>New building requests</h2>${pending.map(x => { const n = active.filter(hasPin).map(a => ({ a, d: hasPin(x) ? distM(x, a) : 1e12 })).sort((p, q) => p.d - q.d)[0];
         return `<article class="card" data-site="${esc(x.id)}" style="border:2px solid var(--hint)"><div class="top" style="align-items:flex-start"><div><h3>${esc(x.name)}</h3><p class="small muted">Drop: ${esc(x.drop_point)}${x.request_note ? " · " + esc(x.request_note) : ""} · asked ${minsAgo(x.created_at) < 120 ? minsAgo(x.created_at) + " min ago" : fmtDate(String(x.created_at).slice(0, 10))}</p></div>${pill("Pending", "warn")}</div>
           ${n && n.d < 1e12 ? `<p class="small">${n.d <= 600 ? `<strong>Close to ${esc(n.a.name)} (${fmtDist(n.d)}).</strong> Consider declining and pointing them there so pools stay full.` : `Nearest ChopPool building: ${esc(n.a.name)}, ${fmtDist(n.d)} away.`}</p>` : ""}
           ${hasPin(x) ? `<a class="linkbtn" href="${osmLink(x)}" target="_blank" rel="noopener">See the pin on the map</a>` : ""}
           <div class="grid2"><div><label>Handoff</label><select data-f="handoff"><option value="meet_rider">Meet the rider</option><option value="host">Drop-point host</option></select></div><div><label>Host (if any)</label><input data-f="host_label" placeholder="the security guard at the gate"></div></div>
-          <div class="row" style="justify-content:flex-start;gap:8px"><button class="btn" data-act="site-approve">Approve</button><button class="ghost" data-act="site-decline">Decline</button></div></article>`; }).join("")}` : ""}
-      <h2>Map</h2><div id="adminMap" class="map" style="height:300px"></div><p class="small muted">Orange: live buildings. Grey: waiting for approval.</p>
+          <div class="row" style="justify-content:flex-start;gap:8px"><button class="btn" data-act="site-approve">Approve</button><button class="ghost" data-act="site-decline">Decline</button></div></article>`; }).join("")}` : `<div class="note">No building requests waiting.</div>`;
+    if (sub === "add") body.innerHTML = `
       <form class="card" data-form="site"><h2>Add a building</h2>
         <div class="grid2"><div><label for="nsName">Building name</label><input id="nsName" name="name" placeholder="Heritage Tower, Ridge"></div><div><label for="nsDrop">Drop point</label><input id="nsDrop" name="drop_point" placeholder="Lobby security desk"></div></div>
         <div class="grid2"><div><label for="nsHand">Handoff</label><select id="nsHand" name="handoff"><option value="host">Drop-point host</option><option value="meet_rider">Meet the rider</option></select></div><div><label for="nsHost">Host</label><input id="nsHost" name="host_label" placeholder="the security desk in the lobby"></div></div>
-        <div id="newSiteMap" class="map" style="height:220px"></div><p class="small muted" id="nsPin">Tap the map to place the building's pin.</p>
-        <p class="err" data-err></p><button class="btn">Add building</button></form>
-      <h2>Live buildings</h2>
-      ${active.map(x => `<article class="card" data-site="${esc(x.id)}"><div class="top"><h3>${esc(x.name)}</h3>${x.active ? pill("Live", "ok") : pill("Paused", "dim")}</div>
+        <div id="newSiteMap" class="map" style="height:260px"></div><p class="small muted" id="nsPin">Tap the map to place the building's pin.</p>
+        <p class="err" data-err></p><button class="btn">Add building</button></form>`;
+    if (sub === "list") {
+      const list = sorted(active, "s", liveS, x => x.name, x => x.active ? "a" : "b");
+      body.innerHTML = `<div id="adminMap" class="map" style="height:280px"></div><p class="small muted">Orange: live buildings. Grey: waiting for approval.</p>` + listBar("s") + `<div class="stack" style="gap:8px">${list.map(x => { const np = livePools.filter(p => p.site_id === x.id);
+        return `<details class="item" data-site="${esc(x.id)}" data-key="s:${esc(x.id)}"${isOpen("s:" + x.id)}>
+        <summary><span class="ititle"><strong>${esc(x.name)}</strong><span class="small muted">${esc(x.drop_point || "")} · ${x.handoff === "host" ? "drop-point host" : "meet the rider"}</span></span>
+          <span class="imeta">${np.length ? pill(np.length + " live pool" + (np.length > 1 ? "s" : ""), "ok") : ""}${x.active ? "" : pill("Paused", "dim")}${hasPin(x) ? "" : pill("No map pin", "warn")}<span class="small muted">${esc(added(x))}</span></span></summary>
+        <div class="ibody">
         <div class="grid2"><div><label>Name</label><input data-f="name" value="${esc(x.name)}"></div><div><label>Drop point</label><input data-f="drop_point" value="${esc(x.drop_point)}"></div></div>
         <div class="grid2"><div><label>Handoff</label><select data-f="handoff"><option value="host"${x.handoff === "host" ? " selected" : ""}>Drop-point host</option><option value="meet_rider"${x.handoff === "meet_rider" ? " selected" : ""}>Meet the rider</option></select></div><div><label>Host</label><input data-f="host_label" value="${esc(x.host_label || "")}"></div></div>
-        <div class="row" style="justify-content:flex-start;gap:8px"><label class="choice" style="padding:8px 10px"><input type="checkbox" data-f="active"${x.active ? " checked" : ""}><span>Live</span></label><button class="ghost" data-act="site-save">Save</button>
-          ${x.handoff === "host" ? `<button class="ghost" data-act="host-copy">Copy host link</button>` : ""}<button class="ghost" data-act="site-remove" style="color:var(--danger)">Remove</button>${hasPin(x) ? `<a class="linkbtn" href="${osmLink(x)}" target="_blank" rel="noopener">Map</a>` : `<span class="small muted">No map pin</span>`}</div></article>`).join("")}`;
-    makeMap($("#adminMap"), ACCRA, 11).then(m => {
-      adminMaps.push(m); const L = window.L, pts = [];
-      A.sites.filter(x => hasPin(x) && x.status !== "declined").forEach(x => { pts.push([x.lat, x.lng]); L.marker([x.lat, x.lng], { icon: pinIcon(L, x.status === "pending" ? "" : "on") }).addTo(m).bindPopup(`<strong>${esc(x.name)}</strong><br>${esc(x.drop_point)}${x.status === "pending" ? "<br>Waiting for approval" : ""}`); });
-      if (pts.length > 1) m.fitBounds(pts, { padding: [30, 30] });
-    }).catch(e => { $("#adminMap").innerHTML = `<p class="err" style="padding:12px">${esc(cleanErr(e))}</p>`; });
-    S.newSitePin = null;
-    makeMap($("#newSiteMap"), ACCRA, 12).then(m => {
-      adminMaps.push(m); let mk;
-      m.on("click", e => { S.newSitePin = { lat: e.latlng.lat, lng: e.latlng.lng }; if (!mk) mk = window.L.marker(e.latlng, { icon: pinIcon(window.L, "on") }).addTo(m); else mk.setLatLng(e.latlng); $("#nsPin").textContent = "Pin placed."; });
-    }).catch(() => {});
+        <div class="row" style="justify-content:flex-start;gap:8px;flex-wrap:wrap"><label class="choice" style="padding:8px 10px"><input type="checkbox" data-f="active"${x.active ? " checked" : ""}><span>Live</span></label><button class="ghost" data-act="site-save">Save</button>
+          ${x.handoff === "host" ? `<button class="ghost" data-act="host-copy">Copy host link</button>` : ""}<button class="ghost" data-act="site-remove" style="color:var(--danger)">Remove</button>${hasPin(x) ? `<a class="linkbtn" href="${osmLink(x)}" target="_blank" rel="noopener">Map</a>` : ""}</div>
+        </div></details>`; }).join("") || `<p class="muted">No buildings match.</p>`}</div>`;
+      makeMap($("#adminMap"), ACCRA, 11).then(m => {
+        adminMaps.push(m); const L = window.L, pts = [];
+        A.sites.filter(x => hasPin(x) && x.status !== "declined").forEach(x => { pts.push([x.lat, x.lng]); L.marker([x.lat, x.lng], { icon: pinIcon(L, x.status === "pending" ? "" : "on") }).addTo(m).bindPopup(`<strong>${esc(x.name)}</strong><br>${esc(x.drop_point)}${x.status === "pending" ? "<br>Waiting for approval" : ""}`); });
+        if (pts.length > 1) m.fitBounds(pts, { padding: [30, 30] });
+      }).catch(e => { $("#adminMap").innerHTML = `<p class="err" style="padding:12px">${esc(cleanErr(e))}</p>`; });
+    }
+    if (sub === "add") {
+      S.newSitePin = null;
+      makeMap($("#newSiteMap"), ACCRA, 12).then(m => {
+        adminMaps.push(m); let mk;
+        m.on("click", e => { S.newSitePin = { lat: e.latlng.lat, lng: e.latlng.lng }; if (!mk) mk = window.L.marker(e.latlng, { icon: pinIcon(window.L, "on") }).addTo(m); else mk.setLatLng(e.latlng); $("#nsPin").textContent = "Pin placed."; });
+      }).catch(() => {});
+    }
   }
 
-  if (S.adminTab === "riders") {
-    const ex = (km) => Math.round(Number(s.base_fare ?? 0) + Number(s.per_km ?? 0) * km);
-    body.innerHTML = `
+  /* ---------- Riders ---------- */
+  if (tab === "riders") {
+    if (sub === "pricing") { const ex = (km) => Math.round(Number(s.base_fare ?? 0) + Number(s.per_km ?? 0) * km);
+      body.innerHTML = `
       <form class="card" data-form="pricing"><h2>Delivery pricing</h2>
         <p class="small muted">Each trip is priced by distance, like Bolt and Yango: base fare + rate per km of road from the kitchen to the building. The trip is then shared across the meals in the pool. Check a few real Bolt or Yango quotes and match them.</p>
         <div class="grid2"><div><label for="pfBase">Base fare (GHS)</label><input id="pfBase" name="base_fare" inputmode="decimal" value="${esc(s.base_fare ?? "")}"></div>
@@ -1782,35 +1968,61 @@ async function renderAdmin() {
           <div><label for="pfFlat">Flat trip cost if a pin is missing (GHS)</label><input id="pfFlat" name="trip_cost" inputmode="decimal" value="${esc(s.trip_cost)}"></div></div>
         <p class="small muted">The cap applies to every pool and every rider: nobody pays more than this per meal for delivery. Changes only affect new orders.</p>
         ${s.base_fare != null ? `<p class="small" style="color:var(--hint)">Examples: 2 km trip ${money(ex(2))} · 5 km ${money(ex(5))} · 10 km ${money(ex(10))}</p>` : ""}
-        <p class="err" data-err></p><button class="btn">Save pricing</button></form>
+        <p class="err" data-err></p><button class="btn">Save pricing</button></form>`; }
+    if (sub === "add") body.innerHTML = `
       <form class="card" data-form="rider"><h2>Add a rider</h2><div class="grid2"><div><label for="nrName">Name</label><input id="nrName" name="name" placeholder="Kwame Asare"></div><div><label for="nrPhone">Phone / WhatsApp</label><input id="nrPhone" name="phone" inputmode="tel" placeholder="024 123 4567"></div></div>
         <p class="err" data-err></p><button class="btn">Add rider</button></form>
-      <p class="small muted">While you use Bolt Send or Yango, you don't need riders here. Log those trips on each pool under Today.</p>
-      ${A.riders.map(r => `<article class="card" data-rider="${esc(r.id)}"><div class="top"><h3>${esc(r.name)}</h3>${r.active ? pill("Active", "ok") : pill("Off", "dim")}</div>
+      <p class="small muted">While you use Bolt Send or Yango, you don't need riders here. Log those trips on each pool under Today › Pools.</p>`;
+    if (sub === "list") {
+      const list = sorted(A.riders, "r", liveR, r => r.name, r => r.active ? "a" : "b");
+      body.innerHTML = listBar("r") + `<div class="stack" style="gap:8px">${list.map(r => { const np = livePools.filter(p => p.rider_id === r.id).length;
+        return `<details class="item" data-rider="${esc(r.id)}" data-key="r:${esc(r.id)}"${isOpen("r:" + r.id)}>
+        <summary><span class="ititle"><strong>${esc(r.name)}</strong><span class="small muted num">${esc(r.phone || "")}</span></span>
+          <span class="imeta">${np ? pill(np + " pool" + (np > 1 ? "s" : "") + " assigned", "ok") : ""}${r.active ? "" : pill("Off", "dim")}<span class="small muted">${esc(added(r))}</span></span></summary>
+        <div class="ibody">
         <div class="grid2"><div><label>Name</label><input data-f="name" value="${esc(r.name)}"></div><div><label>Phone</label><input data-f="phone" value="${esc(r.phone || "")}"></div></div>
-        <div class="row" style="justify-content:flex-start;gap:8px"><label class="choice" style="padding:8px 10px"><input type="checkbox" data-f="active"${r.active ? " checked" : ""}><span>Active</span></label><button class="ghost" data-act="rider-save">Save</button>
-          ${sendLink(r.phone, "Your ChopPool rider page: " + baseUrl() + "/#rider-" + r.token)}<button class="ghost" data-act="rider-copy">Copy link</button></div></article>`).join("") || `<p class="muted">No riders yet.</p>`}`;
+        <div class="row" style="justify-content:flex-start;gap:8px;flex-wrap:wrap"><label class="choice" style="padding:8px 10px"><input type="checkbox" data-f="active"${r.active ? " checked" : ""}><span>Active</span></label><button class="ghost" data-act="rider-save">Save</button>
+          ${sendLink(r.phone, "Your ChopPool rider page: " + baseUrl() + "/#rider-" + r.token)}<button class="ghost" data-act="rider-copy">Copy link</button></div>
+        </div></details>`; }).join("") || `<p class="muted">No riders yet. Add one under "Add a rider".</p>`}</div>`;
+    }
   }
 
-  if (S.adminTab === "team") {
-    const team = A.team || [], me = (S.user?.email || "").toLowerCase(), isSuper = S.role === "super";
-    body.innerHTML = `
+  /* ---------- Team ---------- */
+  if (tab === "team") {
+    const team = A.team || [], me = (S.user?.email || "").toLowerCase();
+    if (sub === "members") body.innerHTML = `
       <section class="card"><h2>Who does what</h2><div class="stack small">
-        <p><strong>Owner</strong> · everything, including adding and removing team members.</p>
+        <p><strong>Owner</strong> · everything, including team members, payment options and money figures.</p>
         <p><strong>Coordinator</strong> · runs each day: payments, pools, kitchens, buildings, riders, wallets.</p>
         <p><strong>Kitchens, riders and building hosts</strong> · no login. They use their own private link, sent from Kitchens & menus, Riders or Buildings.</p>
         <p><strong>Customers</strong> · order from the main link; an account is optional.</p></div></section>
-      ${isSuper ? `<form class="card" data-form="payment"><h2>Payment details</h2><p class="small muted">Customers send MoMo here. Use the number registered to ChopPool.</p>
-        <div class="grid2"><div><label for="pmNum">MoMo number</label><input id="pmNum" name="momo_number" inputmode="tel" value="${esc(s.momo_number || "")}"></div>
-          <div><label for="pmName">Account name</label><input id="pmName" name="momo_name" value="${esc(s.momo_name || "")}"></div>
-          <div><label for="pmNet">Network</label><select id="pmNet" name="momo_network">${["MTN", "Telecel", "AirtelTigo"].map(n => `<option${(s.momo_network || "MTN") === n ? " selected" : ""}>${n}</option>`).join("")}</select></div></div>
-        <p class="err" data-err></p><button class="btn">Save payment details</button></form>` : ""}
       ${isSuper ? `<form class="card" data-form="team"><h2>Add a team member</h2><div class="grid2"><div><label for="ntEmail">Email</label><input id="ntEmail" name="email" type="email" placeholder="ops@yourcompany.com"></div>
         <div><label for="ntRole">Role</label><select id="ntRole" name="role"><option value="coordinator">Coordinator</option><option value="super">Owner</option></select></div></div>
         <p class="small muted">They then open ${esc(baseUrl())}/#admin, choose "Create an account" with this email, and sign in.</p><p class="err" data-err></p><button class="btn">Add to team</button></form>` : `<p class="note">Only the owner can add or remove team members.</p>`}
       <div class="table-wrap"><table><tr><th>Email</th><th>Role</th><th></th></tr>${team.map(t => `<tr data-member="${esc(t.email)}"><td>${esc(t.email)}${t.email === me ? ' <span class="muted small">(you)</span>' : ""}</td>
         <td>${isSuper && t.email !== me ? `<select data-act="team-role"><option value="coordinator"${t.role === "coordinator" ? " selected" : ""}>Coordinator</option><option value="super"${t.role === "super" ? " selected" : ""}>Owner</option></select>` : (t.role === "super" ? "Owner" : "Coordinator")}</td>
         <td>${isSuper && t.email !== me ? `<button class="ghost" data-act="team-remove">Remove</button>` : ""}</td></tr>`).join("")}</table></div>`;
+    if (sub === "payments" && isSuper) {
+      const pm = (A.payment_methods || []).slice().sort((a, b) => (b.is_main - a.is_main) || (a.sort || 0) - (b.sort || 0));
+      body.innerHTML = `
+      <p class="small muted">Customers see every active option at checkout, with the main one first. Coordinators can't change these.</p>
+      <div class="stack" style="gap:8px">${pm.map(p => `<details class="item" data-paym="${esc(p.id)}" data-key="p:${esc(p.id)}"${isOpen("p:" + p.id)}>
+        <summary><span class="ititle"><strong class="num">${esc(p.number)}</strong><span class="small muted">${esc(p.network)} · ${esc(p.name)}</span></span>
+          <span class="imeta">${p.is_main ? pill("Main", "ok") : ""}${p.active ? "" : pill("Off", "dim")}</span></summary>
+        <div class="ibody"><div class="grid2"><div><label>MoMo number</label><input data-f="number" inputmode="tel" value="${esc(p.number)}"></div><div><label>Account name</label><input data-f="name" value="${esc(p.name)}"></div>
+          <div><label>Network</label><select data-f="network">${NETWORKS.map(n => `<option${p.network === n ? " selected" : ""}>${n}</option>`).join("")}</select></div></div>
+          <div class="row" style="justify-content:flex-start;gap:8px;flex-wrap:wrap"><label class="choice" style="padding:8px 10px"><input type="checkbox" data-f="active"${p.active ? " checked" : ""}><span>Active</span></label>
+            <label class="choice" style="padding:8px 10px"><input type="checkbox" data-f="is_main"${p.is_main ? " checked" : ""}><span>Main option</span></label>
+            <button class="ghost" data-act="pay-save">Save</button><button class="ghost" data-act="pay-remove" style="color:var(--danger)">Remove</button></div></div></details>`).join("") || `<p class="muted">No payment options yet. Add your first one below.</p>`}</div>
+      <form class="card" data-form="paymethod"><h2>Add a payment option</h2>
+        <div class="grid2"><div><label for="pmNum">MoMo number</label><input id="pmNum" name="number" inputmode="tel" placeholder="024 123 4567"></div><div><label for="pmName">Account name</label><input id="pmName" name="name" placeholder="ChopPool Ventures"></div>
+          <div><label for="pmNet">Network</label><select id="pmNet" name="network">${NETWORKS.map(n => `<option>${n}</option>`).join("")}</select></div></div>
+        <p class="err" data-err></p><button class="btn">Add payment option</button></form>`;
+    }
+    if (sub === "accounts" && isSuper) {
+      body.innerHTML = `<h2>Customer accounts</h2><div class="dash-grid" id="acctTiles"><div class="dtile"><b>…</b><span>Loading</span></div></div><p class="small muted">Team members aren't counted. "Active" means they ordered in the last 30 days.</p>`;
+      api.accountStats().then(st => { const el = $("#acctTiles"); if (el) el.innerHTML = `<div class="dtile"><b class="num">${st.accounts}</b><span>Customer accounts</span></div><div class="dtile"><b class="num">${st.active}</b><span>Active in the last 30 days</span></div>`; }).catch(e => { const el = $("#acctTiles"); if (el) el.innerHTML = `<p class="err">${esc(cleanErr(e))}</p>`; });
+    }
   }
 }
 function openPinSheet(title, start, onSave) {
@@ -1836,11 +2048,21 @@ function confirmRemove(title, body, fn) {
 }
 const fval = (root, f) => { const el = root.querySelector(`[data-f="${f}"]`); return !el ? undefined : el.type === "checkbox" ? el.checked : el.value.trim(); };
 async function adminClick(e) {
+  const go = e.target.closest("[data-go]");
+  if (go) { const [tb, sb] = go.dataset.go.split(":"); S.adminTab = tb; if (sb) (S.adminSub = S.adminSub || {})[tb] = sb; window.scrollTo(0, 0); return renderAdmin(true); }
   const t = e.target.closest("[data-act], [data-refunded]"); if (!t || t.tagName === "SELECT") return;
   const A = S.admin, s = S.settings, act = t.dataset.act;
   const run = async (fn, ok) => { try { await fn(); if (ok) toast(ok); renderAdmin(); } catch (err) { toast(cleanErr(err)); } };
   if (t.dataset.refunded) return run(() => api.updateOrder(t.dataset.refunded, { refund_needed: false }), "Marked refunded");
   if (act === "csv") return copy(ordersCsv(), "Orders copied. Paste them into Excel or Google Sheets.");
+  const pm = t.closest("[data-paym]");
+  if (pm && act === "pay-save") {
+    const num = (fval(pm, "number") || "").replace(/[^\d ]/g, "").trim();
+    if (!/^0\d{9}$/.test(num.replace(/\s/g, ""))) return toast("Enter the 10-digit MoMo number, like 024 123 4567.");
+    if ((fval(pm, "name") || "").length < 2) return toast("Enter the name on the MoMo account.");
+    return run(() => api.savePayMethod({ id: pm.dataset.paym, number: num, name: fval(pm, "name"), network: fval(pm, "network"), active: fval(pm, "active"), is_main: fval(pm, "is_main") }).then(async () => Object.assign(S, await api.load())), "Payment option saved");
+  }
+  if (pm && act === "pay-remove") return confirmRemove("Remove this payment option?", "Customers will stop seeing " + fval(pm, "number") + " at checkout.", () => api.removePayMethod(pm.dataset.paym));
   const poolCard = t.closest("[data-pool]");
   if (poolCard) {
     const id = poolCard.dataset.pool, p = A.pools.find(x => x.id === id), d = p.order_date;
@@ -1879,7 +2101,7 @@ async function adminClick(e) {
     if (act === "item-save") {
       const row = t.closest("[data-item]"), id = row.dataset.item, name = fval(row, "name"), price = Number(fval(row, "price"));
       if (name.length < 2 || !(price > 0)) return toast("Add the dish name and a price above 0.");
-      const item = { name, price, addons: textToAddons(fval(row, "addons")), active: id ? fval(row, "active") : true };
+      const item = { name, price, addons: textToAddons(fval(row, "addons")), active: id ? fval(row, "active") : true, icon: fval(row, "icon") || null };
       return run(() => api.saveItem(id ? { id, ...item } : { kitchen_id: k.id, ...item }), id ? "Dish saved" : "Dish added");
     }
   }
@@ -1903,6 +2125,7 @@ async function adminClick(e) {
 }
 async function adminChange(e) {
   const t = e.target;
+  if (t.matches("[data-ls]")) { (S.ls = S.ls || {})[t.dataset.ls] = t.value; return renderAdmin(true); }
   const run = async (fn, ok) => { try { await fn(); toast(ok); renderAdmin(); } catch (err) { toast(cleanErr(err)); } };
   if (t.matches("select[data-act=pool-status]")) return run(() => api.updatePool(t.closest("[data-pool]").dataset.pool, { status: t.value }), "Pool updated");
   if (t.matches("select[data-order]")) return run(() => api.updateOrder(t.dataset.order, { status: t.value, ...(t.value === "collected" ? { collected_at: new Date().toISOString(), collected_by: "coordinator" } : {}) }), "Order updated");
@@ -1919,6 +2142,13 @@ async function adminSubmit(e) {
       if (!/^0\d{9}$/.test(num.replace(/\s/g, ""))) return fail("Enter the 10-digit MoMo number, like 024 123 4567.");
       if (name.length < 2) return fail("Enter the name on the MoMo account.");
       await api.updateSettings({ momo_number: num, momo_name: name, momo_network: net }); Object.assign(S, await api.load()); toast("Payment details saved");
+    }
+    if (f.dataset.form === "paymethod") {
+      const num = v("number").replace(/[^\d ]/g, "").trim(), name = v("name"), net = f.querySelector("[name=network]").value;
+      if (!/^0\d{9}$/.test(num.replace(/\s/g, ""))) return fail("Enter the 10-digit MoMo number, like 024 123 4567.");
+      if (name.length < 2) return fail("Enter the name on the MoMo account.");
+      await api.savePayMethod({ number: num, name, network: net, active: true, is_main: !(S.admin.payment_methods || []).some(p => p.is_main && p.active) });
+      Object.assign(S, await api.load()); toast("Payment option added");
     }
     if (f.dataset.form === "pricing") {
       const vals = ["base_fare", "per_km", "max_fee", "trip_cost"].map(n => [n, Number(v(n))]);
@@ -1987,7 +2217,7 @@ async function viewKitchen(token) {
     const waiting = K.pools.filter(p => p.status === "waiting");
     const afterCut = new Date() >= at(d, S.settings.cutoff);
     $("#view").innerHTML = `
-      <header><p class="brand" style="font-size:18px">ChopPool ${k.added_by_customer ? "seller" : "kitchen"}</p><h1>${esc(k.name)}</h1>
+      <header><div class="row" style="gap:10px;justify-content:flex-start">${LOGO(34)}<p class="brand" style="font-size:18px">ChopPool ${k.added_by_customer ? "seller" : "kitchen"}</p></div><h1>${esc(k.name)}</h1>
         <p class="muted">${fmtDate(d)} · ready by ${minus(S.settings.delivery_time, 30)} · ${used} of ${k.capacity} meals · ${k.delivery_mode === "runner" ? "you deliver with your own runner" : "a ChopPool rider collects"}</p></header>
       ${dayTabs}
       ${k.open ? `<p><span class="chip ok">You're taking orders for ${dayLabel(d)}</span></p>`
@@ -2078,7 +2308,7 @@ async function viewRider(token) {
   const NEXT = { ready: ["picked_up", "Picked up"], picked_up: ["arriving", "5 minutes away"], arriving: ["delivered", "Arrived"] };
   const draw = async () => {
     let R; try { R = await api.riderView(token, d); } catch (e) { $("#view").innerHTML = `<p class="card err">${esc(cleanErr(e))}</p>`; return; }
-    $("#view").innerHTML = `<header><p class="brand" style="font-size:18px">ChopPool rider</p><h1>${esc(R.rider.name)}</h1><p class="muted">${fmtDate(d)} · deliver by ${fmtTime(S.settings.delivery_time)}</p></header>` +
+    $("#view").innerHTML = `<header><div class="row" style="gap:10px;justify-content:flex-start">${LOGO(34)}<p class="brand" style="font-size:18px">ChopPool rider</p></div><h1>${esc(R.rider.name)}</h1><p class="muted">${fmtDate(d)} · deliver by ${fmtTime(S.settings.delivery_time)}</p></header>` +
       (R.pools.map((p, i) => {
         const nx = NEXT[p.status];
         const btn = nx ? `<button class="btn wide" data-r="${nx[0]}" data-pool="${esc(p.id)}">${nx[1]}</button>` : p.status === "delivered" ? "" : `<p class="chip warn">Wait for the kitchen to pack</p>`;
@@ -2103,7 +2333,7 @@ async function viewHost(token) {
   const draw = async () => {
     let H; try { H = await api.hostView(token, d); } catch (e) { $("#view").innerHTML = `<p class="card err">${esc(cleanErr(e))}</p>`; return; }
     const left = H.pools.flatMap(p => p.orders).filter(o => !o.collected).length;
-    $("#view").innerHTML = `<header><p class="brand" style="font-size:18px">ChopPool drop point</p><h1>${esc(H.site.name)}</h1><p class="muted">${fmtDate(d)} · ${esc(H.site.drop_point)} · ${left} meals waiting</p></header>
+    $("#view").innerHTML = `<header><div class="row" style="gap:10px;justify-content:flex-start">${LOGO(34)}<p class="brand" style="font-size:18px">ChopPool drop point</p></div><h1>${esc(H.site.name)}</h1><p class="muted">${fmtDate(d)} · ${esc(H.site.drop_point)} · ${left} meals waiting</p></header>
       <section class="card"><h2>Hand over a meal</h2><p class="small muted">Ask for the customer's 4-digit code.</p>${codeBox("hostcode")}</section>` +
       (H.pools.map(p => `<article class="card"><div class="top"><h3>${esc(p.menu)} · Pool ${p.seq}</h3><span class="chip ${p.status === "delivered" ? "ok" : "dim"}">${p.status === "delivered" ? "Bag arrived" : STEP_LABEL[p.status]}</span></div>${handList(p.orders)}</article>`).join("")
         || `<p class="card muted">No deliveries for today yet.</p>`);
@@ -2127,6 +2357,7 @@ async function route() {
     S.pendingJoin = kid; S.tab = "home";
     history.replaceState(null, "", "#order");
   }
+  document.body.classList.remove("is-admin");
   const view = h.startsWith("kitchen-") ? "kitchen" : h.startsWith("rider-") ? "rider" : h.startsWith("host-") ? "host" : h === "admin" ? "admin" : "order";
   document.querySelectorAll("#demoBar a").forEach(a => { if (a.getAttribute("href") === "#" + h || (view === "order" && a.dataset.view === "order")) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
   if (view === "kitchen") return viewKitchen(h.slice(8));
@@ -2149,6 +2380,7 @@ async function start() {
   S.siteId = S.sites.some(x => x.id === saved) ? saved : (S.sites[0] || {}).id;
   $("#sheetBg").addEventListener("click", e => { if (e.target === $("#sheetBg")) closeSheet(); });
   document.addEventListener("keydown", e => { if (e.key === "Escape") closeSheet(); });
+  document.addEventListener("click", e => { const b = e.target.closest("[data-copynum]"); if (b) copy(b.dataset.copynum.replace(/\s/g, ""), "MoMo number copied"); });
   window.addEventListener("hashchange", route);
   if (!DEMO) { try { window.supabase && (await api.user()) && afterSignIn(); } catch (e) {} }
   route();

@@ -1,5 +1,5 @@
 -- =====================================================================
--- ChopPool pilot database, version 11
+-- ChopPool pilot database, version 12
 -- Run once in Supabase: SQL Editor > New query > paste everything > Run.
 -- If you ran an earlier version, run the RESET block at the very bottom
 -- first (it deletes pilot test data), then run this whole file.
@@ -1358,3 +1358,41 @@ with r as (
   select id, row_number() over (partition by order_date, site_id, kitchen_id order by seq, created_at) as rn
   from pools where status <> 'cancelled' and order_date >= (now() at time zone 'utc')::date)
 update pools p set seq = r.rn from r where p.id = r.id and p.seq <> r.rn;
+
+-- =====================================================================
+-- Update 12 (payment options, rider dates, dish pictures)
+-- =====================================================================
+-- Several payment options (owner manages them; customers see the active ones)
+create table if not exists payment_methods (
+  id uuid primary key default gen_random_uuid(),
+  network text not null default 'MTN',
+  number text not null,
+  name text not null,
+  is_main boolean not null default false,
+  active boolean not null default true,
+  sort int not null default 0,
+  created_at timestamptz not null default now()
+);
+alter table payment_methods enable row level security;
+drop policy if exists "read pay methods" on payment_methods;
+create policy "read pay methods" on payment_methods for select using (active or is_admin());
+drop policy if exists "owner pay methods" on payment_methods;
+create policy "owner pay methods" on payment_methods for all to authenticated using (is_super()) with check (is_super());
+grant select on payment_methods to anon, authenticated;
+grant insert, update, delete on payment_methods to authenticated;
+-- First option = the MoMo details already saved in settings
+insert into payment_methods (network, number, name, is_main, sort)
+select coalesce(momo_network, 'MTN'), momo_number, momo_name, true, 1 from settings
+where id = 1 and not exists (select 1 from payment_methods);
+
+-- Date added, shown on each rider
+alter table riders add column if not exists created_at timestamptz not null default now();
+
+-- Dish pictures: blank = chosen automatically from the dish name
+alter table menu_items add column if not exists icon text;
+
+-- Most-ordered dishes (counts only, no customer details): each kitchen shows its top dish
+create or replace view dish_popularity as
+  select item_id, sum(qty)::int as n from orders
+  where status <> 'cancelled' and created_at > now() - interval '60 days' group by item_id;
+grant select on dish_popularity to anon, authenticated;
