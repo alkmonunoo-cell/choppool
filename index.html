@@ -431,19 +431,9 @@ button.dtile:not([disabled]):hover { outline: 2px solid var(--accent-soft); }
 .topzone.compact .hero-stat span { font-size: 10.5px; }
 .topzone.compact .section-title { margin-top: 0; }
 .kgroup { display: grid; gap: 12px; }
-.kghead { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; padding: 4px 0; border: none; background: none; text-align: left; cursor: pointer; font: 700 17px var(--font-display); color: var(--ink); }
-.kghead .muted { font: 600 13px var(--font-body); margin-left: 4px; }
-.kghead svg, .kcur svg { width: 18px; height: 18px; color: var(--muted); flex: none; }
-/* The current category rides under the top bar as an overlay: no layout shift, no jumping */
-.kcur { position: fixed; left: 50%; width: min(640px, 100%); margin-left: max(-320px, -50%); top: 0; z-index: 19; border-radius: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 16px; border: none; border-top: 1px solid color-mix(in srgb, var(--line) 70%, transparent); cursor: pointer; text-align: left;
-  font: 700 16px var(--font-display); color: var(--ink); background: color-mix(in srgb, var(--bg) 90%, transparent); -webkit-backdrop-filter: blur(18px) saturate(150%); backdrop-filter: blur(18px) saturate(150%);
-  opacity: 0; transform: translateY(-6px); pointer-events: none; transition: opacity .2s ease, transform .2s ease; box-shadow: 0 8px 16px -12px rgba(0,0,0,.35); }
-.kcur.show { opacity: 1; transform: none; pointer-events: auto; }
-.kcur span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.kcur.swap-up span { animation: kSwapUp .26s cubic-bezier(.2,.8,.2,1); }
-.kcur.swap-down span { animation: kSwapDown .26s cubic-bezier(.2,.8,.2,1); }
-@keyframes kSwapUp { from { transform: translateY(70%); opacity: 0; } to { transform: none; opacity: 1; } }
-@keyframes kSwapDown { from { transform: translateY(-70%); opacity: 0; } to { transform: none; opacity: 1; } }
+.kghead { position: -webkit-sticky; position: sticky; top: var(--kh, 120px); z-index: 6; display: flex; align-items: center; justify-content: space-between; gap: 8px; width: calc(100% + 32px); margin: 0 -16px; padding: 10px 16px; border: none; border-radius: 0; text-align: left; cursor: pointer;
+  font: 700 17px var(--font-display); color: var(--ink); background: var(--bg); box-shadow: 0 1px 0 color-mix(in srgb, var(--line) 80%, transparent); }
+.kghead svg { width: 18px; height: 18px; color: var(--muted); flex: none; }
 .hero-stat, .hero-stat b, .hero-stat span { transition: padding .38s, font-size .38s; }
 /* Vendor, rider and host page headers */
 .pagetop { gap: 4px; }
@@ -1405,7 +1395,7 @@ function setTab(t) {
   if (t === "wallet") renderWallet();
   if (t === "kitchens") renderKitchens();
   window.scrollTo(0, 0);
-  if ($("#kCur")) { $("#kCur").classList.remove("show"); $("#kCur").dataset.cur = ""; }
+  if (t === "kitchens") requestAnimationFrame(setKTop);
 }
 async function viewOrder() {
   S.tab = S.tab || "home";
@@ -1423,7 +1413,7 @@ async function viewOrder() {
       <div class="section-title" data-for="home"><h2 id="poolsTitle">Active pools</h2><span class="small muted" id="poolCount"></span></div>
       <div data-for="kitchens" class="hidden"><h1>Menus near you</h1></div>
     </div>
-    <button type="button" class="kcur" id="kCur" aria-hidden="true" tabindex="-1"><span id="kCurT"></span>${ICON.chev}</button>
+
     <section id="tabHome" class="stack">
       <section id="pools" class="stack"></section>
     </section>
@@ -1451,7 +1441,6 @@ async function viewOrder() {
   $("#addVendor").addEventListener("click", openAddVendor);
   $("#pools").addEventListener("click", e => { if (e.target.closest("[data-findb]")) { openSitePicker(); $("#fbQ")?.focus(); return; } const ws = e.target.closest("[data-site]"); if (ws) return setSite(ws.dataset.site);
     const b = e.target.closest("button[data-menu]"); if (b) openOrder(b.dataset.menu); const g = e.target.closest("[data-gokitchens]"); if (g) setTab("kitchens"); });
-  $("#kCur").addEventListener("click", openKJump);
   $("#kitchensList").addEventListener("click", e => { if (e.target.closest("[data-kjump]")) return openKJump(); const b = e.target.closest("button[data-menu]"); if (b) openOrder(b.dataset.menu); });
   $("#tabOrders").addEventListener("click", e => { const b = e.target.closest("button[data-pay]"); if (b) openPayQuote(b.dataset.pay); const ro = e.target.closest("[data-reorder]"); if (ro) openOrder(ro.dataset.reorder);
     const ap = e.target.closest("[data-addplate]"); if (ap) { const o = (S.mine || []).find(x => x.id === ap.dataset.addplate); if (o) openOrder(o.kitchen_id, { join: o }); }
@@ -1730,26 +1719,20 @@ function renderKitchens() {
     + (others.length ? kGroup("near", "Top vendors nearby", others.length, shown.map(card).join("") + (others.length > shown.length ? `<button class="ghost wide" id="moreKitchens">See ${others.length - shown.length} more</button>` : "")) : "")
     : `<div class="empty">${ICON.store}<p>No menus deliver to ${esc(site.name || "this building")} yet. Add a vendor you know below.</p></div>`;
   $("#moreKitchens")?.addEventListener("click", () => { S.allKitchens = true; renderKitchens(); });
+  setKTop();
 }
 // A category of vendors: its header sticks under the top bar until the next category pushes it up; the arrow jumps between categories
-const kGroup = (id, title, n, body) => `<section class="kgroup" id="kg-${id}" data-ktitle="${esc(title)}"><button type="button" class="kghead" data-kjump><span>${esc(title)} <span class="muted">${n}</span></span>${ICON.chev}</button><div class="stack">${body}</div></section>`;
+const kGroup = (id, title, n, body) => `<section class="kgroup" id="kg-${id}" data-ktitle="${esc(title)}"><button type="button" class="kghead" data-kjump><span>${esc(title)}</span>${ICON.chev}</button><div class="stack">${body}</div></section>`;
 function openKJump() {
   const groups = [...document.querySelectorAll("#tabKitchens .kgroup")];
   openSheet(`${sheetHead("Go to", "")}<div class="stack" style="gap:6px">${groups.map(g => `<button type="button" class="place-row" data-kgo="${esc(g.id)}"><span class="pdot on">${ICON.store.replace(/width="\d+" height="\d+"/, 'width="18" height="18"')}</span><span><strong>${esc(g.dataset.ktitle)}</strong><span class="small muted">${g.querySelectorAll(".kcard").length} vendors</span></span></button>`).join("")}
     <button type="button" class="place-row" data-kgo="addVendor"><span class="pdot">${ICON.store.replace(/width="\d+" height="\d+"/, 'width="18" height="18"')}</span><span><strong>Add a vendor you know</strong><span class="small muted">Your waakye, gob3 or kenkey seller</span></span></button></div>`);
   $("#sheet").onclick = e => { const b = e.target.closest("[data-kgo]"); if (!b) return; $("#sheet").onclick = null; closeSheet();
-    setTimeout(() => { const t = document.getElementById(b.dataset.kgo); if (!t) return; const tz = $("#topzone"); window.scrollTo({ top: t.getBoundingClientRect().top + window.scrollY - (tz ? tz.offsetHeight : 0) + 10, behavior: "smooth" }); }, 380); };
+    setTimeout(() => { const t = document.getElementById(b.dataset.kgo); if (!t) return; window.scrollTo({ top: t.getBoundingClientRect().top + window.scrollY - (parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--kh")) || 0) + 1, behavior: "smooth" }); }, 380); };
 }
-// Menus: which category is under the top bar right now (shown in the bar, swaps as the next one arrives)
-function kCurrent(tz) {
-  const line = tz.getBoundingClientRect().bottom, groups = [...document.querySelectorAll("#tabKitchens .kgroup")];
-  let cur = null; groups.forEach(g => { if (g.querySelector(".kghead").getBoundingClientRect().top < line - 4) cur = g; });
-  const b = $("#kCur"); if (!b) return;
-  b.style.top = Math.round(line) + "px"; b.classList.toggle("show", !!cur);
-  const label = cur ? cur.dataset.ktitle + " · " + cur.querySelectorAll(".kcard").length : "";
-  if (cur && b.dataset.cur !== cur.id) { const down = !b.dataset.cur || groups.findIndex(g => g.id === b.dataset.cur) < groups.indexOf(cur); b.dataset.cur = cur.id; $("#kCurT").textContent = label; b.classList.remove("swap-up", "swap-down"); void b.offsetWidth; b.classList.add(down ? "swap-up" : "swap-down"); }
-  if (!cur) b.dataset.cur = "";
-}
+// Menus: category headers stick right under the top bar (native sticky, no counts); the next one pushes the last one up
+window.addEventListener("resize", () => { if (S.tab === "kitchens") setKTop(); });
+function setKTop() { const tz = $("#topzone"); if (!tz) return; const top = parseFloat(getComputedStyle(tz).top) || 0; document.documentElement.style.setProperty("--kh", Math.round(top + tz.offsetHeight) + "px"); }
 // Before a building is chosen: the best-rated vendors across Accra, without delivery prices
 function renderKitchensAnywhere(el) {
   const s = S.settings;
@@ -1761,6 +1744,7 @@ function renderKitchensAnywhere(el) {
       <div class="dishline">${dishes.slice(0, 3).map(x => `<span>${esc(x.name)} · ${money(x.price)}</span>`).join("")}${dishes.length > 3 ? `<span>+${dishes.length - 3} more</span>` : ""}</div>
       <button class="ghost wide" data-menu="${esc(k.id)}">${ICON.pin} Choose your building to see delivery</button></div></article>`; }).join(""))
     || `<div class="empty">${ICON.store}<p>Choose your building to see the menus that deliver there.</p></div>`;
+  setKTop();
 }
 // Card header: the vendor's dish photo (lazy-loaded), or a rich illustration on a warm gradient
 const photoOf = k => { const t = topDish(k.id); return (t && t.photo_url) || (S.items.find(i => i.kitchen_id === k.id && i.photo_url) || {}).photo_url || null; };
@@ -3243,7 +3227,7 @@ window.addEventListener("scroll", () => {
     topTick = false; const y = window.scrollY;
     document.querySelectorAll(".topzone").forEach(z => z.classList.toggle("scrolled", y > 4));
     const tz = $("#topzone"); if (tz && S.tab === "home") { if (y > 90) tz.classList.add("compact"); else if (y < 16) tz.classList.remove("compact"); }
-    if (tz && S.tab === "kitchens") kCurrent(tz);
+
   });
 }, { passive: true });
 function initMotion() {
