@@ -146,6 +146,13 @@ p { margin: 0; }
 .ptitle h3, .ptitle strong { color: #fff; font-family: var(--font-display); font-size: 22px; font-weight: 800; letter-spacing: -.3px; line-height: 1.15; }
 .pool-art.small .ptitle strong { font-size: 19px; }
 .ptitle span { font-size: 12.5px; opacity: .9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.waitbox { display: grid; gap: 8px; padding: 12px; border-radius: 18px; background: color-mix(in srgb, #F5B04A 14%, var(--surface)); border: 1.5px solid color-mix(in srgb, #F5B04A 55%, transparent); }
+.wb-top { display: flex; align-items: center; gap: 8px; font-size: 14.5px; }
+.wb-top strong { color: var(--ink); }
+.wb-left { margin-left: auto; font-size: 13px; font-weight: 700; color: var(--hint); white-space: nowrap; }
+.wb-dot { width: 9px; height: 9px; border-radius: 50%; background: #F5B04A; flex: none; box-shadow: 0 0 0 0 rgba(245,176,74,.6); animation: wbPulse 1.6s ease-out infinite; }
+@keyframes wbPulse { 70% { box-shadow: 0 0 0 7px rgba(245,176,74,0); } 100% { box-shadow: 0 0 0 0 rgba(245,176,74,0); } }
+.waitbox .small { margin: 0; color: var(--muted); }
 .seatline { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
 .seatline .hint { font-weight: 700; }
 .dishtext { margin: 0; font-size: 13.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -1708,8 +1715,8 @@ function renderKitchens() {
     const st = menuState(k), p = currentPool(S.siteId, k.id), dishes = S.items.filter(it => it.kitchen_id === k.id), active = activeHere(k);
     const trip = tripTo(k, site), from = feeFor(max, s, trip), km = hasPin(site) ? roadKm(kPin(k, site), site) : null;
     const priceLine = (km != null ? "About " + (km < 1 ? "1" : km.toFixed(1)) + " km by road · " : "") + (isLong(s, trip) ? "long-distance vendor: delivery shared at cost, " + money(from) + " a meal when the pool fills" : "delivery from " + money(from) + " a meal when the pool fills");
-    const status = st.full ? pill("Fully booked " + dayLabel(S.date), "bad") : st.waiting ? pill("Vendor yet to confirm", "warn") : active ? pill(p.meals + " of " + max + " seats taken", "ok") : st.open ? pill("Cooking " + dayLabel(S.date), "ok") : pill("Not confirmed yet", "dim");
-    const btn = st.full ? `<button class="btn wide" disabled>Fully booked today</button>` : st.waiting ? `<button class="btn wide" data-menu="${esc(k.id)}">Join anyway</button>`
+    const status = st.full ? pill("Fully booked " + dayLabel(S.date), "bad") : st.waiting ? "" : active ? pill(p.meals + " of " + max + " seats taken", "ok") : st.open ? pill("Cooking " + dayLabel(S.date), "ok") : pill("Not confirmed yet", "dim");
+    const btn = st.full ? `<button class="btn wide" disabled>Fully booked today</button>` : st.waiting ? waitBox(k)
       : active ? `<button class="btn wide" data-menu="${esc(k.id)}">Join the active pool</button>` : `<button class="btn wide" data-menu="${esc(k.id)}">Start a pool</button>`;
     return `<article class="kcard">${photoHead(k, menuIndex(k.id), `<div class="ptitle"><strong>${esc(k.public_name)}</strong><span>${esc(k.added_by_customer ? "A local vendor added by a customer" : k.tagline || "")}</span></div>`, true)}
       <div class="kbody"><div class="row" style="justify-content:flex-start;gap:6px;flex-wrap:wrap">${status}${scoreLine(k)}</div><p class="small" style="color:var(--hint)">${esc(priceLine)}</p>
@@ -1752,6 +1759,14 @@ function photoHead(k, i, inner, small) {
   const ph = photoOf(k);
   return `<div class="pool-art g${i % 4}${small ? " small" : ""}">${ph ? `<img src="${esc(ph)}" alt="" loading="lazy" decoding="async">` : `<span class="illus">${art(dishKind(topDish(k.id)))}</span>`}<span class="shade"></span>${inner}</div>`;
 }
+// Waiting for the vendor: status, time left and the button together in one box
+function waitBox(k) {
+  const s = S.settings, wp = S.board.pools.find(x => x.site_id === S.siteId && x.kitchen_id === k.id && x.status === "waiting");
+  const left = wp ? Math.max(0, s.accept_timeout_min - minsAgo(wp.created_at)) : s.accept_timeout_min, n = wp ? wp.meals : 0;
+  return `<div class="waitbox"><div class="wb-top"><span class="wb-dot"></span><strong>Vendor yet to confirm</strong><span class="wb-left num">${left} min left</span></div>
+    <p class="small">${n} ${n === 1 ? "meal" : "meals"} so far. Join now: if they don't confirm, everyone gets their money back.</p>
+    <button class="btn wide" data-menu="${esc(k.id)}">Join anyway</button></div>`;
+}
 // Busiest buildings today (most meals), for one-tap chips on the welcome card
 function busySites(n) {
   const meals = {}; S.board.pools.forEach(p => { meals[p.site_id] = (meals[p.site_id] || 0) + p.meals; });
@@ -1791,12 +1806,10 @@ function renderPools() {
     const i = menuIndex(k.id), st = menuState(k), p = currentPool(S.siteId, k.id);
     const trip = poolTrip(p), share = feeFor(Math.max(p.meals, 1), s, trip), drop = nextDrop(p.meals, s, trip);
     const dishes = S.items.filter(it => it.kitchen_id === k.id);
-    const tag = st.full ? `<span class="ptag bad">Fully booked</span>` : st.waiting ? `<span class="ptag warn">Vendor yet to confirm</span>` : !st.open ? `<span class="ptag dim">Not confirmed yet</span>` : `<span class="ptag ok">Pool ${p.seq} · Open</span>`;
+    const tag = st.full ? `<span class="ptag bad">Fully booked</span>` : st.waiting ? "" : !st.open ? `<span class="ptag dim">Not confirmed yet</span>` : `<span class="ptag ok">Pool ${p.seq} · Open</span>`;
     let line, btn, seats = "";
     if (st.full) { line = "This menu is fully booked for today."; btn = `<button class="btn wide" disabled>Fully booked today</button>`; }
-    else if (st.waiting) { const wp = S.board.pools.find(x => x.site_id === S.siteId && x.kitchen_id === k.id && x.status === "waiting"), left = wp ? Math.max(0, s.accept_timeout_min - minsAgo(wp.created_at)) : s.accept_timeout_min;
-      line = `<strong class="num">${wp ? wp.meals : 0} ${wp && wp.meals === 1 ? "meal" : "meals"}</strong> so far · vendor yet to confirm (${left} min left). Join anyway: if they don't confirm, everyone gets their money back.`;
-      btn = `<button class="btn wide" data-menu="${esc(k.id)}">Join anyway</button>`; }
+    else if (st.waiting) { line = ""; btn = waitBox(k); }
     else if (!st.open) { line = "Be the first today. Your order asks the vendor to confirm."; btn = `<button class="btn wide" data-menu="${esc(k.id)}">Order and ask them to cook</button>`; }
     else {
       seats = `<div class="seats" aria-label="${p.meals} of ${max} seats taken">${Array.from({ length: max }, (_, n) => `<i class="${n < p.meals ? "on" : drop && n < p.meals + drop.more ? "next" : ""}"></i>`).join("")}</div>`;
@@ -1809,7 +1822,7 @@ function renderPools() {
       ${photoHead(k, i, `${tag}<div class="fee-tag"><b class="num">${money(share)}</b><span>${share < feeFor(1, s, trip) ? `<s>${money(feeFor(1, s, trip))}</s> ` : ""}delivery a meal</span></div>
         <div class="ptitle"><h3>${esc(k.public_name)}</h3><span>${esc(k.added_by_customer ? "Local vendor" : k.tagline || "")}${km != null ? " · " + (km < 1 ? "under 1" : km.toFixed(1)) + " km" : ""}</span></div>`)}
       <div class="pool-body">
-        ${seats}<p class="small">${line}</p>
+        ${seats}${line ? `<p class="small">${line}</p>` : ""}
         ${k.added_by_customer ? `<p class="small muted">A local vendor added by a customer</p>` : ""}
         <p class="dishtext">${dishes.slice(0, 2).map(d => esc(d.name)).join(" · ")}${dishes.length > 2 ? ` · +${dishes.length - 2} more` : ""}</p>
         ${btn}</div></article>`;
