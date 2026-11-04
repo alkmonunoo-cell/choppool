@@ -473,6 +473,9 @@ input, select, textarea { font-size: 16px; min-width: 0; max-width: 100%; }
 .tabbar { background: color-mix(in srgb, var(--surface) 82%, transparent) !important; -webkit-backdrop-filter: blur(20px) saturate(160%); backdrop-filter: blur(20px) saturate(160%); border: 1px solid color-mix(in srgb, var(--line) 70%, transparent); bottom: calc(12px + env(safe-area-inset-bottom)) !important; }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { .tabbar, .topzone.scrolled, .sheet-foot, .statusglass { background: var(--surface) !important; } }
 .toast { bottom: calc(92px + env(safe-area-inset-bottom)); }
+/* Installed on iPhone, pages shorter than the screen put the tab bar too high (an iOS bug); pages that scroll are fine.
+   So every page is at least a touch taller than the screen. */
+html.standalone .wrap { min-height: calc(100vh + 1px); min-height: calc(100lvh + 1px); }
 html.standalone, html.standalone body { overscroll-behavior: none; }
 /* Launch animation: the packs stack, the name rises, the tagline lands in three beats */
 .splash { position: fixed; inset: 0; z-index: 100; background: var(--bg); display: grid; place-items: center; transition: opacity .35s cubic-bezier(.2,.8,.2,1); cursor: pointer; }
