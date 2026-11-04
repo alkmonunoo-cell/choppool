@@ -470,10 +470,9 @@ input, select, textarea { font-size: 16px; min-width: 0; max-width: 100%; }
 .collapse > div { overflow: hidden; min-height: 0; }
 .ledger-day { margin: 6px 0 0; font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
 /* Frosted tab bar: mostly solid, blurred behind, fine edge */
-.tabbar { background: color-mix(in srgb, var(--surface) 82%, transparent) !important; -webkit-backdrop-filter: blur(20px) saturate(160%); backdrop-filter: blur(20px) saturate(160%); border: 1px solid color-mix(in srgb, var(--line) 70%, transparent); bottom: calc(12px + env(safe-area-inset-bottom) - var(--vbgap, 0px)) !important; }
+.tabbar { background: color-mix(in srgb, var(--surface) 82%, transparent) !important; -webkit-backdrop-filter: blur(20px) saturate(160%); backdrop-filter: blur(20px) saturate(160%); border: 1px solid color-mix(in srgb, var(--line) 70%, transparent); bottom: calc(12px + env(safe-area-inset-bottom)) !important; }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { .tabbar, .topzone.scrolled, .sheet-foot, .statusglass { background: var(--surface) !important; } }
-.toast { bottom: calc(92px + env(safe-area-inset-bottom) - var(--vbgap, 0px)); }
-.sheet-bg { bottom: calc(0px - var(--vbgap, 0px)); }
+.toast { bottom: calc(92px + env(safe-area-inset-bottom)); }
 html.standalone, html.standalone body { overscroll-behavior: none; }
 /* Launch animation: the packs stack, the name rises, the tagline lands in three beats */
 .splash { position: fixed; inset: 0; z-index: 100; background: var(--bg); display: grid; place-items: center; transition: opacity .35s cubic-bezier(.2,.8,.2,1); cursor: pointer; }
@@ -3238,12 +3237,24 @@ function enhanceContacts() {
     inp.insertAdjacentElement("afterend", b);
   });
 }
-// Installed on iPhone, the page can stop short of the bottom of the screen (by about the status bar's height),
-// which leaves the tab bar floating. Measure the gap and pull fixed bars back down to the real bottom.
-function fixViewportGap() {
-  let gap = 0;
-  if (isStandalone() && isIOS() && matchMedia("(orientation: portrait)").matches) { const g = screen.height - window.innerHeight; if (g > 20 && g < 120) gap = g; }
-  document.documentElement.style.setProperty("--vbgap", gap + "px");
+// Installed on iPhone, the first time the keyboard opens the app's screen area shrinks by about the status bar's height
+// and doesn't grow back (an iOS bug): the tab bar floats and a black band appears at the bottom.
+// When the keyboard closes, briefly re-lay out the page so iOS measures the full screen again.
+function healViewport() {
+  if (!(isStandalone() && isIOS())) return;
+  let t = null;
+  const heal = () => {
+    clearTimeout(t);
+    t = setTimeout(() => {
+      if (document.activeElement && document.activeElement.matches("input, textarea, select")) return;   // keyboard still up
+      const y = window.scrollY, b = document.body, sheetOpen = b.classList.contains("locked");
+      b.style.display = "none"; void b.offsetHeight; b.style.display = "";
+      if (!sheetOpen) window.scrollTo(0, y);
+    }, 350);
+  };
+  document.addEventListener("focusout", e => { if (e.target.matches && e.target.matches("input, textarea, select")) heal(); });
+  if (window.visualViewport) { let last = visualViewport.height; visualViewport.addEventListener("resize", () => { if (visualViewport.height > last + 80) heal(); last = visualViewport.height; }); }
+  window.addEventListener("pageshow", heal); document.addEventListener("visibilitychange", () => { if (!document.hidden) heal(); });
 }
 async function start() {
   splash();   // first frame: the animation covers the connection time (no "Loading" text anywhere)
@@ -3274,7 +3285,7 @@ async function start() {
   // Background refresh pauses while the app is hidden; catch up at once when it's opened again
   document.addEventListener("visibilitychange", () => { if (document.hidden || !$("#tabHome")) return; refreshBoard(); refreshMine(); tickCountdown(); });
   if (isStandalone()) document.documentElement.classList.add("standalone");
-  fixViewportGap(); window.addEventListener("resize", fixViewportGap); window.addEventListener("orientationchange", () => setTimeout(fixViewportGap, 300));
+  healViewport();
   initMotion();
   if (canPickContacts()) new MutationObserver(() => enhanceContacts()).observe(document.body, { childList: true, subtree: true });
   if (!DEMO && "serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
