@@ -435,8 +435,7 @@ button.dtile:not([disabled]):hover { outline: 2px solid var(--accent-soft); }
 .kghead .muted { font: 600 13px var(--font-body); margin-left: 4px; }
 .kghead svg, .kcur svg { width: 18px; height: 18px; color: var(--muted); flex: none; }
 /* The current category rides under the top bar as an overlay: no layout shift, no jumping */
-[data-for="kitchens"] { position: relative; }
-.kcur { position: absolute; left: -16px; right: -16px; top: calc(100% + 10px); display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 16px; border: none; border-top: 1px solid color-mix(in srgb, var(--line) 70%, transparent); cursor: pointer; text-align: left;
+.kcur { position: fixed; left: 50%; width: min(640px, 100%); margin-left: max(-320px, -50%); top: 0; z-index: 19; border-radius: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 16px; border: none; border-top: 1px solid color-mix(in srgb, var(--line) 70%, transparent); cursor: pointer; text-align: left;
   font: 700 16px var(--font-display); color: var(--ink); background: color-mix(in srgb, var(--bg) 90%, transparent); -webkit-backdrop-filter: blur(18px) saturate(150%); backdrop-filter: blur(18px) saturate(150%);
   opacity: 0; transform: translateY(-6px); pointer-events: none; transition: opacity .2s ease, transform .2s ease; box-shadow: 0 8px 16px -12px rgba(0,0,0,.35); }
 .kcur.show { opacity: 1; transform: none; pointer-events: auto; }
@@ -1422,9 +1421,9 @@ async function viewOrder() {
     </header>
       <section class="hero" id="hero" data-for="home"></section>
       <div class="section-title" data-for="home"><h2 id="poolsTitle">Active pools</h2><span class="small muted" id="poolCount"></span></div>
-      <div data-for="kitchens" class="hidden"><h1>Menus near you</h1>
-        <button type="button" class="kcur" id="kCur" data-kjump aria-hidden="true" tabindex="-1"><span id="kCurT"></span>${ICON.chev}</button></div>
+      <div data-for="kitchens" class="hidden"><h1>Menus near you</h1></div>
     </div>
+    <button type="button" class="kcur" id="kCur" aria-hidden="true" tabindex="-1"><span id="kCurT"></span>${ICON.chev}</button>
     <section id="tabHome" class="stack">
       <section id="pools" class="stack"></section>
     </section>
@@ -1746,7 +1745,7 @@ function kCurrent(tz) {
   const line = tz.getBoundingClientRect().bottom, groups = [...document.querySelectorAll("#tabKitchens .kgroup")];
   let cur = null; groups.forEach(g => { if (g.querySelector(".kghead").getBoundingClientRect().top < line - 4) cur = g; });
   const b = $("#kCur"); if (!b) return;
-  b.classList.toggle("show", !!cur);
+  b.style.top = Math.round(line) + "px"; b.classList.toggle("show", !!cur);
   const label = cur ? cur.dataset.ktitle + " · " + cur.querySelectorAll(".kcard").length : "";
   if (cur && b.dataset.cur !== cur.id) { const down = !b.dataset.cur || groups.findIndex(g => g.id === b.dataset.cur) < groups.indexOf(cur); b.dataset.cur = cur.id; $("#kCurT").textContent = label; b.classList.remove("swap-up", "swap-down"); void b.offsetWidth; b.classList.add(down ? "swap-up" : "swap-down"); }
   if (!cur) b.dataset.cur = "";
