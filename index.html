@@ -430,6 +430,13 @@ button.dtile:not([disabled]):hover { outline: 2px solid var(--accent-soft); }
 .topzone.compact .hero-stat b { font-size: 15px; }
 .topzone.compact .hero-stat span { font-size: 10.5px; }
 .topzone.compact .section-title { margin-top: 0; }
+#kitchensSub { max-height: 80px; overflow: hidden; transition: max-height .32s cubic-bezier(.2,.8,.2,1), opacity .2s ease, margin .32s; }
+.topzone.compact #kitchensSub { max-height: 0; opacity: 0; margin: 0; }
+.kgroup { display: grid; gap: 12px; }
+.kghead { position: sticky; top: calc(var(--tzh, 120px) - 1px); z-index: 4; display: flex; align-items: center; justify-content: space-between; gap: 8px; width: calc(100% + 32px); margin: 0 -16px; padding: 10px 16px; border: none; text-align: left; cursor: pointer;
+  font: 700 17px var(--font-display); color: var(--ink); background: color-mix(in srgb, var(--bg) 88%, transparent); -webkit-backdrop-filter: blur(16px) saturate(150%); backdrop-filter: blur(16px) saturate(150%); }
+.kghead .muted { font: 600 13px var(--font-body); margin-left: 4px; }
+.kghead svg { width: 18px; height: 18px; color: var(--muted); flex: none; }
 .hero-stat, .hero-stat b, .hero-stat span { transition: padding .38s, font-size .38s; }
 /* Vendor, rider and host page headers */
 .pagetop { gap: 4px; }
@@ -1387,6 +1394,7 @@ function setTab(t) {
   if (t === "wallet") renderWallet();
   if (t === "kitchens") renderKitchens();
   window.scrollTo(0, 0);
+  requestAnimationFrame(() => { const tz = $("#topzone"); if (tz) document.documentElement.style.setProperty("--tzh", tz.offsetHeight + "px"); });
 }
 async function viewOrder() {
   S.tab = S.tab || "home";
@@ -1430,7 +1438,7 @@ async function viewOrder() {
   $("#addVendor").addEventListener("click", openAddVendor);
   $("#pools").addEventListener("click", e => { if (e.target.closest("[data-findb]")) { openSitePicker(); $("#fbQ")?.focus(); return; } const ws = e.target.closest("[data-site]"); if (ws) return setSite(ws.dataset.site);
     const b = e.target.closest("button[data-menu]"); if (b) openOrder(b.dataset.menu); const g = e.target.closest("[data-gokitchens]"); if (g) setTab("kitchens"); });
-  $("#kitchensList").addEventListener("click", e => { const b = e.target.closest("button[data-menu]"); if (b) openOrder(b.dataset.menu); });
+  $("#kitchensList").addEventListener("click", e => { if (e.target.closest("[data-kjump]")) return openKJump(); const b = e.target.closest("button[data-menu]"); if (b) openOrder(b.dataset.menu); });
   $("#tabOrders").addEventListener("click", e => { const b = e.target.closest("button[data-pay]"); if (b) openPayQuote(b.dataset.pay); const ro = e.target.closest("[data-reorder]"); if (ro) openOrder(ro.dataset.reorder);
     const ap = e.target.closest("[data-addplate]"); if (ap) { const o = (S.mine || []).find(x => x.id === ap.dataset.addplate); if (o) openOrder(o.kitchen_id, { join: o }); }
     const ag = e.target.closest("[data-again]"); if (ag) { const o = (S.mine || []).find(x => x.id === ag.dataset.again); if (o) openOrder(o.kitchen_id, { preset: { item_id: o.item_id, qty: o.qty, addons: (o.addons || []).map(a => a.name), site_id: o.site_id } }); } const cx = e.target.closest("[data-cancel]"); if (cx) openCancel(cx.dataset.cancel); const sh = e.target.closest("[data-share]"); if (sh) { const [a, c] = sh.dataset.share.split(","); sharePool(a, c); } if (e.target.closest("[data-keepcb]")) openAccount("Your cashback moves into your new wallet."); const h = e.target.closest("[data-gohome]"); if (h) setTab("home"); });
@@ -1704,21 +1712,30 @@ function renderKitchens() {
       <div class="kbody"><div class="row" style="justify-content:flex-start;gap:6px;flex-wrap:wrap">${status}${scoreLine(k)}</div><p class="small" style="color:var(--hint)">${esc(priceLine)}</p>
       <div class="dishline">${dishes.slice(0, 3).map(x => `<span>${esc(x.name)} · ${money(x.price)}</span>`).join("")}${dishes.length > 3 ? `<span>+${dishes.length - 3} more</span>` : ""}</div>${btn}</div></article>`;
   };
-  el.innerHTML = rows.length ? (mine.length ? `<p class="group-title">Popular in your building</p>${mine.map(card).join("")}` : "")
-    + (others.length ? `${mine.length ? `<p class="group-title">Top vendors nearby</p>` : ""}${shown.map(card).join("")}${others.length > shown.length ? `<button class="ghost wide" id="moreKitchens">See ${others.length - shown.length} more</button>` : ""}` : "")
+  el.innerHTML = rows.length ? (mine.length ? kGroup("mine", "Popular in your building", mine.length, mine.map(card).join("")) : "")
+    + (others.length ? kGroup("near", "Top vendors nearby", others.length, shown.map(card).join("") + (others.length > shown.length ? `<button class="ghost wide" id="moreKitchens">See ${others.length - shown.length} more</button>` : "")) : "")
     : `<div class="empty">${ICON.store}<p>No menus deliver to ${esc(site.name || "this building")} yet. Add a vendor you know below.</p></div>`;
   $("#moreKitchens")?.addEventListener("click", () => { S.allKitchens = true; renderKitchens(); });
+}
+// A category of vendors: its header sticks under the top bar until the next category pushes it up; the arrow jumps between categories
+const kGroup = (id, title, n, body) => `<section class="kgroup" id="kg-${id}" data-ktitle="${esc(title)}"><button type="button" class="kghead" data-kjump><span>${esc(title)} <span class="muted">${n}</span></span>${ICON.chev}</button><div class="stack">${body}</div></section>`;
+function openKJump() {
+  const groups = [...document.querySelectorAll("#tabKitchens .kgroup")];
+  openSheet(`${sheetHead("Go to", "")}<div class="stack" style="gap:6px">${groups.map(g => `<button type="button" class="place-row" data-kgo="${esc(g.id)}"><span class="pdot on">${ICON.store.replace(/width="\d+" height="\d+"/, 'width="18" height="18"')}</span><span><strong>${esc(g.dataset.ktitle)}</strong><span class="small muted">${g.querySelectorAll(".kcard").length} vendors</span></span></button>`).join("")}
+    <button type="button" class="place-row" data-kgo="addVendor"><span class="pdot">${ICON.store.replace(/width="\d+" height="\d+"/, 'width="18" height="18"')}</span><span><strong>Add a vendor you know</strong><span class="small muted">Your waakye, gob3 or kenkey seller</span></span></button></div>`);
+  $("#sheet").onclick = e => { const b = e.target.closest("[data-kgo]"); if (!b) return; $("#sheet").onclick = null; closeSheet();
+    setTimeout(() => { const t = document.getElementById(b.dataset.kgo); if (!t) return; const tz = $("#topzone"); window.scrollTo({ top: t.getBoundingClientRect().top + window.scrollY - (tz ? tz.offsetHeight : 0) + 2, behavior: "smooth" }); }, 380); };
 }
 // Before a building is chosen: the best-rated vendors across Accra, without delivery prices
 function renderKitchensAnywhere(el) {
   const s = S.settings;
   $("#kitchensSub").textContent = "Top-rated vendors across Accra. Choose your building to see delivery prices and pools.";
   const list = S.menus.filter(k => !k.site_id).sort((a, b) => rank(b) - rank(a)).slice(0, S.allKitchens ? 99 : 8);
-  el.innerHTML = list.map(k => { const dishes = S.items.filter(it => it.kitchen_id === k.id), st = menuState(k);
+  el.innerHTML = kGroup("top", "Top-rated across Accra", list.length, list.map(k => { const dishes = S.items.filter(it => it.kitchen_id === k.id), st = menuState(k);
     return `<article class="kcard">${photoHead(k, menuIndex(k.id), `<div class="ptitle"><strong>${esc(k.public_name)}</strong><span>${esc(k.tagline || "")}</span></div>`, true)}
       <div class="kbody">${st.open || scoreLine(k) ? `<div class="row" style="justify-content:flex-start;gap:6px;flex-wrap:wrap">${st.open ? pill("Cooking " + dayLabel(S.date), "ok") : ""}${scoreLine(k)}</div>` : ""}
       <div class="dishline">${dishes.slice(0, 3).map(x => `<span>${esc(x.name)} · ${money(x.price)}</span>`).join("")}${dishes.length > 3 ? `<span>+${dishes.length - 3} more</span>` : ""}</div>
-      <button class="ghost wide" data-menu="${esc(k.id)}">${ICON.pin} Choose your building to see delivery</button></div></article>`; }).join("")
+      <button class="ghost wide" data-menu="${esc(k.id)}">${ICON.pin} Choose your building to see delivery</button></div></article>`; }).join(""))
     || `<div class="empty">${ICON.store}<p>Choose your building to see the menus that deliver there.</p></div>`;
 }
 // Card header: the vendor's dish photo (lazy-loaded), or a rich illustration on a warm gradient
@@ -3197,7 +3214,8 @@ window.addEventListener("scroll", () => {
   requestAnimationFrame(() => {
     topTick = false; const y = window.scrollY;
     document.querySelectorAll(".topzone").forEach(z => z.classList.toggle("scrolled", y > 4));
-    const tz = $("#topzone"); if (tz && S.tab === "home") { if (y > 90) tz.classList.add("compact"); else if (y < 16) tz.classList.remove("compact"); }
+    const tz = $("#topzone"); if (tz && ["home", "kitchens"].includes(S.tab)) { if (y > (S.tab === "home" ? 90 : 24)) tz.classList.add("compact"); else if (y < 16) tz.classList.remove("compact"); }
+    const st = tz ? tz.classList.contains("compact") : null; if (tz && st !== S.tzState) { S.tzState = st; setTimeout(() => document.documentElement.style.setProperty("--tzh", tz.offsetHeight + "px"), 360); }
   });
 }, { passive: true });
 function initMotion() {
