@@ -3334,7 +3334,12 @@ async function start() {
   healViewport();
   initMotion();
   if (canPickContacts()) new MutationObserver(() => enhanceContacts()).observe(document.body, { childList: true, subtree: true });
-  if (!DEMO && "serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
+  // New version published: the app picks it up and reloads once, so phones never stay on an old copy
+  if (!DEMO && "serviceWorker" in navigator && location.protocol === "https:") {
+    const hadSW = !!navigator.serviceWorker.controller; let reloaded = false;
+    navigator.serviceWorker.addEventListener("controllerchange", () => { if (hadSW && !reloaded && !document.body.classList.contains("locked")) { reloaded = true; location.reload(); } });
+    navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).then(r => { r.update().catch(() => {}); document.addEventListener("visibilitychange", () => { if (!document.hidden) r.update().catch(() => {}); }); }).catch(() => {});
+  }
   // Opened from the home-screen icon: go to the page this phone installed (seller, rider or team), else the customer app
   if (/[?&]app=1/.test(location.search) && (!location.hash || location.hash === "#") && local.get("cp_home")) history.replaceState(null, "", location.pathname + location.search + local.get("cp_home"));
   document.addEventListener("click", async e => {

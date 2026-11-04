@@ -1,5 +1,5 @@
 // ChopPool service worker: opens fast and offline (app shell), always fetches fresh data, shows push alerts.
-const CACHE = "choppool-v13";
+const CACHE = "choppool-v14";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icons/icon-192-v2.png", "./icons/icon-512-v2.png", "./icons/apple-touch-icon-v2.png",
   "./fonts/plus-jakarta-sans.woff", "./fonts/bricolage-grotesque.woff"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });
@@ -14,7 +14,9 @@ self.addEventListener("fetch", e => {
     return;
   }
   if (u.origin !== location.origin) return;          // data (Supabase, maps, dish photos) always goes to the network
-  e.respondWith(fetch(e.request).then(r => { if (r.ok) { const copy = r.clone(); caches.open(CACHE).then(c => c.put(e.request, copy)); } return r; })
+  // Always ask the server for the newest page (skips the browser's 10-minute cache), fall back to the saved copy offline
+  const fresh = e.request.mode === "navigate" ? fetch(e.request.url, { cache: "no-cache", credentials: "same-origin" }) : fetch(e.request, { cache: "no-cache" });
+  e.respondWith(fresh.then(r => { if (r.ok) { const copy = r.clone(); caches.open(CACHE).then(c => c.put(e.request, copy)); } return r; })
     .catch(() => caches.match(e.request).then(r => r || caches.match("./index.html"))));
 });
 self.addEventListener("push", e => {
