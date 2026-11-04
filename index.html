@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#D9480F">
+<meta name="theme-color" content="#F8F4EF" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0E0E10" media="(prefers-color-scheme: dark)">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -44,20 +45,20 @@
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #18120F; --surface: #231A16; --surface-2: #2C211C; --ink: #FAEFE8; --muted: #C2A898; --line: #3B2D26;
-    --accent: #F2652A; --accent-2: #FF7A45; --on-accent: #FFFFFF; --accent-soft: #3D2318; --hint: #F5B04A; --hint-soft: #3A2B16;
-    --ok: #62D394; --ok-soft: #1E3829; --danger: #FF8A80; --danger-soft: #44231F;
-    --tint-1: #3B241A; --tint-2: #22301F; --tint-3: #3A2C17; --tint-4: #33231F;
-    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 28px rgba(0,0,0,.35);
+    --bg: #0E0E10; --surface: #17171A; --surface-2: #202024; --ink: #F4F4F5; --muted: #A1A1AA; --line: #2C2C31;
+    --accent: #F2652A; --accent-2: #FF7A45; --on-accent: #FFFFFF; --accent-soft: #2E1A12; --hint: #F5B04A; --hint-soft: #2B2314;
+    --ok: #62D394; --ok-soft: #15291E; --danger: #FF8A80; --danger-soft: #34191A;
+    --tint-1: #24201E; --tint-2: #1C2420; --tint-3: #26231C; --tint-4: #22201F;
+    --shadow: 0 1px 2px rgba(0,0,0,.5), 0 10px 28px rgba(0,0,0,.45);
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --bg: #18120F; --surface: #231A16; --surface-2: #2C211C; --ink: #FAEFE8; --muted: #C2A898; --line: #3B2D26;
-  --accent: #F2652A; --accent-2: #FF7A45; --on-accent: #FFFFFF; --accent-soft: #3D2318; --hint: #F5B04A; --hint-soft: #3A2B16;
-  --ok: #62D394; --ok-soft: #1E3829; --danger: #FF8A80; --danger-soft: #44231F;
-  --tint-1: #3B241A; --tint-2: #22301F; --tint-3: #3A2C17; --tint-4: #33231F;
-  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 28px rgba(0,0,0,.35);
+  --bg: #0E0E10; --surface: #17171A; --surface-2: #202024; --ink: #F4F4F5; --muted: #A1A1AA; --line: #2C2C31;
+  --accent: #F2652A; --accent-2: #FF7A45; --on-accent: #FFFFFF; --accent-soft: #2E1A12; --hint: #F5B04A; --hint-soft: #2B2314;
+  --ok: #62D394; --ok-soft: #15291E; --danger: #FF8A80; --danger-soft: #34191A;
+  --tint-1: #24201E; --tint-2: #1C2420; --tint-3: #26231C; --tint-4: #22201F;
+  --shadow: 0 1px 2px rgba(0,0,0,.5), 0 10px 28px rgba(0,0,0,.45);
   color-scheme: dark;
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -345,6 +346,40 @@ button.dtile:not([disabled]):hover { outline: 2px solid var(--accent-soft); }
   .inline { grid-template-columns: 1fr 1fr; }
   h1 { font-size: 25px; }
 }
+/* Launch animation: the packs stack, the name rises, the tagline lands in three beats */
+.splash { position: fixed; inset: 0; z-index: 100; background: var(--bg); display: grid; place-items: center; transition: opacity .35s cubic-bezier(.2,.8,.2,1); cursor: pointer; }
+.splash.out { opacity: 0; pointer-events: none; }
+.sp-in { display: grid; justify-items: center; gap: 12px; padding: 24px; text-align: center; }
+.sp-logo { animation: spScale .45s cubic-bezier(.2,.8,.2,1) both; }
+.sp-p { transform-box: fill-box; transform-origin: center; }
+.sp-p1 { animation: spDrop .42s cubic-bezier(.2,.8,.2,1) .08s both; }
+.sp-p3 { animation: spDrop .42s cubic-bezier(.2,.8,.2,1) .24s both; }
+.sp-p2 { animation: spSlide .48s cubic-bezier(.2,.9,.3,1.12) .44s both; }
+.sp-word { font-family: var(--font-display); font-weight: 800; font-size: 40px; letter-spacing: -1.5px; color: var(--ink); animation: spUp .45s cubic-bezier(.2,.8,.2,1) .72s both; }
+.sp-word span { color: var(--accent); }
+.sp-tag { margin: 0; font-weight: 700; color: var(--muted); display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+.sp-tag span { display: inline-block; animation: spUp .38s cubic-bezier(.2,.8,.2,1) both; }
+.sp-tag span:nth-child(1) { animation-delay: .95s; color: var(--accent-2); } .sp-tag span:nth-child(2) { animation-delay: 1.1s; } .sp-tag span:nth-child(3) { animation-delay: 1.25s; }
+@keyframes spScale { from { transform: scale(.86); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes spDrop { from { transform: translateY(-34px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes spSlide { from { transform: translateX(54px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes spUp { from { transform: translateY(12px); opacity: 0; } to { transform: none; opacity: 1; } }
+.splash.still * { animation: none !important; }
+/* Premium motion: installed app only. One soft curve, short and small, never bouncy */
+.is-app .pane-in { animation: paneIn .2s cubic-bezier(.2,.8,.2,1) both; }
+.is-app .pane-in.from-left { --dx: -8px; }
+@keyframes paneIn { from { opacity: 0; transform: translateX(var(--dx, 8px)); } to { opacity: 1; transform: none; } }
+.is-app .tabbar button[aria-current="page"] svg { animation: tabPop .15s ease-out; }
+@keyframes tabPop { 50% { transform: scale(1.08); } }
+.is-app .rv { opacity: 0; transform: translateY(12px); transition: opacity .26s cubic-bezier(.2,.8,.2,1), transform .26s cubic-bezier(.2,.8,.2,1); }
+.is-app .rv.in { opacity: 1; transform: none; }
+.is-app button, .is-app .btn, .is-app .ghost { transition: transform .12s cubic-bezier(.2,.8,.2,1); }
+.is-app button:active, .is-app .btn:active { transform: scale(.98); }
+.is-app .sheet-bg.open .sheet { animation: sheetUp .3s cubic-bezier(.2,.8,.2,1); }
+@keyframes sheetUp { from { transform: translateY(40px); opacity: .6; } to { transform: none; opacity: 1; } }
+.is-app .fade-in { animation: fadeIn .15s ease-out both; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .is-app *, .splash * { animation: none !important; } .is-app .rv { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 </head>
@@ -396,6 +431,14 @@ const cleanErr = e => String(e && e.message || e).replace(/^.*?:\s*(?=[A-Z])/, "
 
 /* ---------- Theme: Auto / Light (Jollof) / Dark (Plantain) ---------- */
 const THEMES = ["auto", "light", "dark"];
+// Theme switch shared by every page (customer, team, seller, rider, host)
+const themeBtn = () => { const t = local.get("cp_theme") || "auto"; return `<button class="iconbtn" data-theme-cycle aria-label="Colour theme: ${t}" title="Theme: ${t}">${ICON[t]}</button>`; };
+function cycleTheme() {
+  const next = THEMES[(THEMES.indexOf(local.get("cp_theme") || "auto") + 1) % 3];
+  local.set("cp_theme", next); applyTheme(next);
+  document.querySelectorAll("[data-theme-cycle], #theme").forEach(b => { b.innerHTML = ICON[next]; b.setAttribute("aria-label", "Colour theme: " + next); b.title = "Theme: " + next; });
+  toast(next === "auto" ? "Theme follows your phone" : next === "light" ? "Light theme" : "Dark theme");
+}
 function applyTheme(t) {
   if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
   else document.documentElement.removeAttribute("data-theme");
@@ -901,31 +944,33 @@ function dishKind(x) {
 // The kitchen's picture is its most-ordered dish
 const topDish = kid => { const ds = S.items.filter(i => i.kitchen_id === kid), pop = S.pop || {}; return ds.slice().sort((a, b) => (pop[b.id] || 0) - (pop[a.id] || 0))[0]; };
 function art(kind) {
-  const plate = `<ellipse cx="50" cy="68" rx="43" ry="15" fill="var(--surface)"/><ellipse cx="50" cy="66" rx="35" ry="10" fill="var(--surface-2)"/>`;
-  const bowl = (soup, extra) => `<ellipse cx="50" cy="50" rx="34" ry="9" fill="${soup}"/>${extra || ""}<path d="M14 52h72a36 30 0 0 1-72 0z" fill="var(--accent)"/><path d="M22 60h56" stroke="#fff" stroke-width="3" opacity=".3" stroke-linecap="round"/><rect x="38" y="80" width="24" height="6" rx="3" fill="var(--accent-2)"/>`;
-  const leg = (x, y, r) => `<g transform="rotate(${r || -30} ${x} ${y})"><ellipse cx="${x}" cy="${y}" rx="11" ry="8" fill="#A8541F"/><ellipse cx="${x - 2}" cy="${y - 2}" rx="7" ry="4" fill="#C8702E"/><rect x="${x + 9}" y="${y - 2}" width="10" height="4" rx="2" fill="#F3E3C8"/><circle cx="${x + 19}" cy="${y - 2}" r="3" fill="#F3E3C8"/><circle cx="${x + 19}" cy="${y + 2}" r="3" fill="#F3E3C8"/></g>`;
-  const fish = (x, y) => `<path d="M${x} ${y}c6-10 22-10 28 0-6 6-22 6-28 0z" fill="#B3541E"/><path d="M${x + 28} ${y}l7-5v10z" fill="#B3541E"/><circle cx="${x + 6}" cy="${y - 2}" r="1.6" fill="#fff"/><path d="M${x + 12} ${y - 4}v8M${x + 18} ${y - 4}v8" stroke="#8A3B12" stroke-width="1.5"/>`;
+  // Modern flat, seen from above: a plate or bowl centred in its tile, bold simple shapes, 2-3 colours
   const svg = inner => `<svg viewBox="0 0 100 100" aria-hidden="true">${inner}</svg>`;
-  const steam = `<path d="M40 22c-4 5 4 8 0 13M52 18c-4 5 4 8 0 13M64 22c-4 5 4 8 0 13" stroke="var(--muted)" stroke-width="3" stroke-linecap="round" fill="none" opacity=".4"/>`;
+  const plate = `<circle cx="50" cy="50" r="45" fill="var(--surface)"/><circle cx="50" cy="50" r="45" fill="none" stroke="var(--line)" stroke-width="1.5"/><circle cx="50" cy="50" r="35" fill="var(--surface-2)"/>`;
+  const bowl = (soup, rim) => `<circle cx="50" cy="50" r="45" fill="${rim || "var(--accent)"}"/><circle cx="50" cy="50" r="36" fill="${soup}"/>`;
+  const dots = (pts, c, r) => pts.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="${r || 2}" fill="${c}"/>`).join("");
+  const leg = (x, y, rot) => `<g transform="rotate(${rot} ${x} ${y})"><ellipse cx="${x}" cy="${y}" rx="12" ry="8.5" fill="#B4581F"/><ellipse cx="${x - 3}" cy="${y - 2}" rx="6" ry="3.5" fill="#D27A35"/><rect x="${x + 9}" y="${y - 2.2}" width="10" height="4.4" rx="2.2" fill="#F6EAD7"/><circle cx="${x + 19}" cy="${y - 2.4}" r="3" fill="#F6EAD7"/><circle cx="${x + 19}" cy="${y + 2.4}" r="3" fill="#F6EAD7"/></g>`;
+  const fish = (x, y, rot) => `<g transform="rotate(${rot || 0} ${x} ${y})"><ellipse cx="${x}" cy="${y}" rx="15" ry="8" fill="#B8571F"/><path d="M${x + 13} ${y}l9-7v14z" fill="#B8571F"/><circle cx="${x - 9}" cy="${y - 2}" r="1.8" fill="#FFF7EE"/><path d="M${x - 3} ${y - 6}v12M${x + 3} ${y - 6}v12" stroke="#8E3E12" stroke-width="1.6"/></g>`;
+  const plantain = pts => pts.map(([x, y, r]) => `<ellipse cx="${x}" cy="${y}" rx="8" ry="5" transform="rotate(${r} ${x} ${y})" fill="#F2A93B"/><ellipse cx="${x}" cy="${y}" rx="4.5" ry="2.4" transform="rotate(${r} ${x} ${y})" fill="#F7C46A"/>`).join("");
   switch (kind) {
-    case "jollof": return svg(`${plate}<path d="M20 64c3-20 44-22 50 0z" fill="#D9541E"/><circle cx="32" cy="56" r="1.8" fill="#F4A261"/><circle cx="44" cy="52" r="1.8" fill="#F4A261"/><circle cx="56" cy="56" r="1.8" fill="#F4A261"/><circle cx="38" cy="60" r="1.8" fill="#5DA35A"/>${leg(64, 56, -25)}`);
-    case "waakye": return svg(`${plate}<path d="M18 64c3-20 44-22 50 0z" fill="#5B2626"/><circle cx="30" cy="57" r="1.8" fill="#8A4B43"/><circle cx="46" cy="53" r="1.8" fill="#8A4B43"/><path d="M60 54c4-4 10 4 16 0M60 58c4-4 10 4 16 0" stroke="#F0D9A6" stroke-width="2.5" fill="none" stroke-linecap="round"/><ellipse cx="36" cy="48" rx="9" ry="7" fill="#FFF8EC"/><circle cx="36" cy="48" r="3.6" fill="#F5B04A"/><ellipse cx="70" cy="66" rx="7" ry="3" fill="#3A1F14"/>`);
-    case "friedrice": return svg(`${plate}<path d="M18 64c3-20 52-22 60 0z" fill="#E9C46A"/><circle cx="30" cy="58" r="2" fill="#5DA35A"/><circle cx="40" cy="53" r="2" fill="#E4572E"/><circle cx="52" cy="56" r="2" fill="#5DA35A"/><circle cx="62" cy="52" r="2" fill="#F08C2E"/><circle cx="68" cy="59" r="2" fill="#E4572E"/><circle cx="46" cy="60" r="2" fill="#5DA35A"/>`);
-    case "ricestew": return svg(`${plate}<path d="M18 64c3-18 34-20 40 0z" fill="#FBF6EA"/><circle cx="30" cy="56" r="1.4" fill="#E8DFCC"/><circle cx="40" cy="53" r="1.4" fill="#E8DFCC"/><ellipse cx="66" cy="62" rx="16" ry="7" fill="#C2410C"/><ellipse cx="62" cy="60" rx="5" ry="2" fill="#F08C2E" opacity=".8"/><circle cx="72" cy="60" r="3" fill="#8A3B12"/>`);
-    case "fufu": return svg(`${steam}${bowl("#D9541E", `<ellipse cx="46" cy="44" rx="15" ry="11" fill="#FBF6EA"/><ellipse cx="42" cy="40" rx="6" ry="3" fill="#fff" opacity=".7"/><circle cx="68" cy="48" r="5" fill="#8A3B12"/><circle cx="26" cy="49" r="3" fill="#F5B04A"/>`)}`);
-    case "banku": return svg(`${plate}<circle cx="34" cy="56" r="12" fill="#ECE3CF"/><circle cx="30" cy="52" r="4" fill="#fff" opacity=".6"/>${fish(50, 60)}<circle cx="62" cy="70" r="3" fill="#E4572E"/><circle cx="70" cy="70" r="3" fill="#5DA35A"/><circle cx="54" cy="71" r="2.5" fill="#E4572E"/>`);
-    case "kenkey": return svg(`${plate}<g transform="rotate(-15 34 56)"><rect x="18" y="46" width="32" height="20" rx="9" fill="#D8C27A"/><path d="M24 47v18M31 46v20M38 46v20M45 47v18" stroke="#B89B4A" stroke-width="1.6"/></g>${fish(52, 58)}<ellipse cx="66" cy="70" rx="7" ry="3" fill="#3A1F14"/>`);
-    case "tuo": return svg(`${steam}${bowl("#4E7D3A", `<ellipse cx="48" cy="44" rx="14" ry="10" fill="#FBF6EA"/><circle cx="68" cy="48" r="4.5" fill="#8A3B12"/><path d="M24 50l5-2M30 52l4-3" stroke="#2F5A24" stroke-width="2" stroke-linecap="round"/>`)}`);
-    case "soup": return svg(`${steam}${bowl("#B5651D", `<circle cx="36" cy="48" r="5" fill="#8A3B12"/><circle cx="56" cy="46" r="4" fill="#F5B04A"/><circle cx="66" cy="50" r="4.5" fill="#8A3B12"/><circle cx="46" cy="51" r="2.5" fill="#5DA35A"/>`)}`);
-    case "redred": return svg(`${plate}<path d="M18 64c3-18 38-20 44 0z" fill="#B23A1E"/><circle cx="28" cy="58" r="2" fill="#D9541E"/><circle cx="38" cy="54" r="2" fill="#D9541E"/><circle cx="48" cy="58" r="2" fill="#D9541E"/><g fill="#F2A93B" stroke="#C9701C" stroke-width="1.5"><ellipse cx="66" cy="58" rx="9" ry="5" transform="rotate(-20 66 58)"/><ellipse cx="74" cy="66" rx="9" ry="5" transform="rotate(-10 74 66)"/><ellipse cx="60" cy="68" rx="8" ry="4.5"/></g>`);
-    case "kelewele": return svg(`${plate}<g fill="#E8912D" stroke="#B9651A" stroke-width="1.2"><rect x="26" y="54" width="10" height="9" rx="2.5" transform="rotate(12 31 58)"/><rect x="38" y="50" width="10" height="9" rx="2.5" transform="rotate(-10 43 54)"/><rect x="50" y="55" width="10" height="9" rx="2.5" transform="rotate(20 55 59)"/><rect x="62" y="51" width="10" height="9" rx="2.5" transform="rotate(-6 67 55)"/><rect x="44" y="61" width="10" height="9" rx="2.5" transform="rotate(8 49 65)"/><rect x="32" y="62" width="10" height="9" rx="2.5"/></g><circle cx="58" cy="68" r="1.4" fill="#8A3B12"/><circle cx="40" cy="52" r="1.4" fill="#8A3B12"/><circle cx="68" cy="62" r="1.4" fill="#C2410C"/>`);
-    case "gob3": return svg(`${plate}<path d="M18 64c3-18 38-20 44 0z" fill="#8A4B2A"/><circle cx="26" cy="58" r="1.6" fill="#F3E3C0"/><circle cx="34" cy="53" r="1.6" fill="#F3E3C0"/><circle cx="42" cy="56" r="1.6" fill="#F3E3C0"/><circle cx="50" cy="59" r="1.6" fill="#F3E3C0"/><circle cx="38" cy="60" r="1.6" fill="#F3E3C0"/><ellipse cx="38" cy="50" rx="12" ry="3" fill="#F3E3C0" opacity=".9"/><g fill="#F2A93B" stroke="#C9701C" stroke-width="1.5"><ellipse cx="68" cy="60" rx="9" ry="5" transform="rotate(-20 68 60)"/><ellipse cx="66" cy="69" rx="8" ry="4.5"/></g><ellipse cx="78" cy="68" rx="4" ry="2.5" fill="#C2410C"/>`);
-    case "chicken": return svg(`${plate}${leg(36, 58, -20)}${leg(52, 66, 10)}<circle cx="72" cy="62" r="3" fill="#5DA35A"/><circle cx="76" cy="68" r="2.5" fill="#E4572E"/>`);
-    case "salad": return svg(`<ellipse cx="38" cy="44" rx="13" ry="8" fill="#5DA35A" transform="rotate(-25 38 44)"/><ellipse cx="60" cy="40" rx="14" ry="8" fill="#7DBE5E" transform="rotate(20 60 40)"/><ellipse cx="50" cy="48" rx="12" ry="7" fill="#4C8F4A"/><circle cx="66" cy="50" r="6" fill="#E4572E"/><circle cx="34" cy="52" r="5" fill="#E4572E"/><path d="M14 52h72a36 30 0 0 1-72 0z" fill="var(--ok)"/><rect x="38" y="80" width="24" height="6" rx="3" fill="var(--ok)" opacity=".7"/>`);
-    case "wrap": return svg(`<g transform="rotate(-28 50 58)"><rect x="18" y="44" width="64" height="28" rx="14" fill="#E3B26A"/><rect x="18" y="44" width="20" height="28" rx="10" fill="#D49A4C"/><path d="M24 50c4 3 4 13 0 16" stroke="#9B5B2A" stroke-width="3" fill="none"/><circle cx="26" cy="58" r="4" fill="#E4572E"/><circle cx="31" cy="52" r="3" fill="#5DA35A"/></g>`);
-    case "pizza": return svg(`<path d="M50 84L20 30c18-10 42-10 60 0z" fill="#F4C35A"/><path d="M20 30c18-10 42-10 60 0l-4 7c-16-8-36-8-52 0z" fill="#D49A4C"/><circle cx="44" cy="46" r="5" fill="#C2410C"/><circle cx="58" cy="52" r="4.5" fill="#C2410C"/><circle cx="50" cy="66" r="4" fill="#C2410C"/><circle cx="40" cy="58" r="2" fill="#5DA35A"/><circle cx="60" cy="40" r="2" fill="#5DA35A"/>`);
-    case "burger": return svg(`<path d="M20 50c0-20 60-20 60 0z" fill="#E3A857"/><circle cx="38" cy="40" r="1.5" fill="#FBF6EA"/><circle cx="50" cy="36" r="1.5" fill="#FBF6EA"/><circle cx="62" cy="40" r="1.5" fill="#FBF6EA"/><path d="M18 52c6 4 10-2 16 2s10-2 16 2 10-2 16 2 10-2 16 0v3H18z" fill="#5DA35A"/><rect x="18" y="56" width="64" height="10" rx="5" fill="#6B3A1E"/><rect x="20" y="66" width="60" height="4" fill="#F5B04A"/><path d="M20 70h60v4a8 8 0 0 1-8 8H28a8 8 0 0 1-8-8z" fill="#D49A4C"/>`);
-    default: return svg(`${bowl("#E98A3A", `<circle cx="38" cy="47" r="3" fill="#C2410C"/><circle cx="56" cy="44" r="3" fill="#5DA35A"/><circle cx="64" cy="50" r="3" fill="#C2410C"/><circle cx="46" cy="52" r="2.5" fill="#FDE68A"/><path d="M30 46c8-8 30-10 42-2" stroke="#8B4A1C" stroke-width="5" stroke-linecap="round" fill="none"/>`)}`);
+    case "jollof": return svg(`${plate}<circle cx="44" cy="54" r="22" fill="#DE5B22"/>${dots([[36, 48], [44, 44], [50, 56], [40, 60], [52, 48]], "#F49A5B", 1.8)}${dots([[46, 62]], "#5DA35A", 2.2)}${leg(62, 36, -30)}`);
+    case "waakye": return svg(`${plate}<circle cx="44" cy="56" r="21" fill="#5A2424"/>${dots([[36, 52], [46, 50], [50, 62], [40, 64]], "#874239", 1.8)}<circle cx="63" cy="38" r="10" fill="#FFFBF2"/><circle cx="63" cy="38" r="4.8" fill="#F5B04A"/><path d="M28 36c4-4 8 4 12 0s8 4 12 0" stroke="#F1DBA9" stroke-width="2.6" fill="none" stroke-linecap="round"/><circle cx="67" cy="62" r="6" fill="#3A1D12"/>`);
+    case "friedrice": return svg(`${plate}<circle cx="50" cy="50" r="25" fill="#E8C266"/>${dots([[40, 42], [56, 40], [62, 54], [44, 58], [50, 48], [36, 52], [58, 62]], "#5DA35A", 2.3)}${dots([[46, 40], [60, 46], [40, 62], [54, 56]], "#E4572E", 2.3)}`);
+    case "ricestew": return svg(`${plate}<circle cx="41" cy="52" r="19" fill="#FBF7EC"/>${dots([[36, 48], [44, 46], [40, 56], [46, 58]], "#E7DCC6", 1.6)}<circle cx="64" cy="44" r="13" fill="#C2410C"/><circle cx="60" cy="41" r="4" fill="#E3672A"/><circle cx="68" cy="48" r="3.5" fill="#7A3110"/>`);
+    case "fufu": return svg(`${bowl("#D9541E")}<circle cx="50" cy="50" r="15" fill="#FBF7EC"/><circle cx="46" cy="46" r="5" fill="#FFFFFF" opacity=".7"/><circle cx="31" cy="44" r="5" fill="#7A3110"/><circle cx="68" cy="58" r="5.5" fill="#7A3110"/><circle cx="64" cy="34" r="3" fill="#F5B04A"/>`);
+    case "banku": return svg(`${plate}<circle cx="36" cy="48" r="14" fill="#EDE4D0"/><circle cx="32" cy="44" r="4" fill="#FFFFFF" opacity=".6"/>${fish(62, 52, -20)}${dots([[44, 68], [52, 70]], "#E4572E", 3)}${dots([[38, 66]], "#5DA35A", 3)}`);
+    case "kenkey": return svg(`${plate}<circle cx="37" cy="47" r="14" fill="#D9C27A"/><path d="M26 41q11 6 22 0M25 48q12 6 24 0M27 55q10 5 20 0" stroke="#B49646" stroke-width="1.6" fill="none"/>${fish(62, 55, -15)}<circle cx="44" cy="68" r="5.5" fill="#3A1D12"/>`);
+    case "tuo": return svg(`${bowl("#4E7D3A")}<circle cx="50" cy="50" r="15" fill="#FBF7EC"/><path d="M28 50l6-3M32 60l5-4M66 40l5-3M68 56l5 2" stroke="#2F5A24" stroke-width="2.4" stroke-linecap="round"/><circle cx="66" cy="62" r="4.5" fill="#7A3110"/>`);
+    case "soup": return svg(`${bowl("#B5651D")}<circle cx="38" cy="42" r="6" fill="#7A3110"/><circle cx="60" cy="58" r="6.5" fill="#7A3110"/><circle cx="60" cy="38" r="4.5" fill="#F5B04A"/><circle cx="40" cy="60" r="3.5" fill="#5DA35A"/><circle cx="52" cy="48" r="3" fill="#E58B3C"/>`);
+    case "redred": return svg(`${plate}<circle cx="42" cy="50" r="20" fill="#B03A1E"/>${dots([[36, 44], [44, 42], [48, 54], [38, 58], [46, 48]], "#D45A2C", 2)}${plantain([[66, 40, -30], [70, 54, 10], [62, 66, 40]])}`);
+    case "kelewele": return svg(`${plate}${[[36, 40, 12], [50, 36, -8], [62, 44, 18], [40, 54, -14], [54, 52, 6], [46, 66, 20], [60, 62, -10], [32, 62, 4]].map(([x, y, r]) => `<rect x="${x - 5.5}" y="${y - 5.5}" width="11" height="11" rx="3" transform="rotate(${r} ${x} ${y})" fill="#E8902C"/>`).join("")}${dots([[44, 46], [58, 56], [38, 48]], "#8E3E12", 1.5)}`);
+    case "gob3": return svg(`${plate}<circle cx="42" cy="50" r="20" fill="#874A29"/>${dots([[34, 44], [40, 40], [46, 46], [38, 52], [48, 56], [42, 60], [50, 44]], "#F2E2BD", 1.9)}${plantain([[67, 42, -25], [68, 58, 20]])}<circle cx="58" cy="70" r="4" fill="#C2410C"/>`);
+    case "chicken": return svg(`${plate}${leg(42, 42, -25)}${leg(46, 60, 15)}${dots([[66, 36], [70, 62]], "#5DA35A", 3)}${dots([[66, 48]], "#E4572E", 3)}`);
+    case "salad": return svg(`${bowl("#E9F3DF", "var(--ok)")}<ellipse cx="40" cy="42" rx="12" ry="7" transform="rotate(-25 40 42)" fill="#5DA35A"/><ellipse cx="60" cy="44" rx="12" ry="7" transform="rotate(30 60 44)" fill="#7DBE5E"/><ellipse cx="48" cy="60" rx="13" ry="7" fill="#4C8F4A"/><circle cx="62" cy="60" r="5" fill="#E4572E"/><circle cx="36" cy="56" r="4.5" fill="#E4572E"/><circle cx="52" cy="36" r="3.5" fill="#F5B04A"/>`);
+    case "wrap": return svg(`${plate}<g transform="rotate(-35 50 50)"><rect x="24" y="38" width="52" height="24" rx="12" fill="#E3B26A"/><circle cx="31" cy="50" r="9" fill="#D49A4C"/><circle cx="31" cy="50" r="6" fill="#B4581F"/><circle cx="29" cy="47" r="2" fill="#5DA35A"/><circle cx="33" cy="53" r="2" fill="#E4572E"/></g>`);
+    case "pizza": return svg(`<circle cx="50" cy="50" r="45" fill="#D49A4C"/><circle cx="50" cy="50" r="38" fill="#F4C35A"/><path d="M50 12v76M12 50h76M23 23l54 54M77 23L23 77" stroke="#D49A4C" stroke-width="1.6"/>${dots([[36, 34], [62, 32], [70, 56], [40, 64], [56, 50], [30, 52], [52, 72]], "#C2410C", 5)}${dots([[46, 40], [64, 66], [34, 44]], "#5DA35A", 2.2)}`);
+    case "burger": return svg(`<circle cx="50" cy="50" r="45" fill="#5DA35A"/><circle cx="50" cy="50" r="38" fill="#E3A857"/><circle cx="50" cy="50" r="30" fill="#EDB868"/>${dots([[40, 38], [52, 34], [62, 42], [44, 50], [58, 56], [36, 58], [50, 64], [64, 62]], "#FBF3E2", 1.8)}`);
+    default: return svg(`${bowl("#E98A3A")}<circle cx="50" cy="50" r="18" fill="#FBF7EC"/>${dots([[42, 44], [56, 48], [48, 58]], "#E7DCC6", 1.8)}<circle cx="68" cy="44" r="5" fill="#7A3110"/><circle cx="34" cy="58" r="4" fill="#5DA35A"/><circle cx="62" cy="64" r="3.5" fill="#C2410C"/>`);
   }
 }
 const tint = i => `var(--tint-${(i % 4) + 1})`;
@@ -1050,7 +1095,10 @@ function collectLine(site) {
   return site.handoff === "host" ? "Collect from " + (site.host_label || site.drop_point) + " with your code." : "Meet the rider at " + site.drop_point + " with your code when you get the arrival alert.";
 }
 function setTab(t) {
+  const ORDER = ["home", "kitchens", "orders", "wallet"], prev = S.tab;
   S.tab = t;
+  const pane = $("#tab" + t[0].toUpperCase() + t.slice(1));
+  if (pane && prev && prev !== t && document.body.classList.contains("is-app")) { pane.classList.remove("pane-in", "from-left"); void pane.offsetWidth; pane.classList.add("pane-in"); if (ORDER.indexOf(t) < ORDER.indexOf(prev)) pane.classList.add("from-left"); }
   ["home", "kitchens", "orders", "wallet"].forEach(x => {
     $("#tab" + x[0].toUpperCase() + x.slice(1))?.classList.toggle("hidden", x !== t);
     const b = document.querySelector(`.tabbar button[data-tab="${x}"]`);
@@ -1077,7 +1125,7 @@ async function viewOrder() {
       <section id="pools" class="stack"></section>
     </section>
     <section id="tabKitchens" class="stack hidden">
-      <div><h1>Kitchens near you</h1><p class="small muted" id="kitchensSub"></p></div>
+      <div><h1>Menus near you</h1><p class="small muted" id="kitchensSub"></p></div>
       <section id="kitchensList" class="stack"></section>
       <button class="invite-card" id="addVendor" style="border:none;text-align:left;color:inherit;font:inherit;cursor:pointer;width:100%">
         <span class="blob">${ICON.store}</span>
@@ -1088,19 +1136,14 @@ async function viewOrder() {
     <section id="tabWallet" class="stack hidden"></section>
     <nav class="tabbar" aria-label="Sections">
       <button data-tab="home">${ICON.home}<span>Pools</span></button>
-      <button data-tab="kitchens">${ICON.store.replace('width="26" height="26"', 'width="22" height="22"')}<span>Kitchens</span></button>
+      <button data-tab="kitchens">${ICON.store.replace('width="26" height="26"', 'width="22" height="22"')}<span>Menus</span></button>
       <button data-tab="orders">${ICON.receipt}<span>Orders</span><span class="badge hidden" id="ordBadge"></span></button>
       <button data-tab="wallet">${ICON.wallet}<span>Wallet</span></button>
     </nav>`;
   document.querySelectorAll(".tabbar button").forEach(b => b.addEventListener("click", () => setTab(b.dataset.tab)));
   $("#placeBtn").addEventListener("click", openSitePicker);
   $("#bell").addEventListener("click", toggleAlerts);
-  $("#theme").addEventListener("click", () => {
-    const next = THEMES[(THEMES.indexOf(local.get("cp_theme") || "auto") + 1) % 3];
-    local.set("cp_theme", next); applyTheme(next);
-    $("#theme").innerHTML = ICON[next]; $("#theme").setAttribute("aria-label", "Colour theme: " + next); $("#theme").title = "Theme: " + next;
-    toast(next === "auto" ? "Theme follows your phone" : next === "light" ? "Light theme" : "Dark theme");
-  });
+  $("#theme").addEventListener("click", cycleTheme);
   $("#acct").addEventListener("click", () => S.user ? setTab("wallet") : openAccount());
   $("#addVendor").addEventListener("click", openAddVendor);
   $("#pools").addEventListener("click", e => { const b = e.target.closest("button[data-menu]"); if (b) openOrder(b.dataset.menu); const g = e.target.closest("[data-gokitchens]"); if (g) setTab("kitchens"); });
@@ -1330,7 +1373,7 @@ function renderKitchens() {
   };
   el.innerHTML = rows.length ? (mine.length ? `<p class="group-title">Popular in your building</p>${mine.map(card).join("")}` : "")
     + (others.length ? `${mine.length ? `<p class="group-title">Top kitchens nearby</p>` : ""}${shown.map(card).join("")}${others.length > shown.length ? `<button class="ghost wide" id="moreKitchens">See ${others.length - shown.length} more</button>` : ""}` : "")
-    : `<div class="empty">${ICON.store}<p>No kitchens deliver to ${esc(site.name || "this building")} yet. Add a seller you know below.</p></div>`;
+    : `<div class="empty">${ICON.store}<p>No menus deliver to ${esc(site.name || "this building")} yet. Add a seller you know below.</p></div>`;
   $("#moreKitchens")?.addEventListener("click", () => { S.allKitchens = true; renderKitchens(); });
 }
 function renderPools() {
@@ -1694,9 +1737,9 @@ const ADMIN_TABS = [["dash", "Dashboard"], ["today", "Today"], ["menus", "Kitche
 // Sub-sections per tab; a third value marks owner-only sections
 const ADMIN_SUBS = {
   today: [["pools", "Pools"], ["orders", "Orders & payments"], ["wallets", "Wallets & refunds"]],
-  menus: [["list", "Kitchens"], ["requests", "Listing requests"], ["add", "Add a kitchen"]],
-  buildings: [["list", "Active"], ["requests", "Requests"], ["add", "Add a building"]],
-  riders: [["list", "Riders"], ["apply", "Applications"], ["add", "Add a rider"], ["pricing", "Delivery pricing"]],
+  menus: [["list", "Kitchens"], ["requests", "Listing requests"]],
+  buildings: [["list", "Active"], ["requests", "Requests"]],
+  riders: [["list", "Riders"], ["apply", "Applications"], ["pricing", "Delivery pricing"]],
   team: [["members", "Team members"], ["payments", "Payment options", true], ["accounts", "Customer accounts", true]]
 };
 const NETWORKS = ["MTN", "Telecel", "AirtelTigo"];
@@ -1705,7 +1748,7 @@ async function viewAdmin() {
   if (!S.user && !DEMO) {
     let mode = "signin";
     const draw = () => {
-      $("#view").innerHTML = `<section class="card"><div class="row" style="gap:10px;justify-content:flex-start">${LOGO(36)}<p class="brand" style="font-size:18px">ChopPool team</p></div><h1>${mode === "signin" ? "Sign in" : "Create your team account"}</h1>
+      $("#view").innerHTML = `<section class="card"><div class="row" style="gap:10px"><div class="row" style="gap:10px;justify-content:flex-start">${LOGO(36)}<p class="brand" style="font-size:18px">ChopPool team</p></div>${themeBtn()}</div><h1>${mode === "signin" ? "Sign in" : "Create your team account"}</h1>
         <p class="muted small">${mode === "signin" ? "For the owner and coordinators." : "Use the email the owner added you with. The very first account can become the owner."}</p>
         ${mode === "signup" ? `<div><label for="aname">Your name</label><input id="aname" autocomplete="name" placeholder="Albert Mensah"></div>` : ""}
         <div><label for="email">Email</label><input id="email" type="email" autocomplete="username" placeholder="name@company.com"></div>
@@ -1722,7 +1765,7 @@ async function viewAdmin() {
   }
   let role; try { role = await api.myRole(); } catch (e) { role = "none"; }
   if (role === "unclaimed") {
-    $("#view").innerHTML = `<section class="card"><div class="row" style="gap:10px;justify-content:flex-start">${LOGO(36)}<p class="brand" style="font-size:18px">ChopPool team</p></div><h1>Set up your ChopPool</h1>
+    $("#view").innerHTML = `<section class="card"><div class="row" style="gap:10px"><div class="row" style="gap:10px;justify-content:flex-start">${LOGO(36)}<p class="brand" style="font-size:18px">ChopPool team</p></div>${themeBtn()}</div><h1>Set up your ChopPool</h1>
       <p class="muted">Nobody runs this ChopPool yet. Make <strong>${esc(S.user.email)}</strong> the owner. As owner you can add coordinators, kitchens, riders and buildings. This only works once.</p>
       <p class="err" id="ownErr"></p><button class="btn wide" id="claim">Make me the owner</button></section>`;
     $("#claim").addEventListener("click", async () => { try { await api.claimOwner(); toast("You're the owner of this ChopPool."); viewAdmin(); } catch (e) { $("#ownErr").textContent = cleanErr(e); } });
@@ -1738,7 +1781,7 @@ async function viewAdmin() {
   document.body.classList.add("is-admin");
   S.adminTab = ADMIN_TABS.some(t => t[0] === S.adminTab) ? S.adminTab : "dash";
   $("#view").innerHTML = `
-    <div class="row small" style="justify-content:space-between;gap:8px;flex-wrap:wrap"><span class="muted">Signed in as <strong style="color:var(--ink)">${esc(S.user?.email || "")}</strong> · ${role === "super" ? "Owner" : "Coordinator"}</span><span class="row" style="gap:6px">${isStandalone() ? "" : `<button class="ghost" data-install="#admin" style="padding:6px 14px">Install app</button>`}<button class="ghost" id="aSignOut" style="padding:6px 14px">Sign out</button></span></div>
+    <div class="row small" style="justify-content:space-between;gap:8px;flex-wrap:wrap"><span class="muted">Signed in as <strong style="color:var(--ink)">${esc(S.user?.email || "")}</strong> · ${role === "super" ? "Owner" : "Coordinator"}</span><span class="row" style="gap:6px">${themeBtn()}${isStandalone() ? "" : `<button class="ghost" data-install="#admin" style="padding:6px 14px">Install app</button>`}<button class="ghost" id="aSignOut" style="padding:6px 14px">Sign out</button></span></div>
     <header class="row" style="flex-wrap:wrap;gap:10px"><div class="row" style="gap:12px;justify-content:flex-start">${LOGO(44)}<div><p class="brand" style="font-size:16px">ChopPool ${role === "super" ? "owner" : "coordinator"}</p><h1>Operations</h1></div></div>
       <div class="row" style="gap:8px"><input id="aDate" type="date" value="${day}" aria-label="Delivery date" style="width:auto"><button class="ghost" id="aRefresh">Refresh</button></div></header>
     <div id="aDays"></div>
@@ -1816,6 +1859,8 @@ async function renderAdmin(cached) {
   if (nav) nav.innerHTML = subs.map(([k, l]) => `<button data-asub="${k}"${k === sub ? ' aria-current="page"' : ""}>${esc(l)}${tab === "buildings" && k === "requests" && pending.length ? " (" + pending.length + ")" : ""}${tab === "menus" && k === "requests" && listReq.length ? " (" + listReq.length + ")" : ""}${tab === "riders" && k === "apply" && riderApps.length ? " (" + riderApps.length + ")" : ""}</button>`).join("");
   if (frame) frame.classList.toggle("has-sub", subs.length > 0);
   const body = $("#aBody");
+  if (!cached || S.lastSub !== tab + ":" + sub) { body.classList.remove("fade-in"); void body.offsetWidth; body.classList.add("fade-in"); }
+  S.lastSub = tab + ":" + sub;
 
   // Lists: live first, then A–Z; search and other sorts
   const liveK = new Set(livePools.map(p => p.kitchen_id)), liveS = new Set(livePools.map(p => p.site_id)), liveR = new Set(livePools.map(p => p.rider_id).filter(Boolean));
@@ -1826,6 +1871,7 @@ async function renderAdmin(cached) {
     const cmp = { live: (a, b) => (live.has(b.id) - live.has(a.id)) || byName(a, b), az: byName, za: (a, b) => byName(b, a), new: (a, b) => created(b).localeCompare(created(a)) || byName(a, b), old: (a, b) => created(a).localeCompare(created(b)) || byName(a, b), status: (a, b) => status(a).localeCompare(status(b)) || byName(a, b), pending: (a, b) => ((b.status === "pending") - (a.status === "pending")) || byName(a, b) }[mode] || byName;
     return list.filter(x => !q || name(x).toLowerCase().includes(q)).sort(cmp);
   };
+  const addBar = (label, extra) => `<div class="row" style="justify-content:flex-end;gap:8px;flex-wrap:wrap">${extra || ""}<button class="btn" data-add>+ ${esc(label)}</button></div>`;
   const added = x => x.created_at ? "Added " + fmtDate(String(x.created_at).slice(0, 10)) : "";
   const isOpen = key => (S.openItems || new Set()).has(key) ? " open" : "";
 
@@ -1931,17 +1977,18 @@ async function renderAdmin(cached) {
           <p class="small muted">Approving lists them for every nearby building. Call them first and, if you can, visit or order a test meal.</p>
           <div class="row" style="justify-content:flex-start;gap:8px;flex-wrap:wrap"><button class="btn" data-act="listing-approve">Approve listing</button><button class="ghost" data-act="listing-decline">Decline</button>${k.whatsapp ? `<a class="wa quiet" style="padding:8px 12px" href="${wa(k.whatsapp)}" target="_blank" rel="noopener">${ICON.wa} WhatsApp</a>` : ""}</div></article>`; }).join("")}</div>`
       : `<div class="note">No listing requests. Sellers that customers add can ask to be listed from their own page.</div>`;
-    if (sub === "add") body.innerHTML = `
+    const addForm = `
       <form class="card" data-form="kitchen"><h2>Add a kitchen or seller</h2>
         <div class="grid2"><div><label for="nkName">Real name</label><input id="nkName" name="name" placeholder="Auntie Akos Kitchen"></div><div><label for="nkPub">Menu name customers see</label><input id="nkPub" name="public_name" placeholder="Local favourites"></div></div>
         <div><label for="nkTag">Short description</label><input id="nkTag" name="tagline" placeholder="Ghanaian classics, cooked fresh each morning"></div>
         <div class="grid2"><div><label for="nkAddr">Pickup address</label><input id="nkAddr" name="address" placeholder="Osu, Oxford Street"></div><div><label for="nkWa">WhatsApp number</label><input id="nkWa" name="whatsapp" inputmode="tel" placeholder="024 123 4567"></div></div>
         <div class="grid2"><div><label for="nkCap">Meals per lunch</label><input id="nkCap" name="capacity" inputmode="numeric" value="45"></div><div><label for="nkDel">Delivery</label><select id="nkDel" name="delivery_mode"><option value="rider">ChopPool rider / Bolt / Yango</option><option value="runner">Seller's own runner (close by)</option></select></div></div>
-        <p class="small muted">After adding it, open the kitchen under Kitchens to set its map pin and menu.</p>
+        <p class="small muted">After adding it, open the kitchen in the list to set its map pin and menu.</p>
         <p class="err" data-err></p><button class="btn">Add kitchen</button></form>`;
+    S.addForm = addForm; S.addTitle = "Add a kitchen or seller"; S.addInit = null;
     if (sub === "list") {
       const list = sorted(A.kitchens, "k", liveK, k => k.name + " " + k.public_name, k => k.active ? "a" : "b");
-      body.innerHTML = listBar("k") + `<div class="stack" style="gap:8px">${list.map(k => { const m = livePools.filter(p => p.kitchen_id === k.id).reduce((t, p) => t + p.meals, 0);
+      body.innerHTML = addBar("Add kitchen") + listBar("k") + `<div class="stack" style="gap:8px">${list.map(k => { const m = livePools.filter(p => p.kitchen_id === k.id).reduce((t, p) => t + p.meals, 0);
         return `<details class="item" data-kitchen="${esc(k.id)}" data-key="k:${esc(k.id)}"${isOpen("k:" + k.id)}>
         <summary><span class="ititle"><strong>${esc(k.name)}</strong><span class="small muted">"${esc(k.public_name)}"${k.added_by_customer ? " · added by a customer" : ""}</span></span>
           <span class="imeta">${liveK.has(k.id) ? pill(m + " meals " + (d === today() ? "today" : fmtDate(d)), "ok") : ""}${k.active ? "" : pill("Paused", "dim")}${hasPin(k) ? "" : pill("No map pin", "warn")}<span class="small muted">${esc(added(k))}</span></span></summary>
@@ -1971,7 +2018,7 @@ async function renderAdmin(cached) {
           ${hasPin(x) ? `<a class="linkbtn" href="${osmLink(x)}" target="_blank" rel="noopener">See the pin on the map</a>` : ""}
           <div class="grid2"><div><label>Handoff</label><select data-f="handoff"><option value="meet_rider">Meet the rider</option><option value="host">Drop-point host</option></select></div><div><label>Host (if any)</label><input data-f="host_label" placeholder="the security guard at the gate"></div></div>
           <div class="row" style="justify-content:flex-start;gap:8px"><button class="btn" data-act="site-approve">Approve</button><button class="ghost" data-act="site-decline">Decline</button></div></article>`; }).join("")}` : `<div class="note">No building requests waiting.</div>`;
-    if (sub === "add") body.innerHTML = `
+    const addForm = `
       <form class="card" data-form="site"><h2>Add a building</h2>
         <div class="grid2"><div><label for="nsName">Building name</label><input id="nsName" name="name" placeholder="Heritage Tower, Ridge"></div><div><label for="nsDrop">Drop point</label><input id="nsDrop" name="drop_point" placeholder="Lobby security desk"></div></div>
         <div class="grid2"><div><label for="nsHand">Handoff</label><select id="nsHand" name="handoff"><option value="host">Drop-point host</option><option value="meet_rider">Meet the rider</option></select></div><div><label for="nsHost">Host</label><input id="nsHost" name="host_label" placeholder="the security desk in the lobby"></div></div>
@@ -1979,7 +2026,7 @@ async function renderAdmin(cached) {
         <p class="err" data-err></p><button class="btn">Add building</button></form>`;
     if (sub === "list") {
       const list = sorted(active, "s", liveS, x => x.name, x => x.active ? "a" : "b");
-      body.innerHTML = `<div id="adminMap" class="map" style="height:280px"></div><p class="small muted">Orange: live buildings. Grey: waiting for approval.</p>` + listBar("s") + `<div class="stack" style="gap:8px">${list.map(x => { const np = livePools.filter(p => p.site_id === x.id);
+      body.innerHTML = addBar("Add building") + `<div id="adminMap" class="map" style="height:280px"></div><p class="small muted">Orange: live buildings. Grey: waiting for approval.</p>` + listBar("s") + `<div class="stack" style="gap:8px">${list.map(x => { const np = livePools.filter(p => p.site_id === x.id);
         return `<details class="item" data-site="${esc(x.id)}" data-key="s:${esc(x.id)}"${isOpen("s:" + x.id)}>
         <summary><span class="ititle"><strong>${esc(x.name)}</strong><span class="small muted">${esc(x.drop_point || "")} · ${x.handoff === "host" ? "drop-point host" : "meet the rider"}</span></span>
           <span class="imeta">${np.length ? pill(np.length + " live pool" + (np.length > 1 ? "s" : ""), "ok") : ""}${x.active ? "" : pill("Paused", "dim")}${hasPin(x) ? "" : pill("No map pin", "warn")}<span class="small muted">${esc(added(x))}</span></span></summary>
@@ -1995,7 +2042,8 @@ async function renderAdmin(cached) {
         if (pts.length > 1) m.fitBounds(pts, { padding: [30, 30] });
       }).catch(e => { $("#adminMap").innerHTML = `<p class="err" style="padding:12px">${esc(cleanErr(e))}</p>`; });
     }
-    if (sub === "add") {
+    S.addForm = addForm; S.addTitle = "Add a building";
+    S.addInit = () => {
       S.newSitePin = null;
       makeMap($("#newSiteMap"), ACCRA, 12).then(m => {
         adminMaps.push(m); let mk;
@@ -2021,16 +2069,17 @@ async function renderAdmin(cached) {
         <div class="grid2 small"><p><strong>Phone:</strong> <span class="num">${esc(r.phone || "")}</span></p><p><strong>MoMo:</strong> <span class="num">${esc(r.momo || "—")}</span></p><p><strong>Motorbike:</strong> ${esc(r.bike || "—")}</p><p><strong>Area:</strong> ${esc(r.area || "—")}</p></div>
         <p class="small muted">Call them, check their licence and bike papers, then approve.</p>
         <div class="row" style="justify-content:flex-start;gap:8px;flex-wrap:wrap"><button class="btn" data-act="rider-approve">Approve</button><button class="ghost" data-act="rider-decline">Decline</button>${r.phone ? `<a class="linkbtn" href="tel:${esc(r.phone)}">Call</a>` : ""}</div></article>`).join("")}</div>`
-      : `<div class="note">No rider applications waiting. Share the sign-up link under "Add a rider".</div>`;
-    if (sub === "add") body.innerHTML = `
+      : `<div class="note">No rider applications waiting. Share the sign-up link from the Riders list.</div>`;
+    const addForm = `
       <section class="card"><h2>Let riders sign up</h2><p class="small muted">Share this link. Riders fill in their details and you approve them under Applications.</p>
-        <div class="codebox" style="grid-template-columns:1fr auto"><input readonly value="${esc(baseUrl() + "/#rider-signup")}" aria-label="Rider sign-up link"><button class="ghost" data-act="signup-copy">Copy</button></div></section>
+        <div class="codebox" style="grid-template-columns:1fr auto"><input readonly value="${esc(baseUrl() + "/#rider-signup")}" aria-label="Rider sign-up link"><button class="ghost" type="button" data-copy="${esc(baseUrl() + "/#rider-signup")}">Copy</button></div></section>
       <form class="card" data-form="rider"><h2>Add a rider</h2><div class="grid2"><div><label for="nrName">Name</label><input id="nrName" name="name" placeholder="Kwame Asare"></div><div><label for="nrPhone">Phone / WhatsApp</label><input id="nrPhone" name="phone" inputmode="tel" placeholder="024 123 4567"></div></div>
         <p class="err" data-err></p><button class="btn">Add rider</button></form>
       <p class="small muted">While you use Bolt Send or Yango, you don't need riders here. Log those trips on each pool under Today › Pools.</p>`;
+    S.addForm = addForm; S.addTitle = "Add a rider"; S.addInit = null;
     if (sub === "list") {
       const list = sorted(ridersOk, "r", liveR, r => r.name, r => r.active ? "a" : "b");
-      body.innerHTML = listBar("r") + `<div class="stack" style="gap:8px">${list.map(r => { const np = livePools.filter(p => p.rider_id === r.id).length;
+      body.innerHTML = addBar("Add rider", `<button class="ghost" data-act="signup-copy">Share sign-up link</button>`) + listBar("r") + `<div class="stack" style="gap:8px">${list.map(r => { const np = livePools.filter(p => p.rider_id === r.id).length;
         return `<details class="item" data-rider="${esc(r.id)}" data-key="r:${esc(r.id)}"${isOpen("r:" + r.id)}>
         <summary><span class="ititle"><strong>${esc(r.name)}</strong><span class="small muted num">${esc(r.phone || "")}</span></span>
           <span class="imeta">${np ? pill(np + " pool" + (np > 1 ? "s" : "") + " assigned", "ok") : ""}${r.active ? "" : pill("Off", "dim")}<span class="small muted">${esc(added(r))}</span></span></summary>
@@ -2103,6 +2152,12 @@ function confirmRemove(title, body, fn) {
 }
 const fval = (root, f) => { const el = root.querySelector(`[data-f="${f}"]`); return !el ? undefined : el.type === "checkbox" ? el.checked : el.value.trim(); };
 async function adminClick(e) {
+  if (e.target.closest("[data-add]") && S.addForm) {
+    openSheet(sheetHead(esc(S.addTitle || "Add")) + S.addForm.replace(/<form class="card"/g, '<form class="stack"').replace(/<section class="card">/g, '<section class="stack note">'));
+    $("#sheet").querySelectorAll("form").forEach(f => f.addEventListener("submit", adminSubmit));
+    if (S.addInit) S.addInit();
+    return;
+  }
   const go = e.target.closest("[data-go]");
   if (go) { const [tb, sb] = go.dataset.go.split(":"); S.adminTab = tb; if (sb) (S.adminSub = S.adminSub || {})[tb] = sb; window.scrollTo(0, 0); return renderAdmin(true); }
   const t = e.target.closest("[data-act], [data-refunded]"); if (!t || t.tagName === "SELECT") return;
@@ -2242,6 +2297,7 @@ async function adminSubmit(e) {
       await api.addTeam(v("email").toLowerCase(), v("role")); toast("Added to the team");
     }
     Object.assign(S, await api.load());
+    if (f.closest("#sheet")) closeSheet();
     renderAdmin();
   } catch (x) { fail(cleanErr(x)); }
 }
@@ -2277,7 +2333,7 @@ async function viewKitchen(token) {
     const waiting = K.pools.filter(p => p.status === "waiting");
     const afterCut = new Date() >= at(d, S.settings.cutoff);
     $("#view").innerHTML = `
-      <header><div class="row" style="gap:10px;justify-content:flex-start">${LOGO(34)}<p class="brand" style="font-size:18px">ChopPool ${k.added_by_customer ? "seller" : "kitchen"}</p></div><h1>${esc(k.name)}</h1>
+      <header><div class="row" style="gap:10px"><div class="row" style="gap:10px;justify-content:flex-start">${LOGO(34)}<p class="brand" style="font-size:18px">ChopPool ${k.added_by_customer ? "seller" : "kitchen"}</p></div>${themeBtn()}</div><h1>${esc(k.name)}</h1>
         <p class="muted">${fmtDate(d)} · ready by ${minus(S.settings.delivery_time, 30)} · ${used} of ${k.capacity} meals · ${k.delivery_mode === "runner" ? "you deliver with your own runner" : "a ChopPool rider collects"}</p></header>
       ${k.added_by_customer ? (k.listing_status === "pending" ? `<p class="note">Your free listing request is with ChopPool. We'll let you know once it's approved.</p>`
         : `<section class="card listcta"><div><strong>Want more customers? List on ChopPool for free.</strong><p class="small muted">${k.listing_status === "declined" ? "Your last request wasn't approved. You can update it and try again." : "Reach people in every nearby office, hostel and apartment, not just the building that added you."}</p></div><button class="btn" id="listMe">List my business</button></section>`)
@@ -2372,7 +2428,7 @@ async function viewRider(token) {
   const NEXT = { ready: ["picked_up", "Picked up"], picked_up: ["arriving", "5 minutes away"], arriving: ["delivered", "Arrived"] };
   const draw = async () => {
     let R; try { R = await api.riderView(token, d); } catch (e) { $("#view").innerHTML = `<p class="card err">${esc(cleanErr(e))}</p>`; return; }
-    $("#view").innerHTML = `<header><div class="row" style="gap:10px;justify-content:flex-start">${LOGO(34)}<p class="brand" style="font-size:18px">ChopPool rider</p></div><h1>${esc(R.rider.name)}</h1><p class="muted">${fmtDate(d)} · deliver by ${fmtTime(S.settings.delivery_time)}</p></header>` +
+    $("#view").innerHTML = `<header><div class="row" style="gap:10px"><div class="row" style="gap:10px;justify-content:flex-start">${LOGO(34)}<p class="brand" style="font-size:18px">ChopPool rider</p></div>${themeBtn()}</div><h1>${esc(R.rider.name)}</h1><p class="muted">${fmtDate(d)} · deliver by ${fmtTime(S.settings.delivery_time)}</p></header>` +
       (R.pools.map((p, i) => {
         const nx = NEXT[p.status];
         const btn = nx ? `<button class="btn wide" data-r="${nx[0]}" data-pool="${esc(p.id)}">${nx[1]}</button>` : p.status === "delivered" ? "" : `<p class="chip warn">Wait for the kitchen to pack</p>`;
@@ -2398,7 +2454,7 @@ async function viewHost(token) {
   const draw = async () => {
     let H; try { H = await api.hostView(token, d); } catch (e) { $("#view").innerHTML = `<p class="card err">${esc(cleanErr(e))}</p>`; return; }
     const left = H.pools.flatMap(p => p.orders).filter(o => !o.collected).length;
-    $("#view").innerHTML = `<header><div class="row" style="gap:10px;justify-content:flex-start">${LOGO(34)}<p class="brand" style="font-size:18px">ChopPool drop point</p></div><h1>${esc(H.site.name)}</h1><p class="muted">${fmtDate(d)} · ${esc(H.site.drop_point)} · ${left} meals waiting</p></header>
+    $("#view").innerHTML = `<header><div class="row" style="gap:10px"><div class="row" style="gap:10px;justify-content:flex-start">${LOGO(34)}<p class="brand" style="font-size:18px">ChopPool drop point</p></div>${themeBtn()}</div><h1>${esc(H.site.name)}</h1><p class="muted">${fmtDate(d)} · ${esc(H.site.drop_point)} · ${left} meals waiting</p></header>
       <section class="card"><h2>Hand over a meal</h2><p class="small muted">Ask for the customer's 4-digit code.</p>${codeBox("hostcode")}</section>` +
       (H.pools.map(p => `<article class="card"><div class="top"><h3>${esc(p.menu)} · Pool ${p.seq}</h3><span class="chip ${p.status === "delivered" ? "ok" : "dim"}">${p.status === "delivered" ? "Bag arrived" : STEP_LABEL[p.status]}</span></div>${handList(p.orders)}</article>`).join("")
         || `<p class="card muted">No deliveries for today yet.</p>`);
@@ -2458,7 +2514,7 @@ const rank = k => { const sc = (S.scores || {})[k.id] || {}; return (sc.orders >
 
 /* ---------- Rider sign-up (public link #rider-signup) ---------- */
 function viewRiderSignup() {
-  $("#view").innerHTML = `<header><div class="row" style="gap:10px;justify-content:flex-start">${LOGO(34)}<p class="brand" style="font-size:18px">ChopPool riders</p></div><h1>Ride with ChopPool</h1>
+  $("#view").innerHTML = `<header><div class="row" style="gap:10px"><div class="row" style="gap:10px;justify-content:flex-start">${LOGO(34)}<p class="brand" style="font-size:18px">ChopPool riders</p></div>${themeBtn()}</div><h1>Ride with ChopPool</h1>
       <p class="muted">Deliver lunch from nearby kitchens to offices, hostels and apartments. One pickup, one drop point, every weekday around midday.</p></header>
     <form class="card stack" id="rsForm" novalidate>
       <div><label for="rsName">Full name</label><input id="rsName" autocomplete="name" placeholder="Kwame Asare"></div>
@@ -2500,6 +2556,38 @@ function openListingForm(token, k) {
   });
 }
 
+/* ---------- Launch animation and app motion ---------- */
+function splash() {
+  // Installed app: every time it opens. Website: the first visit only, so shared links open fast.
+  const app = isStandalone(), key = app ? "cp_splash_s" : "cp_splash_v";
+  try { if (app ? sessionStorage.getItem(key) : localStorage.getItem(key)) return; (app ? sessionStorage : localStorage).setItem(key, "1"); } catch (e) {}
+  const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const pk = (cls, x, y, c) => `<g class="sp-p ${cls}"><rect x="${x}" y="${y}" width="56" height="15" rx="4" fill="${c}"/><path d="M${x} ${y + 7}h56" stroke="#D9480F" stroke-width="2.5"/><rect x="${x + 24}" y="${y + 5}" width="8" height="5" rx="1.5" fill="#D9480F"/></g>`;
+  const el = document.createElement("div"); el.className = "splash" + (still ? " still" : ""); el.setAttribute("aria-hidden", "true");
+  el.innerHTML = `<div class="sp-in"><svg class="sp-logo" width="96" height="96" viewBox="0 0 100 100"><rect width="100" height="100" rx="24" fill="#D9480F"/>${pk("sp-p1", 20, 61, "#FFF7EE")}${pk("sp-p3", 21, 27, "#FFF7EE")}${pk("sp-p2", 25, 44, "#F5B04A")}</svg>
+    <div class="sp-word">chop<span>pool</span></div><p class="sp-tag"><span>Split delivery.</span><span>One order.</span><span>One building.</span></p></div>`;
+  document.body.appendChild(el);
+  let gone = false; const done = () => { if (gone) return; gone = true; el.classList.add("out"); setTimeout(() => el.remove(), 380); };
+  el.addEventListener("click", done); setTimeout(done, still ? 600 : 1900);
+}
+// Cards fade up the first time they come into view (installed app only); things already seen never re-animate
+const seenCards = new Set();
+let revealObs = null;
+function revealScan() {
+  if (!document.body.classList.contains("is-app") || !("IntersectionObserver" in window)) return;
+  revealObs = revealObs || new IntersectionObserver(es => { let n = 0; es.forEach(e => { if (!e.isIntersecting) return; const t = e.target; t.style.transitionDelay = Math.min(n++, 5) * 40 + "ms"; t.classList.add("in"); revealObs.unobserve(t); }); }, { rootMargin: "0px 0px -6% 0px" });
+  document.querySelectorAll("#view article, #view .dtile, #view details.item, #view .kcard, #view .order-card, #view section.card").forEach(el => {
+    if (el.dataset.rv) return; el.dataset.rv = "1";
+    const sig = el.className + "|" + (el.dataset.key || el.dataset.kitchen || el.dataset.pool || el.dataset.site || (el.textContent || "").trim().slice(0, 48));
+    if (seenCards.has(sig)) return; seenCards.add(sig);
+    el.classList.add("rv"); revealObs.observe(el);
+  });
+}
+function initMotion() {
+  if (!(isStandalone() || /[?&]motion=1/.test(location.search))) return;
+  document.body.classList.add("is-app");
+  let t; new MutationObserver(() => { clearTimeout(t); t = setTimeout(revealScan, 30); }).observe(document.getElementById("app"), { childList: true, subtree: true });
+}
 async function route() {
   clearTimers(); closeSheet();
   if ($("#demoBar")) $("#demoBar").open = false;
@@ -2536,13 +2624,15 @@ async function start() {
   S.siteId = S.sites.some(x => x.id === saved) ? saved : (S.sites[0] || {}).id;
   $("#sheetBg").addEventListener("click", e => { if (e.target === $("#sheetBg")) closeSheet(); });
   document.addEventListener("keydown", e => { if (e.key === "Escape") closeSheet(); });
-  document.addEventListener("click", e => { const b = e.target.closest("[data-copynum]"); if (b) copy(b.dataset.copynum.replace(/\s/g, ""), "MoMo number copied"); });
+  document.addEventListener("click", e => { const c = e.target.closest("[data-copy]"); if (c) return copy(c.dataset.copy, "Link copied"); const b = e.target.closest("[data-copynum]"); if (b) copy(b.dataset.copynum.replace(/\s/g, ""), "MoMo number copied"); });
   window.addEventListener("hashchange", route);
+  splash(); initMotion();
   if (!DEMO && "serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
   // Opened from the home-screen icon: go to the page this phone installed (seller, rider or team), else the customer app
   if (/[?&]app=1/.test(location.search) && (!location.hash || location.hash === "#") && local.get("cp_home")) history.replaceState(null, "", location.pathname + location.search + local.get("cp_home"));
   document.addEventListener("click", async e => {
     const ins = e.target.closest("[data-install]"); if (ins) return installApp(ins.dataset.install);
+    if (e.target.closest("[data-theme-cycle]")) return cycleTheme();
     const al = e.target.closest("[data-alerts]"); if (al) { if (await pushSubscribe(JSON.parse(al.dataset.alerts || "{}"))) { toast("Alerts are on for this phone."); al.textContent = "Alerts are on"; } }
   });
   if (!DEMO) { try { window.supabase && (await api.user()) && afterSignIn(); } catch (e) {} }
