@@ -459,6 +459,8 @@ button.dtile:not([disabled]):hover { outline: 2px solid var(--accent-soft); }
 .place-row:hover, .place-row:active { background: var(--surface-2); }
 .place-row > span:last-child { display: grid; min-width: 0; }
 .place-row strong, .place-row .small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pdot.on { background: var(--accent-soft); }
+#wRes:not(:empty) { margin-top: -2px; }
 .pdot { width: 36px; height: 36px; border-radius: 12px; display: grid; place-items: center; background: var(--surface-2); color: var(--accent); }
 .placeload { padding: 6px 0; }
 input, select, textarea { font-size: 16px; min-width: 0; max-width: 100%; }
@@ -468,9 +470,10 @@ input, select, textarea { font-size: 16px; min-width: 0; max-width: 100%; }
 .collapse > div { overflow: hidden; min-height: 0; }
 .ledger-day { margin: 6px 0 0; font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
 /* Frosted tab bar: mostly solid, blurred behind, fine edge */
-.tabbar { background: color-mix(in srgb, var(--surface) 82%, transparent) !important; -webkit-backdrop-filter: blur(20px) saturate(160%); backdrop-filter: blur(20px) saturate(160%); border: 1px solid color-mix(in srgb, var(--line) 70%, transparent); bottom: calc(12px + env(safe-area-inset-bottom)) !important; }
+.tabbar { background: color-mix(in srgb, var(--surface) 82%, transparent) !important; -webkit-backdrop-filter: blur(20px) saturate(160%); backdrop-filter: blur(20px) saturate(160%); border: 1px solid color-mix(in srgb, var(--line) 70%, transparent); bottom: calc(12px + env(safe-area-inset-bottom) - var(--vbgap, 0px)) !important; }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { .tabbar, .topzone.scrolled, .sheet-foot, .statusglass { background: var(--surface) !important; } }
-.toast { bottom: calc(92px + env(safe-area-inset-bottom)); }
+.toast { bottom: calc(92px + env(safe-area-inset-bottom) - var(--vbgap, 0px)); }
+.sheet-bg { bottom: calc(0px - var(--vbgap, 0px)); }
 html.standalone, html.standalone body { overscroll-behavior: none; }
 /* Launch animation: the packs stack, the name rises, the tagline lands in three beats */
 .splash { position: fixed; inset: 0; z-index: 100; background: var(--bg); display: grid; place-items: center; transition: opacity .35s cubic-bezier(.2,.8,.2,1); cursor: pointer; }
@@ -1374,7 +1377,7 @@ function setTab(t) {
     if (b) { if (x === t) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); }
   });
   // Fixed top area: "Delivering to" on Pools and Menus; Orders and Wallet show their own title
-  document.querySelectorAll("#topzone [data-for]").forEach(x => x.classList.toggle("hidden", x.dataset.for !== t));
+  document.querySelectorAll("#topzone [data-for]").forEach(x => x.classList.toggle("hidden", x.dataset.for !== t || (!!S.noSite && x.classList.contains("section-title"))));
   const titled = { orders: "Your orders", wallet: "Wallet" }[t];
   $("#placeBtn")?.classList.toggle("hidden", !!titled); $("#appTitle")?.classList.toggle("hidden", !titled); if ($("#appTitle")) $("#appTitle").textContent = titled || "";
   $("#topzone")?.classList.remove("compact");
@@ -1423,7 +1426,7 @@ async function viewOrder() {
   $("#theme").addEventListener("click", cycleTheme);
   $("#acct").addEventListener("click", () => S.user ? setTab("wallet") : openAccount());
   $("#addVendor").addEventListener("click", openAddVendor);
-  $("#pools").addEventListener("click", e => { if (e.target.closest("[data-findb]")) return openSitePicker(); const ws = e.target.closest("[data-site]"); if (ws) return setSite(ws.dataset.site);
+  $("#pools").addEventListener("click", e => { if (e.target.closest("[data-findb]")) { openSitePicker(); $("#fbQ")?.focus(); return; } const ws = e.target.closest("[data-site]"); if (ws) return setSite(ws.dataset.site);
     const b = e.target.closest("button[data-menu]"); if (b) openOrder(b.dataset.menu); const g = e.target.closest("[data-gokitchens]"); if (g) setTab("kitchens"); });
   $("#kitchensList").addEventListener("click", e => { const b = e.target.closest("button[data-menu]"); if (b) openOrder(b.dataset.menu); });
   $("#tabOrders").addEventListener("click", e => { const b = e.target.closest("button[data-pay]"); if (b) openPayQuote(b.dataset.pay); const ro = e.target.closest("[data-reorder]"); if (ro) openOrder(ro.dataset.reorder);
@@ -1532,7 +1535,7 @@ function openSitePicker(opt) {
   let here = S.here || null, map = null, showAll = false;
   openSheet(`${sheetHead("Find your building", "Pools are shared with people in the same building.")}
     ${searchRow("fbQ", "Building, office, hostel or area")}
-    <div class="chips"><button type="button" class="tog" id="nearMe">${ICON.pin} Use my location</button><button type="button" class="tog" id="mapToggle">Show on map</button></div>
+    <div class="chips" id="fbChips"><button type="button" class="tog" id="nearMe">${ICON.pin} Use my location</button><button type="button" class="tog" id="mapToggle">Show on map</button></div>
     <div id="siteMap" class="map hidden" aria-label="Map of ChopPool buildings"></div>
     <p class="group-title" id="fbSitesT">ChopPool buildings</p>
     <p class="small muted" id="siteHint"></p>
@@ -1564,7 +1567,7 @@ function openSitePicker(opt) {
   list();
   const pick = id => setSite(id, then);
   $("#siteList").addEventListener("click", e => { if (e.target.name === "site") pick(e.target.value); });
-  $("#fbQ").addEventListener("input", list);
+  $("#fbQ").addEventListener("input", () => { const typing = !!$("#fbQ").value.trim(); $("#fbChips").classList.toggle("hidden", typing); if (typing) { $("#siteMap").classList.add("hidden"); $("#mapToggle").textContent = "Show on map"; } list(); });
   placeSearch($("#fbQ"), $("#fbPlaces"), r => openRequestSite({ lat: r.lat, lng: r.lng }, { name: r.short, then }), { title: "Places in Ghana", none: "No places found. Pin it on the map below." });
   $("#nearMe").addEventListener("click", async () => {
     $("#siteHint").textContent = "Finding buildings near you…";
@@ -1654,7 +1657,7 @@ function renderHero() {
       <p class="small" style="opacity:.8">Ghana time (GMT) now <span class="num" id="ghNow">${ghanaNow()}</span></p></div>
     <div class="hero-stats"><div class="hero-stat"><b class="num" id="countdown">--</b><span>until orders close</span></div>
       <div class="hero-stat"><b class="num">${meals}</b><span>meals ordered</span></div>
-      <div class="hero-stat"><b class="num">${money(best)}</b><span>best delivery</span></div></div>`;
+      ${S.noSite ? `<div class="hero-stat"><b class="num">${here.filter(p => p.status === "collecting" && p.meals > 0).length}</b><span>pools open</span></div>` : `<div class="hero-stat"><b class="num">${money(best)}</b><span>best delivery</span></div>`}</div>`;
   tickCountdown();
 }
 function tickCountdown() {
@@ -1727,14 +1730,33 @@ function busySites(n) {
   const meals = {}; S.board.pools.forEach(p => { meals[p.site_id] = (meals[p.site_id] || 0) + p.meals; });
   return S.sites.map((x, i) => ({ x, i, m: meals[x.id] || 0 })).sort((a, b) => b.m - a.m || a.i - b.i).slice(0, n).map(r => r.x);
 }
+const busyChips = () => S.sites.length ? `<p class="group-title" style="margin-top:4px">Busy today</p><div class="chips">${busySites(5).map(x => `<button class="tog" data-site="${esc(x.id)}">${esc(x.name)}</button>`).join("")}</div>` : "";
 function welcomeCard() {
-  return `<article class="card welcome"><h2>Where should lunch go?</h2><p class="small muted">Choose your building to see its pools. Pools are shared with people in the same building, so delivery gets cheaper.</p>
+  return `<article class="card welcome"><h2>Start a pool</h2><p class="small muted">Find your building, then start a pool. Others there can join, so delivery gets cheaper for everyone.</p>
     <button class="searchfake" data-findb>${SV('<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>', 18)}<span>Search your building or area</span></button>
-    ${S.sites.length ? `<p class="group-title" style="margin-top:4px">Busy today</p><div class="chips">${busySites(5).map(x => `<button class="tog" data-site="${esc(x.id)}">${esc(x.name)}</button>`).join("")}</div>` : ""}</article>`;
+    <div id="wChips">${busyChips()}</div></article>`;
+}
+// Matching ChopPool buildings as you type (from the first letter)
+const normTxt = x => String(x || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+function matchSites(q) {
+  const words = normTxt(q).split(/\s+/).filter(Boolean); if (!words.length) return [];
+  return S.sites.filter(x => words.every(w => normTxt(x.name + " " + x.drop_point + " " + (x.host_label || "")).includes(w))).slice(0, 8);
+}
+const siteRow = x => `<button type="button" class="place-row" data-site="${esc(x.id)}"><span class="pdot on">${ICON.store.replace(/width="\d+" height="\d+"/, 'width="18" height="18"')}</span><span><strong>${esc(x.name)}</strong><span class="small muted">ChopPool building · ${esc(x.drop_point)}</span></span></button>`;
+function wireWelcome() {
+  const q = $("#wQ"); if (!q || q.dataset.wired) return; q.dataset.wired = "1";
+  const draw = () => { const v = q.value.trim(), hits = matchSites(v);
+    $("#wRes").innerHTML = hits.map(siteRow).join(""); $("#wChips").classList.toggle("hidden", !!v); };
+  q.addEventListener("input", draw);
+  placeSearch(q, $("#wPlaces"), r => openRequestSite({ lat: r.lat, lng: r.lng }, { name: r.short }), { title: "Other places", none: "No places found. Try a nearby landmark." });
+  q.addEventListener("focus", () => { const top = q.getBoundingClientRect().top; if (top > 220) window.scrollBy({ top: top - 160, behavior: "smooth" }); });
 }
 function renderPools() {
-  if ($("#poolsTitle")) $("#poolsTitle").textContent = S.noSite ? "Get started" : "Active pools";
-  if (S.noSite) { if ($("#poolCount")) $("#poolCount").textContent = ""; if (S.tab === "kitchens") renderKitchens(); $("#pools").innerHTML = welcomeCard(); return; }
+  if ($("#poolsTitle")) { $("#poolsTitle").textContent = "Active pools"; $("#poolsTitle").parentElement.classList.toggle("hidden", !!S.noSite || S.tab !== "home"); }
+  if (S.noSite) { if ($("#poolCount")) $("#poolCount").textContent = ""; if (S.tab === "kitchens") renderKitchens();
+    // Keep what's being typed: only refresh the busy chips on background updates
+    if ($("#pools .welcome")) { if ($("#wChips")) $("#wChips").innerHTML = busyChips(); } else { $("#pools").innerHTML = welcomeCard(); wireWelcome(); }
+    return; }
   const s = S.settings, max = Number(s.max_meals), list = menusHere().filter(activeHere);
   if ($("#poolCount")) $("#poolCount").textContent = list.length ? list.length + " at " + (siteOf(S.siteId).name || "") : "";
   if (S.tab === "kitchens") renderKitchens();
@@ -3216,6 +3238,13 @@ function enhanceContacts() {
     inp.insertAdjacentElement("afterend", b);
   });
 }
+// Installed on iPhone, the page can stop short of the bottom of the screen (by about the status bar's height),
+// which leaves the tab bar floating. Measure the gap and pull fixed bars back down to the real bottom.
+function fixViewportGap() {
+  let gap = 0;
+  if (isStandalone() && isIOS() && matchMedia("(orientation: portrait)").matches) { const g = screen.height - window.innerHeight; if (g > 20 && g < 120) gap = g; }
+  document.documentElement.style.setProperty("--vbgap", gap + "px");
+}
 async function start() {
   splash();   // first frame: the animation covers the connection time (no "Loading" text anywhere)
   if (DEMO) $("#demoBar").classList.remove("hidden");
@@ -3245,6 +3274,7 @@ async function start() {
   // Background refresh pauses while the app is hidden; catch up at once when it's opened again
   document.addEventListener("visibilitychange", () => { if (document.hidden || !$("#tabHome")) return; refreshBoard(); refreshMine(); tickCountdown(); });
   if (isStandalone()) document.documentElement.classList.add("standalone");
+  fixViewportGap(); window.addEventListener("resize", fixViewportGap); window.addEventListener("orientationchange", () => setTimeout(fixViewportGap, 300));
   initMotion();
   if (canPickContacts()) new MutationObserver(() => enhanceContacts()).observe(document.body, { childList: true, subtree: true });
   if (!DEMO && "serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
