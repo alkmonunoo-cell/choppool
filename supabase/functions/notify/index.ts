@@ -14,10 +14,12 @@ async function once(key: string) {   // true the first time a key is seen
   const { data } = await db.from("push_log").upsert({ key }, { onConflict: "key", ignoreDuplicates: true }).select("key");
   return !!(data && data.length);
 }
-async function send(subs: any[], title: string, body: string, url: string, tag: string) {
+// type: the alert kind a customer can switch off in Account > Notifications (vendor, rider and team alerts have none)
+async function send(subs: any[], title: string, body: string, url: string, tag: string, type = "") {
   const seen = new Set<string>();
   for (const s of subs || []) {
     if (seen.has(s.endpoint)) continue; seen.add(s.endpoint);
+    if (type && Array.isArray(s.mute) && s.mute.includes(type)) continue;
     try { await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, JSON.stringify({ title, body, url, tag })); }
     catch (e: any) { if (e && (e.statusCode === 404 || e.statusCode === 410)) await db.from("push_subs").delete().eq("endpoint", s.endpoint); }
   }
@@ -45,13 +47,13 @@ async function poolEvents(poolId: string, opened = false) {
   if (p.status === "collecting" && (k.auto_days || []).length && meals && await once("auto_start:" + p.id))
     await send(await kitchenSubs(k.id), "New pool at " + site.name, meals + " meal" + (meals > 1 ? "s" : "") + " so far. Orders close at " + String(s.cutoff).slice(0, 5) + "; you'll get the final count then.", APP + "/#kitchen-" + k.token, "pool-" + p.id);
   if (opened && p.status === "collecting" && meals && await once("pool_open:" + p.id))
-    await send(await cust(), k.public_name + " is cooking", "Your pool at " + site.name + " is open. Share it so delivery gets cheaper.", url, "pool-" + p.id);
+    await send(await cust(), k.public_name + " is cooking", "Your pool at " + site.name + " is open. Share it so delivery gets cheaper.", url, "pool-" + p.id, "confirm");
   if (p.status === "collecting" && meals === s.max_meals - 1 && await once("seat1:" + p.id))
-    await send(await cust(), "1 seat left", "Your pool at " + site.name + " is almost full. Delivery is at its lowest.", url, "pool-" + p.id);
+    await send(await cust(), "1 seat left", "Your pool at " + site.name + " is almost full. Delivery is at its lowest.", url, "pool-" + p.id, "almost");
   if (p.status === "arriving" && await once("arriving:" + p.id))
-    await send(await cust(), "Lunch is 5 minutes away", site.handoff === "host" ? "It's coming to " + site.drop_point + "." : "Meet the rider at " + site.drop_point + " with your code.", url, "pool-" + p.id);
+    await send(await cust(), "Lunch is 5 minutes away", site.handoff === "host" ? "It's coming to " + site.drop_point + "." : "Meet the rider at " + site.drop_point + " with your code.", url, "pool-" + p.id, "arriving");
   if (p.status === "delivered" && site.handoff === "host" && await once("delivered:" + p.id))
-    await send(await cust(), "Lunch is here", "Collect it from " + (site.host_label || site.drop_point) + " with your code.", url, "pool-" + p.id);
+    await send(await cust(), "Lunch is here", "Collect it from " + (site.host_label || site.drop_point) + " with your code.", url, "pool-" + p.id, "arriving");
   if (p.rider_id && !["delivered", "cancelled"].includes(p.status) && await once("rider:" + p.id + ":" + p.rider_id)) {
     const { data: r } = await db.from("riders").select("*").eq("id", p.rider_id).single();
     if (r) await send(await riderSubs(r.id), "New pickup", k.public_name + " → " + site.name + ", " + meals + " meals.", APP + "/#rider-" + r.token, "rider-" + p.id);
@@ -63,9 +65,9 @@ async function orderEvents(orderId: string) {
   if (o.status === "quote_requested" && await once("special:" + o.id))
     await send(await kitchenSubs(o.kitchen_id), "Special request to price", o.qty + " × " + o.item_name + ": " + o.special_request, APP + "/#kitchen-" + k.token, "special-" + o.id);
   if (o.status === "quoted" && await once("quoted:" + o.id + ":" + o.quote_price))
-    await send(await customerSubs([o]), "Your request is priced", k.public_name + " priced it at " + money(o.quote_price) + " a meal. Pay to confirm.", APP + "/#order", "order-" + o.id);
+    await send(await customerSubs([o]), "Your request is priced", k.public_name + " priced it at " + money(o.quote_price) + " a meal. Pay to confirm.", APP + "/#order", "order-" + o.id, "priced");
   if (o.status === "cancelled" && /^The seller can't/.test(o.cancel_reason || "") && await once("declined:" + o.id))
-    await send(await customerSubs([o]), k.public_name + " can't do your request", (o.cancel_reason || "") + ". Nothing was charged.", APP + "/#order", "order-" + o.id);
+    await send(await customerSubs([o]), k.public_name + " can't do your request", (o.cancel_reason || "") + ". Nothing was charged.", APP + "/#order", "order-" + o.id, "confirm");
   await poolEvents(o.pool_id);
 }
 
@@ -91,7 +93,7 @@ async function tick() {
       const { data: os } = await db.from("orders").select("*").eq("pool_id", p.id).eq("cancel_reason", "The seller did not confirm in time");
       if (os && os.length) {
         const { data: k } = await db.from("kitchens").select("public_name").eq("id", p.kitchen_id).single();
-        await send(await customerSubs(os), (k ? k.public_name : "The vendor") + " didn't confirm", "Your money is back. Tap Order again if they start cooking later.", APP + "/#order", "pool-" + p.id);
+        await send(await customerSubs(os), (k ? k.public_name : "The vendor") + " didn't confirm", "Your money is back. Tap Order again if they start cooking later.", APP + "/#order", "pool-" + p.id, "confirm");
       }
     }
   }

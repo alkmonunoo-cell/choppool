@@ -115,6 +115,8 @@ p { margin: 0; }
 .hero p { opacity: .92; position: relative; z-index: 1; }
 .hero-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; position: relative; z-index: 1; }
 .hero-stat { background: rgba(255,255,255,.16); border: 1px solid rgba(255,255,255,.22); border-radius: 16px; padding: 10px 12px; display: grid; align-content: start; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+button.hero-stat { font: inherit; color: inherit; text-align: left; cursor: pointer; position: relative; }
+button.hero-stat::after { content: "›"; position: absolute; right: 9px; top: 6px; font-weight: 700; font-size: 17px; opacity: .85; }
 .hero-stat b { font-family: var(--font-display); font-size: 18px; font-weight: 800; line-height: 1.15; white-space: nowrap; }
 .hero-stat span { font-size: 11.5px; opacity: .9; line-height: 1.3; }
 :root[data-theme="dark"] .hero-stat { background: rgba(0,0,0,.12); }
@@ -585,6 +587,201 @@ html.standalone, html.standalone body { overscroll-behavior: none; }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .is-app *, .splash * { animation: none !important; } .is-app .rv { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+/* ---------- Update 17: Home, Vendors, vendor page, Orders, Account ---------- */
+:root[data-theme="dark"] { --bg: #0A0A0B; --surface: #151517; --surface-2: #1C1C1F; --line: #26262A; --tint-1: #211814; --tint-2: #141F17; --tint-3: #221E15; --tint-4: #1A1A24; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #0A0A0B; --surface: #151517; --surface-2: #1C1C1F; --line: #26262A; --tint-1: #211814; --tint-2: #141F17; --tint-3: #221E15; --tint-4: #1A1A24; } }
+body.on-home .topzone { position: relative; top: 0; }
+.hsec { display: grid; gap: 10px; }
+.sechead { position: -webkit-sticky; position: sticky; top: var(--secTop, env(safe-area-inset-top)); z-index: 7; display: flex; align-items: center; gap: 10px; margin: 0 -16px; padding: 10px 16px; background: var(--bg); transition: box-shadow .25s; }
+.sechead h2 { white-space: nowrap; font-size: 20px; }
+.sechead .sr { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+.sechead .linkbtn { font-weight: 700; color: var(--accent); white-space: nowrap; }
+.sechead.stuck { box-shadow: 0 10px 16px -14px rgba(30,15,5,.45); }
+.locchip { display: flex; align-items: center; gap: 4px; font: 800 12px var(--font-body); color: var(--accent-2); background: var(--accent-soft); border: none; border-radius: 99px; padding: 5px 0; white-space: nowrap; max-width: 0; overflow: hidden;
+  opacity: 0; transform: translateY(-22px) scale(.85); pointer-events: none; transition: opacity .25s, transform .45s cubic-bezier(.3,1.5,.5,1), max-width .3s, padding .3s; }
+.locchip svg { width: 13px; height: 13px; flex: none; }
+.sechead.stuck .locchip { opacity: 1; transform: none; pointer-events: auto; max-width: 160px; padding: 5px 10px 5px 8px; }
+.locchip span { overflow: hidden; text-overflow: ellipsis; }
+/* Active pool rows */
+.prow { display: flex; gap: 12px; align-items: center; background: var(--surface); border-radius: 20px; padding: 12px; box-shadow: var(--shadow); }
+.prow.mine { box-shadow: 0 0 0 1.5px var(--accent), var(--shadow); }
+.prow .ptile { width: 58px; height: 58px; border-radius: 16px; display: grid; place-items: center; flex: none; }
+.prow .ptile svg { width: 48px; height: 48px; }
+.prow .ptx { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.prow .ptx strong { font-size: 15px; line-height: 1.25; }
+.prow .l1 { font-size: 12.5px; color: var(--muted); display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.prow .l2 { font-size: 12.5px; font-weight: 700; color: var(--ok); line-height: 1.35; }
+.prow.mine .l2 { color: var(--accent-2); }
+.prow .l2.warn { color: var(--hint); }
+.prow .pbar { height: 4px; border-radius: 9px; background: var(--surface-2); overflow: hidden; margin-top: 6px; }
+.prow .pbar i { display: block; height: 100%; border-radius: 9px; background: var(--ok); }
+.prow .acts { display: flex; gap: 6px; align-items: center; flex: none; }
+.prow .acts .btn { padding: 9px 15px; font-size: 13.5px; border-radius: 99px; }
+.ytag { font-size: 10.5px; vertical-align: 2px; white-space: nowrap; font-weight: 800; color: #fff; background: var(--accent); border-radius: 99px; padding: 2px 7px; }
+.iconround { width: 38px; height: 38px; border-radius: 99px; display: grid; place-items: center; background: var(--surface-2); border: 1px solid var(--line); color: var(--ink); padding: 0; flex: none; }
+.iconround svg { width: 18px; height: 18px; }
+.emptyrow { display: flex; gap: 12px; align-items: center; background: var(--surface); border: 1.5px dashed var(--line); border-radius: 20px; padding: 16px; }
+.emptyrow .eic { width: 46px; height: 46px; border-radius: 14px; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; flex: none; }
+.emptyrow .eic svg { width: 22px; height: 22px; }
+.emptyrow strong { font-size: 14px; display: block; margin-bottom: 2px; }
+.emptyrow p { font-size: 13px; color: var(--muted); line-height: 1.45; }
+/* Vendor tiles */
+.vgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.vtile { background: var(--surface); border: none; border-radius: 22px; overflow: hidden; text-align: left; padding: 0; color: inherit; font: inherit; box-shadow: var(--shadow); display: grid; align-content: start; cursor: pointer; transition: transform .15s; }
+.vtile:active { transform: scale(.97); }
+.vtile .vph { position: relative; aspect-ratio: 1.15; display: grid; place-items: center; }
+.vtile .vph svg { width: 72%; height: 72%; filter: drop-shadow(0 8px 10px rgba(60,30,10,.18)); }
+.vtile .vb { padding: 10px 12px 12px; display: grid; gap: 3px; }
+.vtile strong { font-size: 14px; line-height: 1.25; }
+.vmeta { font-size: 12px; color: var(--muted); display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+.vmeta .rs { color: #C77700; font-weight: 800; display: inline-flex; gap: 2px; align-items: center; }
+.vdl { font-size: 12px; font-weight: 800; color: var(--accent-2); line-height: 1.3; margin-top: 3px; }
+.vdl.dim { color: var(--muted); font-weight: 600; }
+.vbadge { position: absolute; left: 8px; top: 8px; font-size: 10.5px; font-weight: 800; background: var(--surface); color: var(--ok); border-radius: 99px; padding: 4px 8px; display: flex; gap: 5px; align-items: center; }
+.vbadge.ok::before { content: ""; width: 6px; height: 6px; border-radius: 9px; background: var(--ok); }
+.vbadge.bad { color: var(--danger); }
+.vnear { position: absolute; right: 8px; top: 8px; font-size: 10.5px; font-weight: 800; background: var(--ink); color: var(--bg); border-radius: 99px; padding: 4px 8px; }
+.vlist { display: grid; gap: 10px; }
+.vrow { display: flex; gap: 12px; align-items: center; background: var(--surface); border: none; border-radius: 20px; padding: 10px; text-align: left; color: inherit; font: inherit; box-shadow: var(--shadow); cursor: pointer; width: 100%; }
+.vrow .vph { width: 76px; height: 76px; border-radius: 16px; display: grid; place-items: center; flex: none; }
+.vrow .vph svg { width: 62px; height: 62px; }
+.vrow .vtx { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.vrow .vtx strong { font-size: 14.5px; }
+.vrow .cu { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrow .vr { text-align: right; flex: none; display: grid; }
+.vrow .vr b { font-size: 13px; color: var(--accent-2); }
+.vrow .vr small { font-size: 10.5px; color: var(--muted); }
+.vhead { display: flex; justify-content: space-between; align-items: flex-end; gap: 10px; }
+.vseg { display: flex; background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 3px; flex: none; }
+.vseg button { width: 38px; height: 32px; border-radius: 9px; border: none; background: none; color: var(--muted); display: grid; place-items: center; padding: 0; }
+.vseg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 2px 6px -2px rgba(30,15,5,.3); }
+.vseg svg { width: 18px; height: 18px; }
+.vstick { position: -webkit-sticky; position: sticky; top: var(--kh, 80px); z-index: 8; margin: 0 -16px; padding: 6px 16px 8px; background: var(--bg); display: grid; gap: 10px; }
+.vsearch { position: relative; }
+.vsearch input { width: 100%; height: 46px; border-radius: 16px; padding-left: 42px; }
+.vsearch > svg { position: absolute; left: 14px; top: 13px; width: 20px; height: 20px; color: var(--muted); pointer-events: none; }
+.vsugg { position: absolute; left: 0; right: 0; top: 52px; z-index: 9; background: var(--surface); border: 1px solid var(--line); border-radius: 18px; box-shadow: 0 18px 40px -16px rgba(30,15,5,.4); padding: 6px; display: none; max-height: 60vh; overflow: auto; }
+.vsugg.on { display: block; }
+.vsugg .dym { font-size: 12.5px; color: var(--muted); padding: 8px 10px 4px; }
+.vsugg .dym b { color: var(--accent-2); }
+.vsg { display: flex; gap: 10px; align-items: center; padding: 8px; border-radius: 12px; width: 100%; text-align: left; background: none; border: none; color: inherit; font: inherit; cursor: pointer; }
+.vsg:hover, .vsg:focus-visible { background: var(--surface-2); }
+.vsg .vph { width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; flex: none; }
+.vsg .vph svg { width: 36px; height: 36px; }
+.vsg strong { font-size: 14px; display: block; }
+.vsg small { font-size: 12px; color: var(--muted); }
+.vsg mark { background: none; color: var(--accent-2); font-weight: 800; }
+.vsugg .none { font-size: 13.5px; color: var(--muted); padding: 12px; }
+.fchips { display: flex; gap: 8px; overflow-x: auto; margin: 0 -16px; padding: 0 16px; scrollbar-width: none; }
+.fchips::-webkit-scrollbar { display: none; }
+.fchips button { flex: none; font: 700 13px var(--font-body); padding: 8px 14px; border-radius: 99px; background: var(--surface); border: 1px solid var(--line); color: var(--muted); }
+.fchips button[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+/* Vendor page */
+.vpage { position: fixed; inset: 0; z-index: 26; background: var(--bg); overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; transform: translateX(100%); transition: transform .38s cubic-bezier(.2,.85,.25,1); }
+.vpage.open { transform: none; }
+.vpage .vhero { position: relative; height: calc(250px + env(safe-area-inset-top)); display: grid; place-items: center; overflow: hidden; padding-top: env(safe-area-inset-top); }
+.vpage .vhero::after { content: ""; position: absolute; inset: 0; background: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22120%22%20height%3D%22120%22%20fill%3D%22none%22%20stroke%3D%22%23B85A2A%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M10%2030h34a17%2017%200%200%201-34%200z%22/%3E%3Cpath%20d%3D%22M18%2024c0-4%204-4%204-8M27%2024c0-4%204-4%204-8%22/%3E%3Cpath%20d%3D%22M78%2012l14%2030M86%2010v14a4%204%200%200%200%208%200V10M90%2024v22%22/%3E%3Cpath%20d%3D%22M70%2080c6-10%2020-10%2026%200-6%2010-20%2010-26%200z%22/%3E%3Cpath%20d%3D%22M70%2080h26%22/%3E%3Cpath%20d%3D%22M14%2084c8-6%2014%202%2022-4%204%2010-8%2022-22%2014z%22/%3E%3Cpath%20d%3D%22M14%2094c6-4%2012-6%2022-14%22/%3E%3Ccircle%20cx%3D%2256%22%20cy%3D%2256%22%20r%3D%223%22/%3E%3Ccircle%20cx%3D%22104%22%20cy%3D%22104%22%20r%3D%222%22/%3E%3Ccircle%20cx%3D%2250%22%20cy%3D%22108%22%20r%3D%222%22/%3E%3C/svg%3E") 0 0 / 120px repeat; opacity: .16; pointer-events: none; }
+.vpage .vplate { position: relative; z-index: 1; width: 190px; height: 190px; filter: drop-shadow(0 18px 20px rgba(60,30,10,.25)); animation: vrise .5s cubic-bezier(.2,.8,.2,1); }
+.vpage .vplate svg { width: 100%; height: 100%; }
+@keyframes vrise { from { transform: translateY(16px) scale(.92); opacity: 0; } }
+.vfab { position: absolute; top: calc(14px + env(safe-area-inset-top)); z-index: 3; width: 42px; height: 42px; border-radius: 99px; background: color-mix(in srgb, var(--surface) 92%, transparent); color: var(--ink); border: none; display: grid; place-items: center; box-shadow: 0 4px 12px -4px rgba(30,15,5,.35); padding: 0; }
+.vfab svg { width: 20px; height: 20px; }
+.vfab.fav svg { fill: #E0452B; stroke: #E0452B; }
+.vbody { position: relative; z-index: 2; margin-top: -26px; background: var(--bg); border-radius: 26px 26px 0 0; padding: 22px 16px calc(120px + env(safe-area-inset-bottom)); max-width: 640px; margin-left: auto; margin-right: auto; display: grid; gap: 12px; }
+.vbody .cu { font-size: 13.5px; color: var(--muted); margin-top: -6px; }
+.vfacts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.vfacts div { background: var(--surface); border-radius: 16px; padding: 10px 11px; box-shadow: var(--shadow); }
+.vfacts b { font: 800 16px var(--font-display); display: block; white-space: nowrap; }
+.vfacts span { font-size: 11.5px; color: var(--muted); line-height: 1.3; display: block; }
+.vfacts b .rs { color: #C77700; font-size: inherit; display: inline; }
+.vfoot .btn > span:first-child { display: grid; text-align: left; }
+.vfoot .btn > span:last-child { display: grid; text-align: right; }
+.vbanner { display: flex; gap: 12px; align-items: center; background: var(--ok-soft); color: var(--ok); border-radius: 18px; padding: 12px 14px; font-size: 13px; line-height: 1.4; }
+.vbanner.o { background: var(--accent-soft); color: var(--accent-2); }
+.vbanner.w { background: var(--hint-soft); color: var(--hint); }
+.vbanner.bad { background: var(--danger-soft); color: var(--danger); }
+.vbanner b { font-weight: 800; }
+.vtabs { position: -webkit-sticky; position: sticky; top: calc(8px + env(safe-area-inset-top)); z-index: 6; display: flex; gap: 4px; background: var(--surface-2); border-radius: 14px; padding: 4px; margin-top: 6px; box-shadow: 0 0 0 8px var(--bg); }
+.vtabs button { flex: 1; padding: 9px; border-radius: 11px; border: none; background: none; font: 800 13.5px var(--font-body); color: var(--muted); }
+.vtabs button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 2px 6px -2px rgba(30,15,5,.3); }
+.vcat { position: -webkit-sticky; position: sticky; top: calc(58px + env(safe-area-inset-top)); z-index: 5; margin: 6px -16px 0; padding: 10px 16px 8px; background: var(--bg); font: 800 16px var(--font-display); }
+.vitem { display: flex; gap: 12px; align-items: center; background: var(--surface); border-radius: 18px; padding: 10px; box-shadow: var(--shadow); width: 100%; border: none; text-align: left; color: inherit; font: inherit; cursor: pointer; }
+.vitem .vph { width: 64px; height: 64px; border-radius: 14px; display: grid; place-items: center; flex: none; overflow: hidden; }
+.vitem .vph svg { width: 54px; height: 54px; }
+.vitem .vtx { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.vitem strong { font-size: 14.5px; line-height: 1.3; }
+.vitem .ds { font-size: 12px; color: var(--muted); }
+.vitem .pr { font-size: 14px; font-weight: 800; margin-top: 3px; }
+.vitem .plus { width: 36px; height: 36px; border-radius: 99px; background: var(--accent-soft); color: var(--accent-2); display: grid; place-items: center; flex: none; font: 800 21px/1 var(--font-body); }
+.vfoot { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(12px + env(safe-area-inset-bottom)); width: min(460px, calc(100% - 24px)); z-index: 27; }
+.vfoot .btn { width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 15px 18px; font-size: 15.5px; border-radius: 20px; box-shadow: 0 14px 28px -12px rgba(185,58,8,.7); }
+.vfoot .btn small { display: block; font-size: 11.5px; font-weight: 600; opacity: .88; text-align: left; }
+.rsum { display: flex; gap: 16px; align-items: center; background: var(--surface); border-radius: 18px; padding: 14px; box-shadow: var(--shadow); }
+.rsum .big { text-align: center; } .rsum .big b { font: 800 36px/1 var(--font-display); display: block; } .rsum .big span { font-size: 11.5px; color: var(--muted); }
+.rbars { flex: 1; display: grid; gap: 4px; } .rbars div { display: flex; gap: 6px; align-items: center; font-size: 11px; color: var(--muted); }
+.rbars i { flex: 1; height: 5px; border-radius: 9px; background: var(--surface-2); overflow: hidden; } .rbars i u { display: block; height: 100%; background: #F2A53A; }
+.rcm { background: var(--surface); border-radius: 18px; padding: 12px 14px; box-shadow: var(--shadow); display: grid; gap: 4px; }
+.rcm .h { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); } .rcm .h b { color: var(--ink); font-size: 13.5px; }
+.rcm p { font-size: 13.5px; line-height: 1.45; }
+.rcm img { width: 100%; max-height: 220px; object-fit: cover; border-radius: 12px; margin-top: 4px; }
+/* Orders */
+.oseg { display: flex; background: var(--surface-2); border: 1px solid var(--line); border-radius: 14px; padding: 4px; }
+.oseg button { flex: 1; padding: 9px; border-radius: 11px; border: none; background: none; font: 800 13.5px var(--font-body); color: var(--muted); }
+.oseg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 2px 6px -2px rgba(30,15,5,.3); }
+.ohead { position: -webkit-sticky; position: sticky; top: var(--kh, 80px); z-index: 6; margin: 0 -16px -6px; padding: 8px 18px 6px; background: var(--bg); font: 800 13.5px var(--font-body); color: var(--muted); }
+.order-card.next { box-shadow: 0 0 0 1.5px var(--accent), var(--shadow); }
+.steps4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.steps4 i { height: 5px; border-radius: 9px; background: var(--surface-2); display: block; }
+.steps4 i.on { background: var(--ok); }
+.steps4l { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; font-size: 10.5px; color: var(--muted); margin-top: -6px; }
+.steps4l span.on { color: var(--ok); font-weight: 800; }
+.olist { background: var(--surface); border-radius: 20px; box-shadow: var(--shadow); overflow: hidden; }
+.orow { display: flex; gap: 12px; align-items: center; padding: 11px 12px; width: 100%; border: none; background: none; text-align: left; color: inherit; font: inherit; }
+.orow + .orow { border-top: 1px solid var(--line); }
+.orow .vph { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; flex: none; }
+.orow .vph svg { width: 38px; height: 38px; }
+.orow .otx { flex: 1; min-width: 0; display: grid; gap: 1px; }
+.orow .otx strong { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.orow .otx small { font-size: 12px; color: var(--muted); line-height: 1.35; }
+.orow .oend { flex: none; display: grid; justify-items: end; gap: 4px; }
+.otag { font-size: 11px; font-weight: 800; border-radius: 99px; padding: 4px 9px; white-space: nowrap; background: var(--surface-2); color: var(--muted); }
+.otag.ok { background: var(--ok-soft); color: var(--ok); } .otag.o { background: var(--accent-soft); color: var(--accent-2); }
+.orate { font-size: 12px; font-weight: 800; color: var(--accent-2); background: none; border: none; padding: 0; }
+.ostars { display: flex; gap: 1px; }
+/* Account */
+.prof { display: flex; gap: 12px; align-items: center; background: none; border: none; padding: 0; text-align: left; color: inherit; font: inherit; width: 100%; cursor: pointer; }
+.pavatar { width: 56px; height: 56px; border-radius: 99px; background: var(--accent-soft); color: var(--accent-2); display: grid; place-items: center; font: 800 20px var(--font-display); flex: none; overflow: hidden; position: relative; }
+.pavatar img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.pavatar.big { width: 92px; height: 92px; font-size: 32px; }
+.prof .ptx { flex: 1; min-width: 0; display: grid; } .prof .ptx b { font: 800 19px var(--font-display); } .prof .ptx small { font-size: 12.5px; color: var(--muted); }
+.prof .ed { font-weight: 800; font-size: 13px; color: var(--accent); }
+.wcard { border-radius: 24px; padding: 18px; color: #fff; background: radial-gradient(130% 120% at 85% 0%, #3A2218 0%, #23160F 70%); position: relative; overflow: hidden; display: grid; gap: 4px; }
+:root[data-theme="dark"] .wcard { background: radial-gradient(130% 120% at 85% 0%, #232326 0%, #141416 70%); border: 1px solid var(--line); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .wcard { background: radial-gradient(130% 120% at 85% 0%, #232326 0%, #141416 70%); border: 1px solid var(--line); } }
+.wcard::after { content: ""; position: absolute; inset: 0; background: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22120%22%20height%3D%22120%22%20fill%3D%22none%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M10%2030h34a17%2017%200%200%201-34%200z%22/%3E%3Cpath%20d%3D%22M18%2024c0-4%204-4%204-8M27%2024c0-4%204-4%204-8%22/%3E%3Cpath%20d%3D%22M78%2012l14%2030M86%2010v14a4%204%200%200%200%208%200V10M90%2024v22%22/%3E%3Cpath%20d%3D%22M70%2080c6-10%2020-10%2026%200-6%2010-20%2010-26%200z%22/%3E%3Cpath%20d%3D%22M70%2080h26%22/%3E%3Cpath%20d%3D%22M14%2084c8-6%2014%202%2022-4%204%2010-8%2022-22%2014z%22/%3E%3Cpath%20d%3D%22M14%2094c6-4%2012-6%2022-14%22/%3E%3Ccircle%20cx%3D%2256%22%20cy%3D%2256%22%20r%3D%223%22/%3E%3Ccircle%20cx%3D%22104%22%20cy%3D%22104%22%20r%3D%222%22/%3E%3Ccircle%20cx%3D%2250%22%20cy%3D%22108%22%20r%3D%222%22/%3E%3C/svg%3E") 0 0 / 120px repeat; opacity: .07; pointer-events: none; }
+.wcard > * { position: relative; }
+.wcard small { font-size: 12.5px; opacity: .72; } .wcard b { font: 800 32px/1.1 var(--font-display); } .wcard p { font-size: 12.5px; opacity: .78; }
+.wcard .btn { margin-top: 8px; background: #fff; color: #23160F; }
+.glist { background: var(--surface); border-radius: 20px; box-shadow: var(--shadow); overflow: hidden; }
+.grow { display: flex; align-items: center; gap: 12px; padding: 13px 14px; width: 100%; border: none; background: none; text-align: left; color: inherit; font: inherit; font-size: 14.5px; cursor: pointer; }
+.grow + .grow { border-top: 1px solid var(--line); }
+.grow .gic { width: 36px; height: 36px; border-radius: 11px; background: var(--surface-2); display: grid; place-items: center; flex: none; color: var(--ink); }
+.grow .gic svg { width: 18px; height: 18px; }
+.grow .gtx { flex: 1; min-width: 0; display: grid; } .grow .gtx small { font-size: 12px; color: var(--muted); }
+.grow .ch { color: var(--muted); font-weight: 700; }
+.grow .amt { font-weight: 800; white-space: nowrap; } .grow .amt.pos { color: var(--ok); }
+.grow.seeall { justify-content: center; color: var(--accent); font-weight: 800; font-size: 13.5px; }
+.gtitle { font: 800 13px var(--font-body); color: var(--muted); margin: 6px 4px -4px; letter-spacing: .02em; }
+.tgl { width: 46px; height: 28px; border-radius: 99px; background: var(--line); position: relative; flex: none; transition: background .2s; }
+.tgl::after { content: ""; position: absolute; left: 3px; top: 3px; width: 22px; height: 22px; border-radius: 99px; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,.18); transition: transform .2s; }
+.tgl.on { background: var(--ok); } .tgl.on::after { transform: translateX(18px); }
+.nupd { display: flex; gap: 12px; padding: 12px 2px; border-bottom: 1px solid var(--line); }
+.nupd .dot { width: 9px; height: 9px; border-radius: 9px; background: var(--accent); margin-top: 6px; flex: none; }
+.nupd .dot.r { background: transparent; }
+.nupd b { font-size: 14px; display: block; } .nupd p { font-size: 13px; color: var(--muted); line-height: 1.4; } .nupd small { font-size: 11.5px; color: var(--muted); }
+#bell { position: relative; }
+#bell .bdot { position: absolute; top: 7px; right: 8px; width: 8px; height: 8px; border-radius: 9px; background: var(--accent); border: 2px solid var(--bg); }
 </style>
 </head>
 <body>
@@ -1140,7 +1337,9 @@ function makeSupabaseApi() {
       if (x.error && /function|schema cache/i.test(x.error.message)) throw new Error("Rider sign-up isn't switched on yet. Please contact ChopPool."); return must(x); },
     async vendorRequestListing(t, listing) { const x = await sb.rpc("vendor_request_listing", { p_token: t, p_listing: listing });
       if (x.error && /function|schema cache/i.test(x.error.message)) throw new Error("Listing isn't switched on yet. Please contact ChopPool."); return must(x); },
-    savePushSub: p => rpc("save_push_sub", { p_endpoint: p.endpoint, p_p256dh: p.p256dh, p_auth: p.auth, p_order_ids: p.order_ids || [], p_kitchen_token: p.kitchen_token || null, p_rider_token: p.rider_token || null }),
+    savePushSub: async p => { const base = { p_endpoint: p.endpoint, p_p256dh: p.p256dh, p_auth: p.auth, p_order_ids: p.order_ids || [], p_kitchen_token: p.kitchen_token || null, p_rider_token: p.rider_token || null };
+      if (p.mute) { try { return await rpc("save_push_sub", { ...base, p_mute: p.mute }); } catch (e) { /* database not on update 17 yet */ } }
+      return rpc("save_push_sub", base); },
     notify: body => sb.functions.invoke("notify", { body }),
     riderUpdate: (t, p, s) => rpc("rider_update", { p_token: t, p_pool: p, p_status: s }),
     hostView: (t, d) => rpc("host_view", { p_token: t, p_date: d }),
@@ -1287,6 +1486,16 @@ const ICON = {
   store: SV(`<path d="M4 10h16l-1.5-5h-13z"/><path d="M5 10v10h14V10"/><path d="M10 20v-5h4v5"/>`, 26),
   check: SV(`<path d="m5 12.5 4.5 4.5L19 7.5"/>`, 32),
   close: SV(`<path d="M6 6l12 12M18 6 6 18"/>`, 18),
+  grid: SV(`<rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/>`, 18),
+  list: SV(`<rect x="4" y="5" width="5" height="5" rx="1.5"/><rect x="4" y="14" width="5" height="5" rx="1.5"/><path d="M12 7.5h8M12 16.5h8"/>`, 18),
+  search: SV(`<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>`, 20),
+  back: SV(`<path d="M15 5l-7 7 7 7"/>`, 20),
+  heart: SV(`<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>`, 20),
+  share: SV(`<path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M12 3v13"/><path d="m7 8 5-5 5 5"/>`, 18),
+  phone: SV(`<rect x="7" y="3" width="10" height="18" rx="2.5"/><path d="M11 18h2"/>`, 18),
+  help: SV(`<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5V14M12 17.5v.01"/>`, 18),
+  out: SV(`<path d="M14 4h5v16h-5M10 8l-4 4 4 4M6 12h10"/>`, 18),
+  download: SV(`<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>`, 18),
   copy: SV(`<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/>`, 16),
   wa: SV(`<path d="M3.5 20.5 5 16a8.5 8.5 0 1 1 3 3z"/>`, 18)
 };
@@ -1447,7 +1656,7 @@ const menuIndex = id => Math.max(0, S.menus.findIndex(m => m.id === id));
 const greeting = () => { const h = new Date().getHours(); return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening"; };
 const ghanaNow = () => new Date().toISOString().slice(11, 16);
 const dayLabel = iso => { const t = today(), d = new Date(Date.now() + 864e5).toISOString().slice(0, 10); return iso === t ? "today" : iso === d ? "tomorrow" : fmtDate(iso); };
-const firstName = () => (S.user && S.user.name ? String(S.user.name).trim().split(/\s+/)[0] : "");
+const firstName = () => String((S.user && S.user.name) || (local.get("cp_me") || {}).name || "").trim().split(/\s+/)[0] || "";
 const sheetHead = (title, sub) => `<div class="top" style="align-items:flex-start"><div><h2 id="sheetTitle">${title}</h2>${sub ? `<p class="small muted">${sub}</p>` : ""}</div><button class="closex" data-close aria-label="Close">${ICON.close}</button></div>`;
 
 /* =====================================================================================
@@ -1456,15 +1665,9 @@ const sheetHead = (title, sub) => `<div class="top" style="align-items:flex-star
 async function refreshUser() {
   try { S.user = await api.user(); } catch (e) { S.user = null; }
   S.balance = 0;
-  if (S.user) { try { S.balance = Number((await api.wallet()).balance) || 0; } catch (e) {} }
-  const b = $("#acct");
-  if (b) {
-    const initial = (firstName() || S.user?.email || "").slice(0, 1).toUpperCase();
-    renderHero();
-    b.className = S.user ? "avatar" : "avatar guest";
-    b.innerHTML = S.user ? esc(initial || "C") : ICON.user;
-    b.setAttribute("aria-label", S.user ? "Your account" : "Sign in");
-  }
+  S.walletEntries = null;
+  if (S.user) { try { const w = await api.wallet(); S.balance = Number(w.balance) || 0; S.walletEntries = w.entries || []; } catch (e) {} }
+  renderHero(); updateBellDot();
   if (S.tab === "wallet") renderWallet();
 }
 const customerInstall = () => isStandalone() ? ""
@@ -1533,29 +1736,6 @@ async function afterSignIn() {
   await refreshUser(); refreshMine();
 }
 function openWallet() { setTab("wallet"); }
-async function renderWallet() {
-  const el = $("#tabWallet"); if (!el) return;
-  if (!S.user) {
-    el.innerHTML = `<div class="balance"><span class="small" style="opacity:.8">ChopPool wallet</span><b class="num">${money(0)}</b><p class="small" style="opacity:.85">When pools fill up, the delivery you saved comes back here as cashback.</p></div>
-      <button class="btn wide" id="wSign">Create an account to collect cashback</button><button class="linkbtn" id="wIn" style="justify-self:center">I already have an account</button>`;
-    el.insertAdjacentHTML("beforeend", customerInstall());
-    $("#wSign").addEventListener("click", () => openAccount());
-    $("#wIn").addEventListener("click", () => openAccount(null, "signin"));
-    return;
-  }
-  let w; try { w = await api.wallet(); } catch (e) { el.innerHTML = `<p class="err">${esc(cleanErr(e))}</p>`; return; }
-  S.balance = Number(w.balance) || 0;
-  el.innerHTML = `<div class="balance"><span class="small" style="opacity:.8">ChopPool wallet</span><b class="num">${money(w.balance)}</b>
-      <p class="small" style="opacity:.85">Used first at checkout. Credit can't be withdrawn as cash.</p></div>
-    <div class="section-title"><h2>Activity</h2></div>
-    ${activityHtml(w.entries || [])}
-    <div class="card" style="display:grid;gap:4px"><span class="small muted">Your name</span><div class="row"><strong>${esc(S.user.name || "Not set")}</strong><button class="ghost" id="chName" style="padding:6px 12px">Change</button></div></div>
-    <p class="small muted center">Signed in as ${esc(S.user.email)} · <button class="linkbtn" id="signOut">Sign out</button></p>`;
-  el.insertAdjacentHTML("beforeend", customerInstall());
-  $("#actToggle")?.addEventListener("click", () => { const open = !local.get("cp_act_open"); local.set("cp_act_open", open); const box = $("#actMore"); box.classList.toggle("open", open); $("#actToggle").textContent = open ? "Show less" : "See all activity (" + box.dataset.n + ")"; });
-  $("#chName").addEventListener("click", openChangeName);
-  $("#signOut").addEventListener("click", async () => { await api.signOut(); S.user = null; await refreshUser(); refreshMine(); renderWallet(); toast("Signed out"); });
-}
 
 /* =====================================================================================
    CUSTOMER VIEW: app bar, Home (pools), Orders, Wallet
@@ -1577,6 +1757,7 @@ function collectLine(site) {
   return site.handoff === "host" ? "Collect from " + (site.host_label || site.drop_point) + " with your code." : "Meet the rider at " + site.drop_point + " with your code when you get the arrival alert.";
 }
 function setTab(t) {
+  if ($("#vpage")) closeVendor();
   const ORDER = ["home", "kitchens", "orders", "wallet"], prev = S.tab;
   S.tab = t;
   const pane = $("#tab" + t[0].toUpperCase() + t.slice(1));
@@ -1588,12 +1769,13 @@ function setTab(t) {
   });
   // Fixed top area: "Delivering to" on Pools and Menus; Orders and Wallet show their own title
   document.querySelectorAll("#topzone [data-for]").forEach(x => x.classList.toggle("hidden", x.dataset.for !== t));
-  const titled = { orders: "Your orders", wallet: "Wallet" }[t];
+  document.body.classList.toggle("on-home", t === "home");
+  const titled = { orders: "Orders", wallet: "Account" }[t];
   $("#placeBtn")?.classList.toggle("hidden", !!titled); $("#appTitle")?.classList.toggle("hidden", !titled); if ($("#appTitle")) $("#appTitle").textContent = titled || "";
   $("#topzone")?.classList.remove("compact");
   if (t === "orders") renderOrders();
   if (t === "wallet") renderWallet();
-  if (t === "kitchens") renderKitchens();
+  if (t === "kitchens") { syncVChips(); renderKitchens(); }
   window.scrollTo(0, 0);
   requestAnimationFrame(() => { setKTop(); if (t === "home") watchHero(); });
 }
@@ -1605,22 +1787,22 @@ async function viewOrder() {
     <header class="appbar">
       <button class="place" id="placeBtn" aria-label="Change building"><span class="eyebrow">${ICON.pin} Delivering to</span><strong><span id="placeName"></span>${ICON.chev}</strong></button>
       <h1 class="apptitle hidden" id="appTitle"></h1>
-      <button class="iconbtn" id="theme" aria-label="Colour theme: ${theme}" title="Theme: ${theme}">${ICON[theme]}</button>
-      <button class="iconbtn" id="bell" aria-pressed="${!!local.get("cp_alerts")}" aria-label="Alerts when people here order">${ICON.bell}</button>
-      <button class="avatar guest" id="acct" aria-label="Sign in">${ICON.user}</button>
+      <button class="iconbtn" id="theme" aria-label="Switch light or dark">${ICON[themeNow() === "dark" ? "light" : "dark"]}</button>
+      <button class="iconbtn" id="bell" aria-label="Notifications">${ICON.bell}<span class="bdot hidden" id="bellDot"></span></button>
     </header>
-      <div data-for="kitchens" class="hidden"><h1>Menus near you</h1></div>
     </div>
 
     <section id="tabHome" class="stack">
       <section class="hero" id="hero"></section>
-      <div class="homemini" id="homeMini" aria-hidden="true"></div>
-      <div class="section-title"><h2 id="poolsTitle">Active pools</h2><span class="small muted" id="poolCount"></span></div>
-      <section id="pools" class="stack"></section>
+      <div class="hsec" id="secPools"><div class="sechead"><h2 id="poolsTitle">Active pools</h2><span class="sr">${locChip()}</span></div><section id="pools" class="stack" style="gap:10px"></section></div>
+      <div class="hsec" id="secNear"><div class="sechead"><h2>Vendors near you</h2><span class="sr">${locChip()}<button class="linkbtn" data-seeall>See all</button></span></div><div class="vgrid" id="nearGrid"></div></div>
     </section>
     <section id="tabKitchens" class="stack hidden">
-      <p class="small muted" id="kitchensSub" style="margin-top:-8px"></p>
-      <section id="kitchensList" class="stack"></section>
+      <div class="vhead"><div style="display:grid;gap:4px"><h1>Vendors</h1><p class="small muted" id="kitchensSub"></p></div>
+        <div class="vseg" role="group" aria-label="View"><button data-view="grid" aria-label="Grid" aria-pressed="${(local.get("cp_vview") || "grid") === "grid"}">${ICON.grid}</button><button data-view="list" aria-label="List" aria-pressed="${local.get("cp_vview") === "list"}">${ICON.list}</button></div></div>
+      <div class="vstick"><div class="vsearch">${ICON.search}<input id="vq" type="search" placeholder="Search vendors or dishes" autocomplete="off" aria-label="Search vendors or dishes"><div class="vsugg" id="vsugg" role="listbox"></div></div>
+        <div class="fchips" id="vchips">${VFILTERS.map(([k, l]) => `<button data-vf="${k}" aria-pressed="false">${l}</button>`).join("")}</div></div>
+      <section id="kitchensList"></section>
       <button class="invite-card" id="addVendor" style="border:none;text-align:left;color:inherit;font:inherit;cursor:pointer;width:100%">
         <span class="blob">${ICON.store}</span>
         <span style="display:grid;gap:2px"><strong>Know a great vendor?</strong><span class="small muted">Add your waakye, gob3 or kenkey seller so others in your building can order together.</span></span>
@@ -1629,27 +1811,33 @@ async function viewOrder() {
     <section id="tabOrders" class="stack hidden"></section>
     <section id="tabWallet" class="stack hidden"></section>
     <nav class="tabbar" aria-label="Sections">
-      <button data-tab="home">${ICON.home}<span>Pools</span></button>
-      <button data-tab="kitchens">${ICON.store.replace('width="26" height="26"', 'width="22" height="22"')}<span>Menus</span></button>
+      <button data-tab="home">${ICON.home}<span>Home</span></button>
+      <button data-tab="kitchens">${ICON.store.replace('width="26" height="26"', 'width="22" height="22"')}<span>Vendors</span></button>
       <button data-tab="orders">${ICON.receipt}<span>Orders</span><span class="badge hidden" id="ordBadge"></span></button>
-      <button data-tab="wallet">${ICON.wallet}<span>Wallet</span></button>
+      <button data-tab="wallet">${ICON.user.replace('width="20" height="20"', 'width="22" height="22"')}<span>Account</span></button>
     </nav>`;
   document.querySelectorAll(".tabbar button").forEach(b => b.addEventListener("click", () => setTab(b.dataset.tab)));
   $("#placeBtn").addEventListener("click", openSitePicker);
-  $("#bell").addEventListener("click", toggleAlerts);
-  $("#theme").addEventListener("click", cycleTheme);
-  $("#acct").addEventListener("click", () => S.user ? setTab("wallet") : openAccount());
+  $("#bell").addEventListener("click", openUpdates);
+  $("#theme").addEventListener("click", toggleTheme);
+  wireHome(); wireVendors();
   $("#addVendor").addEventListener("click", openAddVendor);
   const mineClick = e => { const ap = e.target.closest("[data-addplate]"); if (ap) { const o = (S.mine || []).find(x => x.id === ap.dataset.addplate); if (o) openOrder(o.kitchen_id, { join: o }); return true; }
     const sh = e.target.closest("[data-share]"); if (sh) { const [a, c] = sh.dataset.share.split(","); sharePool(a, c); return true; } return false; };
-  $("#pools").addEventListener("click", e => { if (mineClick(e)) return; if (e.target.closest("[data-findb]")) { openSitePicker(); $("#fbQ")?.focus(); return; } const ws = e.target.closest("[data-site]"); if (ws) return setSite(ws.dataset.site);
+  $("#tabHome").addEventListener("click", e => { if (mineClick(e)) return; if (e.target.closest("[data-findb]")) { openSitePicker(); $("#fbQ")?.focus(); return; } const ws = e.target.closest("[data-site]"); if (ws) return setSite(ws.dataset.site);
+    if (e.target.closest(".locchip")) return openSitePicker();
+    if (e.target.closest("[data-seeall]")) { S.vf = "near"; S.vq = ""; return setTab("kitchens"); }
+    if (e.target.closest("[data-gomine]")) return setTab("orders");
+    const v = e.target.closest("[data-vendor]"); if (v) return openVendor(v.dataset.vendor);
     const b = e.target.closest("button[data-menu]"); if (b) openOrder(b.dataset.menu); const g = e.target.closest("[data-gokitchens]"); if (g) setTab("kitchens"); });
-  $("#kitchensList").addEventListener("click", e => { if (mineClick(e)) return; if (e.target.closest("[data-kjump]")) return openKJump(); const b = e.target.closest("button[data-menu]"); if (b) openOrder(b.dataset.menu); });
-  $("#tabOrders").addEventListener("click", e => { const b = e.target.closest("button[data-pay]"); if (b) openPayQuote(b.dataset.pay); const ro = e.target.closest("[data-reorder]"); if (ro) openOrder(ro.dataset.reorder);
+  $("#kitchensList").addEventListener("click", e => { if (mineClick(e)) return; const v = e.target.closest("[data-vendor]"); if (v) return openVendor(v.dataset.vendor); const b = e.target.closest("button[data-menu]"); if (b) openOrder(b.dataset.menu); });
+  $("#tabOrders").addEventListener("click", e => { const sg = e.target.closest("[data-oseg]"); if (sg) { S.oseg = sg.dataset.oseg; S.osegPicked = true; renderOrders(); window.scrollTo(0, 0); return; }
+    const vd = e.target.closest("[data-vendor]"); if (vd) return openVendor(vd.dataset.vendor);
+    const b = e.target.closest("button[data-pay]"); if (b) openPayQuote(b.dataset.pay); const ro = e.target.closest("[data-reorder]"); if (ro) openOrder(ro.dataset.reorder);
     const ap = e.target.closest("[data-addplate]"); if (ap) { const o = (S.mine || []).find(x => x.id === ap.dataset.addplate); if (o) openOrder(o.kitchen_id, { join: o }); }
     const rt = e.target.closest("[data-rate]"); if (rt) { const o = (S.mine || []).find(x => x.id === rt.dataset.rate); if (o) openReview(o, +rt.dataset.n || 0); return; }
     const ag = e.target.closest("[data-again]"); if (ag) { const o = (S.mine || []).find(x => x.id === ag.dataset.again); if (o) openOrder(o.kitchen_id, { preset: { item_id: o.item_id, qty: o.qty, addons: (o.addons || []).map(a => a.name), site_id: o.site_id } }); } const cx = e.target.closest("[data-cancel]"); if (cx) openCancel(cx.dataset.cancel); const sh = e.target.closest("[data-share]"); if (sh) { const [a, c] = sh.dataset.share.split(","); sharePool(a, c); } if (e.target.closest("[data-keepcb]")) openAccount("Your cashback moves into your new wallet."); const h = e.target.closest("[data-gohome]"); if (h) setTab("home"); });
-  setKTop(); watchHero();
+  setKTop();
   renderWhen(); refreshUser(); if (S.board.pools.length) renderPools(); await refreshBoard(); await refreshMine();
   setTab(S.tab);
   if (S.pendingJoin) {
@@ -1716,7 +1904,7 @@ const poolsOpenAt = id => S.board.pools.filter(p => p.site_id === id && ["collec
 function setSite(id, then, quiet) {
   local.set("cp_recent_sites", [id, ...(local.get("cp_recent_sites") || []).filter(x => x !== id)].slice(0, 5));
   S.siteId = id; S.noSite = false; local.set("cp_site", id); S.seen = null; S.allKitchens = false;
-  renderWhen(); renderPools(); if (S.tab === "kitchens") renderKitchens(); closeSheet();
+  renderWhen(); renderPools(); if (S.tab === "kitchens") renderKitchens(); if (S.vp) drawVendor(); closeSheet();
   if (!quiet) toast("Delivering to " + siteOf(id).name);
   if (typeof then === "function") setTimeout(then, 380);
 }
@@ -1771,7 +1959,10 @@ function openSitePicker(opt) {
   const list = () => {
     const q = norm($("#fbQ").value.trim()), words = q.split(/\s+/).filter(Boolean), near = !!here && !words.length && showNear;
     let rows = S.sites.map((x, i) => ({ x, i, d: here && hasPin(x) ? distM(here, x) : null }));
-    if (words.length) rows = rows.filter(r => words.every(w => norm(r.x.name + " " + r.x.drop_point + " " + (r.x.host_label || "")).includes(w))).sort((a, b) => (a.d ?? 1e12) - (b.d ?? 1e12)).slice(0, 8);
+    if (words.length) { const ex = rows.filter(r => words.every(w => norm(r.x.name + " " + r.x.drop_point + " " + (r.x.host_label || "")).includes(w))).sort((a, b) => (a.d ?? 1e12) - (b.d ?? 1e12));
+      // Similar names too, so a typo still finds the ChopPool building
+      const fz = rows.filter(r => !ex.includes(r)).map(r => ({ r, h: fuzzyHit(q, r.x.name + " " + r.x.drop_point + " " + (r.x.host_label || "")) })).filter(z => z.h).sort((a, b) => a.h.s - b.h.s).map(z => z.r);
+      rows = ex.concat(fz).slice(0, 8); }
     else if (near) rows = rows.filter(r => r.d != null).sort((a, b) => a.d - b.d).slice(0, 3);
     else { const rec = recentSites(); rows = rec.map(id => rows.find(r => r.x.id === id)).filter(Boolean); }
     $("#fbSitesT").textContent = near ? "Nearest to you" : "Recent";
@@ -1864,10 +2055,10 @@ function renderWhen() {
 function heroDelivery(here, site) {
   const s = S.settings, opts = [];
   here.filter(p => p.status === "collecting" && p.meals > 0 && p.meals < s.max_meals)
-    .forEach(p => opts.push({ fee: feeFor(p.meals + 1, s, poolTrip(p)), label: "a meal in a live pool" }));
+    .forEach(p => opts.push({ fee: feeFor(p.meals + 1, s, poolTrip(p)), label: "a meal in a live pool", kid: p.kitchen_id }));
   if (hasPin(site)) {
     const near = menusHere().filter(k => hasPin(k)).sort((a, b) => distM(a, site) - distM(b, site))[0];
-    if (near) opts.push({ fee: tripFor(near, site, s), label: "delivery from nearest vendor" });
+    if (near) opts.push({ fee: tripFor(near, site, s), label: "delivery from " + shortName(near.public_name), kid: near.id });
   }
   return opts.sort((a, b) => a.fee - b.fee)[0] || null;
 }
@@ -1884,9 +2075,8 @@ function renderHero() {
       <p class="small">Order by ${fmtTime(s.cutoff)}${dl === "today" ? "" : " " + (dl === "tomorrow" ? "tomorrow" : fmtDate(S.date))} · arrives ${fmtTime(s.delivery_time)}${site.drop_point ? " at " + esc(site.drop_point) : ""}</p>
       <p class="small" style="opacity:.8">Ghana time (GMT) now <span class="num" id="ghNow">${ghanaNow()}</span></p></div>
     <div class="hero-stats"><div class="hero-stat"><b class="num" id="countdown">--</b><span>until orders close</span></div>
-      <div class="hero-stat"><b class="num">${meals}</b><span>meals ordered</span></div>
-      ${S.noSite ? `<div class="hero-stat"><b class="num">${here.filter(p => p.status === "collecting" && p.meals > 0).length}</b><span>pools open</span></div>` : (dlv ? `<div class="hero-stat"><b class="num">${Number.isInteger(dlv.fee) ? "GHS " + dlv.fee : money(dlv.fee)}</b><span>${esc(dlv.label)}</span></div>` : `<div class="hero-stat"><b class="num">${menusHere().length}</b><span>vendors cooking</span></div>`)}</div>`;
-  if ($("#homeMini")) $("#homeMini").innerHTML = `<span><b class="num" id="countdownMini">--</b> to order</span><span><b class="num">${meals}</b> meals</span>${S.noSite || !dlv ? "" : `<span><b class="num">${money(dlv.fee)}</b> ${dlv.label.startsWith("a meal") ? "a meal" : "delivery"}</span>`}`;
+      ${hasMineToday() ? `<button class="hero-stat hlink" data-gomine aria-label="${meals} meals ordered. Open your orders"><b class="num">${meals}</b><span>meals ordered</span></button>` : `<div class="hero-stat"><b class="num">${meals}</b><span>meals ordered</span></div>`}
+      ${S.noSite ? `<div class="hero-stat"><b class="num">${here.filter(p => p.status === "collecting" && p.meals > 0).length}</b><span>pools open</span></div>` : (dlv ? `<button class="hero-stat hlink" data-vendor="${esc(dlv.kid)}"><b class="num">${Number.isInteger(dlv.fee) ? "GHS " + dlv.fee : money(dlv.fee)}</b><span>${esc(dlv.label)}</span></button>` : `<div class="hero-stat"><b class="num">${menusHere().length}</b><span>vendors cooking</span></div>`)}</div>`;
   tickCountdown();
 }
 function tickCountdown() {
@@ -1908,37 +2098,6 @@ async function refreshBoard() {
 }
 const activeHere = k => S.board.pools.some(p => p.site_id === S.siteId && p.kitchen_id === k.id && ["collecting", "waiting"].includes(p.status) && p.meals > 0);
 const NEAR_KITCHEN_M = 10000;
-function renderKitchens() {
-  const el = $("#kitchensList"); if (!el) return;
-  if (S.noSite) return renderKitchensAnywhere(el);
-  const site = siteOf(S.siteId), base = hasPin(site) ? site : S.here || null, s = S.settings, max = Number(s.max_meals);
-  // Only kitchens with a map pin show here, so this is always a true "near you" list
-  let rows = menusHere().map(k => ({ k, pin: kPin(k, site) })).filter(r => r.pin).map(r => ({ k: r.k, d: base ? distM(base, r.pin) : null }));
-  const far = rows.filter(r => r.k.site_id !== S.siteId && r.d != null && r.d > NEAR_KITCHEN_M).length;
-  rows = rows.filter(r => r.k.site_id === S.siteId || r.d == null || r.d <= NEAR_KITCHEN_M).sort((a, b) => (a.d ?? 1e12) - (b.d ?? 1e12));
-  $("#kitchensSub").textContent = "Delivering to " + (site.name || "your building") + ". Start a pool and others in your building can join it." + (far ? " " + far + " more kitchen" + (far > 1 ? "s are" : " is") + " too far to deliver here." : "");
-  // Curated: this building's own favourites first, then the best-rated nearby kitchens (6, with "See more")
-  const counts = (S.siteCounts || {})[S.siteId] || {}, mine = rows.filter(r => r.k.site_id === S.siteId || counts[r.k.id] > 0).sort((a, b) => (counts[b.k.id] || 0) - (counts[a.k.id] || 0) || (a.d ?? 1e12) - (b.d ?? 1e12));
-  const others = rows.filter(r => !mine.includes(r)).sort((a, b) => rank(b.k) - rank(a.k) || (a.d ?? 1e12) - (b.d ?? 1e12));
-  const shown = S.allKitchens ? others : others.slice(0, 6);
-  const card = ({ k, d }) => {
-    const st = menuState(k), p = currentPool(S.siteId, k.id), dishes = S.items.filter(it => it.kitchen_id === k.id), active = activeHere(k);
-    const trip = tripTo(k, site), from = feeFor(max, s, trip), km = hasPin(site) ? roadKm(kPin(k, site), site) : null;
-    const priceLine = (km != null ? "About " + (km < 1 ? "1" : km.toFixed(1)) + " km by road · " : "") + (isLong(s, trip) ? "long-distance vendor: delivery shared at cost, " + money(from) + " a meal when the pool fills" : "delivery from " + money(from) + " a meal when the pool fills");
-    const status = st.full ? pill("Fully booked " + dayLabel(S.date), "bad") : st.waiting ? "" : active ? pill(p.meals + " of " + max + " seats taken", "ok") : st.open ? pill("Cooking " + dayLabel(S.date), "ok") : pill("Not confirmed yet", "dim");
-    const mo = myOrderIn(k);
-    const btn = st.full ? `<button class="btn wide" disabled>Fully booked today</button>` : st.waiting ? waitBox(k) : mo ? mineBtns(mo, k)
-      : active ? `<button class="btn wide" data-menu="${esc(k.id)}">Join the active pool</button>` : `<button class="btn wide" data-menu="${esc(k.id)}">Start a pool</button>`;
-    return `<article class="kcard">${photoHead(k, menuIndex(k.id), `<div class="ptitle"><strong>${esc(k.public_name)}</strong><span>${esc(k.added_by_customer ? "A local vendor added by a customer" : k.tagline || "")}</span></div>`, true)}
-      <div class="kbody"><div class="row" style="justify-content:flex-start;gap:6px;flex-wrap:wrap">${status}${scoreLine(k)}</div><p class="small" style="color:var(--hint)">${esc(priceLine)}</p>
-      <div class="dishline">${dishes.slice(0, 3).map(x => `<span>${esc(x.name)} · ${money(x.price)}</span>`).join("")}${dishes.length > 3 ? `<span>+${dishes.length - 3} more</span>` : ""}</div>${btn}</div></article>`;
-  };
-  el.innerHTML = rows.length ? (mine.length ? kGroup("mine", "Popular in your building", mine.length, mine.map(card).join("")) : "")
-    + (others.length ? kGroup("near", "Top vendors nearby", others.length, shown.map(card).join("") + (others.length > shown.length ? `<button class="ghost wide" id="moreKitchens">See ${others.length - shown.length} more</button>` : "")) : "")
-    : `<div class="empty">${ICON.store}<p>No menus deliver to ${esc(site.name || "this building")} yet. Add a vendor you know below.</p></div>`;
-  $("#moreKitchens")?.addEventListener("click", () => { S.allKitchens = true; renderKitchens(); });
-  setKTop();
-}
 // A category of vendors: its header sticks under the top bar until the next category pushes it up; the arrow jumps between categories
 const kGroup = (id, title, n, body) => `<section class="kgroup" id="kg-${id}" data-ktitle="${esc(title)}"><button type="button" class="kghead" data-kjump><span>${esc(title)}</span>${ICON.chev}</button><div class="stack">${body}</div></section>`;
 function openKJump() {
@@ -2009,7 +2168,11 @@ function welcomeCard() {
 const normTxt = x => String(x || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 function matchSites(q) {
   const words = normTxt(q).split(/\s+/).filter(Boolean); if (!words.length) return [];
-  return S.sites.filter(x => words.every(w => normTxt(x.name + " " + x.drop_point + " " + (x.host_label || "")).includes(w))).slice(0, 8);
+  const txt = x => x.name + " " + x.drop_point + " " + (x.host_label || "");
+  const exact = S.sites.filter(x => words.every(w => normTxt(txt(x)).includes(w)));
+  // Typos: "heritge", "pent hostl" still find the building (closest first)
+  const close = S.sites.filter(x => !exact.includes(x)).map(x => ({ x, h: fuzzyHit(q, txt(x)) })).filter(r => r.h).sort((a, b) => a.h.s - b.h.s).map(r => r.x);
+  return exact.concat(close).slice(0, 8);
 }
 const siteRow = x => `<button type="button" class="place-row" data-site="${esc(x.id)}"><span class="pdot on">${ICON.store.replace(/width="\d+" height="\d+"/, 'width="18" height="18"')}</span><span><strong>${esc(x.name)}</strong><span class="small muted">ChopPool building · ${esc(x.drop_point)}</span></span></button>`;
 function wireWelcome() {
@@ -2020,40 +2183,491 @@ function wireWelcome() {
   placeSearch(q, $("#wPlaces"), r => openRequestSite({ lat: r.lat, lng: r.lng }, { name: r.short }), { title: "Other places", none: "No places found. Try a nearby landmark." });
   q.addEventListener("focus", () => { const top = q.getBoundingClientRect().top; if (top > 220) window.scrollBy({ top: top - 160, behavior: "smooth" }); });
 }
+
+/* =====================================================================================
+   UPDATE 17: Home (active pools + vendors near you), Vendors, vendor page, Orders, Account
+   ===================================================================================== */
+const shortName = n => String(n || "").split(/\s+/).slice(0, 2).join(" ");
+const moneyShort = v => Number.isInteger(Number(v)) ? "GHS " + Number(v) : money(v);
+const themeNow = () => { const t = local.get("cp_theme") || "auto"; return t === "auto" ? (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light") : t; };
+function syncThemeBtns() {
+  const d = themeNow() === "dark", b = $("#theme");
+  if (b) { b.innerHTML = ICON[d ? "light" : "dark"]; b.setAttribute("aria-label", d ? "Switch to light mode" : "Switch to dark mode"); }
+}
+function toggleTheme() { const next = themeNow() === "dark" ? "light" : "dark"; local.set("cp_theme", next); applyTheme(next); syncThemeBtns(); }
+const locChip = () => `<button class="locchip" aria-label="Change building">${ICON.pin}<span class="locname">${esc(siteOf(S.siteId).name || "")}</span></button>`;
+const hasMineToday = () => (S.mine || []).some(o => o.order_date === S.date && o.status !== "cancelled");
+const favs = () => new Set(local.get("cp_favs") || []);
+function toggleFav(kid) { const f = favs(); f.has(kid) ? f.delete(kid) : f.add(kid); local.set("cp_favs", [...f]); return f.has(kid); }
+const VFILTERS = [["fav", "♥ Favourites"], ["near", "Nearest"], ["top", "Top rated"], ["pools", "Pools open"], ["local", "Local dishes"], ["healthy", "Healthy"]];
+const LOCAL_KINDS = new Set(["jollof", "waakye", "banku", "fufu", "kenkey", "tuo", "omotuo", "redred", "gob3", "kelewele", "ampesi", "ricestew", "soup", "koko", "yam"]);
+const HEALTHY_KINDS = new Set(["salad", "bowl", "wrap"]);
+const kindsOf = k => new Set(S.items.filter(i => i.kitchen_id === k.id).map(i => dishKind(i)));
+
+/* ---------- Typo-tolerant matching (vendors, dishes, buildings) ---------- */
+function editDist(a, b) {
+  const m = a.length, n = b.length; if (Math.abs(m - n) > 2) return 9;
+  const d = Array.from({ length: m + 1 }, (_, i) => [i].concat(Array(n).fill(0))); for (let j = 1; j <= n; j++) d[0][j] = j;
+  for (let i = 1; i <= m; i++) for (let j = 1; j <= n; j++) {
+    d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
+  }
+  return d[m][n];
+}
+// null = no match; s = 0 for an exact (substring) match, higher for typos; word = what it matched
+function fuzzyHit(q, text) {
+  const qn = normTxt(q).replace(/[^a-z0-9 ]/g, " ").trim().replace(/\s+/g, " "), t = normTxt(text).replace(/[^a-z0-9 ]/g, " ");
+  if (!qn) return null; if (t.includes(qn)) return { s: 0, word: qn };
+  const words = t.split(/\s+/).filter(Boolean); let total = 0; const hits = [];
+  for (const w of qn.split(" ")) {
+    if (t.includes(w)) { hits.push(w); continue; }
+    let best = 9, bw = "";
+    for (const x of words) { const e = Math.min(editDist(w, x), w.length >= 3 && x.length > w.length ? editDist(w, x.slice(0, w.length)) : 9); if (e < best) { best = e; bw = x; } }
+    const lim = w.length <= 3 ? 0 : w.length <= 5 ? 1 : 2;
+    if (best > lim) return null; total += best; hits.push(bw);
+  }
+  return { s: total, word: hits.join(" ") };
+}
+const markHit = (txt, word) => { if (!word) return esc(txt); const i = normTxt(txt).indexOf(word); return i < 0 ? esc(txt) : esc(txt.slice(0, i)) + "<mark>" + esc(txt.slice(i, i + word.length)) + "</mark>" + esc(txt.slice(i + word.length)); };
+
+/* ---------- Home: sticky section headers; the building chip drops into the stuck header ---------- */
+function wireHome() {
+  if (S.homeWired) return; S.homeWired = true;
+  const check = () => {
+    if (!document.body.classList.contains("on-home")) return;
+    document.querySelectorAll("#tabHome .sechead").forEach(h => {
+      const top = parseFloat(getComputedStyle(h).top) || 0, r = h.getBoundingClientRect();
+      h.classList.toggle("stuck", window.scrollY > 40 && r.top <= top + 1.5 && r.bottom > 0);
+    });
+  };
+  window.addEventListener("scroll", check, { passive: true }); S.checkDock = check;
+}
+function vInfo(k) {
+  const site = siteOf(S.siteId), s = S.settings, pin = S.noSite ? null : kPin(k, site), km = pin && hasPin(site) ? roadKm(pin, site) : null;
+  const st = menuState(k), active = !S.noSite && activeHere(k), p = active ? currentPool(S.siteId, k.id) : null, trip = S.noSite ? null : tripTo(k, site);
+  let dl, short = "", unit = "";
+  if (S.noSite) dl = "Choose your building to see delivery";
+  else if (st.full) dl = "Fully booked " + dayLabel(S.date);
+  else if (active) { const j = feeFor(p.meals + 1, s, poolTrip(p)); dl = "Delivery " + money(j) + " a meal if you join"; short = money(j); unit = "a meal"; }
+  else { dl = "Delivery ~" + moneyShort(trip) + ", shared"; short = moneyShort(trip); unit = "delivery"; }
+  return { km, st, active, p, trip, dl, short, unit, long: !S.noSite && isLong(s, trip) };
+}
+const kmText = km => km == null ? "" : km < 1 ? "under 1 km" : km.toFixed(1) + " km";
+const rateHtml = k => { const sc = (S.scores || {})[k.id] || {}; return sc.ratings >= 3 ? `<span class="rs">${STAR(true, 12)} ${Number(sc.rating).toFixed(1)}</span>` : `<span>New</span>`; };
+function vendorTile(k, nearest) {
+  const v = vInfo(k), i = menuIndex(k.id);
+  const badge = v.st.full ? `<span class="vbadge bad">Fully booked</span>` : v.st.waiting ? `<span class="vbadge">Waiting to confirm</span>` : v.active ? `<span class="vbadge ok">${v.p.meals} in a pool</span>` : "";
+  return `<button class="vtile" data-vendor="${esc(k.id)}"><span class="vph" style="background:${tint(i)}">${badge}${nearest ? `<span class="vnear">Nearest</span>` : ""}${art(dishKind(topDish(k.id)))}</span>
+    <span class="vb"><strong>${esc(k.public_name)}</strong><span class="vmeta">${rateHtml(k)}${v.km != null ? ` · ${kmText(v.km)}` : ""}</span><span class="vdl${S.noSite || v.st.full ? " dim" : ""}">${esc(v.dl)}</span></span></button>`;
+}
+function vendorRow(k) {
+  const v = vInfo(k), i = menuIndex(k.id), dishes = S.items.filter(it => it.kitchen_id === k.id);
+  return `<button class="vrow" data-vendor="${esc(k.id)}"><span class="vph" style="background:${tint(i)}">${art(dishKind(topDish(k.id)))}</span>
+    <span class="vtx"><strong>${esc(k.public_name)}</strong><span class="cu">${esc(k.tagline || dishes.slice(0, 2).map(d => d.name).join(", "))}</span><span class="vmeta">${rateHtml(k)}${v.km != null ? ` · ${kmText(v.km)}` : ""}</span>
+      ${v.active ? `<span class="small" style="color:var(--ok);font-weight:800">${v.p.meals} in a pool</span>` : v.st.full ? `<span class="small" style="color:var(--danger);font-weight:700">Fully booked</span>` : ""}</span>
+    ${S.noSite || v.st.full ? "" : `<span class="vr"><b>${esc(v.short)}</b><small>${esc(v.unit)}</small></span>`}</button>`;
+}
+// Vendors with a pin near this building, nearest first
+function nearRows() {
+  const site = siteOf(S.siteId), base = hasPin(site) ? site : S.here || null;
+  const rows = menusHere().map(k => ({ k, pin: kPin(k, site) })).filter(r => r.pin).map(r => ({ k: r.k, d: base ? distM(base, r.pin) : null }));
+  const far = rows.filter(r => r.k.site_id !== S.siteId && r.d != null && r.d > NEAR_KITCHEN_M).length;
+  return { far, rows: rows.filter(r => r.k.site_id === S.siteId || r.d == null || r.d <= NEAR_KITCHEN_M).sort((a, b) => (a.d ?? 1e12) - (b.d ?? 1e12)) };
+}
+function poolRow(k) {
+  const s = S.settings, max = Number(s.max_meals), st = menuState(k), p = currentPool(S.siteId, k.id), trip = poolTrip(p), mo = myOrderIn(k), i = menuIndex(k.id);
+  const now = feeFor(Math.max(p.meals, 1), s, trip), j = feeFor(p.meals + 1, s, trip);
+  let l2, warn = false;
+  if (st.full) { l2 = "Fully booked " + dayLabel(S.date); warn = true; }
+  else if (st.waiting) {
+    const wp = S.board.pools.find(x => x.site_id === S.siteId && x.kitchen_id === k.id && x.status === "waiting"), left = wp ? Math.max(0, s.accept_timeout_min - minsAgo(wp.created_at)) : s.accept_timeout_min;
+    l2 = mo ? "Waiting for the vendor to confirm · " + left + " min left" : "Waiting for the vendor · " + left + " min left. Full refund if they don't confirm"; warn = true;
+  } else if (mo) l2 = "Delivery is " + money(now) + " a meal right now";
+  else l2 = j < now ? "Join and delivery drops to " + money(j) + " a meal" : "Delivery " + money(j) + " a meal if you join";
+  const act = mo ? `<button class="btn" data-addplate="${esc(mo.id)}">Add</button>` : st.full ? `<button class="btn" disabled>Full</button>` : `<button class="btn" data-vendor="${esc(k.id)}">Join</button>`;
+  return `<article class="prow${mo ? " mine" : ""}"><span class="ptile" data-vendor="${esc(k.id)}" style="background:${tint(i)}">${art(dishKind(topDish(k.id)))}</span>
+    <span class="ptx" data-vendor="${esc(k.id)}"><strong>${esc(k.public_name)}${mo ? ` <span class="ytag">Your pool</span>` : ""}</strong><span class="l1"><span class="num">${p.meals} of ${max} meals${mo ? " · code " + esc(mo.code) : ""}</span></span>
+      <span class="l2${warn ? " warn" : ""}">${esc(l2)}</span><span class="pbar"><i style="width:${Math.min(100, Math.round(p.meals / max * 100))}%"></i></span></span>
+    <span class="acts">${act}${st.full ? "" : `<button class="iconround" data-share="${esc(S.siteId)},${esc(k.id)}" aria-label="Share this pool">${ICON.share}</button>`}</span></article>`;
+}
 function renderPools() {
-  if ($("#poolsTitle")) { $("#poolsTitle").textContent = "Active pools"; $("#poolsTitle").parentElement.classList.toggle("hidden", !!S.noSite); }
-  if (S.noSite) { if ($("#poolCount")) $("#poolCount").textContent = ""; if (S.tab === "kitchens") renderKitchens();
-    // Keep what's being typed: only refresh the busy chips on background updates
-    if ($("#pools .welcome")) { if ($("#wChips")) $("#wChips").innerHTML = busyChips(); } else { $("#pools").innerHTML = welcomeCard(); wireWelcome(); }
-    return; }
-  const s = S.settings, max = Number(s.max_meals), list = menusHere().filter(activeHere);
-  if ($("#poolCount")) $("#poolCount").textContent = list.length ? list.length + " at " + (siteOf(S.siteId).name || "") : "";
+  document.querySelectorAll(".locname").forEach(x => { x.textContent = siteOf(S.siteId).name || ""; });
+  const head = $("#secPools .sechead"), near = $("#secNear");
   if (S.tab === "kitchens") renderKitchens();
-  $("#pools").innerHTML = list.map(k => {
-    const i = menuIndex(k.id), st = menuState(k), p = currentPool(S.siteId, k.id);
-    const trip = poolTrip(p), share = feeFor(Math.max(p.meals, 1), s, trip), drop = nextDrop(p.meals, s, trip);
-    const dishes = S.items.filter(it => it.kitchen_id === k.id);
-    const tag = st.full ? `<span class="ptag bad">Fully booked</span>` : st.waiting ? "" : !st.open ? `<span class="ptag dim">Not confirmed yet</span>` : `<span class="ptag ok">Pool ${p.seq} · Open</span>`;
-    let line, btn, seats = "";
-    if (st.full) { line = "This menu is fully booked for today."; btn = `<button class="btn wide" disabled>Fully booked today</button>`; }
-    else if (st.waiting) { line = ""; btn = waitBox(k); }
-    else if (!st.open) { line = "Be the first today. Your order asks the vendor to confirm."; btn = `<button class="btn wide" data-menu="${esc(k.id)}">Order and ask them to cook</button>`; }
-    else {
-      seats = `<div class="seats" aria-label="${p.meals} of ${max} seats taken">${Array.from({ length: max }, (_, n) => `<i class="${n < p.meals ? "on" : drop && n < p.meals + drop.more ? "next" : ""}"></i>`).join("")}</div>`;
-      line = p.meals === 0 ? `<span class="hint">Start the pool. Delivery gets cheaper with every seat filled.</span>`
-        : `<span class="seatline"><span><strong class="num">${p.meals} of ${max}</strong> seats taken</span>${drop ? `<span class="hint">${drop.more} more → ${money(drop.fee)}</span>` : ""}</span>`;
-      const mo = myOrderIn(k);
-      btn = mo ? `<p class="small mine-note">You're in this pool · code <strong class="num">${esc(mo.code)}</strong></p>` + mineBtns(mo, k) : `<button class="btn wide" data-menu="${esc(k.id)}">Join this pool</button>`;
-    }
-    const site = siteOf(S.siteId), km = hasPin(site) && kPin(k, site) ? roadKm(kPin(k, site), site) : null;
-    return `<article class="pool">
-      ${photoHead(k, i, `${tag}<div class="fee-tag"><b class="num">${money(share)}</b><span>${share < feeFor(1, s, trip) ? `<s>${money(feeFor(1, s, trip))}</s> ` : ""}delivery a meal</span></div>
-        <div class="ptitle"><h3>${esc(k.public_name)}</h3><span>${esc(k.added_by_customer ? "Local vendor added by a customer" : k.tagline || "")}${km != null ? " · " + (km < 1 ? "under 1" : km.toFixed(1)) + " km" : ""}</span></div>`)}
-      <div class="pool-body">
-        ${seats}${line ? `<p class="small">${line}</p>` : ""}
-        <p class="dishtext">${dishes.slice(0, 2).map(d => esc(d.name)).join(" · ")}${dishes.length > 2 ? ` · +${dishes.length - 2} more` : ""}</p>
-        ${btn}</div></article>`;
-  }).join("") || `<div class="empty">${ICON.store}<p>No active pools at ${esc(siteOf(S.siteId).name || "your building")} yet today.</p><p class="small">Start one and others in your building can join it.</p><button class="btn" data-gokitchens>Start a pool</button></div>`;
+  if (S.noSite) {
+    head?.classList.add("hidden"); near?.classList.add("hidden");
+    if ($("#pools .welcome")) { if ($("#wChips")) $("#wChips").innerHTML = busyChips(); } else { $("#pools").innerHTML = welcomeCard(); wireWelcome(); }
+    return;
+  }
+  head?.classList.remove("hidden"); near?.classList.remove("hidden");
+  const list = menusHere().filter(activeHere).sort((a, b) => (myOrderIn(b) ? 1 : 0) - (myOrderIn(a) ? 1 : 0));
+  const site = siteOf(S.siteId);
+  $("#pools").innerHTML = list.map(poolRow).join("") || `<div class="emptyrow"><span class="eic">${ICON.store.replace(/width="\d+" height="\d+"/, 'width="22" height="22"')}</span><div><strong>No active pools at ${esc(site.name || "your building")} yet today.</strong><p>Start one and others in your building can join it.</p></div></div>`;
+  const nr = nearRows().rows.slice(0, 6);
+  $("#nearGrid").innerHTML = nr.map((r, n) => vendorTile(r.k, n === 0)).join("") || `<p class="small muted">No vendors deliver here yet. Add one you know from the Vendors tab.</p>`;
+  if (S.vp) drawVendorLive();
+}
+
+/* ---------- Vendors tab: grid or list, typo-tolerant search, filters ---------- */
+function syncVChips() {
+  S.vf = S.vf || "near";
+  document.querySelectorAll("#vchips [data-vf]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.vf === S.vf)));
+  if ($("#vq") && S.vq === "") $("#vq").value = "";
+}
+function vendorPool() { return S.noSite ? S.menus.filter(k => !k.site_id) : nearRows().rows.map(r => r.k); }
+function renderKitchens() {
+  const el = $("#kitchensList"); if (!el) return;
+  const view = local.get("cp_vview") || "grid", f = S.vf || "near", fv = favs(), site = siteOf(S.siteId);
+  let rows, far = 0;
+  if (S.noSite) rows = S.menus.filter(k => !k.site_id).map(k => ({ k, d: null }));
+  else { const nr = nearRows(); rows = nr.rows; far = nr.far; }
+  $("#kitchensSub").textContent = S.noSite ? "Top vendors across Accra. Choose your building to see delivery prices." : "Delivering to " + (site.name || "your building") + "." + (far ? " " + far + " more too far to deliver here." : "");
+  if (f === "fav") rows = rows.filter(r => fv.has(r.k.id));
+  if (f === "pools") rows = rows.filter(r => !S.noSite && activeHere(r.k));
+  if (f === "local") rows = rows.filter(r => [...kindsOf(r.k)].some(x => LOCAL_KINDS.has(x)));
+  if (f === "healthy") rows = rows.filter(r => [...kindsOf(r.k)].some(x => HEALTHY_KINDS.has(x)));
+  if (f === "top" || S.noSite) rows.sort((a, b) => (((S.scores || {})[b.k.id] || {}).rating || 0) - (((S.scores || {})[a.k.id] || {}).rating || 0) || rank(b.k) - rank(a.k));
+  const nearestId = !S.noSite && nearRows().rows[0]?.k.id;
+  const empty = { fav: ["No favourites yet", "Tap the heart on any vendor's page to keep them here."], pools: ["No pools open yet", "Start one from any vendor and others in your building can join."], local: ["No local dishes here yet", "Try another filter."], healthy: ["No healthy options here yet", "Try another filter."] }[f]
+    || [S.noSite ? "Choose your building" : "No vendors deliver here yet", S.noSite ? "Then you'll see the menus that deliver there." : "Add a vendor you know below."];
+  el.innerHTML = rows.length ? (view === "list" ? `<div class="vlist">${rows.map(r => vendorRow(r.k)).join("")}</div>` : `<div class="vgrid">${rows.map(r => vendorTile(r.k, r.k.id === nearestId)).join("")}</div>`)
+    : `<div class="emptyrow"><span class="eic">${f === "fav" ? ICON.heart : ICON.store.replace(/width="\d+" height="\d+"/, 'width="22" height="22"')}</span><div><strong>${esc(empty[0])}</strong><p>${esc(empty[1])}</p></div></div>`;
+  setKTop();
+}
+function vendorSuggest() {
+  const raw = $("#vq").value, q = raw.trim(), box = $("#vsugg");
+  if (!q) { box.classList.remove("on"); box.innerHTML = ""; return; }
+  const out = [];
+  vendorPool().forEach(k => {
+    let hit = fuzzyHit(q, k.public_name + " " + (k.tagline || "")), why = k.tagline || "", whyHit = hit;
+    S.items.filter(i => i.kitchen_id === k.id).forEach(d => { const h = fuzzyHit(q, d.name); if (h && (!hit || h.s < hit.s)) { hit = h; why = d.name; whyHit = h; } });
+    if (hit) out.push({ k, s: hit.s, why, word: whyHit.word, nameHit: fuzzyHit(q, k.public_name) });
+  });
+  const near = new Map(nearRows().rows.map((r, n) => [r.k.id, n]));
+  out.sort((a, b) => a.s - b.s || (near.get(a.k.id) ?? 99) - (near.get(b.k.id) ?? 99));
+  const fixed = out.find(o => o.s > 0 && !out.some(x => x.s === 0));
+  box.innerHTML = (fixed ? `<p class="dym">Showing results for <b>${esc(fixed.word)}</b></p>` : "") + (out.length ? out.slice(0, 6).map(o => {
+    const v = vInfo(o.k);
+    return `<button class="vsg" data-vendor="${esc(o.k.id)}" role="option"><span class="vph" style="background:${tint(menuIndex(o.k.id))}">${art(dishKind(topDish(o.k.id)))}</span><span><strong>${o.nameHit ? markHit(o.k.public_name, o.nameHit.word) : esc(o.k.public_name)}</strong><small>${markHit(o.why, o.word)}${v.km != null ? " · " + kmText(v.km) : ""}</small></span></button>`;
+  }).join("") : `<p class="none">No vendors match “${esc(raw)}”. Try a dish like jollof or waakye.</p>`);
+  box.classList.add("on");
+}
+function wireVendors() {
+  const t = $("#tabKitchens"); if (!t || t.dataset.wired) return; t.dataset.wired = "1";
+  t.addEventListener("click", e => {
+    const vw = e.target.closest("[data-view]"); if (vw) { local.set("cp_vview", vw.dataset.view); document.querySelectorAll("#tabKitchens [data-view]").forEach(b => b.setAttribute("aria-pressed", String(b === vw))); return renderKitchens(); }
+    const vf = e.target.closest("[data-vf]"); if (vf) { S.vf = vf.dataset.vf; syncVChips(); renderKitchens(); return; }
+    const sg = e.target.closest("#vsugg [data-vendor]"); if (sg) { $("#vsugg").classList.remove("on"); return openVendor(sg.dataset.vendor); }
+  });
+  $("#vq").addEventListener("input", vendorSuggest);
+  $("#vq").addEventListener("focus", () => { vendorSuggest(); const r = $("#vq").getBoundingClientRect(); if (r.top > window.innerHeight * .45) window.scrollBy({ top: r.top - 140, behavior: "smooth" }); });
+  $("#vq").addEventListener("keydown", e => { if (e.key === "Enter") { const first = $("#vsugg [data-vendor]"); if (first) { e.preventDefault(); $("#vq").blur(); openVendor(first.dataset.vendor); } } if (e.key === "Escape") $("#vsugg").classList.remove("on"); });
+  document.addEventListener("click", e => { if (!e.target.closest(".vsearch")) $("#vsugg")?.classList.remove("on"); });
+}
+
+/* ---------- Vendor page: the full menu, reviews and photos, then the order sheet ---------- */
+function openVendor(kid) {
+  const k = menuOf(kid); if (!k.id) return;
+  S.vp = { id: kid, tab: "menu" };
+  let el = $("#vpage");
+  if (!el) {
+    el = document.createElement("div"); el.id = "vpage"; el.className = "vpage"; el.setAttribute("role", "dialog"); el.setAttribute("aria-modal", "true");
+    document.body.appendChild(el);
+    const foot = document.createElement("div"); foot.id = "vfoot"; foot.className = "vfoot"; document.body.appendChild(foot);
+    el.addEventListener("click", vendorClick); foot.addEventListener("click", vendorClick);
+    history.pushState({ vp: 1 }, "");
+  }
+  el.scrollTop = 0; drawVendor();
+  requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add("open")));
+}
+function closeVendor(fromPop) {
+  const el = $("#vpage"); if (!el) return;
+  S.vp = null; el.classList.remove("open"); $("#vfoot")?.remove();
+  setTimeout(() => el.remove(), 400);
+  if (!fromPop && history.state && history.state.vp) history.back();
+}
+window.addEventListener("popstate", () => { if ($("#vpage")) closeVendor(true); });
+function vendorBanner(k) {
+  const s = S.settings, v = vInfo(k), mo = S.noSite ? null : myOrderIn(k), site = siteOf(S.siteId), day = dayLabel(S.date);
+  if (S.noSite) return `<div class="vbanner o"><span>Choose your building to order from <b>${esc(k.public_name)}</b> and see delivery prices.</span></div>`;
+  if (mo) return `<div class="vbanner"><span><b>You're in this pool</b> · code <b class="num">${esc(mo.code)}</b>. ${v.active ? "Delivery is " + money(feeFor(Math.max(v.p.meals, 1), s, poolTrip(v.p))) + " a meal right now." : ""} Add a plate or share it so delivery drops.</span></div>`;
+  if (v.st.full) return `<div class="vbanner bad"><span><b>Fully booked ${esc(day)}.</b> Try another vendor near you.</span></div>`;
+  if (v.st.waiting) return `<div class="vbanner w"><span><b>Waiting for ${esc(k.public_name)} to confirm</b> · ${v.p ? v.p.meals : 0} meals so far. Join anyway: if they don't confirm in time, everyone gets their money back.</span></div>`;
+  if (v.active) { const j = feeFor(v.p.meals + 1, s, poolTrip(v.p)); return `<div class="vbanner"><span><b>${v.p.meals} meal${v.p.meals > 1 ? "s" : ""} from ${esc(site.name || "your building")}</b> in a pool. Join now and delivery is ${money(j)} a meal.</span></div>`; }
+  if (v.st.open) return `<div class="vbanner o"><span><b>Cooking ${esc(day)}.</b> Start a pool and share it: delivery gets cheaper for everyone who joins.</span></div>`;
+  return `<div class="vbanner o"><span><b>No pool yet ${esc(day)}.</b> Start one and we'll ask ${esc(k.public_name)} to confirm. Others in your building can join.</span></div>`;
+}
+function vendorFoot(k) {
+  const v = vInfo(k), mo = S.noSite ? null : myOrderIn(k);
+  const label = S.noSite ? "Choose your building" : mo ? "Add to my order" : v.st.full ? "Fully booked" : v.st.waiting ? "Join anyway" : v.active ? "Join the pool" : v.st.open ? "Start a pool" : "Order and ask them to cook";
+  const sub = S.noSite ? "Then pick your meal" : mo ? "Same bag, code " + mo.code : v.st.full ? "Try another vendor" : "Pick your meal next";
+  return `<button class="btn" data-vgo${v.st.full && !mo ? " disabled" : ""}><span><span>${esc(label)}</span><small>${esc(sub)}</small></span>${S.noSite || v.st.full ? "" : `<span class="num">${esc(v.short)}<small style="text-align:right">${esc(v.unit)}</small></span>`}</button>`;
+}
+function drawVendorLive() {
+  const k = menuOf(S.vp && S.vp.id); if (!k.id) return;
+  if ($("#vpBanner")) $("#vpBanner").innerHTML = vendorBanner(k);
+  if ($("#vfoot")) $("#vfoot").innerHTML = vendorFoot(k);
+}
+function drawVendor() {
+  const el = $("#vpage"), k = menuOf(S.vp.id); if (!el || !k.id) return;
+  const s = S.settings, v = vInfo(k), i0 = menuIndex(k.id), sc = (S.scores || {})[k.id] || {}, dishes = S.items.filter(i => i.kitchen_id === k.id), fav = favs().has(k.id);
+  const pop = S.pop || {}, popular = dishes.filter(d => (pop[d.id] || 0) > 0).sort((a, b) => pop[b.id] - pop[a.id]).slice(0, 2), rest = dishes.filter(d => !popular.includes(d));
+  const groups = popular.length && rest.length ? [["Most ordered", popular], ["More dishes", rest]] : [["Menu", dishes]];
+  const facts = [
+    sc.ratings >= 1 ? [`<span class="rs">★ ${Number(sc.rating).toFixed(1)}</span>`, sc.ratings + " rating" + (sc.ratings > 1 ? "s" : "")] : ["New", "on ChopPool"],
+    v.km != null ? [kmText(v.km).replace(/^u/, "U"), "by road"] : [String(dishes.length), "dish" + (dishes.length === 1 ? "" : "es") + " on the menu"],
+    S.noSite ? ["Choose", "your building for prices"] : ["~" + moneyShort(v.trip), v.long ? "delivery, shared at cost" : "delivery, shared by the pool"]];
+  el.innerHTML = `<div class="vhero" style="background:${tint(i0)}">
+      <button class="vfab" data-vback style="left:14px" aria-label="Back">${ICON.back}</button>
+      <button class="vfab${fav ? " fav" : ""}" data-vfav style="right:${S.noSite ? 14 : 64}px" aria-label="${fav ? "Remove from favourites" : "Add to favourites"}" aria-pressed="${fav}">${ICON.heart}</button>
+      ${S.noSite ? "" : `<button class="vfab" data-share="${esc(S.siteId)},${esc(k.id)}" style="right:14px" aria-label="Share">${ICON.share}</button>`}
+      <div class="vplate">${art(dishKind(topDish(k.id)))}</div></div>
+    <div class="vbody">
+      <h1>${esc(k.public_name)}</h1>
+      <p class="cu">${esc(k.added_by_customer ? "A local vendor added by a customer. ChopPool doesn't inspect their kitchen." : k.tagline || "")}</p>
+      <div class="vfacts">${facts.map(([b, t]) => `<div><b>${b}</b><span>${esc(t)}</span></div>`).join("")}</div>
+      <div id="vpBanner">${vendorBanner(k)}</div>
+      <div class="vtabs" role="tablist"><button data-vtab="menu" aria-pressed="${S.vp.tab === "menu"}">Menu</button><button data-vtab="rev" aria-pressed="${S.vp.tab === "rev"}">Reviews${sc.ratings ? " · " + sc.ratings : ""}</button></div>
+      <div id="vpBody" class="stack" style="gap:8px">${S.vp.tab === "menu" ? groups.map(([t, ds]) => `<h3 class="vcat">${esc(t)}</h3>` + ds.map(d => `<button class="vitem" data-dish="${esc(d.id)}">
+          <span class="vph" style="background:${tint(i0)}">${art(dishKind(d))}</span><span class="vtx"><strong>${esc(d.name)}</strong>${(d.addons || []).length ? `<span class="ds">Extras: ${esc(d.addons.map(a => a.name).join(", "))}</span>` : ""}<span class="pr num">${money(d.price)}</span></span><span class="plus" aria-hidden="true">+</span></button>`).join("")).join("")
+        || `<p class="small muted">No dishes on the menu yet.</p>` : `<p class="small muted">Loading reviews…</p>`}</div>
+    </div>`;
+  if ($("#vfoot")) $("#vfoot").innerHTML = vendorFoot(k);
+  if (S.vp.tab === "rev") loadVendorReviews(k);
+}
+async function loadVendorReviews(k) {
+  let rs = []; try { rs = await api.kitchenReviews(k.id); } catch (e) {}
+  const box = $("#vpBody"); if (!box || !S.vp || S.vp.id !== k.id || S.vp.tab !== "rev") return;
+  const sc = (S.scores || {})[k.id] || {}, n = rs.length, dist = [5, 4, 3, 2, 1].map(x => [x, n ? Math.round(rs.filter(r => r.rating === x).length / n * 100) : 0]);
+  const vendorPics = S.items.filter(i => i.kitchen_id === k.id && i.photo_url).map(i => ({ photo_url: i.photo_url, vendor: true, item_name: i.name }));
+  const pics = rs.filter(r => r.photo_url).concat(vendorPics), notes = rs.filter(r => r.comment || r.rating);
+  const avg = sc.ratings ? Number(sc.rating) : n ? rs.reduce((t, r) => t + r.rating, 0) / n : 0;
+  box.innerHTML = (avg ? `<div class="rsum"><div class="big"><b>${avg.toFixed(1)}</b><span>${sc.ratings || n} rating${(sc.ratings || n) > 1 ? "s" : ""}</span></div><div class="rbars">${dist.map(([x, pc]) => `<div>${x}<i><u style="width:${pc}%"></u></i></div>`).join("")}</div></div>` : "")
+    + (pics.length ? `<h3 class="vcat">Photos</h3><div class="photostrip">${pics.map((r, m) => `<button type="button" class="pshot" data-shot="${m}"><img src="${esc(r.photo_url)}" alt="" loading="lazy"><span>${r.vendor ? "From the vendor" : starsOf(r.rating, 10)}</span></button>`).join("")}</div>` : "")
+    + (notes.length ? `<h3 class="vcat">What people say</h3>` + notes.slice(0, 20).map(r => `<div class="rcm"><div class="h"><b>${esc(r.name || "Customer")}</b><span>${esc(r.created_at ? fmtDate(String(r.created_at).slice(0, 10)) : "")}</span></div><span class="stars">${starsOf(r.rating, 13)}</span>${r.comment ? `<p>${esc(r.comment)}</p>` : ""}${r.item_name ? `<span class="small muted">${esc(r.item_name)}</span>` : ""}</div>`).join("") : "")
+    || `<div class="emptyrow"><span class="eic">${STAR(false, 22)}</span><div><strong>No reviews yet</strong><p>Customers can rate ${esc(k.public_name)} after they collect their lunch.</p></div></div>`;
+  box.onclick = e => { const b = e.target.closest("[data-shot]"); if (!b) return; const r = pics[+b.dataset.shot];
+    const lb = document.createElement("div"); lb.className = "lightbox"; lb.innerHTML = `<img src="${esc(r.photo_url)}" alt=""><p>${r.vendor ? "From the vendor · " + esc(r.item_name || "") : starsOf(r.rating, 14) + " " + esc(r.item_name || "") + (r.comment ? " · “" + esc(r.comment) + "”" : "")}</p>`;
+    lb.addEventListener("click", () => lb.remove()); document.body.appendChild(lb); };
+}
+function vendorClick(e) {
+  if (!S.vp) return; const k = menuOf(S.vp.id), mo = S.noSite ? null : myOrderIn(k);
+  if (e.target.closest("[data-vback]")) return closeVendor();
+  const fb = e.target.closest("[data-vfav]"); if (fb) { const on = toggleFav(k.id); fb.classList.toggle("fav", on); fb.setAttribute("aria-pressed", String(on)); toast(on ? "Added to your favourites" : "Removed from your favourites"); if (S.tab === "kitchens") renderKitchens(); return; }
+  const sh = e.target.closest("[data-share]"); if (sh) { const [a, c] = sh.dataset.share.split(","); return sharePool(a, c); }
+  const tb = e.target.closest("[data-vtab]"); if (tb) { S.vp.tab = tb.dataset.vtab; const y = $("#vpage").scrollTop; drawVendor(); $("#vpage").scrollTop = Math.min(y, $(".vtabs").offsetTop - 8); return; }
+  const d = e.target.closest("[data-dish]");
+  if (d) return mo ? openOrder(k.id, { join: mo, preset: { item_id: d.dataset.dish, qty: 1 }, fromPage: true }) : openOrder(k.id, { preset: { item_id: d.dataset.dish, qty: 1 }, fromPage: true });
+  if (e.target.closest("[data-vgo]")) return S.noSite ? openSitePicker() : mo ? openOrder(k.id, { join: mo, fromPage: true }) : openOrder(k.id, { fromPage: true });
+}
+
+/* ---------- Orders: Upcoming / Past ---------- */
+const STEP_LABELS = ["Paid", "Confirmed", "On the way", "Ready"];
+function orderCard(o, all, next) {
+  const step = progressOf(o), k = menuOf(o.kitchen_id), kids = all.filter(c => c.parent_id === o.id).sort((a, b) => a.created_at < b.created_at ? -1 : 1), liveKids = kids.filter(c => c.status !== "cancelled");
+  const s4 = Math.min(4, step);
+  return `<article class="order-card${next ? " next" : ""}"><div class="head"><span class="tile" style="background:${tint(menuIndex(o.kitchen_id))}">${art(dishKind(S.items.find(i => i.kitchen_id === o.kitchen_id && i.name === o.item_name) || o.item_name))}</span>
+      <div><strong>${esc(k.public_name || "")}</strong><p class="small" style="font-weight:600">${o.qty} × ${esc(o.item_name)}</p>${liveKids.map(c => `<p class="small" style="font-weight:600">+ ${c.qty} × ${esc(c.item_name)}</p>`).join("")}${liveKids.length ? `<p class="small muted">One bag</p>` : ""}</div>
+      <div class="c"><span>Code</span><b class="num">${esc(o.code)}</b></div></div>
+      ${["quote_requested", "quoted"].includes(o.status) ? "" : `<div class="steps4" aria-label="Progress ${s4} of 4">${[1, 2, 3, 4].map(n => `<i class="${n <= s4 ? "on" : ""}"></i>`).join("")}</div><div class="steps4l">${STEP_LABELS.map((l, n) => `<span class="${n < s4 ? "on" : ""}">${l}</span>`).join("")}</div>`}
+      <p class="status-text">${esc(statusLine(o))}</p>
+      ${o.status === "quoted" ? quoteBreakdown(o) + `<button class="btn wide" data-pay="${esc(o.id)}">Pay ${money(o.amount_due)}</button>` : ""}
+      ${liveKids.filter(c => c.status === "pending").length ? `<p class="small muted">Added plate: payment being checked.</p>` : ""}
+      ${savingLine(o)}
+      ${canAddPlate(o) || shareablePool(o) ? `<div class="minebtns">${canAddPlate(o) ? `<button class="btn wide" data-addplate="${esc(o.id)}">${SV('<path d="M12 5v14M5 12h14"/>', 18)} Add a plate</button>` : ""}${shareablePool(o) ? `<button class="ghost sharebtn" data-share="${esc(o.site_id)},${esc(o.kitchen_id)}" aria-label="Share this pool">${SHARE}</button>` : ""}</div>` : ""}
+      ${canCancel(o) || liveKids.some(canCancel) ? `<div class="row" style="justify-content:flex-start;gap:14px;flex-wrap:wrap">${canCancel(o) ? `<button class="linkbtn" data-cancel="${esc(o.id)}" style="color:var(--danger)">Cancel order</button>` : ""}${liveKids.filter(canCancel).map(c => `<button class="linkbtn" data-cancel="${esc(c.id)}" style="color:var(--danger)">Remove ${esc(c.item_name.split(" with ")[0])}</button>`).join("")}</div>` : ""}</article>`;
+}
+function pastRow(o) {
+  const k = menuOf(o.kitchen_id), cancelled = o.status === "cancelled";
+  let end;
+  if (cancelled) end = `<span class="otag">${o.refund_needed || Number(o.refund_due) > 0 || /wallet/.test(statusLine(o)) ? "Refunded" : "Cancelled"}</span>`;
+  else if (o.my_rating) end = `<button class="ostars" data-rate="${esc(o.id)}" aria-label="You rated it ${o.my_rating} stars. Edit">${starsOf(o.my_rating, 12)}</button>`;
+  else end = `<button class="orate" data-rate="${esc(o.id)}">Rate ★</button>`;
+  const extra = cancelled ? `<small>${esc(statusLine(o))}</small>` : "";
+  const cb = cancelled && o.refund_needed && Number(o.refund_due) > 0 && !o.has_account ? `<button class="linkbtn" data-keepcb style="justify-self:start">Get ${money(o.refund_due)} in your wallet</button>` : (!cancelled && savingLine(o) && !o.has_account ? `<button class="linkbtn" data-keepcb style="justify-self:start">Keep ${money(o.saving)} cashback</button>` : "");
+  return `<div class="orow"><span class="vph" style="background:${cancelled ? "var(--surface-2)" : tint(menuIndex(o.kitchen_id))}">${art(dishKind(S.items.find(i => i.kitchen_id === o.kitchen_id && i.name === o.item_name) || o.item_name))}</span>
+    <span class="otx"><strong>${esc(k.public_name || o.item_name)}</strong><small>${fmtDate(o.order_date)} · ${o.qty} × ${esc(o.item_name)}</small>${extra}${cb}
+      ${cancelled && /^The seller can't/.test(o.cancel_reason || "") && S.menus.some(m => m.id === o.kitchen_id) ? `<button class="linkbtn" data-reorder="${esc(o.kitchen_id)}" style="justify-self:start">Order the standard meal instead</button>` : ""}
+      ${canOrderAgain(o) ? `<button class="linkbtn" data-again="${esc(o.id)}" style="justify-self:start">Order again</button>` : !cancelled && k.id ? `<button class="linkbtn" data-vendor="${esc(k.id)}" style="justify-self:start">Order again</button>` : ""}</span>
+    <span class="oend">${end}</span></div>`;
+}
+function dateHead(d) { const t = today(), tm = new Date(Date.parse(t + "T00:00:00Z") + 864e5).toISOString().slice(0, 10); return (d === t ? "Today · " : d === tm ? "Tomorrow · " : "") + fmtDate(d); }
+function renderOrders() {
+  const el = $("#tabOrders"); if (!el) return;
+  const all = S.mine || [], ids = new Set(all.map(o => o.id)), rows = all.filter(o => !o.parent_id || !ids.has(o.parent_id));
+  const isPast = o => ["collected", "cancelled"].includes(o.status) || o.order_date < today();
+  const up = rows.filter(o => !isPast(o)).sort((a, b) => a.order_date < b.order_date ? -1 : a.order_date > b.order_date ? 1 : 0), past = rows.filter(isPast).sort((a, b) => a.order_date < b.order_date ? 1 : -1);
+  if (!S.osegPicked) S.oseg = up.length || !past.length ? "up" : "past";
+  let body = "";
+  if (S.oseg === "up") {
+    let last = null;
+    up.forEach((o, n) => { if (o.order_date !== last) { body += `<p class="ohead">${esc(dateHead(o.order_date))}</p>`; last = o.order_date; } body += orderCard(o, all, n === 0); });
+    body = body || `<div class="emptyrow"><span class="eic">${ICON.receipt}</span><div><strong>No upcoming orders</strong><p>Join an active pool or start one from a vendor near you.</p></div></div><button class="btn wide" data-gohome>See active pools</button>`;
+  } else {
+    const byM = {}; past.forEach(o => { const m = o.order_date.slice(0, 7); (byM[m] = byM[m] || []).push(o); });
+    const thisM = today().slice(0, 7);
+    body = Object.keys(byM).map(m => `<p class="ohead">${m === thisM ? "This month" : new Date(m + "-01T00:00:00Z").toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" })}</p><div class="olist">${byM[m].map(pastRow).join("")}</div>`).join("")
+      || `<div class="emptyrow"><span class="eic">${ICON.receipt}</span><div><strong>No past orders${S.user ? "" : " on this phone"}</strong><p>${S.user ? "Orders you've collected show here." : "Create an account to keep your order history on any phone."}</p></div></div>`;
+  }
+  el.innerHTML = `<div class="oseg" role="tablist"><button data-oseg="up" aria-pressed="${S.oseg === "up"}">Upcoming${up.length ? " · " + up.length : ""}</button><button data-oseg="past" aria-pressed="${S.oseg === "past"}">Past</button></div>${body}`;
+}
+
+/* ---------- Account: profile, wallet, settings ---------- */
+const meNow = () => local.get("cp_me") || {};
+const avatarHtml = (name, big, pic = local.get("cp_avatar")) => { const ini = String(name || "").trim().split(/\s+/).map(w => w[0] || "").slice(0, 2).join("").toUpperCase();
+  return `<span class="pavatar${big ? " big" : ""}">${pic ? `<img src="${esc(pic)}" alt="">` : ini ? esc(ini) : ICON.user}</span>`; };
+const txRow = e => `<div class="grow"><span class="gic">${ICON.wallet}</span><span class="gtx">${esc(e.reason)}<small>${esc(e.at ? fmtDate(String(e.at).slice(0, 10)) : "")}</small></span><span class="amt num${e.amount > 0 ? " pos" : ""}">${e.amount < 0 ? "−" : "+"}${money(Math.abs(e.amount))}</span></div>`;
+const MUTE_TYPES = [["Your orders", [["confirm", "The vendor confirms or cancels your pool"], ["priced", "Your special request is priced"], ["arriving", "Lunch is 5 minutes away or ready to collect"], ["almost", "Your pool is almost full"], ["cashback", "Cashback and refunds"]]],
+  ["Your building", [["building", "Someone orders at your building"]]]];
+const muted = () => new Set(local.get("cp_mute") || []);
+const notifOn = type => !muted().has(type);
+const alertsSummary = () => { const all = MUTE_TYPES.flatMap(g => g[1]).length, on = all - muted().size; return (local.get("cp_alerts") ? "On" : "Off on this phone") + " · " + on + " of " + all + " types"; };
+const themeLabel = () => ({ auto: "Match my phone", light: "Light", dark: "Dark" })[local.get("cp_theme") || "auto"];
+async function renderWallet() {
+  const el = $("#tabWallet"); if (!el) return;
+  const me = meNow(), name = (S.user && S.user.name) || me.name || "", site = siteOf(S.siteId);
+  let w = null; if (S.user) { try { w = await api.wallet(); S.balance = Number(w.balance) || 0; S.walletEntries = w.entries || []; } catch (e) {} }
+  if (!$("#tabWallet")) return;
+  const entries = (w && w.entries) || [];
+  const recent = recentSites().map(id => siteOf(id).name).filter(Boolean);
+  el.innerHTML = `
+    <button class="prof" id="profBtn">${avatarHtml(name)}<span class="ptx"><b>${esc(name || "Add your name")}</b><small>${esc([me.phone, site.name].filter(Boolean).join(" · ") || (S.user ? S.user.email : "Guest on this phone"))}</small></span><span class="ed">Edit</span></button>
+    <div class="wcard"><small>ChopPool wallet</small><b class="num">${money(S.user ? S.balance : 0)}</b><p>${S.user ? "Used first at checkout. Credit can't be withdrawn as cash." : "When pools fill up, the delivery you saved comes back here as cashback."}</p>
+      ${S.user ? "" : `<button class="btn" id="wSign">Create an account to collect cashback</button>`}</div>
+    ${S.user ? `<p class="gtitle">Activity</p><div class="glist">${entries.length ? entries.slice(0, 3).map(txRow).join("") + `<button class="grow seeall" id="txAll">See all transactions</button>` : `<div class="grow"><span class="gtx"><small>No activity yet. Order from a pool to start earning cashback.</small></span></div>`}</div>`
+      : `<button class="linkbtn" id="wIn" style="justify-self:center">I already have an account</button>`}
+    <p class="gtitle">Settings</p>
+    <div class="glist">
+      <button class="grow" data-acc="notif"><span class="gic">${ICON.bell}</span><span class="gtx">Notifications<small>${esc(alertsSummary())}</small></span><span class="ch">›</span></button>
+      <button class="grow" data-acc="profile"><span class="gic">${ICON.phone}</span><span class="gtx">MoMo number<small>${esc(me.phone || "Add the number you pay with")}</small></span><span class="ch">›</span></button>
+      <button class="grow" data-acc="building"><span class="gic">${ICON.pin.replace('width="13" height="13"', 'width="18" height="18"')}</span><span class="gtx">My buildings<small>${esc(recent.slice(0, 2).join(", ") || site.name || "Choose your building")}</small></span><span class="ch">›</span></button>
+      <button class="grow" data-acc="theme"><span class="gic">${ICON.dark}</span><span class="gtx">Appearance<small>${esc(themeLabel())}</small></span><span class="ch">›</span></button>
+      ${isStandalone() ? "" : `<button class="grow" data-install="#order"><span class="gic">${ICON.download}</span><span class="gtx">Get the app<small>One tap from your home screen${pushReady() ? ", with alerts" : ""}</small></span><span class="ch">›</span></button>`}
+      <button class="grow" data-acc="help"><span class="gic">${ICON.help}</span><span class="gtx">How ChopPool works</span><span class="ch">›</span></button>
+      ${S.user ? `<button class="grow" data-acc="signout"><span class="gic">${ICON.out}</span><span class="gtx">Sign out<small>${esc(S.user.email || "")}</small></span></button>` : `<button class="grow" data-acc="signin"><span class="gic">${ICON.user}</span><span class="gtx">Sign in or create an account</span><span class="ch">›</span></button>`}
+    </div>`;
+  if (!el.dataset.wired) { el.dataset.wired = "1"; el.addEventListener("click", accountClick); }
+}
+async function accountClick(e) {
+  if (e.target.closest("#profBtn")) return openProfile();
+  if (e.target.closest("#wSign")) return openAccount();
+  if (e.target.closest("#wIn")) return openAccount(null, "signin");
+  if (e.target.closest("#txAll")) return openTransactions();
+  const a = e.target.closest("[data-acc]"); if (!a) return;
+  const t = a.dataset.acc;
+  if (t === "notif") return openNotifSettings();
+  if (t === "profile") return openProfile(true);
+  if (t === "building") return openSitePicker();
+  if (t === "theme") return openAppearance();
+  if (t === "help") return openHelp();
+  if (t === "signin") return openAccount();
+  if (t === "signout") { await api.signOut(); S.user = null; await refreshUser(); refreshMine(); renderWallet(); toast("Signed out"); }
+}
+function openProfile(focusPhone) {
+  const me = meNow(), name = (S.user && S.user.name) || me.name || "";
+  let pic = local.get("cp_avatar") || null;
+  openSheet(`${sheetHead("Edit profile", "Your name shows in your greeting and on your orders.")}
+    <div style="display:grid;justify-items:center;gap:8px"><span id="pfAv">${avatarHtml(name, true)}</span>
+      <div class="row" style="gap:16px;justify-content:center"><button type="button" class="linkbtn" id="pfPick">${pic ? "Change photo" : "Add a photo"}</button><button type="button" class="linkbtn${pic ? "" : " hidden"}" id="pfRm" style="color:var(--muted)">Use initials</button></div></div>
+    <form id="pfForm" class="stack" novalidate>
+      <div><label for="pfName">Your name</label><input id="pfName" autocomplete="name" maxlength="60" value="${esc(name)}" placeholder="Your name"></div>
+      <div><label for="pfPhone">MoMo number</label><input id="pfPhone" inputmode="tel" value="${esc(me.phone || "")}" placeholder="024 123 4567"></div>
+      <p class="small muted">Your photo stays on this phone.</p><p class="err" id="pfErr"></p><button class="btn wide">Save</button></form>`);
+  const redraw = () => { $("#pfAv").innerHTML = avatarHtml($("#pfName").value, true, pic); $("#pfRm").classList.toggle("hidden", !pic); $("#pfPick").textContent = pic ? "Change photo" : "Add a photo"; };
+  if (focusPhone) setTimeout(() => $("#pfPhone")?.focus(), 350);
+  $("#pfName").addEventListener("input", redraw);
+  $("#pfRm").addEventListener("click", () => { pic = null; redraw(); });
+  $("#pfPick").addEventListener("click", () => { const inp = document.createElement("input"); inp.type = "file"; inp.accept = "image/*";
+    inp.onchange = async () => { const f = inp.files && inp.files[0]; if (!f) return;
+      try { const blob = await compressImage(f); const url = await new Promise((ok, no) => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = no; r.readAsDataURL(blob); }); pic = url; redraw(); } catch (err) { toast(cleanErr(err)); } };
+    inp.click(); });
+  $("#pfForm").addEventListener("submit", async ev => {
+    ev.preventDefault();
+    const nm = $("#pfName").value.trim().replace(/\s+/g, " "), ph = $("#pfPhone").value.replace(/\D/g, "");
+    if (nm.length < 2) return ($("#pfErr").textContent = "Enter your name.");
+    if (ph && !/^0\d{9}$/.test(ph)) return ($("#pfErr").textContent = "Enter a 10-digit MoMo number starting with 0, like 024 123 4567.");
+    try {
+      if (S.user) { if (nm !== S.user.name) S.user = await api.updateName(nm); try { await api.saveProfile({ name: nm, phone: ph || null }); } catch (e2) {} }
+      local.set("cp_me", { ...meNow(), name: nm, phone: ph || meNow().phone || "" });
+      try { local.set("cp_avatar", pic); } catch (e3) { toast("That photo is too large to keep on this phone."); }
+      closeSheet(); toast("Profile saved"); renderHero(); renderWallet();
+    } catch (err) { $("#pfErr").textContent = cleanErr(err); }
+  });
+}
+function openTransactions() {
+  const all = S.walletEntries || [];
+  let f = "all";
+  const draw = () => {
+    const l = all.filter(e => f === "all" || (f === "in" ? e.amount > 0 : e.amount < 0)), byM = {};
+    l.forEach(e => { const m = String(e.at || "").slice(0, 7) || "Earlier"; (byM[m] = byM[m] || []).push(e); });
+    $("#txBody").innerHTML = Object.keys(byM).map(m => `<p class="gtitle">${m === today().slice(0, 7) ? "This month" : /^\d{4}-\d{2}$/.test(m) ? new Date(m + "-01T00:00:00Z").toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" }) : m}</p><div class="glist">${byM[m].map(txRow).join("")}</div>`).join("") || `<p class="small muted">Nothing here yet.</p>`;
+    document.querySelectorAll("#txF [data-tf]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.tf === f)));
+  };
+  openSheet(`${sheetHead("Transactions", "Your ChopPool wallet")}<div class="fchips" id="txF" style="margin:0;padding:0"><button data-tf="all">All</button><button data-tf="in">Money in</button><button data-tf="out">Money out</button></div><div id="txBody" class="stack" style="gap:10px"></div>`);
+  $("#txF").addEventListener("click", e => { const b = e.target.closest("[data-tf]"); if (b) { f = b.dataset.tf; draw(); } });
+  draw();
+}
+function openAppearance() {
+  const cur = local.get("cp_theme") || "auto";
+  openSheet(`${sheetHead("Appearance", "")}<div class="glist">${[["auto", "Match my phone", "auto"], ["light", "Light", "light"], ["dark", "Dark", "dark"]].map(([v, l, ic]) => `<button class="grow" data-th="${v}"><span class="gic">${ICON[ic]}</span><span class="gtx">${l}</span>${v === cur ? `<span style="color:var(--accent)">${SV('<path d="m5 12.5 4.5 4.5L19 7.5"/>', 20)}</span>` : ""}</button>`).join("")}</div>`);
+  $("#sheet").onclick = e => { const b = e.target.closest("[data-th]"); if (!b) return; $("#sheet").onclick = null; local.set("cp_theme", b.dataset.th); applyTheme(b.dataset.th); syncThemeBtns(); closeSheet(); renderWallet(); };
+}
+function openHelp() {
+  const s = S.settings;
+  openSheet(`${sheetHead("How ChopPool works", "")}
+    <div class="stack small" style="gap:12px">
+      <p><strong>Pools.</strong> People in the same building order from the same vendor, and one rider brings everything. The delivery cost is shared, so it drops as more people join.</p>
+      <p><strong>Paying.</strong> You pay delivery up front. When orders close at ${fmtTime(s.cutoff)}, whatever the pool saved comes back to your wallet as cashback.</p>
+      <p><strong>If the vendor doesn't confirm.</strong> Your money comes back: to your wallet if you have an account, or ChopPool refunds your MoMo.</p>
+      <p><strong>Collecting.</strong> Lunch arrives around ${fmtTime(s.delivery_time)}. Show your code at the drop point.</p>
+      <p><strong>Cancelling.</strong> You can cancel from Orders until ${fmtTime(s.cutoff)}.</p></div>`);
+}
+function openNotifSettings() {
+  const draw = () => {
+    const m = muted(), on = !!local.get("cp_alerts");
+    $("#nsBody").innerHTML = `<div class="glist"><button class="grow" data-ns="__all"><span class="gic">${ICON.bell}</span><span class="gtx">Alerts on this phone<small>${on ? (pushReady() ? "Including when the app is closed" : "While the app is open") : "Off"}</small></span><span class="tgl${on ? " on" : ""}"></span></button></div>`
+      + MUTE_TYPES.map(([g, rows]) => `<p class="gtitle">${esc(g)}</p><div class="glist">${rows.map(([t, l]) => `<button class="grow" data-ns="${t}"${on ? "" : " style=\"opacity:.55\""}><span class="gtx">${esc(l)}</span><span class="tgl${m.has(t) ? "" : " on"}"></span></button>`).join("")}</div>`).join("")
+      + `<p class="small muted">Everything you leave on also shows under the bell on Home.</p>`;
+  };
+  openSheet(`${sheetHead("Notifications", "Choose what reaches you.")}<div id="nsBody" class="stack" style="gap:10px"></div>`);
+  draw();
+  $("#nsBody").addEventListener("click", async e => {
+    const b = e.target.closest("[data-ns]"); if (!b) return;
+    if (b.dataset.ns === "__all") { await toggleAlerts(); draw(); if (S.tab === "wallet") renderWallet(); return; }
+    const m = muted(), t = b.dataset.ns; m.has(t) ? m.delete(t) : m.add(t); local.set("cp_mute", [...m]); draw();
+    if (local.get("cp_push")) pushSubscribe({ order_ids: (local.get("cp_orders") || []).map(o => o.id) }, true);
+    if (S.tab === "wallet") renderWallet(); updateBellDot();
+  });
+}
+// The bell: recent updates about your orders, your building and your wallet (only the types you've left on)
+function updatesList() {
+  const out = [], mineIds = new Set((local.get("cp_orders") || []).map(o => o.id));
+  (S.mine || []).filter(o => !o.parent_id).forEach(o => {
+    const k = menuOf(o.kitchen_id), name = k.public_name || "The vendor", at = o.created_at || "";
+    let t = null, title = "";
+    if (o.status === "quoted") { t = "priced"; title = "Your request is priced"; }
+    else if (o.status === "cancelled") { t = /did not confirm/.test(o.cancel_reason || "") ? "cashback" : "confirm"; title = /did not confirm/.test(o.cancel_reason || "") ? name + " didn't confirm" : "Order cancelled"; }
+    else if (["arriving", "delivered"].includes(o.pool_status) && o.status !== "collected") { t = "arriving"; title = o.pool_status === "arriving" ? "Lunch is 5 minutes away" : "Lunch is here"; }
+    else if (o.pool_status === "waiting") { t = "confirm"; title = "Waiting for " + name; }
+    else if (["collecting", "accepted", "ready", "picked_up"].includes(o.pool_status) && o.status !== "collected") { t = "confirm"; title = name + " is cooking"; }
+    if (t) out.push({ id: o.id + o.status + o.pool_status, t, title, body: statusLine(o), at });
+  });
+  (S.board.activity || []).filter(a => a.site_id === S.siteId && !mineIds.has(a.id)).slice(-4).reverse().forEach(a => out.push({ id: "a" + a.id, t: "building", title: "New order at " + (siteOf(a.site_id).name || "your building"), body: "Someone ordered " + a.item_name + ".", at: a.created_at }));
+  (S.walletEntries || []).filter(e => e.amount > 0).slice(0, 3).forEach(e => out.push({ id: "w" + e.at + e.amount, t: "cashback", title: money(e.amount) + " in your wallet", body: e.reason, at: e.at }));
+  return out.filter(x => notifOn(x.t));
+}
+function updateBellDot() { const seen = new Set(local.get("cp_seen_upd") || []), fresh = updatesList().some(x => !seen.has(x.id)); $("#bellDot")?.classList.toggle("hidden", !fresh); }
+async function openUpdates() {
+  if (S.user && !S.walletEntries) { try { S.walletEntries = (await api.wallet()).entries || []; } catch (e) {} }
+  const list = updatesList(), seen = new Set(local.get("cp_seen_upd") || []);
+  const ago = t => { if (!t) return ""; const m = Math.max(0, Math.round((Date.now() - Date.parse(t)) / 6e4)); return m < 1 ? "Just now" : m < 60 ? m + " min ago" : m < 1440 ? Math.round(m / 60) + " hr ago" : fmtDate(String(t).slice(0, 10)); };
+  openSheet(`${sheetHead("Notifications", "")}
+    ${local.get("cp_alerts") ? "" : `<div class="vbanner o" style="justify-content:space-between"><span>Alerts are off on this phone.</span><button class="btn" id="updOn" style="padding:8px 14px">Turn on</button></div>`}
+    <div>${list.map(x => `<div class="nupd"><span class="dot${seen.has(x.id) ? " r" : ""}"></span><div><b>${esc(x.title)}</b><p>${esc(x.body || "")}</p><small>${esc(ago(x.at))}</small></div></div>`).join("") || `<p class="small muted" style="padding:12px 2px">Nothing new. Updates about your orders and your building show here.</p>`}</div>
+    <button class="ghost wide" id="updSet">Choose what you get</button>`);
+  local.set("cp_seen_upd", list.map(x => x.id).concat([...seen]).slice(0, 80)); updateBellDot();
+  $("#updSet").addEventListener("click", () => { closeSheet(); setTimeout(openNotifSettings, 350); });
+  $("#updOn")?.addEventListener("click", async () => { closeSheet(); setTimeout(toggleAlerts, 350); });
 }
 
 /* Alerts: someone at your building ordered (opt-in, capped per day) */
@@ -2084,7 +2698,8 @@ function announceActivity() {
   const fresh = here.filter(a => a.created_at > S.seen).sort((a, b) => a.created_at < b.created_at ? -1 : 1);
   if (!fresh.length) return;
   S.seen = fresh.at(-1).created_at;
-  if (!local.get("cp_alerts")) return;
+  updateBellDot();
+  if (!local.get("cp_alerts") || !notifOn("building")) return;
   const key = "cp_alert_count_" + today(), n = local.get(key) || 0;
   if (n >= S.settings.notify_daily_cap) return;
   const a = fresh.at(-1), p = S.board.pools.find(x => x.id === a.pool_id) || { meals: 1, seq: 1 };
@@ -2135,13 +2750,15 @@ async function refreshMine() {
   rows.forEach(o => {
     const key = o.status + "|" + o.pool_status; S.mineStatus[o.id] = key;
     const changed = prev[o.id] && prev[o.id] !== key;
-    if (changed && (["arriving", "delivered"].includes(o.pool_status) || ["quoted", "cancelled"].includes(o.status) || (o.pool_status === "collecting" && prev[o.id].endsWith("|waiting"))) && o.status !== "collected") {
+    const kind = ["arriving", "delivered"].includes(o.pool_status) ? "arriving" : o.status === "quoted" ? "priced" : "confirm";
+    if (changed && notifOn(kind) && (["arriving", "delivered"].includes(o.pool_status) || ["quoted", "cancelled"].includes(o.status) || (o.pool_status === "collecting" && prev[o.id].endsWith("|waiting"))) && o.status !== "collected") {
       const msg = statusLine(o); toast(msg); sysNotify("Your ChopPool lunch", msg);
     }
   });
   const active = rows.filter(o => !["collected", "cancelled"].includes(o.status)).length;
   $("#ordBadge").textContent = active; $("#ordBadge").classList.toggle("hidden", !active);
   if (S.tab === "orders") renderOrders();
+  updateBellDot(); if (S.tab === "home") renderHero();
   const sig = rows.map(o => o.id + o.status + o.pool_status).join(); if (sig !== S.mineSig) { S.mineSig = sig; if ($("#pools") && !S.noSite) renderPools(); }
 }
 // Customers can cancel until the cut-off; after that the kitchen is cooking
@@ -2239,30 +2856,6 @@ const canAddPlate = o => !o.parent_id && ["pending", "paid"].includes(o.status) 
   && new Date() < at(o.order_date, S.settings.cutoff) && S.items.some(i => i.kitchen_id === o.kitchen_id);
 const canOrderAgain = o => o.status === "cancelled" && !o.parent_id && S.menus.some(m => m.id === o.kitchen_id) && o.order_date === S.date && new Date() < at(o.order_date, S.settings.cutoff)
   && !/^The seller can't/.test(o.cancel_reason || "");
-function renderOrders() {
-  const el = $("#tabOrders"), all = S.mine || [], ids = new Set(all.map(o => o.id));
-  const rows = all.filter(o => !o.parent_id || !ids.has(o.parent_id));
-  el.innerHTML = (rows.map(o => {
-    const step = progressOf(o), k = menuOf(o.kitchen_id), kids = all.filter(c => c.parent_id === o.id).sort((a, b) => a.created_at < b.created_at ? -1 : 1);
-    const liveKids = kids.filter(c => c.status !== "cancelled");
-    return `<article class="order-card"><div class="head"><span class="tile" style="background:${tint(menuIndex(o.kitchen_id))}">${art(dishKind(S.items.find(i => i.kitchen_id === o.kitchen_id && i.name === o.item_name) || o.item_name))}</span>
-      <div><strong>${o.qty} × ${esc(o.item_name)}</strong>${liveKids.map(c => `<p class="small" style="font-weight:600">+ ${c.qty} × ${esc(c.item_name)}</p>`).join("")}<p class="small muted">${esc(k.public_name || "")} · ${fmtDate(o.order_date)}${liveKids.length ? " · one bag" : ""}</p></div>
-      <div class="c"><span>Code</span><b class="num">${esc(o.code)}</b></div></div>
-      ${o.status === "cancelled" ? "" : `<div class="track" aria-label="Progress ${step} of 5">${[1, 2, 3, 4, 5].map(n => `<i class="${n <= step ? "on" : ""}"></i>`).join("")}</div>`}
-      <p class="status-text">${esc(statusLine(o))}</p>
-      ${o.status === "collected" && !o.parent_id ? (o.my_rating ? `<p class="small rated">You rated it <span class="stars">${starsOf(o.my_rating, 14)}</span> <button class="linkbtn" data-rate="${esc(o.id)}">Edit</button></p>`
-        : `<div class="ratebox"><span>How was lunch?</span><div class="stars">${[1, 2, 3, 4, 5].map(n => `<button type="button" data-rate="${esc(o.id)}" data-n="${n}" aria-label="${n} star${n > 1 ? "s" : ""}">${STAR(false, 26)}</button>`).join("")}</div></div>`) : ""}
-      ${o.status === "quoted" ? quoteBreakdown(o) + `<button class="btn wide" data-pay="${esc(o.id)}">Pay ${money(o.amount_due)}</button>` : ""}
-      ${liveKids.filter(c => c.status === "pending").length ? `<p class="small muted">Added plate: payment being checked.</p>` : ""}
-      ${savingLine(o)}
-      ${canAddPlate(o) ? `<button class="ghost wide" data-addplate="${esc(o.id)}">${SV('<path d="M12 5v14M5 12h14"/>', 18)} Add another plate</button>` : ""}
-      ${shareablePool(o) ? `<button class="ghost wide" data-share="${esc(o.site_id)},${esc(o.kitchen_id)}">Share this pool</button>` : ""}
-      ${o.status === "cancelled" && o.refund_needed && Number(o.refund_due) > 0 && !o.has_account ? `<button class="ghost wide" data-keepcb>Create an account and get ${money(o.refund_due)} in your wallet</button>` : ""}
-      ${canOrderAgain(o) ? `<button class="btn wide" data-again="${esc(o.id)}">Order again</button>` : ""}
-      ${canCancel(o) || liveKids.some(canCancel) ? `<div class="row" style="justify-content:flex-start;gap:14px;flex-wrap:wrap">${canCancel(o) ? `<button class="linkbtn" data-cancel="${esc(o.id)}" style="color:var(--danger)">Cancel order</button>` : ""}${liveKids.filter(canCancel).map(c => `<button class="linkbtn" data-cancel="${esc(c.id)}" style="color:var(--danger)">Remove ${esc(c.item_name.split(" with ")[0])}</button>`).join("")}</div>` : ""}
-      ${o.status === "cancelled" && /^The seller can't/.test(o.cancel_reason || "") && S.menus.some(m => m.id === o.kitchen_id) ? `<button class="ghost wide" data-reorder="${esc(o.kitchen_id)}">Order the standard meal instead</button>` : ""}</article>`;
-  }).join("") || `<div class="empty">${ICON.receipt}<p>No orders yet today.</p><button class="btn" data-gohome>See today's pools</button></div>`);
-}
 
 /* Order sheet: pick a dish, make it yours, pay. Total stays visible at the bottom. */
 function openOrder(menuId, opt = {}) {
@@ -2279,7 +2872,7 @@ function openOrder(menuId, opt = {}) {
   const waitingHere = S.board.pools.some(p => p.site_id === site.id && p.kitchen_id === k.id && p.status === "waiting" && p.meals > 0);
   openSheet(`
     ${join ? sheetHead("Add another plate", esc(k.public_name) + " · code " + esc(join.code) + ", same bag") : sheetHead(esc(k.public_name), esc(site.name) + " · " + fmtDate(S.date) + ", " + fmtTime(s.delivery_time))}
-    ${join ? "" : `<div id="revStrip" class="revstrip"></div>`}
+    ${join || opt.fromPage ? "" : `<div id="revStrip" class="revstrip"></div>`}
     ${join ? `<p class="note">Your plate joins code <strong>${esc(join.code)}</strong>. You pay only for the plate and its service fee: delivery is already paid, and the final split counts every meal under your code.</p>` : ""}
     ${!join && k.added_by_customer ? `<p class="note">A local vendor added by a customer. ChopPool doesn't inspect their kitchen.</p>` : ""}
     ${!join && isLong(s, tripTo(k, site)) ? `<p class="note"><strong>Long-distance vendor:</strong> delivery is shared at cost (about ${money(tripTo(k, site))} for the trip). The more people join, the less each pays.</p>` : ""}
@@ -2339,7 +2932,7 @@ function openOrder(menuId, opt = {}) {
     $("#totTxt").textContent = money(due); $("#totSub").textContent = due <= 0 ? "Paid from your wallet" : "Pay by MoMo";
     $("#submitBtn").textContent = join ? "Add to my order" : waitingHere ? "Join anyway" : st.open ? "Join the pool" : "Order and ask them to cook";
   };
-  drawExtras(); draw(); if (!join) loadReviews(k);
+  drawExtras(); draw(); if (!join && !opt.fromPage) loadReviews(k);
   $("#orderForm").addEventListener("change", e => { if (e.target.name === "dish") { item = dishes.find(d => d.id === e.target.value); extras = new Set(); drawExtras(); } draw(); });
   $("#extrasGroup").addEventListener("click", e => { const b = e.target.closest("[data-addon]"); if (!b) return; const n = b.dataset.addon; extras.has(n) ? extras.delete(n) : extras.add(n); b.setAttribute("aria-pressed", String(extras.has(n))); draw(); });
   $("#minus").addEventListener("click", () => { qty = Math.max(1, qty - 1); draw(); });
@@ -2368,7 +2961,7 @@ function openOrder(menuId, opt = {}) {
       if (S.user) { try { await api.saveProfile({ name, phone }); } catch (e) {} }
       await refreshBoard(); refreshMine(); refreshUser();
       notifyServer({ order_id: r.id }); if (local.get("cp_push")) pushSubscribe({ order_ids: [r.id] }, true);
-      if (join) { closeSheet(); toast("Added to code " + r.code + ". " + (r.status === "paid" ? "Paid." : "Payment being checked.")); setTab("orders"); return; }
+      if (join) { closeSheet(); closeVendor(); toast("Added to code " + r.code + ". " + (r.status === "paid" ? "Paid." : "Payment being checked.")); setTab("orders"); return; }
       r.myQty = qty; showConfirmation(r, k, site, sp);
     } catch (e) { $("#submitBtn").disabled = false; err.textContent = cleanErr(e); }
   });
@@ -2844,7 +3437,7 @@ async function renderAdmin(cached) {
         <div class="grid2"><div><label for="nkCap">Meals per lunch</label><input id="nkCap" name="capacity" inputmode="numeric" value="45"></div><div><label for="nkDel">Delivery</label><select id="nkDel" name="delivery_mode"><option value="rider">ChopPool rider / Bolt / Yango</option><option value="runner">Vendor's own runner (close by)</option></select></div></div>
         <div class="group"><p class="group-title">Where they cook</p>${searchRow("nkSearch", "Search the area or landmark")}<div id="nkResults" class="stack"></div>
           <div id="newKitMap" class="map" style="height:220px"></div><p class="small muted" id="nkPin">Search above, or tap the map where they cook. Customers only see vendors with a pin.</p></div>
-        <div class="group"><p class="group-title">Always cooking (optional)</p>${autoPicker([])}</div>
+        <div class="group"><p class="group-title">Days they cook (optional)</p>${autoPicker([])}</div>
         <div class="group"><p class="group-title">Menu</p>${menuEditor([], "admin:new", true)}</div>
         <p class="err" data-err></p><button class="btn wide">Add vendor</button></form>`;
     S.addForm = addForm; S.addTitle = "Add a vendor";
@@ -2870,7 +3463,7 @@ async function renderAdmin(cached) {
           <div><label>Delivery</label><select data-f="delivery_mode"><option value="rider"${k.delivery_mode === "rider" ? " selected" : ""}>ChopPool rider</option><option value="runner"${k.delivery_mode === "runner" ? " selected" : ""}>Own runner</option></select></div>
           <div><label>Meals</label><input data-f="capacity" inputmode="numeric" value="${esc(k.capacity)}"></div>
           <label class="choice" style="padding:8px 10px"><input type="checkbox" data-f="active"${k.active ? " checked" : ""}><span>Active</span></label></div>
-        <div class="group"><p class="group-title">Always cooking (pools open without the vendor confirming)</p>${autoPicker(k.auto_days)}
+        <div class="group"><p class="group-title">Days they cook (pools open without the vendor confirming)</p>${autoPicker(k.auto_days)}
           <p class="small muted" style="margin-top:4px">${(k.auto_days || []).length ? "On: " + daysText(k.auto_days) + ". Untick every day to switch it off for a vendor who lets pools down." : "Off: the vendor confirms each day."}${(k.paused_dates || []).filter(x => x >= today()).length ? " Paused: " + k.paused_dates.filter(x => x >= today()).map(fmtDate).join(", ") + "." : ""}</p></div>
         <div class="row" style="justify-content:flex-start;gap:8px;flex-wrap:wrap"><button class="ghost" data-act="kitchen-save">Save</button>${sendLink(k.whatsapp, "Your ChopPool order page: " + baseUrl() + "/#kitchen-" + k.token)}<button class="ghost" data-act="kitchen-copy">Copy link</button><button class="ghost" data-act="kitchen-reset">Reset link</button><button class="ghost" data-act="kitchen-remove" style="color:var(--danger)">Remove</button></div>
         <p class="group-title">Menu</p>
@@ -3210,7 +3803,7 @@ function reportHtml(R, isSuper) {
   const c = (R.headline || {}).cur || {}, p = (R.headline || {}).prev || {}, M = R.money;
   const tile = (l, k, pct) => `<div class="dtile"><b class="num">${trend(c[k] ?? (k === "repeat_rate" || k === "avg_meals" ? null : 0), p[k] ?? null, pct)}</b><span>${esc(l)}</span></div>`;
   const table = (title, cols, rows, empty) => `<section class="card stack" style="gap:8px"><h3>${esc(title)}</h3>${rows.length ? `<div class="tablewrap"><table class="rtable"><thead><tr>${cols.map(x => `<th>${esc(x[0])}</th>`).join("")}</tr></thead><tbody>${rows.map(r => `<tr>${cols.map(x => `<td>${x[1](r)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>` : `<p class="small muted">${esc(empty)}</p>`}</section>`;
-  const flag = v => v.expired >= 2 || (v.on_time != null && v.on_time < 70) ? pill("Unreliable", "bad") : v.always_cooking ? pill("Always cooking", "ok") : "";
+  const flag = v => v.expired >= 2 || (v.on_time != null && v.on_time < 70) ? pill("Unreliable", "bad") : v.always_cooking ? pill("Set cooking days", "ok") : "";
   return `<div class="stack" style="gap:14px"><p class="small muted">${fmtDate(R.week_start)}–${fmtDate(R.week_end)}, compared with the week before.</p>
     <div class="dash-grid">${tile("Meals", "meals")}${tile("Orders", "orders")}${tile("Active customers", "customers")}${tile("New customers", "new_customers")}${tile("Repeat rate", "repeat_rate", true)}${tile("Average meals per pool", "avg_meals")}${tile("Pools that filled", "filled")}${tile("Cancelled orders", "cancelled")}</div>
     ${isSuper && M ? `<section class="stack" style="gap:10px"><h3>Money <span class="small muted">(owner only)</span></h3><div class="dash-grid">${[["Food value", M.food], ["ChopPool commission", M.commission], ["Service fees", M.service_fees], ["Cashback paid", M.cashback], ["Wallet refunds", M.refunds], ["Wallet balances owed", M.wallets_owed]].map(([l, v]) => `<div class="dtile"><b class="num" style="font-size:18px;white-space:nowrap">${money(v || 0)}</b><span>${esc(l)}</span></div>`).join("")}<div class="dtile"><b class="num">${M.momo_refunds || 0}</b><span>MoMo refunds to send</span></div></div></section>` : ""}
@@ -3309,8 +3902,7 @@ async function viewKitchen(token) {
         <div class="photogrid">${K.menu.map(i => `<div class="mdish" data-item="${esc(i.id)}"><button type="button" class="mphoto" data-photo aria-label="Photo for ${esc(i.name)}">${i.photo_url ? `<img src="${esc(i.photo_url)}" alt="" loading="lazy">` : `<span class="dishpic">${art(dishKind(i))}</span>`}<span class="cam">${CAM}</span></button><span class="small">${esc(i.name)}</span></div>`).join("")}</div></section>` : ""}`;
     $("#listMe")?.addEventListener("click", () => openListingForm(token, k));
     // Always cooking: weekdays that open automatically; one-tap pause for a single day
-    const saveAuto = async list => { try { await api.kitchenSetAuto(token, list); notifyServer({ kitchen_token: token, date: d }); toast(list.length ? "Always cooking on " + daysText(list) + "." : "Always cooking is off. Confirm each day instead."); draw(); } catch (e) { toast(cleanErr(e)); } };
-    $("#autoOn")?.addEventListener("change", e => saveAuto(e.target.checked ? [1, 2, 3, 4, 5] : []));
+    const saveAuto = async list => { try { await api.kitchenSetAuto(token, list); notifyServer({ kitchen_token: token, date: d }); toast(list.length ? "You cook " + daysText(list) + ". Pools open straight away on those days." : "No days ticked. Confirm each day instead."); draw(); } catch (e) { toast(cleanErr(e)); } };
     let autoT = null; $("#autoDays")?.addEventListener("autochange", e => { const days = pickedDays(e.target.closest("[data-autopick]")); clearTimeout(autoT); autoT = setTimeout(() => saveAuto(days), 700); });
     $("#pauseDay")?.addEventListener("click", async () => { try { await api.kitchenPause(token, d, true); toast("Paused. Customers can't order from you for " + fmtDate(d) + "."); draw(); } catch (e) { toast(cleanErr(e)); } });
     $("#unpause")?.addEventListener("click", async () => { try { await api.kitchenPause(token, d, false); if (!(k.auto_days || []).includes(isoDow(d))) await api.kitchenOpenDay(token, d); notifyServer({ kitchen_token: token, date: d }); toast("You're taking orders for " + dayLabel(d) + "."); draw(); } catch (e) { toast(cleanErr(e)); } });
@@ -3375,10 +3967,10 @@ document.addEventListener("change", e => {
 });
 const daysText = list => { const l = [...list].sort(); if (l.join() === "1,2,3,4,5") return "Mon–Fri"; if (l.join() === "1,2,3,4,5,6,7") return "every day"; return l.map(n => DOW[n - 1][1]).join(", "); };
 function autoCard(k, d) {
-  const on = (k.auto_days || []).length > 0, today_ = (k.auto_days || []).includes(isoDow(d));
-  return `<section class="card stack" style="gap:10px"><label class="switch" style="background:none;padding:0"><span style="display:grid;gap:2px"><span>Always cooking</span><span class="small muted" style="font-weight:500">Pools open straight away on these days. No need to confirm each morning.</span></span><input type="checkbox" id="autoOn"${on ? " checked" : ""}></label>
-    ${on ? `<div id="autoDays">${autoPicker(k.auto_days)}</div>
-      <p class="small muted">You get an alert when a pool starts and a summary at ${fmtTime(S.settings.cutoff)} with the final meals.</p>` : ""}
+  const today_ = (k.auto_days || []).includes(isoDow(d));
+  return `<section class="card stack" style="gap:10px"><div style="display:grid;gap:2px"><strong>Days I cook</strong><span class="small muted">Tick the days you cook. On those days pools open straight away, with no need to confirm each morning.</span></div>
+    <div id="autoDays">${autoPicker(k.auto_days)}</div>
+    <p class="small muted">${(k.auto_days || []).length ? "You get an alert when a pool starts and a summary at " + fmtTime(S.settings.cutoff) + " with the final meals." : "No days ticked: you confirm each day when customers order."}</p>
     ${k.open && !k.paused && (today_ || k.confirmed) ? `<button class="linkbtn" id="pauseDay" style="justify-self:start;color:var(--danger)">Not cooking ${dayLabel(d)}? Pause ${fmtDate(d)}</button>` : ""}</section>`;
 }
 
@@ -3473,7 +4065,7 @@ async function pushSubscribe(extra, quiet) {
     const reg = await navigator.serviceWorker.ready;
     let sub = await reg.pushManager.getSubscription();
     if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64u8(CONFIG.VAPID_PUBLIC_KEY) });
-    const j = sub.toJSON(); await api.savePushSub({ endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth, ...extra });
+    const j = sub.toJSON(); await api.savePushSub({ endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth, ...(extra && (extra.kitchen_token || extra.rider_token) ? {} : { mute: local.get("cp_mute") || [] }), ...extra });
     local.set("cp_push", true); return true;
   } catch (e) { if (!quiet) toast("Couldn't switch on alerts: " + cleanErr(e)); return false; }
 }

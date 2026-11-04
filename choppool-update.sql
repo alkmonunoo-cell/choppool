@@ -1507,5 +1507,32 @@ begin
 end $$;
 grant execute on function admin_weekly_report(date) to authenticated;
 
+-- ---------- from update17 ----------
+-- =====================================================================
+-- Update 17: choose which alerts reach your phone
+-- =====================================================================
+alter table push_subs add column if not exists mute text[] not null default '{}';   -- alert types this phone switched off
+
+drop function if exists save_push_sub(text, text, text, uuid[], text, text);
+create or replace function save_push_sub(p_endpoint text, p_p256dh text, p_auth text, p_order_ids uuid[] default '{}',
+                                         p_kitchen_token text default null, p_rider_token text default null, p_mute text[] default null)
+returns void language plpgsql security definer set search_path = public as $$
+declare v_k uuid; v_r uuid;
+begin
+  if p_endpoint !~ '^https://' or length(p_endpoint) > 1000 then raise exception 'Invalid subscription.'; end if;
+  if p_mute is not null and (array_length(p_mute, 1) > 20 or exists (select 1 from unnest(p_mute) m where length(m) > 20)) then raise exception 'Invalid alert settings.'; end if;
+  if p_kitchen_token is not null then select id into v_k from kitchens where token = p_kitchen_token and active; end if;
+  if p_rider_token is not null then select id into v_r from riders where token = p_rider_token and active; end if;
+  insert into push_subs (endpoint, p256dh, auth, user_id, order_ids, kitchen_id, rider_id, is_team, mute)
+  values (p_endpoint, p_p256dh, p_auth, auth.uid(), coalesce(p_order_ids, '{}'), v_k, v_r, is_admin(), coalesce(p_mute, '{}'))
+  on conflict (endpoint) do update set p256dh = excluded.p256dh, auth = excluded.auth,
+    user_id = coalesce(excluded.user_id, push_subs.user_id),
+    order_ids = (select array(select distinct unnest(push_subs.order_ids || excluded.order_ids))),
+    kitchen_id = coalesce(excluded.kitchen_id, push_subs.kitchen_id), rider_id = coalesce(excluded.rider_id, push_subs.rider_id),
+    is_team = push_subs.is_team or excluded.is_team,
+    mute = coalesce(p_mute, push_subs.mute), updated_at = now();
+end $$;
+grant execute on function save_push_sub(text, text, text, uuid[], text, text, text[]) to anon, authenticated;
+
 notify pgrst, 'reload schema';
-select 'ChopPool database is up to date (version 16)' as result;
+select 'ChopPool database is up to date (version 17)' as result;
