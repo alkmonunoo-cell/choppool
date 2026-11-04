@@ -1,5 +1,5 @@
 -- =====================================================================
--- ChopPool pilot database, version 12
+-- ChopPool pilot database, version 13
 -- Run once in Supabase: SQL Editor > New query > paste everything > Run.
 -- If you ran an earlier version, run the RESET block at the very bottom
 -- first (it deletes pilot test data), then run this whole file.
@@ -1396,3 +1396,132 @@ create or replace view dish_popularity as
   select item_id, sum(qty)::int as n from orders
   where status <> 'cancelled' and created_at > now() - interval '60 days' group by item_id;
 grant select on dish_popularity to anon, authenticated;
+
+-- =====================================================================
+-- Update 13 (listing, rider sign-up, scores, push)
+-- =====================================================================
+-- ===== Batch B: sellers list themselves, riders apply, ratings from real orders, push alerts =====
+
+-- Sellers added by customers can ask to be listed for free
+alter table kitchens add column if not exists listing_status text not null default 'none';   -- none | pending | approved | declined
+alter table kitchens add column if not exists listing jsonb;                                    -- what the seller sent
+alter table kitchens add column if not exists listing_requested_at timestamptz;
+
+create or replace function vendor_request_listing(p_token text, p_listing jsonb)
+returns void language plpgsql security definer set search_path = public as $$
+declare k kitchens;
+begin
+  select * into k from kitchens where token = p_token and active;
+  if not found then raise exception 'This seller link is not valid.'; end if;
+  if not k.added_by_customer or k.listing_status = 'approved' then raise exception 'You are already listed on ChopPool.'; end if;
+  if length(coalesce(p_listing ->> 'name', '')) < 2 then raise exception 'Add your business name.'; end if;
+  if (p_listing ->> 'lat') is null then raise exception 'Set your location on the map.'; end if;
+  update kitchens set listing = p_listing, listing_status = 'pending', listing_requested_at = now() where id = k.id;
+end $$;
+grant execute on function vendor_request_listing(text, jsonb) to anon, authenticated;
+
+create or replace function kitchen_view(p_token text, p_date date)
+returns json language plpgsql volatile security definer set search_path = public as $$
+declare k kitchens;
+begin
+  perform housekeeping();
+  select * into k from kitchens where token = p_token and active;
+  if not found then raise exception 'This seller link is not valid. Ask ChopPool for a new one.'; end if;
+  return json_build_object(
+    'kitchen', json_build_object('name', k.name, 'public_name', k.public_name, 'capacity', k.capacity,
+                                 'delivery_mode', k.delivery_mode, 'added_by_customer', k.added_by_customer,
+                                 'open', kitchen_is_open(k.id, p_date), 'listing_status', k.listing_status, 'listing', k.listing),
+    'menu', coalesce((select json_agg(json_build_object('id', id, 'name', name, 'price', price) order by name)
+                      from menu_items where kitchen_id = k.id and active), '[]'::json),
+    'pools', coalesce((
+      select json_agg(json_build_object(
+        'id', p.id, 'seq', p.seq, 'status', p.status, 'site', si.name, 'drop_point', si.drop_point,
+        'handoff', si.handoff, 'host_label', si.host_label,
+        'orders', (select json_agg(json_build_object('id', o.id, 'code', o.code, 'qty', o.qty, 'item_name', o.item_name,
+                                                     'unit_price', o.unit_price, 'addons_total', o.addons_total,
+                                                     'addons', o.addons, 'note', o.note, 'special_request', o.special_request,
+                                                     'quote_price', o.quote_price, 'status', o.status,
+                                                     'paid', o.status in ('paid', 'collected'), 'collected', o.status = 'collected')
+                                   order by o.code)
+                   from orders o where o.pool_id = p.id and o.status <> 'cancelled'))
+        order by si.name, p.seq)
+      from pools p join sites si on si.id = p.site_id
+      where p.kitchen_id = k.id and p.order_date = p_date and p.status <> 'cancelled' and pool_meals(p.id) > 0
+    ), '[]'::json));
+end $$;
+
+-- Riders apply themselves; the team approves
+alter table riders add column if not exists status text not null default 'approved';           -- pending | approved | declined
+alter table riders add column if not exists bike text;
+alter table riders add column if not exists area text;
+alter table riders add column if not exists momo text;
+
+create or replace function rider_apply(p_name text, p_phone text, p_bike text, p_area text, p_momo text)
+returns void language plpgsql security definer set search_path = public as $$
+declare v_phone text := regexp_replace(coalesce(p_phone, ''), '\D', '', 'g');
+begin
+  if length(trim(coalesce(p_name, ''))) < 2 then raise exception 'Add your full name.'; end if;
+  if v_phone !~ '^0\d{9}$' then raise exception 'Enter your 10-digit phone number, like 024 123 4567.'; end if;
+  if exists (select 1 from riders where regexp_replace(coalesce(phone, ''), '\D', '', 'g') = v_phone) then raise exception 'This phone number has already applied.'; end if;
+  if (select count(*) from riders where status = 'pending' and created_at > now() - interval '1 day') > 50 then raise exception 'Too many applications today. Please try tomorrow.'; end if;
+  insert into riders (name, phone, bike, area, momo, status, active)
+  values (left(trim(p_name), 60), v_phone, left(trim(coalesce(p_bike, '')), 60), left(trim(coalesce(p_area, '')), 60), left(regexp_replace(coalesce(p_momo, ''), '[^0-9 ]', '', 'g'), 20), 'pending', false);
+end $$;
+grant execute on function rider_apply(text, text, text, text, text) to anon, authenticated;
+
+-- Kitchen scores from real orders only (last 90 days). Counts and percentages, no customer details.
+create or replace view kitchen_scores as
+  with p as (
+    select pl.kitchen_id, pl.id, pl.status, pl.delivered_at, pl.order_date,
+           exists (select 1 from orders o where o.pool_id = pl.id and o.cancel_reason in ('The seller did not confirm in time') ) as no_show
+    from pools pl where pl.order_date > (now() at time zone 'utc')::date - 90),
+  o as (select kitchen_id, phone, count(*) as n from orders where status in ('paid', 'collected') and order_date > (now() at time zone 'utc')::date - 90 group by 1, 2)
+  select k.id as kitchen_id,
+    coalesce((select sum(n) from o where o.kitchen_id = k.id), 0)::int as orders,
+    (select round(100.0 * count(*) filter (where p.delivered_at <= (p.order_date + s.delivery_time + interval '15 minutes')) / nullif(count(*) filter (where p.delivered_at is not null), 0))
+       from p cross join settings s where s.id = 1 and p.kitchen_id = k.id)::int as on_time,
+    (select round(100.0 * count(*) filter (where p.status <> 'cancelled') / nullif(count(*) filter (where p.status <> 'cancelled' or p.no_show), 0)) from p where p.kitchen_id = k.id)::int as reliable,
+    (select round(100.0 * count(*) filter (where o.n >= 2) / nullif(count(*), 0)) from o where o.kitchen_id = k.id)::int as come_back
+  from kitchens k where k.active and not k.archived;
+grant select on kitchen_scores to anon, authenticated;
+
+-- Which kitchens each building orders from (counts only): used to show a building its own favourites first
+create or replace view site_kitchen_counts as
+  select site_id, kitchen_id, sum(qty)::int as n from orders
+  where status <> 'cancelled' and order_date > (now() at time zone 'utc')::date - 60 group by 1, 2;
+grant select on site_kitchen_counts to anon, authenticated;
+
+-- Push alerts: each phone that switches alerts on, and what it wants to hear about
+create table if not exists push_subs (
+  endpoint text primary key,
+  p256dh text not null,
+  auth text not null,
+  user_id uuid,
+  order_ids uuid[] not null default '{}',
+  kitchen_id uuid references kitchens(id) on delete cascade,
+  rider_id uuid references riders(id) on delete cascade,
+  is_team boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+alter table push_subs enable row level security;   -- no direct access; only the functions below and the server
+create table if not exists push_log (key text primary key, sent_at timestamptz not null default now());
+alter table push_log enable row level security;
+
+create or replace function save_push_sub(p_endpoint text, p_p256dh text, p_auth text, p_order_ids uuid[] default '{}',
+                                         p_kitchen_token text default null, p_rider_token text default null)
+returns void language plpgsql security definer set search_path = public as $$
+declare v_k uuid; v_r uuid;
+begin
+  if p_endpoint !~ '^https://' or length(p_endpoint) > 1000 then raise exception 'Invalid subscription.'; end if;
+  if p_kitchen_token is not null then select id into v_k from kitchens where token = p_kitchen_token and active; end if;
+  if p_rider_token is not null then select id into v_r from riders where token = p_rider_token and active; end if;
+  insert into push_subs (endpoint, p256dh, auth, user_id, order_ids, kitchen_id, rider_id, is_team)
+  values (p_endpoint, p_p256dh, p_auth, auth.uid(), coalesce(p_order_ids, '{}'), v_k, v_r, is_admin())
+  on conflict (endpoint) do update set p256dh = excluded.p256dh, auth = excluded.auth,
+    user_id = coalesce(excluded.user_id, push_subs.user_id),
+    order_ids = (select array(select distinct unnest(push_subs.order_ids || excluded.order_ids))),
+    kitchen_id = coalesce(excluded.kitchen_id, push_subs.kitchen_id), rider_id = coalesce(excluded.rider_id, push_subs.rider_id),
+    is_team = push_subs.is_team or excluded.is_team, updated_at = now();
+end $$;
+grant execute on function save_push_sub(text, text, text, uuid[], text, text) to anon, authenticated;

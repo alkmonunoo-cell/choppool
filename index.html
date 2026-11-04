@@ -3,7 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#F8F4EF">
+<meta name="theme-color" content="#D9480F">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="ChopPool">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <title>ChopPool · Split delivery. One order. One building.</title>
 <meta name="description" content="Split delivery. One order. One building. Order lunch with people in your building and share one delivery.">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Crect%20width%3D%22100%22%20height%3D%22100%22%20rx%3D%2224%22%20fill%3D%22%23D9480F%22/%3E%3Crect%20x%3D%2220%22%20y%3D%2261%22%20width%3D%2256%22%20height%3D%2215%22%20rx%3D%224%22%20fill%3D%22%23FFF7EE%22/%3E%3Cpath%20d%3D%22M20%2068h56%22%20stroke%3D%22%23D9480F%22%20stroke-width%3D%222.5%22/%3E%3Crect%20x%3D%2244%22%20y%3D%2266%22%20width%3D%228%22%20height%3D%225%22%20rx%3D%221.5%22%20fill%3D%22%23D9480F%22/%3E%3Crect%20x%3D%2225%22%20y%3D%2244%22%20width%3D%2256%22%20height%3D%2215%22%20rx%3D%224%22%20fill%3D%22%23F5B04A%22/%3E%3Cpath%20d%3D%22M25%2051h56%22%20stroke%3D%22%23D9480F%22%20stroke-width%3D%222.5%22/%3E%3Crect%20x%3D%2249%22%20y%3D%2249%22%20width%3D%228%22%20height%3D%225%22%20rx%3D%221.5%22%20fill%3D%22%23D9480F%22/%3E%3Crect%20x%3D%2221%22%20y%3D%2227%22%20width%3D%2256%22%20height%3D%2215%22%20rx%3D%224%22%20fill%3D%22%23FFF7EE%22/%3E%3Cpath%20d%3D%22M21%2034h56%22%20stroke%3D%22%23D9480F%22%20stroke-width%3D%222.5%22/%3E%3Crect%20x%3D%2245%22%20y%3D%2232%22%20width%3D%228%22%20height%3D%225%22%20rx%3D%221.5%22%20fill%3D%22%23D9480F%22/%3E%3C/svg%3E">
@@ -319,6 +325,9 @@ button.dtile:not([disabled]):hover { outline: 2px solid var(--accent-soft); }
 .capline { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; font-size: 14px; }
 .capline i { grid-column: 1 / -1; height: 6px; border-radius: 3px; background: linear-gradient(90deg, var(--accent) var(--w), var(--surface-2) var(--w)); }
 .cards2 { display: grid; gap: 14px; }
+.apptools { display: grid; gap: 12px; }
+.listcta { display: grid; gap: 10px; box-shadow: inset 0 0 0 2px var(--accent-soft), var(--shadow); }
+.score { color: var(--ok); font-weight: 600; align-self: center; }
 .payalts { font-size: 14px; } .payalts summary { cursor: pointer; color: var(--accent-2); font-weight: 600; padding: 4px 0; }
 .payalt { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 0; border-top: 1px solid var(--line); }
 @media (min-width: 900px) {
@@ -368,7 +377,8 @@ const CONFIG = {
   SUPABASE_URL: "https://urdodbvwgujqrlqziain.supabase.co",
   SUPABASE_ANON_KEY: "sb_publishable_N2WBi5WTRlnGZnHukWysuQ_1zd6p4_S",   // publishable key (safe to be public)
   PUBLIC_URL: "https://alkmonunoo-cell.github.io/choppool",          // the link you share, e.g. https://choppool.netlify.app
-  GOOGLE_SIGN_IN: false    // set to true after enabling Google in Supabase (see SETUP.md)
+  GOOGLE_SIGN_IN: false,   // set to true after enabling Google in Supabase (see SETUP.md)
+  VAPID_PUBLIC_KEY: "BMlJ_jsKjf9TO-1m9RgSNTRxUH7cJpCRHp50JXbGeK1FlYEX934Ryfc-g4p4BYYAJON5Kbma3UNTXbZLJTYiubY"     // push alerts: the public key from PUSH-SETUP.md (blank = alerts only while the app is open)
 };
 /* ======================================================================================================= */
 
@@ -546,8 +556,9 @@ function makeDemoApi() {
 
   return {
     demo: true,
-    async load() { const pop = {}; orders.filter(o => o.status !== "cancelled").forEach(o => { pop[o.item_id] = (pop[o.item_id] || 0) + o.qty; });
-      return { pop, payMethods: payMethods.filter(p => p.active), settings, sites: sites.filter(x => x.status === "active" && x.active), menus: kitchens.filter(k => k.active).map(k => ({ id: k.id, public_name: k.public_name, tagline: k.tagline, capacity: k.capacity, site_id: k.site_id, added_by_customer: k.added_by_customer, lat: k.lat ?? null, lng: k.lng ?? null })), items: items.filter(i => i.active !== false) }; },
+    async load() { const pop = {}, siteCounts = {}; orders.filter(o => o.status !== "cancelled").forEach(o => { pop[o.item_id] = (pop[o.item_id] || 0) + o.qty; (siteCounts[o.site_id] = siteCounts[o.site_id] || {})[o.kitchen_id] = ((siteCounts[o.site_id] || {})[o.kitchen_id] || 0) + o.qty; });
+      const scores = { k1: { orders: 140, on_time: 98, reliable: 100, come_back: 64 }, k2: { orders: 36, on_time: 91, reliable: 95, come_back: 41 } };
+      return { pop, siteCounts, scores, payMethods: payMethods.filter(p => p.active), settings, sites: sites.filter(x => x.status === "active" && x.active), menus: kitchens.filter(k => k.active).map(k => ({ id: k.id, public_name: k.public_name, tagline: k.tagline, capacity: k.capacity, site_id: k.site_id, added_by_customer: k.added_by_customer, lat: k.lat ?? null, lng: k.lng ?? null })), items: items.filter(i => i.active !== false) }; },
     async board(date) {
       housekeeping();
       const load = {}; orders.filter(o => o.order_date === date && o.status !== "cancelled").forEach(o => { load[o.kitchen_id] = (load[o.kitchen_id] || 0) + o.qty; });
@@ -598,7 +609,7 @@ function makeDemoApi() {
     async kitchenView(token, date) {
       housekeeping();
       const k = byToken(kitchens, "token", token);
-      return { kitchen: { name: k.name, public_name: k.public_name, capacity: k.capacity, delivery_mode: k.delivery_mode, added_by_customer: k.added_by_customer, open: isOpen(k.id, date) },
+      return { kitchen: { name: k.name, public_name: k.public_name, capacity: k.capacity, delivery_mode: k.delivery_mode, added_by_customer: k.added_by_customer, open: isOpen(k.id, date), listing_status: k.listing_status || "none", listing: k.listing || null },
         menu: items.filter(i => i.kitchen_id === k.id && i.active !== false).map(i => ({ id: i.id, name: i.name, price: i.price })),
         pools: pools.filter(p => p.kitchen_id === k.id && p.order_date === date && p.status !== "cancelled" && meals(p.id) > 0).map(p => {
           const si = sites.find(s => s.id === p.site_id);
@@ -692,6 +703,10 @@ function makeDemoApi() {
     async saveItem(it) { if (it.id) Object.assign(items.find(i => i.id === it.id), it); else items.push({ id: "i" + uid(), addons: [], active: true, ...it }); },
     async addRider(r) { riders.push({ id: "r" + uid(), token: "demo" + uid(), active: true, created_at: nowIso(), ...r }); },
     async updateRider(id, p) { Object.assign(riders.find(r => r.id === id), p); },
+    async riderApply(r) { const ph = String(r.phone || "").replace(/\D/g, ""); if ((r.name || "").length < 2) throw new Error("Add your full name."); if (!/^0\d{9}$/.test(ph)) throw new Error("Enter your 10-digit phone number, like 024 123 4567."); if (riders.some(x => String(x.phone || "").replace(/\D/g, "") === ph)) throw new Error("This phone number has already applied.");
+      riders.push({ id: "r" + uid(), token: "demo" + uid(), name: r.name, phone: ph, bike: r.bike, area: r.area, momo: r.momo, status: "pending", active: false, created_at: nowIso() }); },
+    async vendorRequestListing(token, listing) { const k = byToken(kitchens, "token", token); if (!k.added_by_customer || k.listing_status === "approved") throw new Error("You are already listed on ChopPool."); k.listing = listing; k.listing_status = "pending"; k.listing_requested_at = nowIso(); },
+    async savePushSub() {}, async notify() {},
     async addSite(si) { sites.push({ id: "s" + uid(), host_token: "demo" + uid(), status: "active", active: true, created_at: nowIso(), ...si }); },
     async updateSite(id, p) { Object.assign(sites.find(x => x.id === id), p); },
     async addTeam(email, role) { if (team.some(t => t.email === email)) throw new Error("That email is already on the team."); team.push({ email, role }); },
@@ -714,15 +729,15 @@ function makeSupabaseApi() {
     demo: false,
     async load() {
       const soft = q => q.then(r => r.error ? null : r.data, () => null);   // optional tables: the app still works before the database update
-      const [payMethods, popRows] = await Promise.all([soft(sb.from("payment_methods").select("*").eq("active", true).order("sort")), soft(sb.from("dish_popularity").select("*"))]);
-      const pop = {}; (popRows || []).forEach(r => { pop[r.item_id] = r.n; });
+      const [payMethods, popRows, scoreRows, scRows] = await Promise.all([soft(sb.from("payment_methods").select("*").eq("active", true).order("sort")), soft(sb.from("dish_popularity").select("*")), soft(sb.from("kitchen_scores").select("*")), soft(sb.from("site_kitchen_counts").select("*"))]);
+      const pop = {}, scores = {}, siteCounts = {}; (popRows || []).forEach(r => { pop[r.item_id] = r.n; }); (scoreRows || []).forEach(r => { scores[r.kitchen_id] = r; }); (scRows || []).forEach(r => { (siteCounts[r.site_id] = siteCounts[r.site_id] || {})[r.kitchen_id] = r.n; });
       const [settings, sites, menus, items] = await Promise.all([
         sb.from("settings").select("*").eq("id", 1).single().then(must),
         sb.from("public_sites").select("*").order("name").then(must),
         sb.from("public_menus").select("*").order("public_name").then(must),
         sb.from("menu_items").select("*").eq("active", true).order("price").then(must)
       ]);
-      return { settings, sites, menus, items, payMethods: payMethods || [], pop };
+      return { settings, sites, menus, items, payMethods: payMethods || [], pop, scores, siteCounts };
     },
     async board(date) {
       await sb.rpc("housekeeping");
@@ -772,6 +787,12 @@ function makeSupabaseApi() {
     async waitingPools(date) { const ps = must(await sb.from("public_pools").select("*").eq("order_date", date).eq("status", "waiting")); return ps.filter(p => p.meals > 0); },
     vendorSetMenu: (t, items) => rpc("vendor_set_menu", { p_token: t, p_items: items }),
     riderView: (t, d) => rpc("rider_view", { p_token: t, p_date: d }),
+    async riderApply(r) { const x = await sb.rpc("rider_apply", { p_name: r.name, p_phone: r.phone, p_bike: r.bike, p_area: r.area, p_momo: r.momo });
+      if (x.error && /function|schema cache/i.test(x.error.message)) throw new Error("Rider sign-up isn't switched on yet. Please contact ChopPool."); return must(x); },
+    async vendorRequestListing(t, listing) { const x = await sb.rpc("vendor_request_listing", { p_token: t, p_listing: listing });
+      if (x.error && /function|schema cache/i.test(x.error.message)) throw new Error("Listing isn't switched on yet. Please contact ChopPool."); return must(x); },
+    savePushSub: p => rpc("save_push_sub", { p_endpoint: p.endpoint, p_p256dh: p.p256dh, p_auth: p.auth, p_order_ids: p.order_ids || [], p_kitchen_token: p.kitchen_token || null, p_rider_token: p.rider_token || null }),
+    notify: body => sb.functions.invoke("notify", { body }),
     riderUpdate: (t, p, s) => rpc("rider_update", { p_token: t, p_pool: p, p_status: s }),
     hostView: (t, d) => rpc("host_view", { p_token: t, p_date: d }),
     collectCode: (t, c, d) => rpc("collect_code", { p_token: t, p_code: c, p_date: d }),
@@ -932,6 +953,8 @@ async function refreshUser() {
   }
   if (S.tab === "wallet") renderWallet();
 }
+const customerInstall = () => isStandalone() ? (pushReady() && !local.get("cp_push") ? `<button class="ghost wide" data-alerts='${esc(JSON.stringify({ order_ids: (local.get("cp_orders") || []).map(o => o.id) }))}'>Turn on order alerts</button>` : "")
+  : `<section class="card apptools"><div class="row" style="gap:12px;justify-content:flex-start">${LOGO(40)}<div><strong>Get the ChopPool app</strong><p class="small muted">One tap from your home screen${pushReady() ? ", with alerts when your lunch is on the way" : ""}. No app store needed.</p></div></div><button class="btn" data-install="#order">Install app</button></section>`;
 function openChangeName() {
   openSheet(`${sheetHead("Change your name", "This is the name in your greeting and on your orders.")}
     <form id="nameForm" class="stack" novalidate><div><label for="newName">Your name</label><input id="newName" autocomplete="name" maxlength="60" value="${esc(S.user?.name || "")}"></div>
@@ -989,6 +1012,7 @@ async function renderWallet() {
   if (!S.user) {
     el.innerHTML = `<div class="balance"><span class="small" style="opacity:.8">ChopPool wallet</span><b class="num">${money(0)}</b><p class="small" style="opacity:.85">When pools fill up, the delivery you saved comes back here as cashback.</p></div>
       <button class="btn wide" id="wSign">Create an account to collect cashback</button><button class="linkbtn" id="wIn" style="justify-self:center">I already have an account</button>`;
+    el.insertAdjacentHTML("beforeend", customerInstall());
     $("#wSign").addEventListener("click", () => openAccount());
     $("#wIn").addEventListener("click", () => openAccount());
     return;
@@ -1001,6 +1025,7 @@ async function renderWallet() {
     <div class="ledger">${(w.entries || []).map(e => `<div><span>${esc(e.reason)}</span><strong class="num" style="color:${e.amount < 0 ? "var(--muted)" : "var(--ok)"}">${e.amount < 0 ? "−" : "+"}${money(Math.abs(e.amount))}</strong></div>`).join("") || `<div><span class="muted">No activity yet. Order from a pool to start earning cashback.</span></div>`}</div>
     <div class="card" style="display:grid;gap:4px"><span class="small muted">Your name</span><div class="row"><strong>${esc(S.user.name || "Not set")}</strong><button class="ghost" id="chName" style="padding:6px 12px">Change</button></div></div>
     <p class="small muted center">Signed in as ${esc(S.user.email)} · <button class="linkbtn" id="signOut">Sign out</button></p>`;
+  el.insertAdjacentHTML("beforeend", customerInstall());
   $("#chName").addEventListener("click", openChangeName);
   $("#signOut").addEventListener("click", async () => { await api.signOut(); S.user = null; await refreshUser(); refreshMine(); renderWallet(); toast("Signed out"); });
 }
@@ -1287,7 +1312,11 @@ function renderKitchens() {
   const far = rows.filter(r => r.d != null && r.d > NEAR_KITCHEN_M).length;
   rows = rows.filter(r => r.d == null || r.d <= NEAR_KITCHEN_M).sort((a, b) => (a.d ?? 1e12) - (b.d ?? 1e12));
   $("#kitchensSub").textContent = "Delivering to " + (site.name || "your building") + ". Start a pool and others in your building can join it." + (far ? " " + far + " more kitchen" + (far > 1 ? "s are" : " is") + " too far to deliver here." : "");
-  el.innerHTML = rows.map(({ k, d }) => {
+  // Curated: this building's own favourites first, then the best-rated nearby kitchens (6, with "See more")
+  const counts = (S.siteCounts || {})[S.siteId] || {}, mine = rows.filter(r => r.k.site_id === S.siteId || counts[r.k.id] > 0).sort((a, b) => (counts[b.k.id] || 0) - (counts[a.k.id] || 0) || (a.d ?? 1e12) - (b.d ?? 1e12));
+  const others = rows.filter(r => !mine.includes(r)).sort((a, b) => rank(b.k) - rank(a.k) || (a.d ?? 1e12) - (b.d ?? 1e12));
+  const shown = S.allKitchens ? others : others.slice(0, 6);
+  const card = ({ k, d }) => {
     const st = menuState(k), p = currentPool(S.siteId, k.id), dishes = S.items.filter(it => it.kitchen_id === k.id), active = activeHere(k);
     const trip = tripTo(k, site), from = feeFor(max, s, trip), km = hasPin(site) ? roadKm(kPin(k, site), site) : null;
     const priceLine = (km != null ? "About " + (km < 1 ? "1" : km.toFixed(1)) + " km by road · " : "") + "delivery from " + money(from) + " a meal when the pool fills";
@@ -1296,9 +1325,13 @@ function renderKitchens() {
       : active ? `<button class="btn wide" data-menu="${esc(k.id)}">Join the active pool</button>` : `<button class="btn wide" data-menu="${esc(k.id)}">Start a pool</button>`;
     return `<article class="kcard"><div class="head"><span class="tile" style="background:${tint(menuIndex(k.id))}">${art(dishKind(topDish(k.id)))}</span>
       <div style="flex:1;min-width:0"><strong>${esc(k.public_name)}</strong><p class="small muted">${esc(k.added_by_customer ? "A local seller added by a customer" : k.tagline || "")}</p>
-        <div class="row" style="justify-content:flex-start;gap:6px;margin-top:4px">${status}</div><p class="small" style="margin-top:4px;color:var(--hint)">${esc(priceLine)}</p></div></div>
+        <div class="row" style="justify-content:flex-start;gap:6px;margin-top:4px;flex-wrap:wrap">${status}${scoreLine(k)}</div><p class="small" style="margin-top:4px;color:var(--hint)">${esc(priceLine)}</p></div></div>
       <div class="dishline">${dishes.slice(0, 3).map(x => `<span>${esc(x.name)} · ${money(x.price)}</span>`).join("")}${dishes.length > 3 ? `<span>+${dishes.length - 3} more</span>` : ""}</div>${btn}</article>`;
-  }).join("") || `<div class="empty">${ICON.store}<p>No kitchens deliver to ${esc(site.name || "this building")} yet. Add a seller you know below.</p></div>`;
+  };
+  el.innerHTML = rows.length ? (mine.length ? `<p class="group-title">Popular in your building</p>${mine.map(card).join("")}` : "")
+    + (others.length ? `${mine.length ? `<p class="group-title">Top kitchens nearby</p>` : ""}${shown.map(card).join("")}${others.length > shown.length ? `<button class="ghost wide" id="moreKitchens">See ${others.length - shown.length} more</button>` : ""}` : "")
+    : `<div class="empty">${ICON.store}<p>No kitchens deliver to ${esc(site.name || "this building")} yet. Add a seller you know below.</p></div>`;
+  $("#moreKitchens")?.addEventListener("click", () => { S.allKitchens = true; renderKitchens(); });
 }
 function renderPools() {
   const s = S.settings, max = Number(s.max_meals), list = menusHere().filter(activeHere);
@@ -1339,6 +1372,8 @@ async function toggleAlerts() {
   if (on) {
     try { if ("Notification" in window && Notification.permission === "default") await Notification.requestPermission(); } catch (e) {}
     toast("Alerts on. We'll tell you when people at " + siteOf(S.siteId).name + " order, up to " + S.settings.notify_daily_cap + " a day.");
+    // With the installed app, alerts about your own orders arrive even when ChopPool is closed
+    pushSubscribe({ order_ids: (local.get("cp_orders") || []).map(o => o.id) }, true);
   } else toast("Alerts off. You'll still get updates about your own orders.");
 }
 function announceActivity() {
@@ -1557,6 +1592,7 @@ function openOrder(menuId) {
       const mine = (local.get("cp_orders") || []).filter(o => o.order_date >= today()); mine.push({ id: r.id, order_date: r.order_date }); local.set("cp_orders", mine);
       if (S.user) { try { await api.saveProfile({ name, phone }); } catch (e) {} }
       await refreshBoard(); refreshMine(); refreshUser();
+      notifyServer({ order_id: r.id }); if (local.get("cp_push")) pushSubscribe({ order_ids: [r.id] }, true);
       showConfirmation(r, k, site, sp);
     } catch (e) { $("#submitBtn").disabled = false; err.textContent = cleanErr(e); }
   });
@@ -1658,9 +1694,9 @@ const ADMIN_TABS = [["dash", "Dashboard"], ["today", "Today"], ["menus", "Kitche
 // Sub-sections per tab; a third value marks owner-only sections
 const ADMIN_SUBS = {
   today: [["pools", "Pools"], ["orders", "Orders & payments"], ["wallets", "Wallets & refunds"]],
-  menus: [["list", "Kitchens"], ["add", "Add a kitchen"]],
+  menus: [["list", "Kitchens"], ["requests", "Listing requests"], ["add", "Add a kitchen"]],
   buildings: [["list", "Active"], ["requests", "Requests"], ["add", "Add a building"]],
-  riders: [["list", "Riders"], ["add", "Add a rider"], ["pricing", "Delivery pricing"]],
+  riders: [["list", "Riders"], ["apply", "Applications"], ["add", "Add a rider"], ["pricing", "Delivery pricing"]],
   team: [["members", "Team members"], ["payments", "Payment options", true], ["accounts", "Customer accounts", true]]
 };
 const NETWORKS = ["MTN", "Telecel", "AirtelTigo"];
@@ -1702,7 +1738,7 @@ async function viewAdmin() {
   document.body.classList.add("is-admin");
   S.adminTab = ADMIN_TABS.some(t => t[0] === S.adminTab) ? S.adminTab : "dash";
   $("#view").innerHTML = `
-    <div class="row small" style="justify-content:space-between;gap:8px;flex-wrap:wrap"><span class="muted">Signed in as <strong style="color:var(--ink)">${esc(S.user?.email || "")}</strong> · ${role === "super" ? "Owner" : "Coordinator"}</span><button class="ghost" id="aSignOut" style="padding:6px 14px">Sign out</button></div>
+    <div class="row small" style="justify-content:space-between;gap:8px;flex-wrap:wrap"><span class="muted">Signed in as <strong style="color:var(--ink)">${esc(S.user?.email || "")}</strong> · ${role === "super" ? "Owner" : "Coordinator"}</span><span class="row" style="gap:6px">${isStandalone() ? "" : `<button class="ghost" data-install="#admin" style="padding:6px 14px">Install app</button>`}<button class="ghost" id="aSignOut" style="padding:6px 14px">Sign out</button></span></div>
     <header class="row" style="flex-wrap:wrap;gap:10px"><div class="row" style="gap:12px;justify-content:flex-start">${LOGO(44)}<div><p class="brand" style="font-size:16px">ChopPool ${role === "super" ? "owner" : "coordinator"}</p><h1>Operations</h1></div></div>
       <div class="row" style="gap:8px"><input id="aDate" type="date" value="${day}" aria-label="Delivery date" style="width:auto"><button class="ghost" id="aRefresh">Refresh</button></div></header>
     <div id="aDays"></div>
@@ -1767,6 +1803,8 @@ async function renderAdmin(cached) {
   const pending = A.sites.filter(x => x.status === "pending");
   const badge = document.querySelector('[data-atab="buildings"]'); if (badge) badge.textContent = "Buildings" + (pending.length ? " (" + pending.length + " new)" : "");
   const livePools = A.pools.filter(p => p.status !== "cancelled" && p.meals > 0);
+  const listReq = A.kitchens.filter(k => k.listing_status === "pending"), riderApps = A.riders.filter(r => r.status === "pending");
+  const ridersOk = A.riders.filter(r => !r.status || r.status === "approved");
   A.pools.forEach(p => { p.runner = K(p.kitchen_id).delivery_mode === "runner"; });
 
   // Sub-sections: a second row of tabs on phones, a side menu on laptops
@@ -1775,7 +1813,7 @@ async function renderAdmin(cached) {
   if (subs.length && !subs.some(x => x[0] === S.adminSub[tab])) S.adminSub[tab] = subs[0][0];
   const sub = S.adminSub[tab];
   const nav = $("#aSub"), frame = $("#aFrame");
-  if (nav) nav.innerHTML = subs.map(([k, l]) => `<button data-asub="${k}"${k === sub ? ' aria-current="page"' : ""}>${esc(l)}${tab === "buildings" && k === "requests" && pending.length ? " (" + pending.length + ")" : ""}</button>`).join("");
+  if (nav) nav.innerHTML = subs.map(([k, l]) => `<button data-asub="${k}"${k === sub ? ' aria-current="page"' : ""}>${esc(l)}${tab === "buildings" && k === "requests" && pending.length ? " (" + pending.length + ")" : ""}${tab === "menus" && k === "requests" && listReq.length ? " (" + listReq.length + ")" : ""}${tab === "riders" && k === "apply" && riderApps.length ? " (" + riderApps.length + ")" : ""}</button>`).join("");
   if (frame) frame.classList.toggle("has-sub", subs.length > 0);
   const body = $("#aBody");
 
@@ -1803,6 +1841,8 @@ async function renderAdmin(cached) {
       ["Sellers not confirmed", waiting.length + otherWait.length, "today:pools", "bad", waiting.length ? "Least time left: " + Math.min(...waiting.map(minsLeft)) + " min" : otherWait.length ? "For " + dayLabel(d === dToday ? dNext : dToday) : ""],
       ["Special requests to price", A.orders.filter(o => o.status === "quote_requested").length, "today:orders", "warn", "Sellers haven't priced yet"],
       ["Building requests", pending.length, "buildings:requests", "warn", "Waiting for approval"],
+      ["Seller listing requests", listReq.length, "menus:requests", "warn", "Sellers asking to be listed"],
+      ["Rider applications", riderApps.length, "riders:apply", "warn", "Riders asking to join"],
       ["Small pools", small.length, "today:pools", "warn", "Under " + s.min_pool + " meals near cut-off"]
     ].filter(a => a[1] > 0);
     const byStage = STEPS.map(st => [STEP_LABEL[st], livePools.filter(p => p.status === st).length]).filter(x => x[1]);
@@ -1847,7 +1887,7 @@ async function renderAdmin(cached) {
           <div class="top" style="align-items:flex-start"><div><h3>${esc(sName(p.site_id))}</h3><p class="small muted">${esc(k.public_name)} Pool ${p.seq} · ${k.added_by_customer ? "seller added by a customer" : "cooked by " + esc(k.name)}${p.runner ? " · own runner" : ""}</p></div>
             <div class="fee"><b class="num" style="font-size:22px">${p.meals}/${s.max_meals}</b><span>${money(feeFor(p.meals, s, aTrip(p)))} a meal · trip est. ${money(aTrip(p))}</span></div></div>
           ${stepsHtml(p.status)}${fl.length ? `<p class="small" style="color:var(--danger)">${fl.map(esc).join(" · ")}</p>` : ""}
-          ${p.runner ? "" : `<div class="inline"><div><label for="rd-${p.id}">Rider</label><select id="rd-${p.id}" data-f="rider_id"><option value="">Bolt Send / Yango</option>${A.riders.filter(r => r.active).map(r => `<option value="${esc(r.id)}"${r.id === p.rider_id ? " selected" : ""}>${esc(r.name)}</option>`).join("")}</select></div>
+          ${p.runner ? "" : `<div class="inline"><div><label for="rd-${p.id}">Rider</label><select id="rd-${p.id}" data-f="rider_id"><option value="">Bolt Send / Yango</option>${ridersOk.filter(r => r.active).map(r => `<option value="${esc(r.id)}"${r.id === p.rider_id ? " selected" : ""}>${esc(r.name)}</option>`).join("")}</select></div>
             <div><label for="tr-${p.id}">Trip ref</label><input id="tr-${p.id}" data-f="trip_ref" value="${esc(p.trip_ref || "")}" placeholder="Booking code"></div>
             <div><label for="tc-${p.id}">Trip cost</label><input id="tc-${p.id}" data-f="trip_cost" inputmode="decimal" value="${esc(p.trip_cost ?? "")}" placeholder="GHS"></div>
             <button class="ghost" data-act="pool-save">Save</button></div>`}
@@ -1883,6 +1923,14 @@ async function renderAdmin(cached) {
   /* ---------- Kitchens & menus ---------- */
   if (tab === "menus") {
     const items = A.items || [];
+    if (sub === "requests") body.innerHTML = listReq.length ? `<div class="stack" style="gap:10px">${listReq.map(k => { const L = k.listing || {}, dishes = items.filter(i => i.kitchen_id === k.id && i.active !== false);
+        return `<article class="card" data-kitchen="${esc(k.id)}" style="border:2px solid var(--hint)"><div class="top" style="align-items:flex-start"><div><h3>${esc(L.name || k.name)}</h3><p class="small muted">${esc(L.tagline || "")}${k.listing_requested_at ? " · asked " + fmtDate(String(k.listing_requested_at).slice(0, 10)) : ""} · first added by a customer at ${esc(sName(k.site_id))}</p></div>${pill("Wants to be listed", "warn")}</div>
+          <div class="grid2 small"><p><strong>Cooks:</strong> ${esc(L.hours || "—")}</p><p><strong>Meals a day:</strong> ${esc(L.capacity || k.capacity)}</p><p><strong>MoMo:</strong> <span class="num">${esc(L.momo || "—")}</span></p><p><strong>WhatsApp:</strong> <span class="num">${esc(k.whatsapp || "—")}</span></p></div>
+          ${L.lat != null ? `<a class="linkbtn" href="${osmLink(L)}" target="_blank" rel="noopener">See where they cook</a>` : ""}
+          <p class="group-title">Menu</p><div class="dishline">${dishes.map(x => `<span>${esc(x.name)} · ${money(x.price)}</span>`).join("") || `<span>No dishes yet</span>`}</div>
+          <p class="small muted">Approving lists them for every nearby building. Call them first and, if you can, visit or order a test meal.</p>
+          <div class="row" style="justify-content:flex-start;gap:8px;flex-wrap:wrap"><button class="btn" data-act="listing-approve">Approve listing</button><button class="ghost" data-act="listing-decline">Decline</button>${k.whatsapp ? `<a class="wa quiet" style="padding:8px 12px" href="${wa(k.whatsapp)}" target="_blank" rel="noopener">${ICON.wa} WhatsApp</a>` : ""}</div></article>`; }).join("")}</div>`
+      : `<div class="note">No listing requests. Sellers that customers add can ask to be listed from their own page.</div>`;
     if (sub === "add") body.innerHTML = `
       <form class="card" data-form="kitchen"><h2>Add a kitchen or seller</h2>
         <div class="grid2"><div><label for="nkName">Real name</label><input id="nkName" name="name" placeholder="Auntie Akos Kitchen"></div><div><label for="nkPub">Menu name customers see</label><input id="nkPub" name="public_name" placeholder="Local favourites"></div></div>
@@ -1969,12 +2017,19 @@ async function renderAdmin(cached) {
         <p class="small muted">The cap applies to every pool and every rider: nobody pays more than this per meal for delivery. Changes only affect new orders.</p>
         ${s.base_fare != null ? `<p class="small" style="color:var(--hint)">Examples: 2 km trip ${money(ex(2))} · 5 km ${money(ex(5))} · 10 km ${money(ex(10))}</p>` : ""}
         <p class="err" data-err></p><button class="btn">Save pricing</button></form>`; }
+    if (sub === "apply") body.innerHTML = riderApps.length ? `<div class="stack" style="gap:10px">${riderApps.map(r => `<article class="card" data-rider="${esc(r.id)}"><div class="top" style="align-items:flex-start"><div><h3>${esc(r.name)}</h3><p class="small muted">${esc(added(r))}</p></div>${pill("Applied", "warn")}</div>
+        <div class="grid2 small"><p><strong>Phone:</strong> <span class="num">${esc(r.phone || "")}</span></p><p><strong>MoMo:</strong> <span class="num">${esc(r.momo || "—")}</span></p><p><strong>Motorbike:</strong> ${esc(r.bike || "—")}</p><p><strong>Area:</strong> ${esc(r.area || "—")}</p></div>
+        <p class="small muted">Call them, check their licence and bike papers, then approve.</p>
+        <div class="row" style="justify-content:flex-start;gap:8px;flex-wrap:wrap"><button class="btn" data-act="rider-approve">Approve</button><button class="ghost" data-act="rider-decline">Decline</button>${r.phone ? `<a class="linkbtn" href="tel:${esc(r.phone)}">Call</a>` : ""}</div></article>`).join("")}</div>`
+      : `<div class="note">No rider applications waiting. Share the sign-up link under "Add a rider".</div>`;
     if (sub === "add") body.innerHTML = `
+      <section class="card"><h2>Let riders sign up</h2><p class="small muted">Share this link. Riders fill in their details and you approve them under Applications.</p>
+        <div class="codebox" style="grid-template-columns:1fr auto"><input readonly value="${esc(baseUrl() + "/#rider-signup")}" aria-label="Rider sign-up link"><button class="ghost" data-act="signup-copy">Copy</button></div></section>
       <form class="card" data-form="rider"><h2>Add a rider</h2><div class="grid2"><div><label for="nrName">Name</label><input id="nrName" name="name" placeholder="Kwame Asare"></div><div><label for="nrPhone">Phone / WhatsApp</label><input id="nrPhone" name="phone" inputmode="tel" placeholder="024 123 4567"></div></div>
         <p class="err" data-err></p><button class="btn">Add rider</button></form>
       <p class="small muted">While you use Bolt Send or Yango, you don't need riders here. Log those trips on each pool under Today › Pools.</p>`;
     if (sub === "list") {
-      const list = sorted(A.riders, "r", liveR, r => r.name, r => r.active ? "a" : "b");
+      const list = sorted(ridersOk, "r", liveR, r => r.name, r => r.active ? "a" : "b");
       body.innerHTML = listBar("r") + `<div class="stack" style="gap:8px">${list.map(r => { const np = livePools.filter(p => p.rider_id === r.id).length;
         return `<details class="item" data-rider="${esc(r.id)}" data-key="r:${esc(r.id)}"${isOpen("r:" + r.id)}>
         <summary><span class="ititle"><strong>${esc(r.name)}</strong><span class="small muted num">${esc(r.phone || "")}</span></span>
@@ -2055,6 +2110,7 @@ async function adminClick(e) {
   const run = async (fn, ok) => { try { await fn(); if (ok) toast(ok); renderAdmin(); } catch (err) { toast(cleanErr(err)); } };
   if (t.dataset.refunded) return run(() => api.updateOrder(t.dataset.refunded, { refund_needed: false }), "Marked refunded");
   if (act === "csv") return copy(ordersCsv(), "Orders copied. Paste them into Excel or Google Sheets.");
+  if (act === "signup-copy") return copy(baseUrl() + "/#rider-signup", "Rider sign-up link copied");
   const pm = t.closest("[data-paym]");
   if (pm && act === "pay-save") {
     const num = (fval(pm, "number") || "").replace(/[^\d ]/g, "").trim();
@@ -2068,7 +2124,7 @@ async function adminClick(e) {
     const id = poolCard.dataset.pool, p = A.pools.find(x => x.id === id), d = p.order_date;
     const k = A.kitchens.find(x => x.id === p.kitchen_id), site = A.sites.find(x => x.id === p.site_id);
     const os = A.orders.filter(o => o.pool_id === id && !["cancelled", "quote_requested", "quoted"].includes(o.status));
-    if (act === "pool-save") return run(() => api.updatePool(id, { rider_id: fval(poolCard, "rider_id") || null, trip_ref: fval(poolCard, "trip_ref") || null, trip_cost: fval(poolCard, "trip_cost") ? Number(fval(poolCard, "trip_cost")) : null }), "Pool saved");
+    if (act === "pool-save") return run(() => api.updatePool(id, { rider_id: fval(poolCard, "rider_id") || null, trip_ref: fval(poolCard, "trip_ref") || null, trip_cost: fval(poolCard, "trip_cost") ? Number(fval(poolCard, "trip_cost")) : null }).then(() => notifyServer({ pool_id: id })), "Pool saved");
     if (act === "ticket") {
       const tally = {}; os.forEach(o => { const key = o.item_name + (o.addons?.length ? " (" + addonText(o.addons) + ")" : ""); tally[key] = (tally[key] || 0) + o.qty; });
       const text = "ChopPool order for " + fmtDate(d) + ". Ready by " + minus(s.delivery_time, 30) + ".\n" + site.name + ", Pool " + p.seq + " (" + p.meals + " meals):\n" +
@@ -2088,6 +2144,8 @@ async function adminClick(e) {
   if (kc) {
     const k = A.kitchens.find(x => x.id === kc.dataset.kitchen);
     if (act === "kitchen-copy") return copy(baseUrl() + "/#kitchen-" + k.token, "Link copied");
+    if (act === "listing-approve") { const L = k.listing || {}; return run(() => api.updateKitchen(k.id, { listing_status: "approved", added_by_customer: false, site_id: null, name: L.name || k.name, public_name: L.name || k.public_name, tagline: L.tagline || k.tagline || null, capacity: Number(L.capacity) || k.capacity, ...(L.lat != null ? { lat: L.lat, lng: L.lng } : {}) }).then(async () => Object.assign(S, await api.load())), "Listed. Nearby buildings can now see " + (L.name || k.name) + "."); }
+    if (act === "listing-decline") return run(() => api.updateKitchen(k.id, { listing_status: "declined" }), "Listing declined. They can still serve the building that added them.");
     if (act === "kitchen-save") {
       const w = (fval(kc, "whatsapp") || "").replace(/\D/g, "");
       if (w && !/^0\d{9}$/.test(w)) return toast("Enter a 10-digit WhatsApp number starting with 0.");
@@ -2118,6 +2176,8 @@ async function adminClick(e) {
   if (rc) {
     const r = A.riders.find(y => y.id === rc.dataset.rider);
     if (act === "rider-copy") return copy(baseUrl() + "/#rider-" + r.token, "Link copied");
+    if (act === "rider-approve") return run(async () => { await api.updateRider(r.id, { status: "approved", active: true }); setTimeout(() => openSheet(`${sheetHead("Rider approved")}<p>Send ${esc(r.name)} their private rider link. It opens their rider app.</p>${sendLink(r.phone, "Welcome to ChopPool, " + r.name + ". Your rider page: " + baseUrl() + "/#rider-" + r.token) || ""}<button class="ghost wide" data-close>Done</button>`), 300); }, "Rider approved");
+    if (act === "rider-decline") return run(() => api.updateRider(r.id, { status: "declined", active: false }), "Application declined");
     if (act === "rider-save") return run(() => api.updateRider(r.id, { name: fval(rc, "name"), phone: (fval(rc, "phone") || "").replace(/\D/g, "") || null, active: fval(rc, "active") }), "Rider saved");
   }
   const mr = t.closest("[data-member]");
@@ -2127,7 +2187,7 @@ async function adminChange(e) {
   const t = e.target;
   if (t.matches("[data-ls]")) { (S.ls = S.ls || {})[t.dataset.ls] = t.value; return renderAdmin(true); }
   const run = async (fn, ok) => { try { await fn(); toast(ok); renderAdmin(); } catch (err) { toast(cleanErr(err)); } };
-  if (t.matches("select[data-act=pool-status]")) return run(() => api.updatePool(t.closest("[data-pool]").dataset.pool, { status: t.value }), "Pool updated");
+  if (t.matches("select[data-act=pool-status]")) { const pid = t.closest("[data-pool]").dataset.pool; return run(() => api.updatePool(pid, { status: t.value }).then(() => notifyServer({ pool_id: pid })), "Pool updated"); }
   if (t.matches("select[data-order]")) return run(() => api.updateOrder(t.dataset.order, { status: t.value, ...(t.value === "collected" ? { collected_at: new Date().toISOString(), collected_by: "coordinator" } : {}) }), "Order updated");
   if (t.matches("select[data-act=team-role]")) return run(() => api.updateTeam(t.closest("[data-member]").dataset.member, t.value), "Role updated");
 }
@@ -2219,6 +2279,9 @@ async function viewKitchen(token) {
     $("#view").innerHTML = `
       <header><div class="row" style="gap:10px;justify-content:flex-start">${LOGO(34)}<p class="brand" style="font-size:18px">ChopPool ${k.added_by_customer ? "seller" : "kitchen"}</p></div><h1>${esc(k.name)}</h1>
         <p class="muted">${fmtDate(d)} · ready by ${minus(S.settings.delivery_time, 30)} · ${used} of ${k.capacity} meals · ${k.delivery_mode === "runner" ? "you deliver with your own runner" : "a ChopPool rider collects"}</p></header>
+      ${k.added_by_customer ? (k.listing_status === "pending" ? `<p class="note">Your free listing request is with ChopPool. We'll let you know once it's approved.</p>`
+        : `<section class="card listcta"><div><strong>Want more customers? List on ChopPool for free.</strong><p class="small muted">${k.listing_status === "declined" ? "Your last request wasn't approved. You can update it and try again." : "Reach people in every nearby office, hostel and apartment, not just the building that added you."}</p></div><button class="btn" id="listMe">List my business</button></section>`)
+        : appTools("#kitchen-" + token, { kitchen_token: token }, "Seller")}
       ${dayTabs}
       ${k.open ? `<p><span class="chip ok">You're taking orders for ${dayLabel(d)}</span></p>`
         : `<section class="card" style="border-color:var(--accent)"><h2>${waiting.length ? "Customers are waiting for you" : "Are you cooking " + dayLabel(d) + "?"}</h2>
@@ -2253,7 +2316,8 @@ async function viewKitchen(token) {
         <div id="menuRows" class="stack">${K.menu.map(i => `<div class="menurow" data-id="${esc(i.id)}"><input aria-label="Dish" value="${esc(i.name)}"><input aria-label="Price" inputmode="decimal" value="${esc(i.price)}"><span class="small muted">GHS</span></div>`).join("")}
         <div class="menurow"><input aria-label="New dish" placeholder="New dish"><input aria-label="Price" inputmode="decimal" placeholder="Price"><span class="small muted">GHS</span></div></div>
         <button class="ghost" id="saveMenu">Save menu</button></section>` : ""}`;
-    $("#openDay")?.addEventListener("click", async () => { try { await api.kitchenOpenDay(token, d); toast("Thank you. Customers can now order from you for " + dayLabel(d) + "."); draw(); } catch (e) { toast(cleanErr(e)); } });
+    $("#listMe")?.addEventListener("click", () => openListingForm(token, k));
+    $("#openDay")?.addEventListener("click", async () => { try { await api.kitchenOpenDay(token, d); notifyServer({ kitchen_token: token, date: d }); toast("Thank you. Customers can now order from you for " + dayLabel(d) + "."); draw(); } catch (e) { toast(cleanErr(e)); } });
     $("#saveMenu")?.addEventListener("click", async () => {
       const list = [...document.querySelectorAll("#menuRows .menurow")].map(r => ({ id: r.dataset.id || null, name: r.children[0].value.trim(), price: r.children[1].value.trim(), active: r.dataset.id ? !!r.children[1].value.trim() : true }));
       try { await api.vendorSetMenu(token, list); toast("Menu saved"); draw(); } catch (e) { toast(cleanErr(e)); }
@@ -2266,18 +2330,18 @@ async function viewKitchen(token) {
       openSheet(`${sheetHead("Can't do this request?", "The customer is told and can order the standard meal instead. Nothing is charged.")}
         <div><label for="decWhy">Reason (optional)</label><input id="decWhy" maxlength="120" placeholder="No tilapia today"></div>
         <div class="row" style="justify-content:flex-start;gap:8px"><button class="btn" id="decYes">Decline request</button><button class="ghost" data-close>Keep it</button></div>`);
-      $("#decYes").addEventListener("click", async () => { try { await api.kitchenDecline(token, dec.dataset.decline, $("#decWhy").value.trim()); closeSheet(); toast("Request declined. The customer has been told."); draw(); } catch (err) { toast(cleanErr(err)); } });
+      $("#decYes").addEventListener("click", async () => { try { await api.kitchenDecline(token, dec.dataset.decline, $("#decWhy").value.trim()); notifyServer({ order_id: dec.dataset.decline }); closeSheet(); toast("Request declined. The customer has been told."); draw(); } catch (err) { toast(cleanErr(err)); } });
       return;
     }
     const b = e.target.closest("button[data-k]"); if (!b) return;
     b.disabled = true;
-    try { await api.kitchenUpdate(token, b.dataset.pool, b.dataset.k); toast({ accepted: "Batch confirmed. Thank you.", ready: "Marked packed.", picked_up: "On the way.", arriving: "Customers have been told you're 5 minutes away.", delivered: "Arrived. Hand over meals against codes." }[b.dataset.k]); draw(); }
+    try { await api.kitchenUpdate(token, b.dataset.pool, b.dataset.k); notifyServer({ pool_id: b.dataset.pool }); toast({ accepted: "Batch confirmed. Thank you.", ready: "Marked packed.", picked_up: "On the way.", arriving: "Customers have been told you're 5 minutes away.", delivered: "Arrived. Hand over meals against codes." }[b.dataset.k]); draw(); }
     catch (err) { b.disabled = false; toast(cleanErr(err)); }
   });
   $("#view").addEventListener("submit", async e => {
     const f = e.target.closest("[data-quote]"); if (!f) return;
     e.preventDefault();
-    try { await api.kitchenQuote(token, f.dataset.quote, f.querySelector("input").value); toast("Price sent. The customer will pay to confirm."); draw(); } catch (err) { toast(cleanErr(err)); }
+    try { await api.kitchenQuote(token, f.dataset.quote, f.querySelector("input").value); notifyServer({ order_id: f.dataset.quote }); toast("Price sent. The customer will pay to confirm."); draw(); } catch (err) { toast(cleanErr(err)); }
   });
   wireCodes(token, () => d, draw);
   await draw(); every(() => { if (!document.activeElement?.matches("#view input")) draw(); }, 30000);
@@ -2319,11 +2383,12 @@ async function viewRider(token) {
           <p class="small"><strong>Pick up:</strong> ${esc(p.kitchen)}${p.kitchen_address ? ", " + esc(p.kitchen_address) : ""}${p.kitchen_phone ? " · " + esc(p.kitchen_phone) : ""}</p>
           <p class="small"><strong>Drop:</strong> ${esc(p.drop_point)} (Pool ${p.seq}, 1 bag)</p>${hand}${btn}</article>`;
       }).join("") || `<p class="card muted">No deliveries assigned to you today yet.</p>`);
+    $("#view").insertAdjacentHTML("beforeend", appTools("#rider-" + token, { rider_token: token }, "Rider"));
   };
   $("#view").addEventListener("click", async e => {
     const b = e.target.closest("button[data-r]"); if (!b) return;
     b.disabled = true;
-    try { await api.riderUpdate(token, b.dataset.pool, b.dataset.r); draw(); } catch (err) { b.disabled = false; toast(cleanErr(err)); }
+    try { await api.riderUpdate(token, b.dataset.pool, b.dataset.r); notifyServer({ pool_id: b.dataset.pool }); draw(); } catch (err) { b.disabled = false; toast(cleanErr(err)); }
   });
   wireCodes(token, d, draw);
   await draw(); every(() => { if (!document.activeElement?.matches("[data-codeform] input")) draw(); }, 30000);
@@ -2345,6 +2410,96 @@ async function viewHost(token) {
 /* =====================================================================================
    Routing and start-up
    ===================================================================================== */
+/* ---------- Installable app and push alerts ---------- */
+let installEvt = null;
+window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); installEvt = e; });
+const isStandalone = () => { try { return matchMedia("(display-mode: standalone)").matches || navigator.standalone === true; } catch (e) { return false; } };
+const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const pushReady = () => !DEMO && !!CONFIG.VAPID_PUBLIC_KEY && "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+// Install: Android shows the system prompt; iPhone gets the Share › Add to Home Screen steps. The icon then opens this page.
+async function installApp(home) {
+  if (home) local.set("cp_home", home);
+  if (isStandalone()) return toast("ChopPool is already installed on this phone.");
+  if (installEvt) { installEvt.prompt(); try { await installEvt.userChoice; } catch (e) {} installEvt = null; return; }
+  openSheet(`${sheetHead("Install ChopPool", isIOS() ? "On iPhone, it takes three taps:" : "Add ChopPool to your home screen:")}
+    ${isIOS() ? `<ol class="stack small" style="padding-left:20px;margin:0"><li>Open this page in <strong>Safari</strong>.</li><li>Tap the <strong>Share</strong> button (the square with an arrow).</li><li>Scroll down and tap <strong>Add to Home Screen</strong>, then <strong>Add</strong>.</li></ol><p class="small muted">Alerts on iPhone work once ChopPool is on your home screen (iOS 16.4 or later).</p>`
+      : `<ol class="stack small" style="padding-left:20px;margin:0"><li>Open your browser menu (⋮).</li><li>Tap <strong>Install app</strong> or <strong>Add to Home screen</strong>.</li></ol>`}
+    <button class="ghost wide" data-close>Done</button>`);
+}
+const b64u8 = s => { const p = "=".repeat((4 - s.length % 4) % 4), b = atob((s + p).replace(/-/g, "+").replace(/_/g, "/")); return Uint8Array.from([...b].map(c => c.charCodeAt(0))); };
+// Switch on push alerts for this phone. extra says what to hear about: order ids, a seller link or a rider link.
+async function pushSubscribe(extra, quiet) {
+  if (!pushReady()) { if (!quiet && isIOS() && !isStandalone()) installApp(); return false; }
+  try {
+    if (Notification.permission !== "granted") { if (quiet) return false; if (await Notification.requestPermission() !== "granted") { toast("Alerts are blocked. Allow notifications for this site in your phone settings."); return false; } }
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64u8(CONFIG.VAPID_PUBLIC_KEY) });
+    const j = sub.toJSON(); await api.savePushSub({ endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth, ...extra });
+    local.set("cp_push", true); return true;
+  } catch (e) { if (!quiet) toast("Couldn't switch on alerts: " + cleanErr(e)); return false; }
+}
+const notifyServer = body => { if (!pushReady()) return; try { api.notify(body).catch(() => {}); } catch (e) {} };
+// Install and alerts card for sellers, riders and the team
+function appTools(home, extra, who) {
+  const installed = isStandalone();
+  return `<section class="card apptools"><div class="row" style="gap:12px;justify-content:flex-start">${LOGO(40)}<div><strong>ChopPool ${esc(who)} app</strong><p class="small muted">${installed ? "Installed on this phone." : "Open your page from your home screen, like an app."}${pushReady() ? " Get alerts even when it's closed." : ""}</p></div></div>
+    <div class="row" style="justify-content:flex-start;gap:8px;flex-wrap:wrap">${installed ? "" : `<button class="btn" data-install="${esc(home)}">Install app</button>`}${pushReady() ? `<button class="ghost" data-alerts='${esc(JSON.stringify(extra))}'>${local.get("cp_push") ? "Alerts are on" : "Turn on alerts"}</button>` : ""}</div></section>`;
+}
+
+/* ---------- Ratings from real orders (no typed reviews) ---------- */
+function scoreLine(k) {
+  const sc = (S.scores || {})[k.id];
+  if (!sc || (sc.orders || 0) < 20) return `<span class="chip">New on ChopPool</span>`;
+  const parts = [sc.on_time != null ? sc.on_time + "% on time" : "", sc.orders + " orders", sc.come_back != null ? sc.come_back + "% come back" : ""].filter(Boolean);
+  return `<span class="small score">${esc(parts.join(" · "))}</span>`;
+}
+const rank = k => { const sc = (S.scores || {})[k.id] || {}; return (sc.orders >= 20 ? 1 : 0) * 1000 + (sc.come_back || 0) * 3 + (sc.on_time || 0) * 2 + (sc.reliable || 0) + Math.min(sc.orders || 0, 200) / 10; };
+
+/* ---------- Rider sign-up (public link #rider-signup) ---------- */
+function viewRiderSignup() {
+  $("#view").innerHTML = `<header><div class="row" style="gap:10px;justify-content:flex-start">${LOGO(34)}<p class="brand" style="font-size:18px">ChopPool riders</p></div><h1>Ride with ChopPool</h1>
+      <p class="muted">Deliver lunch from nearby kitchens to offices, hostels and apartments. One pickup, one drop point, every weekday around midday.</p></header>
+    <form class="card stack" id="rsForm" novalidate>
+      <div><label for="rsName">Full name</label><input id="rsName" autocomplete="name" placeholder="Kwame Asare"></div>
+      <div class="grid2"><div><label for="rsPhone">Phone / WhatsApp</label><input id="rsPhone" inputmode="tel" autocomplete="tel" placeholder="024 123 4567"></div><div><label for="rsMomo">MoMo number for payouts</label><input id="rsMomo" inputmode="tel" placeholder="024 123 4567"></div></div>
+      <div class="grid2"><div><label for="rsBike">Motorbike and plate</label><input id="rsBike" placeholder="Honda, GW 1234-22"></div><div><label for="rsArea">Area you ride in</label><input id="rsArea" placeholder="Osu, Airport, East Legon"></div></div>
+      <p class="small muted">The ChopPool team checks every application and will call you. Delivery pricing is the same for every rider.</p>
+      <p class="err" id="rsErr"></p><button class="btn wide">Send application</button></form>`;
+  $("#rsForm").addEventListener("submit", async e => {
+    e.preventDefault();
+    try { await api.riderApply({ name: $("#rsName").value.trim(), phone: $("#rsPhone").value.trim(), bike: $("#rsBike").value.trim(), area: $("#rsArea").value.trim(), momo: $("#rsMomo").value.trim() });
+      $("#view").innerHTML = `<section class="card center stack"><span class="success">${ICON.check}</span><h1>Application sent</h1><p class="muted">Thank you. The ChopPool team will call you on the number you gave. Once approved, you'll get your own rider link and app.</p></section>`;
+    } catch (err) { $("#rsErr").textContent = cleanErr(err); }
+  });
+}
+
+/* ---------- Free listing for sellers customers added ---------- */
+function openListingForm(token, k) {
+  const L = k.listing || {}; let pin = L.lat != null ? { lat: L.lat, lng: L.lng } : null;
+  openSheet(`${sheetHead("List on ChopPool for free", "Reach customers in every nearby building, not just the one that added you. ChopPool checks each request.")}
+    <form id="lsForm" class="stack" novalidate>
+      <div><label for="lsName">Business name</label><input id="lsName" value="${esc(L.name || k.name || "")}" placeholder="Sister Ama Waakye"></div>
+      <div><label for="lsTag">What you sell, in a few words</label><input id="lsTag" value="${esc(L.tagline || "")}" placeholder="Waakye and gob3, cooked every morning"></div>
+      <div class="row" style="justify-content:flex-start;gap:10px"><span class="small" id="lsPinTxt">${pin ? "Location set" : "Where do you cook?"}</span><button type="button" class="ghost" id="lsPin">${pin ? "Move pin" : "Set on map"}</button></div>
+      <div class="grid2"><div><label for="lsCap">Meals you can make a day</label><input id="lsCap" inputmode="numeric" value="${esc(L.capacity || k.capacity || 30)}"></div><div><label for="lsHours">Days and times you cook</label><input id="lsHours" value="${esc(L.hours || "")}" placeholder="Mon–Fri, 7am–1pm"></div></div>
+      <div><label for="lsMomo">MoMo number for payments</label><input id="lsMomo" inputmode="tel" value="${esc(L.momo || "")}" placeholder="024 123 4567"></div>
+      <p class="small muted">Your menu and prices are the ones on this page. Check them before you send.</p>
+      <p class="err" id="lsErr"></p><button class="btn wide">Send listing request</button></form>`);
+  $("#lsPin").addEventListener("click", () => {
+    const keep = { name: $("#lsName").value, tagline: $("#lsTag").value, capacity: $("#lsCap").value, hours: $("#lsHours").value, momo: $("#lsMomo").value };
+    openPinSheet("Where do you cook?", pin, p => { pin = p; openListingForm(token, { ...k, listing: { ...keep, lat: p.lat, lng: p.lng } }); });
+  });
+  $("#lsForm").addEventListener("submit", async e => {
+    e.preventDefault();
+    const listing = { name: $("#lsName").value.trim(), tagline: $("#lsTag").value.trim(), capacity: Number($("#lsCap").value) || 30, hours: $("#lsHours").value.trim(), momo: $("#lsMomo").value.replace(/[^\d ]/g, "").trim(), lat: pin && pin.lat, lng: pin && pin.lng };
+    if (listing.name.length < 2) return ($("#lsErr").textContent = "Add your business name.");
+    if (!pin) return ($("#lsErr").textContent = "Set where you cook on the map.");
+    if (!/^0\d{9}$/.test(listing.momo.replace(/\s/g, ""))) return ($("#lsErr").textContent = "Enter your 10-digit MoMo number.");
+    try { await api.vendorRequestListing(token, listing); closeSheet(); toast("Request sent. ChopPool will check it and let you know."); route(); } catch (err) { $("#lsErr").textContent = cleanErr(err); }
+  });
+}
+
 async function route() {
   clearTimers(); closeSheet();
   if ($("#demoBar")) $("#demoBar").open = false;
@@ -2358,6 +2513,7 @@ async function route() {
     history.replaceState(null, "", "#order");
   }
   document.body.classList.remove("is-admin");
+  if (h === "rider-signup") return viewRiderSignup();
   const view = h.startsWith("kitchen-") ? "kitchen" : h.startsWith("rider-") ? "rider" : h.startsWith("host-") ? "host" : h === "admin" ? "admin" : "order";
   document.querySelectorAll("#demoBar a").forEach(a => { if (a.getAttribute("href") === "#" + h || (view === "order" && a.dataset.view === "order")) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
   if (view === "kitchen") return viewKitchen(h.slice(8));
@@ -2382,6 +2538,13 @@ async function start() {
   document.addEventListener("keydown", e => { if (e.key === "Escape") closeSheet(); });
   document.addEventListener("click", e => { const b = e.target.closest("[data-copynum]"); if (b) copy(b.dataset.copynum.replace(/\s/g, ""), "MoMo number copied"); });
   window.addEventListener("hashchange", route);
+  if (!DEMO && "serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
+  // Opened from the home-screen icon: go to the page this phone installed (seller, rider or team), else the customer app
+  if (/[?&]app=1/.test(location.search) && (!location.hash || location.hash === "#") && local.get("cp_home")) history.replaceState(null, "", location.pathname + location.search + local.get("cp_home"));
+  document.addEventListener("click", async e => {
+    const ins = e.target.closest("[data-install]"); if (ins) return installApp(ins.dataset.install);
+    const al = e.target.closest("[data-alerts]"); if (al) { if (await pushSubscribe(JSON.parse(al.dataset.alerts || "{}"))) { toast("Alerts are on for this phone."); al.textContent = "Alerts are on"; } }
+  });
   if (!DEMO) { try { window.supabase && (await api.user()) && afterSignIn(); } catch (e) {} }
   route();
 }
