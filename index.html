@@ -266,7 +266,8 @@ body.locked { position: fixed; left: 0; right: 0; overflow: hidden; }
 
 /* Confirmation */
 .success { width: 64px; height: 64px; border-radius: 50%; background: var(--ok-soft); color: var(--ok); display: grid; place-items: center; justify-self: center; }
-.codetiles { display: flex; gap: 8px; justify-content: center; }
+.codetiles { display: flex; gap: 8px; justify-content: center; align-items: center; }
+.codetiles .cdash { font-style: normal; font: 800 30px var(--font-display); color: var(--muted); margin: 0 2px; }
 .codetiles span { width: 54px; height: 64px; border-radius: 14px; background: var(--accent-soft); color: var(--accent-2); font-family: var(--font-display); font-size: 34px; font-weight: 800; display: grid; place-items: center; }
 :root[data-theme="dark"] .codetiles span { color: var(--accent); }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .codetiles span { color: var(--accent); } }
@@ -2134,7 +2135,7 @@ function openOrder(menuId, opt = {}) {
       await refreshBoard(); refreshMine(); refreshUser();
       notifyServer({ order_id: r.id }); if (local.get("cp_push")) pushSubscribe({ order_ids: [r.id] }, true);
       if (join) { closeSheet(); toast("Added to code " + r.code + ". " + (r.status === "paid" ? "Paid." : "Payment being checked.")); setTab("orders"); return; }
-      showConfirmation(r, k, site, sp);
+      r.myQty = qty; showConfirmation(r, k, site, sp);
     } catch (e) { $("#submitBtn").disabled = false; err.textContent = cleanErr(e); }
   });
 }
@@ -2142,35 +2143,37 @@ function openOrder(menuId, opt = {}) {
 const joinLink = (siteId, kid) => baseUrl() + "/#join=" + siteId + "," + kid;
 function poolInvite(p, k, site) {
   const s = S.settings, trip = tripTo(k, site), fee = feeFor(Math.max(p.meals, 1), s, trip), drop = nextDrop(p.meals, s, trip);
+  if (p.status === "waiting") return "ChopPool · " + TAGLINE + "\nI've started a lunch pool at " + site.name + " from " + k.public_name + " (" + p.meals + " " + (p.meals === 1 ? "meal" : "meals") + " so far). Join now: every seat makes delivery cheaper, and if " + k.public_name + " doesn't confirm you get your money back. Order before " + fmtTime(s.cutoff) + (dayLabel(S.date) === "today" ? "" : " " + dayLabel(S.date)) + ":";
   return "ChopPool · " + TAGLINE + "\nLunch pool at " + site.name + " from " + k.public_name + ": " + p.meals + " of " + s.max_meals + " seats taken, delivery now " + money(fee) + " a meal." +
     (drop ? " " + drop.more + " more and it drops to " + money(drop.fee) + "." : "") + " Order before " + fmtTime(s.cutoff) + (dayLabel(S.date) === "today" ? "" : " " + dayLabel(S.date)) + ":";
 }
 async function sharePool(siteId, kid) {
   const k = menuOf(kid), site = siteOf(siteId), p = currentPool(siteId, kid);
-  if (!p || p.status !== "collecting") return toast("This pool can't take more orders right now.");
+  if (!p || !["collecting", "waiting"].includes(p.status)) return toast("This pool can't take more orders right now.");
   const text = poolInvite(p, k, site), url = joinLink(siteId, kid);
   if (navigator.share) { try { await navigator.share({ title: "ChopPool lunch pool", text, url }); return; } catch (e) { if (e && e.name === "AbortError") return; } }
   copy(text + " " + url, "Link copied. Paste it anywhere to invite people.");
 }
 // Can this order's pool still be shared? Only once the seller has confirmed, before the cut-off, while seats are left.
 function shareablePool(o) {
-  if (["cancelled", "quote_requested", "quoted"].includes(o.status) || o.pool_status !== "collecting" || o.order_date !== S.date) return null;
-  const p = S.board.pools.find(x => x.site_id === o.site_id && x.kitchen_id === o.kitchen_id && x.seq === o.pool_seq && x.status === "collecting");
+  if (["cancelled", "quote_requested", "quoted"].includes(o.status) || !["collecting", "waiting"].includes(o.pool_status) || o.order_date !== S.date) return null;
+  const p = S.board.pools.find(x => x.site_id === o.site_id && x.kitchen_id === o.kitchen_id && x.seq === o.pool_seq && ["collecting", "waiting"].includes(x.status));
   return p && p.meals < Number(S.settings.max_meals) && new Date() < at(o.order_date, S.settings.cutoff) ? p : null;
 }
 function showConfirmation(r, k, site, special) {
   const s = S.settings, trip = tripTo(k, site), fee = feeFor(r.meals, s, trip), drop = nextDrop(r.meals, s, trip);
-  const head = special ? "Request sent" : r.pool_status === "waiting" ? "We've asked them to cook" : "You're in the pool";
+  const waiting = r.pool_status === "waiting", back = S.user ? "your money goes straight back to your wallet" : "you get your money back";
+  const head = special ? "Request sent" : waiting ? (r.meals > r.myQty ? "You're in the pool" : "You've started a pool") : "You're in the pool";
   const body = special ? `${esc(k.public_name)} will price your request before ${fmtTime(s.special_cutoff)}. You'll see the price under Orders, then pay to confirm.`
-    : r.pool_status === "waiting" ? `${esc(k.public_name)} has ${s.accept_timeout_min} minutes to confirm they're cooking today. Once they do, others in your building can join your pool. If they don't, you get your money back.`
+    : waiting ? `We've asked ${esc(k.public_name)} to confirm they're cooking. Share the pool now: every person who joins makes delivery cheaper. If they don't confirm within ${s.accept_timeout_min} minutes, ${back}.`
     : `${esc(collectLine(site))} ${r.meals} of ${s.max_meals} seats are taken and delivery is now ${money(fee)} a meal.`;
   openSheet(`
     <div class="top" style="justify-content:flex-end"><button class="closex" data-close aria-label="Close">${ICON.close}</button></div>
     <span class="success">${ICON.check}</span>
     <div class="center" style="display:grid;gap:6px"><h2 id="sheetTitle">${esc(head)}</h2><p class="muted">${body}</p></div>
-    <div class="center" style="display:grid;gap:8px"><p class="eyebrow">Your collection code</p><div class="codetiles">${String(r.code).split("").map(c => `<span>${esc(c)}</span>`).join("")}</div></div>
-    ${!special && r.pool_status !== "waiting" && drop ? `<p class="note center">${drop.more} more ${drop.more === 1 ? "person" : "people"} and everyone's delivery drops to ${money(drop.fee)}.</p>` : ""}
-    ${!special && r.pool_status !== "waiting" && r.meals < s.max_meals ? `<button class="btn wide" id="sharePool">Share this pool</button>` : ""}
+    <div class="center" style="display:grid;gap:8px"><p class="eyebrow">Your collection code</p><div class="codetiles">${String(r.code).split("").map(c => c === "-" ? `<i class="cdash">–</i>` : `<span>${esc(c)}</span>`).join("")}</div></div>
+    ${!special && drop ? `<p class="note center">${drop.more} more ${drop.more === 1 ? "person" : "people"} and everyone's delivery drops to ${money(drop.fee)}.</p>` : ""}
+    ${!special && r.meals < s.max_meals ? `<button class="btn wide" id="sharePool">Share this pool</button>` : ""}
     ${!S.user && !special ? `<button class="ghost wide" id="toAccount">Create an account to keep your cashback</button>` : ""}
     <button class="linkbtn" id="toOrders" style="justify-self:center">Track this order</button>`);
   $("#toAccount")?.addEventListener("click", () => openAccount("Your order is saved. Create an account to keep your delivery cashback."));
