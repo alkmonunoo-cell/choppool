@@ -154,6 +154,31 @@ p { margin: 0; }
 .homemini.show { opacity: 1; transform: none; }
 .homemini b { font-family: var(--font-display); font-size: 15px; font-weight: 800; margin-right: 2px; }
 .homemini span { white-space: nowrap; }
+.revgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+.revcard { display: grid; gap: 10px; padding: 12px; } .revcard img { width: 100%; height: 170px; object-fit: cover; border-radius: 14px; }
+.hiddenrev { opacity: .55; }
+.ratebox { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; border-radius: 14px; background: color-mix(in srgb, #F5B04A 12%, var(--surface-2)); }
+.ratebox > span { font-weight: 700; font-size: 14.5px; }
+.stars { display: inline-flex; gap: 2px; vertical-align: -3px; color: var(--muted); }
+.ratebox .stars button { border: none; background: none; padding: 2px; color: #E39A1E; cursor: pointer; }
+.rated { margin: 0; display: flex; align-items: center; gap: 6px; }
+.bigstars { display: flex; justify-content: center; gap: 6px; color: #E39A1E; }
+.bigstars button { border: none; background: none; padding: 4px; cursor: pointer; transition: transform .15s; }
+.bigstars button:active { transform: scale(.88); }
+.rvphoto { display: grid; gap: 8px; } .rvphoto img { width: 100%; max-height: 220px; object-fit: cover; border-radius: 16px; }
+.revstrip { display: grid; gap: 8px; } .revstrip:empty { display: none; }
+.ratingline { margin: 0; display: flex; align-items: center; gap: 6px; font-size: 14px; }
+.ratingline svg { margin-right: -2px; }
+.photostrip { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; margin: 0 -4px; padding: 2px 4px; scroll-snap-type: x mandatory; }
+.photostrip::-webkit-scrollbar { display: none; }
+.pshot { position: relative; flex: none; width: 104px; height: 104px; padding: 0; border: none; border-radius: 16px; overflow: hidden; background: var(--surface-2); scroll-snap-align: start; cursor: pointer; }
+.pshot img { width: 100%; height: 100%; object-fit: cover; }
+.pshot span { position: absolute; left: 6px; bottom: 6px; padding: 2px 6px; border-radius: 8px; background: rgba(0,0,0,.55); color: #fff; font-size: 10px; font-weight: 700; display: inline-flex; gap: 1px; }
+.revnote { margin: 0; font-size: 13.5px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.rstar { display: inline-flex; align-items: center; gap: 2px; font-weight: 800; color: var(--ink); }
+.lightbox { position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,.88); display: grid; place-items: center; align-content: center; gap: 12px; padding: 24px; animation: fadeIn .2s ease-out; }
+.lightbox img { max-width: 100%; max-height: 72vh; border-radius: 18px; }
+.lightbox p { color: #fff; margin: 0; text-align: center; display: flex; gap: 4px; align-items: center; flex-wrap: wrap; justify-content: center; }
 .minebtns { display: grid; grid-template-columns: 1fr 52px; gap: 8px; }
 .minebtns .btn { display: flex; align-items: center; justify-content: center; gap: 6px; }
 .sharebtn { display: grid; place-items: center; padding: 0; border-radius: 15px; }
@@ -501,6 +526,10 @@ button.dtile:not([disabled]):hover { outline: 2px solid var(--accent-soft); }
 .place-row > span:last-child { display: grid; min-width: 0; }
 .place-row strong, .place-row .small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pdot.on { background: var(--accent-soft); }
+.siterow { position: relative; }
+.siterow input { position: absolute; opacity: 0; pointer-events: none; }
+.siterow:has(input:checked) { background: var(--accent-soft); }
+.onchop { font-style: normal; font-size: 11px; font-weight: 800; color: var(--accent); background: var(--accent-soft); border-radius: 999px; padding: 2px 7px; margin-left: 4px; vertical-align: 2px; white-space: nowrap; }
 #wRes:not(:empty) { margin-top: -2px; }
 .pdot { width: 36px; height: 36px; border-radius: 12px; display: grid; place-items: center; background: var(--surface-2); color: var(--accent); }
 .placeload { padding: 6px 0; }
@@ -699,7 +728,7 @@ function makeDemoApi() {
   ];
   const riders = [{ id: "r1", name: "Kwame (example rider)", phone: "0240000003", token: "demor1", active: true }];
   [...sites, ...kitchens, ...riders].forEach((x, n) => { if (!x.created_at) x.created_at = new Date(Date.now() - (40 - n * 3) * 864e5).toISOString(); });
-  const pools = [], orders = [], days = [], ledger = [], users = [], profiles = [];
+  const pools = [], orders = [], days = [], ledger = [], users = [], profiles = [], reviews = [];
   const payMethods = [{ id: "pm1", network: "MTN", number: "024 000 0000", name: "ChopPool Pilot", is_main: true, active: true, sort: 1, created_at: new Date().toISOString() }];
   const team = [{ email: "you@choppool.demo", role: "super" }, { email: "ops@choppool.demo", role: "coordinator" }];
   let me = null;
@@ -818,7 +847,8 @@ function makeDemoApi() {
   return {
     demo: true,
     async load() { const pop = {}, siteCounts = {}; orders.filter(o => o.status !== "cancelled").forEach(o => { pop[o.item_id] = (pop[o.item_id] || 0) + o.qty; (siteCounts[o.site_id] = siteCounts[o.site_id] || {})[o.kitchen_id] = ((siteCounts[o.site_id] || {})[o.kitchen_id] || 0) + o.qty; });
-      const scores = { k1: { orders: 140, on_time: 98, reliable: 100, come_back: 64 }, k2: { orders: 36, on_time: 91, reliable: 95, come_back: 41 } };
+      const scores = { k1: { orders: 140, on_time: 98, reliable: 100, come_back: 64, rating: 4.7, ratings: 38 }, k2: { orders: 36, on_time: 91, reliable: 95, come_back: 41, rating: 4.4, ratings: 9 } };
+      kitchens.forEach(k => { const rs = reviews.filter(r => r.kitchen_id === k.id && !r.hidden); if (rs.length) { scores[k.id] = scores[k.id] || { orders: 0 }; scores[k.id].rating = Math.round(rs.reduce((t, r) => t + r.rating, 0) / rs.length * 10) / 10; scores[k.id].ratings = rs.length; } });
       return { pop, siteCounts, scores, payMethods: payMethods.filter(p => p.active), settings, sites: sites.filter(x => x.status === "active" && x.active), menus: kitchens.filter(k => k.active).map(k => ({ id: k.id, public_name: k.public_name, tagline: k.tagline, capacity: k.capacity, site_id: k.site_id, added_by_customer: k.added_by_customer, lat: k.lat ?? null, lng: k.lng ?? null })), items: items.filter(i => i.active !== false) }; },
     async board(date) {
       housekeeping();
@@ -835,7 +865,7 @@ function makeDemoApi() {
           special_request: o.special_request, quote_price: o.quote_price, amount_due: dueOf(o) - o.wallet_used, cancel_reason: o.cancel_reason,
           unit_price: o.unit_price, addons: o.addons, addons_total: o.addons_total, max_fee: o.max_fee, service_fee: o.service_fee, wallet_used: o.wallet_used,
           saving: ["pending", "paid", "collected"].includes(o.status) && p.status !== "cancelled" ? cashOf(o) : 0,
-          has_account: !!o.user_id, refund_needed: !!o.refund_needed, refund_due: o.refund_due || 0, parent_id: o.parent_id || null, fee_per_meal: !!o.fee_per_meal, item_id: o.item_id, pool_id: o.pool_id, created_at: o.created_at };
+          has_account: !!o.user_id, refund_needed: !!o.refund_needed, refund_due: o.refund_due || 0, my_rating: (reviews.find(r => r.order_id === o.id) || {}).rating || null, my_photo: (reviews.find(r => r.order_id === o.id) || {}).photo_url || null, parent_id: o.parent_id || null, fee_per_meal: !!o.fee_per_meal, item_id: o.item_id, pool_id: o.pool_id, created_at: o.created_at };
       });
     },
     async addVendor(r) {
@@ -915,6 +945,18 @@ function makeDemoApi() {
       if (paused) { if (pools.some(p => p.kitchen_id === k.id && p.order_date === date && p.status !== "cancelled" && meals(p.id) > 0)) throw new Error("You already have orders for this day. Message ChopPool if you can't cook them.");
         k.paused_dates = [...new Set([...(k.paused_dates || []), date])]; for (let i = days.length - 1; i >= 0; i--) if (days[i].kitchen_id === k.id && days[i].order_date === date) days.splice(i, 1); }
       else k.paused_dates = (k.paused_dates || []).filter(x => x !== date); },
+    async submitReview(id, phone, rating, comment, photo) {
+      const o = orders.find(x => x.id === id && !x.parent_id); if (!o) throw new Error("Order not found.");
+      if (!((me && o.user_id === me.id) || o.phone === String(phone || "").replace(/\D/g, ""))) throw new Error("Use the phone or account that placed the order.");
+      if (o.status !== "collected") throw new Error("You can rate your lunch once you've collected it.");
+      const ex = reviews.find(r => r.order_id === id), row = { order_id: id, kitchen_id: o.kitchen_id, site_id: o.site_id, rating, comment: (comment || "").trim() || null, photo_url: photo || (ex && ex.photo_url) || null, name: o.customer_name.split(" ")[0], item_name: o.item_name };
+      if (ex) Object.assign(ex, row); else reviews.push({ id: "r" + uid(), hidden: false, created_at: nowIso(), ...row });
+      return { ok: true };
+    },
+    async kitchenReviews(kid) { return reviews.filter(r => r.kitchen_id === kid && !r.hidden).sort((a, b) => a.created_at < b.created_at ? 1 : -1).slice(0, 20); },
+    async adminReviews() { return reviews.slice().sort((a, b) => a.created_at < b.created_at ? 1 : -1).map(r => ({ ...r })); },
+    async hideReview(id, hidden) { Object.assign(reviews.find(r => r.id === id), { hidden }); },
+    async uploadReviewPhoto(orderId, blob) { return await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(blob); }); },
     async vendorSetPhoto(token, itemId, url) { const k = byToken(kitchens, "token", token); const i = items.find(x => x.id === itemId && x.kitchen_id === k.id); if (!i) throw new Error("That dish is not on your menu."); i.photo_url = url; },
     async uploadPhoto(folder, blob) { return await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(blob); }); },
     async kitchenOpenDay(token, date) { const k = byToken(kitchens, "token", token); k.paused_dates = (k.paused_dates || []).filter(x => x !== date); if (!isOpen(k.id, date)) days.push({ kitchen_id: k.id, order_date: date }); pools.filter(p => p.kitchen_id === k.id && p.order_date === date && p.status === "waiting").forEach(p => { p.status = "collecting"; }); },
@@ -1106,6 +1148,18 @@ function makeSupabaseApi() {
     kitchenSetAuto: (t, days) => rpc("kitchen_set_auto", { p_token: t, p_days: days }),
     kitchenPause: (t, d, on) => rpc("kitchen_pause", { p_token: t, p_date: d, p_paused: !!on }),
     vendorSetPhoto: (t, item, url) => rpc("vendor_set_photo", { p_token: t, p_item: item, p_url: url }),
+    submitReview: (id, phone, rating, comment, photo) => rpc("submit_review", { p_order: id, p_phone: phone || "", p_rating: rating, p_comment: comment || null, p_photo: photo || null }),
+    async kitchenReviews(kid) { const r = await sb.from("public_reviews").select("*").eq("kitchen_id", kid).order("created_at", { ascending: false }).limit(20); return r.error ? [] : r.data; },
+    async adminReviews() { const r = await sb.from("reviews").select("*, orders(customer_name, item_name)").order("created_at", { ascending: false }).limit(150);
+      if (r.error) throw new Error(/reviews|schema cache|relation/i.test(r.error.message) ? "Run the latest ChopPool update in Supabase once to see reviews." : r.error.message);
+      return r.data.map(x => ({ ...x, name: ((x.orders || {}).customer_name || "").split(" ")[0], item_name: (x.orders || {}).item_name })); },
+    async hideReview(id, hidden) { must(await sb.from("reviews").update({ hidden }).eq("id", id)); },
+    async uploadReviewPhoto(orderId, blob) {
+      const path = "reviews/" + orderId + "/" + Date.now().toString(36) + (blob.type === "image/webp" ? ".webp" : ".jpg");
+      const r = await sb.storage.from("dish-photos").upload(path, blob, { contentType: blob.type, cacheControl: "31536000", upsert: false });
+      if (r.error) throw new Error(r.error.message);
+      return sb.storage.from("dish-photos").getPublicUrl(path).data.publicUrl;
+    },
     weeklyReport: wk => rpc("admin_weekly_report", { p_week_start: wk }),
     // Dish photos go to the public "dish-photos" bucket; vendors write only to their own folder
     async uploadPhoto(folder, blob) {
@@ -1593,6 +1647,7 @@ async function viewOrder() {
   $("#kitchensList").addEventListener("click", e => { if (mineClick(e)) return; if (e.target.closest("[data-kjump]")) return openKJump(); const b = e.target.closest("button[data-menu]"); if (b) openOrder(b.dataset.menu); });
   $("#tabOrders").addEventListener("click", e => { const b = e.target.closest("button[data-pay]"); if (b) openPayQuote(b.dataset.pay); const ro = e.target.closest("[data-reorder]"); if (ro) openOrder(ro.dataset.reorder);
     const ap = e.target.closest("[data-addplate]"); if (ap) { const o = (S.mine || []).find(x => x.id === ap.dataset.addplate); if (o) openOrder(o.kitchen_id, { join: o }); }
+    const rt = e.target.closest("[data-rate]"); if (rt) { const o = (S.mine || []).find(x => x.id === rt.dataset.rate); if (o) openReview(o, +rt.dataset.n || 0); return; }
     const ag = e.target.closest("[data-again]"); if (ag) { const o = (S.mine || []).find(x => x.id === ag.dataset.again); if (o) openOrder(o.kitchen_id, { preset: { item_id: o.item_id, qty: o.qty, addons: (o.addons || []).map(a => a.name), site_id: o.site_id } }); } const cx = e.target.closest("[data-cancel]"); if (cx) openCancel(cx.dataset.cancel); const sh = e.target.closest("[data-share]"); if (sh) { const [a, c] = sh.dataset.share.split(","); sharePool(a, c); } if (e.target.closest("[data-keepcb]")) openAccount("Your cashback moves into your new wallet."); const h = e.target.closest("[data-gohome]"); if (h) setTab("home"); });
   setKTop(); watchHero();
   renderWhen(); refreshUser(); if (S.board.pools.length) renderPools(); await refreshBoard(); await refreshMine();
@@ -1654,8 +1709,12 @@ function myPosition() {
 }
 const osmLink = x => `https://www.openstreetmap.org/?mlat=${x.lat}&mlon=${x.lng}#map=18/${x.lat}/${x.lng}`;
 
+// Buildings this phone used, most recent first
+const recentSites = () => (local.get("cp_recent_sites") || []).filter(id => S.sites.some(x => x.id === id)).slice(0, 3);
+const poolsOpenAt = id => S.board.pools.filter(p => p.site_id === id && ["collecting", "waiting"].includes(p.status) && p.meals > 0).length;
 // Choose a building (remembered on this phone); "then" carries on with what the customer was doing
 function setSite(id, then, quiet) {
+  local.set("cp_recent_sites", [id, ...(local.get("cp_recent_sites") || []).filter(x => x !== id)].slice(0, 5));
   S.siteId = id; S.noSite = false; local.set("cp_site", id); S.seen = null; S.allKitchens = false;
   renderWhen(); renderPools(); if (S.tab === "kitchens") renderKitchens(); closeSheet();
   if (!quiet) toast("Delivering to " + siteOf(id).name);
@@ -1695,46 +1754,42 @@ const useMeChip = id => `<button type="button" class="tog" id="${id}">${ICON.pin
 const NEAR_M = 5000;
 function openSitePicker(opt) {
   const then = opt && opt.then;
-  let here = S.here || null, map = null, showAll = false;
+  let here = S.here || null, map = null, showNear = false;
   openSheet(`${sheetHead("Find your building", "Pools are shared with people in the same building.")}
     ${searchRow("fbQ", "Building, office, hostel or area")}
     <div class="chips" id="fbChips"><button type="button" class="tog" id="nearMe">${ICON.pin} Use my location</button><button type="button" class="tog" id="mapToggle">Show on map</button></div>
     <div id="siteMap" class="map hidden" aria-label="Map of ChopPool buildings"></div>
-    <p class="group-title" id="fbSitesT">ChopPool buildings</p>
+    <p class="group-title" id="fbSitesT">Recent</p>
     <p class="small muted" id="siteHint"></p>
-    <div class="dishes" id="siteList"></div>
+    <div class="places" id="siteList"></div>
     <div id="fbPlaces" class="stack"></div>
     <button class="invite-card" id="addBuilding" style="border:none;text-align:left;color:inherit;font:inherit;cursor:pointer;width:100%">
       <span class="blob">${ICON.pin.replace('width="13" height="13"', 'width="24" height="24"')}</span>
       <span style="display:grid;gap:2px"><strong>Can't find it? Pin it on the map</strong><span class="small muted">Drop a pin on your building and we'll add it.</span></span></button>`);
   const norm = x => String(x || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  // Before typing: recent buildings (or the nearest, after "Use my location"). While typing: matching ChopPool buildings first, then places, in one list.
   const list = () => {
-    const q = norm($("#fbQ").value.trim()), words = q.split(/\s+/).filter(Boolean);
+    const q = norm($("#fbQ").value.trim()), words = q.split(/\s+/).filter(Boolean), near = !!here && !words.length && showNear;
     let rows = S.sites.map((x, i) => ({ x, i, d: here && hasPin(x) ? distM(here, x) : null }));
-    if (words.length) rows = rows.filter(r => words.every(w => norm(r.x.name + " " + r.x.drop_point + " " + (r.x.host_label || "")).includes(w)));
-    rows.sort((a, b) => (a.d ?? 1e12) - (b.d ?? 1e12));
-    if (!here && !words.length) { const busy = busySites(S.sites.length).map(x => x.id); rows.sort((a, b) => busy.indexOf(a.x.id) - busy.indexOf(b.x.id)); }
-    const total = rows.length, cap = words.length || showAll ? 99 : 6;
-    if (here && !words.length && !showAll) rows = rows.filter(r => r.d != null && r.d <= NEAR_M);
-    rows = rows.slice(0, cap);
-    $("#fbSitesT").classList.toggle("hidden", !rows.length && !!words.length);
-    $("#siteHint").innerHTML = words.length ? (rows.length ? "" : "No ChopPool building matches yet. Pick a place below or pin it on the map.")
-      : here && !showAll ? (rows.length ? "Closest to you. " : `None within ${NEAR_M / 1000} km of you yet. `) + (total > rows.length ? `<button class="linkbtn" id="showAll">Show all ${total}</button>` : "")
-      : total > rows.length ? `<button class="linkbtn" id="showAll">Show all ${total}</button>` : "";
-    $("#showAll")?.addEventListener("click", () => { showAll = true; list(); });
-    $("#siteList").innerHTML = rows.map(({ x, i, d }) => `<label class="dish" style="grid-template-columns:44px 1fr auto"><input type="radio" name="site" value="${esc(x.id)}"${x.id === S.siteId ? " checked" : ""}>
-      <span class="tile" style="width:44px;height:44px;background:${tint(i)};color:var(--accent)">${ICON.pin.replace('width="13" height="13"', 'width="22" height="22"')}</span>
-      <span style="display:grid"><span>${esc(x.name)}</span><span class="small muted" style="font-weight:500">${esc(x.drop_point)} · ${x.handoff === "host" ? "collect from " + esc(x.host_label || "the desk") : "meet the rider"}</span></span>
-      <span class="small muted num">${d != null ? fmtDist(d) : ""}</span></label>`).join("");
+    if (words.length) rows = rows.filter(r => words.every(w => norm(r.x.name + " " + r.x.drop_point + " " + (r.x.host_label || "")).includes(w))).sort((a, b) => (a.d ?? 1e12) - (b.d ?? 1e12)).slice(0, 8);
+    else if (near) rows = rows.filter(r => r.d != null).sort((a, b) => a.d - b.d).slice(0, 3);
+    else { const rec = recentSites(); rows = rec.map(id => rows.find(r => r.x.id === id)).filter(Boolean); }
+    $("#fbSitesT").textContent = near ? "Nearest to you" : "Recent";
+    $("#fbSitesT").classList.toggle("hidden", !!words.length || !rows.length);
+    $("#siteHint").textContent = near && !rows.length ? "No ChopPool buildings near you yet. Search for yours or pin it on the map." : "";
+    $("#siteList").innerHTML = rows.map(({ x, d }) => { const n = poolsOpenAt(x.id);
+      return `<label class="place-row siterow"><input type="radio" name="site" value="${esc(x.id)}"${x.id === S.siteId ? " checked" : ""}>
+        <span class="pdot on">${ICON.store.replace(/width="\d+" height="\d+"/, 'width="18" height="18"')}</span>
+        <span><strong>${esc(x.name)} <em class="onchop">On ChopPool</em></strong><span class="small muted">${n ? n + (n === 1 ? " pool" : " pools") + " open today" : esc(x.drop_point)}${d != null ? " · " + fmtDist(d) : ""}</span></span></label>`; }).join("");
   };
   list();
   const pick = id => setSite(id, then);
   $("#siteList").addEventListener("click", e => { if (e.target.name === "site") pick(e.target.value); });
   $("#fbQ").addEventListener("input", () => { const typing = !!$("#fbQ").value.trim(); $("#fbChips").classList.toggle("hidden", typing); if (typing) { $("#siteMap").classList.add("hidden"); $("#mapToggle").textContent = "Show on map"; } list(); });
-  placeSearch($("#fbQ"), $("#fbPlaces"), r => openRequestSite({ lat: r.lat, lng: r.lng }, { name: r.short, then }), { title: "Places in Ghana", none: "No places found. Pin it on the map below." });
+  placeSearch($("#fbQ"), $("#fbPlaces"), r => openRequestSite({ lat: r.lat, lng: r.lng }, { name: r.short, then }), { none: "No places found. Pin it on the map below." });
   $("#nearMe").addEventListener("click", async () => {
     $("#siteHint").textContent = "Finding buildings near you…";
-    try { here = S.here = await myPosition(); showAll = false; $("#nearMe").setAttribute("aria-pressed", "true"); if (map) map.setView([here.lat, here.lng], 14); }
+    try { here = S.here = await myPosition(); showNear = true; $("#nearMe").setAttribute("aria-pressed", "true"); if (map) map.setView([here.lat, here.lng], 14); }
     catch (e) { toast(cleanErr(e)); }
     list();
   });
@@ -1910,8 +1965,8 @@ function renderKitchensAnywhere(el) {
 // Card header: the vendor's dish photo (lazy-loaded), or a rich illustration on a warm gradient
 const photoOf = k => { const t = topDish(k.id); return (t && t.photo_url) || (S.items.find(i => i.kitchen_id === k.id && i.photo_url) || {}).photo_url || null; };
 function photoHead(k, i, inner, small) {
-  const ph = photoOf(k);
-  return `<div class="pool-art g${i % 4}${small ? " small" : ""}">${ph ? `<img src="${esc(ph)}" alt="" loading="lazy" decoding="async">` : `<span class="illus">${art(dishKind(topDish(k.id)))}</span>`}<span class="shade"></span>${inner}</div>`;
+  // Cards always use the illustration so Pools and Menus stay consistent; real photos are in the vendor's menu sheet
+  return `<div class="pool-art g${i % 4}${small ? " small" : ""}"><span class="illus">${art(dishKind(topDish(k.id)))}</span><span class="shade"></span>${inner}</div>`;
 }
 // Your own live order in this vendor's pool here (then the card offers "Add to my order" instead of joining again)
 const myOrderIn = k => (S.mine || []).find(o => !o.parent_id && o.kitchen_id === k.id && o.site_id === S.siteId && o.order_date === S.date
@@ -1933,7 +1988,8 @@ function busySites(n) {
   const meals = {}; S.board.pools.forEach(p => { meals[p.site_id] = (meals[p.site_id] || 0) + p.meals; });
   return S.sites.map((x, i) => ({ x, i, m: meals[x.id] || 0 })).sort((a, b) => b.m - a.m || a.i - b.i).slice(0, n).map(r => r.x);
 }
-const busyChips = () => S.sites.length ? `<p class="group-title" style="margin-top:4px">Busy today</p><div class="chips">${busySites(5).map(x => `<button class="tog" data-site="${esc(x.id)}">${esc(x.name)}</button>`).join("")}</div>` : "";
+const busyChips = () => { const rec = recentSites().map(id => siteOf(id)), list = rec.length ? rec : busySites(4);
+  return list.length ? `<p class="group-title" style="margin-top:4px">${rec.length ? "Recent" : "Busy today"}</p><div class="chips">${list.map(x => `<button class="tog" data-site="${esc(x.id)}">${esc(x.name)}</button>`).join("")}</div>` : ""; };
 function welcomeCard() {
   return `<article class="card welcome"><h2>Start a pool</h2><p class="small muted">Find your building, then start a pool. Others there can join, so delivery gets cheaper for everyone.</p>
     <button class="searchfake" data-findb>${SV('<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>', 18)}<span>Search your building or area</span></button>
@@ -2127,6 +2183,47 @@ function quoteBreakdown(o) {
     <div><span><strong>Total to pay</strong></span><strong class="num">${money(o.amount_due)}</strong></div></div>
     <p class="small muted">What the pool saves on delivery comes back to your wallet as cashback after ${fmtTime(S.settings.cutoff)}.</p>`;
 }
+/* ---------- Ratings and photos from customers (collected orders only) ---------- */
+const STAR = (on, w = 16) => `<svg width="${w}" height="${w}" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.9 6.4.8-4.7 4.4 1.2 6.3L12 17.1l-5.7 3.1 1.2-6.3L2.8 9.5l6.4-.8z" fill="${on ? "#F5B04A" : "none"}" stroke="${on ? "#E39A1E" : "currentColor"}" stroke-width="1.6" stroke-linejoin="round"/></svg>`;
+const starsOf = (n, w) => [1, 2, 3, 4, 5].map(i => STAR(i <= Math.round(n), w)).join("");
+function openReview(o, start) {
+  let rating = start || o.my_rating || 0, blob = null;
+  const k = menuOf(o.kitchen_id);
+  openSheet(`${sheetHead("How was lunch?", esc(o.qty + " × " + o.item_name) + " from " + esc(k.public_name || "the vendor"))}
+    <div class="bigstars" id="rvStars" role="radiogroup" aria-label="Rating">${[1, 2, 3, 4, 5].map(i => `<button type="button" data-s="${i}" aria-label="${i} star${i > 1 ? "s" : ""}">${STAR(i <= rating, 38)}</button>`).join("")}</div>
+    <div><label for="rvText">Tell others (optional)</label><textarea id="rvText" rows="3" maxlength="280" placeholder="Generous portion, still warm, great shito">${esc(o.my_comment || "")}</textarea></div>
+    <div class="rvphoto"><button type="button" class="ghost" id="rvPick">${CAM} ${o.my_photo ? "Change photo" : "Add a photo of your food"}</button><div id="rvPrev">${o.my_photo ? `<img src="${esc(o.my_photo)}" alt="">` : ""}</div></div>
+    <p class="small muted">Only customers who collected their lunch can rate it. Photos show on ${esc(k.public_name || "the vendor")}'s menu.</p>
+    <p class="err" id="rvErr"></p><div class="sheet-foot"><button class="btn wide" id="rvSend">Send rating</button></div>`);
+  const draw = () => $("#rvStars").querySelectorAll("[data-s]").forEach(b => { b.innerHTML = STAR(+b.dataset.s <= rating, 38); b.setAttribute("aria-checked", String(+b.dataset.s === rating)); });
+  $("#rvStars").addEventListener("click", e => { const b = e.target.closest("[data-s]"); if (b) { rating = +b.dataset.s; draw(); } });
+  $("#rvPick").addEventListener("click", () => { const inp = document.createElement("input"); inp.type = "file"; inp.accept = "image/*";
+    inp.onchange = async () => { const f = inp.files && inp.files[0]; if (!f) return; try { blob = await compressImage(f); $("#rvPrev").innerHTML = `<img src="${URL.createObjectURL(blob)}" alt="">`; } catch (e) { toast(cleanErr(e)); } }; inp.click(); });
+  $("#rvSend").addEventListener("click", async () => {
+    if (!rating) return ($("#rvErr").textContent = "Tap the stars to rate it.");
+    const btn = $("#rvSend"); btn.disabled = true; btn.textContent = "Sending…";
+    try {
+      const photo = blob ? await api.uploadReviewPhoto(o.id, blob) : null;
+      await api.submitReview(o.id, (local.get("cp_me") || {}).phone || "", rating, $("#rvText").value, photo);
+      closeSheet(); toast("Thank you! Your rating helps others choose."); refreshMine();
+    } catch (e) { btn.disabled = false; btn.textContent = "Send rating"; $("#rvErr").textContent = cleanErr(e); }
+  });
+}
+// Ratings and photos inside a vendor's menu sheet: customer photos first, the vendor's own photos labelled
+async function loadReviews(k) {
+  const el = $("#revStrip"); if (!el) return;
+  let rs = []; try { rs = await api.kitchenReviews(k.id); } catch (e) {}
+  if (!$("#revStrip")) return;
+  const sc = (S.scores || {})[k.id] || {}, vendorPics = S.items.filter(i => i.kitchen_id === k.id && i.photo_url).map(i => ({ photo_url: i.photo_url, vendor: true, item_name: i.name }));
+  const pics = rs.filter(r => r.photo_url).concat(vendorPics), notes = rs.filter(r => r.comment).slice(0, 2);
+  if (!pics.length && !notes.length && !(sc.ratings > 0)) { el.remove(); return; }
+  el.innerHTML = `${sc.ratings ? `<p class="ratingline">${starsOf(sc.rating, 15)} <strong class="num">${Number(sc.rating).toFixed(1)}</strong> <span class="muted">· ${sc.ratings} rating${sc.ratings > 1 ? "s" : ""}</span></p>` : ""}
+    ${pics.length ? `<div class="photostrip">${pics.map((r, n) => `<button type="button" class="pshot" data-shot="${n}"><img src="${esc(r.photo_url)}" alt="" loading="lazy"><span>${r.vendor ? "From the vendor" : starsOf(r.rating, 10)}</span></button>`).join("")}</div>` : ""}
+    ${notes.map(r => `<p class="revnote">${starsOf(r.rating, 11)} “${esc(r.comment)}” <span class="muted">· ${esc(r.name || "")}</span></p>`).join("")}`;
+  el.onclick = e => { const b = e.target.closest("[data-shot]"); if (!b) return; const r = pics[+b.dataset.shot];
+    const lb = document.createElement("div"); lb.className = "lightbox"; lb.innerHTML = `<img src="${esc(r.photo_url)}" alt=""><p>${r.vendor ? "From the vendor · " + esc(r.item_name || "") : starsOf(r.rating, 14) + " " + esc(r.item_name || "") + (r.comment ? " · “" + esc(r.comment) + "”" : "")}</p>`;
+    lb.addEventListener("click", () => lb.remove()); document.body.appendChild(lb); };
+}
 // Can another plate join this order's code? Only the main order, while its pool is open and before the cut-off
 const canAddPlate = o => !o.parent_id && ["pending", "paid"].includes(o.status) && ["waiting", "collecting"].includes(o.pool_status)
   && new Date() < at(o.order_date, S.settings.cutoff) && S.items.some(i => i.kitchen_id === o.kitchen_id);
@@ -2143,6 +2240,8 @@ function renderOrders() {
       <div class="c"><span>Code</span><b class="num">${esc(o.code)}</b></div></div>
       ${o.status === "cancelled" ? "" : `<div class="track" aria-label="Progress ${step} of 5">${[1, 2, 3, 4, 5].map(n => `<i class="${n <= step ? "on" : ""}"></i>`).join("")}</div>`}
       <p class="status-text">${esc(statusLine(o))}</p>
+      ${o.status === "collected" && !o.parent_id ? (o.my_rating ? `<p class="small rated">You rated it <span class="stars">${starsOf(o.my_rating, 14)}</span> <button class="linkbtn" data-rate="${esc(o.id)}">Edit</button></p>`
+        : `<div class="ratebox"><span>How was lunch?</span><div class="stars">${[1, 2, 3, 4, 5].map(n => `<button type="button" data-rate="${esc(o.id)}" data-n="${n}" aria-label="${n} star${n > 1 ? "s" : ""}">${STAR(false, 26)}</button>`).join("")}</div></div>`) : ""}
       ${o.status === "quoted" ? quoteBreakdown(o) + `<button class="btn wide" data-pay="${esc(o.id)}">Pay ${money(o.amount_due)}</button>` : ""}
       ${liveKids.filter(c => c.status === "pending").length ? `<p class="small muted">Added plate: payment being checked.</p>` : ""}
       ${savingLine(o)}
@@ -2170,6 +2269,7 @@ function openOrder(menuId, opt = {}) {
   const waitingHere = S.board.pools.some(p => p.site_id === site.id && p.kitchen_id === k.id && p.status === "waiting" && p.meals > 0);
   openSheet(`
     ${join ? sheetHead("Add another plate", esc(k.public_name) + " · code " + esc(join.code) + ", same bag") : sheetHead(esc(k.public_name), esc(site.name) + " · " + fmtDate(S.date) + ", " + fmtTime(s.delivery_time))}
+    ${join ? "" : `<div id="revStrip" class="revstrip"></div>`}
     ${join ? `<p class="note">Your plate joins code <strong>${esc(join.code)}</strong>. You pay only for the plate and its service fee: delivery is already paid, and the final split counts every meal under your code.</p>` : ""}
     ${!join && k.added_by_customer ? `<p class="note">A local vendor added by a customer. ChopPool doesn't inspect their kitchen.</p>` : ""}
     ${!join && isLong(s, tripTo(k, site)) ? `<p class="note"><strong>Long-distance vendor:</strong> delivery is shared at cost (about ${money(tripTo(k, site))} for the trip). The more people join, the less each pays.</p>` : ""}
@@ -2229,7 +2329,7 @@ function openOrder(menuId, opt = {}) {
     $("#totTxt").textContent = money(due); $("#totSub").textContent = due <= 0 ? "Paid from your wallet" : "Pay by MoMo";
     $("#submitBtn").textContent = join ? "Add to my order" : waitingHere ? "Join anyway" : st.open ? "Join the pool" : "Order and ask them to cook";
   };
-  drawExtras(); draw();
+  drawExtras(); draw(); if (!join) loadReviews(k);
   $("#orderForm").addEventListener("change", e => { if (e.target.name === "dish") { item = dishes.find(d => d.id === e.target.value); extras = new Set(); drawExtras(); } draw(); });
   $("#extrasGroup").addEventListener("click", e => { const b = e.target.closest("[data-addon]"); if (!b) return; const n = b.dataset.addon; extras.has(n) ? extras.delete(n) : extras.add(n); b.setAttribute("aria-pressed", String(extras.has(n))); draw(); });
   $("#minus").addEventListener("click", () => { qty = Math.max(1, qty - 1); draw(); });
@@ -2387,7 +2487,7 @@ const ADMIN_TABS = [["dash", "Dashboard"], ["today", "Today"], ["menus", "Vendor
 // Sub-sections per tab; a third value marks owner-only sections
 const ADMIN_SUBS = {
   today: [["pools", "Pools"], ["orders", "Orders & payments"], ["wallets", "Wallets & refunds"]],
-  menus: [["list", "Vendors"], ["requests", "Listing requests"]],
+  menus: [["list", "Vendors"], ["reviews", "Ratings & photos"], ["requests", "Listing requests"]],
   buildings: [["list", "Active"], ["requests", "Requests"]],
   riders: [["list", "Riders"], ["apply", "Applications"], ["pricing", "Delivery pricing"]],
   team: [["members", "Team members"], ["payments", "Payment options", true], ["accounts", "Customer accounts", true]]
@@ -2705,7 +2805,18 @@ async function renderAdmin(cached) {
   }
 
   /* ---------- Kitchens & menus ---------- */
-  if (tab === "menus") {
+  if (tab === "menus" && sub === "reviews") {
+    body.innerHTML = `<section class="stack" style="gap:12px"><div><h2>Ratings & photos</h2><p class="small muted">From customers who collected their lunch. Hide anything that isn't right: it disappears from the app and from the vendor's rating.</p></div><div id="revAdmin"><div class="skeleton" style="height:160px"></div></div></section>`;
+    api.adminReviews().then(list => { const el = $("#revAdmin"); if (!el) return; const kn = id => (A.kitchens.find(k => k.id === id) || {}).public_name || "";
+      el.innerHTML = list.length ? `<div class="revgrid">${list.map(r => `<article class="card revcard${r.hidden ? " hiddenrev" : ""}" data-review="${esc(r.id)}">
+          ${r.photo_url ? `<img src="${esc(r.photo_url)}" alt="" loading="lazy">` : ""}
+          <div class="stack" style="gap:4px"><p class="ratingline">${starsOf(r.rating, 14)} <span class="small muted">${esc(kn(r.kitchen_id))} · ${esc(r.name || "")} · ${fmtDate(String(r.created_at).slice(0, 10))}</span></p>
+          ${r.comment ? `<p class="small">“${esc(r.comment)}”</p>` : ""}${r.item_name ? `<p class="small muted">${esc(r.item_name)}</p>` : ""}
+          <div class="row" style="justify-content:flex-start;gap:8px">${r.hidden ? pill("Hidden", "dim") + `<button class="ghost" data-act="rev-show">Show again</button>` : `<button class="ghost" data-act="rev-hide" style="color:var(--danger)">Hide</button>`}</div></div></article>`).join("")}</div>`
+        : `<div class="note">No ratings yet. Customers can rate their lunch after they collect it.</div>`; })
+      .catch(e => { const el = $("#revAdmin"); if (el) el.innerHTML = `<div class="note">${esc(cleanErr(e))}</div>`; });
+  }
+  if (tab === "menus" && sub !== "reviews") {
     const items = A.items || [];
     if (sub === "requests") body.innerHTML = listReq.length ? `<div class="stack" style="gap:10px">${listReq.map(k => { const L = k.listing || {}, dishes = items.filter(i => i.kitchen_id === k.id && i.active !== false);
         return `<article class="card" data-kitchen="${esc(k.id)}" style="border:2px solid var(--hint)"><div class="top" style="align-items:flex-start"><div><h3>${esc(L.name || k.name)}</h3><p class="small muted">${esc(L.tagline || "")}${k.listing_requested_at ? " · asked " + fmtDate(String(k.listing_requested_at).slice(0, 10)) : ""} · first added by a customer at ${esc(sName(k.site_id))}</p></div>${pill("Wants to be listed", "warn")}</div>
@@ -2929,6 +3040,8 @@ async function adminClick(e) {
   const A = S.admin, s = S.settings, act = t.dataset.act;
   const run = async (fn, ok) => { try { await fn(); if (ok) toast(ok); renderAdmin(); } catch (err) { toast(cleanErr(err)); } };
   if (t.dataset.refunded) return run(() => api.updateOrder(t.dataset.refunded, { refund_needed: false, refund_due: 0 }), "Marked refunded");
+  const rv = t.closest("[data-review]");
+  if (rv && (act === "rev-hide" || act === "rev-show")) return run(() => api.hideReview(rv.dataset.review, act === "rev-hide"), act === "rev-hide" ? "Hidden from the app" : "Shown again");
   if (act === "csv") return copy(ordersCsv(), "Orders copied. Paste them into Excel or Google Sheets.");
   if (act === "report-copy" && S.report) return copy(reportCsv(S.report, S.role === "super"), "Report copied. Paste it into Excel or Google Sheets.");
   if (act === "report-csv" && S.report) { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([reportCsv(S.report, S.role === "super")], { type: "text/csv" })); a.download = "choppool-week-" + S.report.week_start + ".csv"; document.body.appendChild(a); a.click(); a.remove(); return; }
@@ -3367,7 +3480,7 @@ function scoreLine(k) {
   const sc = (S.scores || {})[k.id];
   if (!sc || (sc.orders || 0) < 20) return `<span class="chip">New on ChopPool</span>`;
   const parts = [sc.on_time != null ? sc.on_time + "% on time" : "", sc.orders + " orders", sc.come_back != null ? sc.come_back + "% come back" : ""].filter(Boolean);
-  return `<span class="small score">${esc(parts.join(" · "))}</span>`;
+  return `<span class="small score">${sc.ratings >= 3 ? `<span class="rstar">${STAR(true, 13)} ${Number(sc.rating).toFixed(1)}</span> · ` : ""}${esc(parts.join(" · "))}</span>`;
 }
 const rank = k => { const sc = (S.scores || {})[k.id] || {}; return (sc.orders >= 20 ? 1 : 0) * 1000 + (sc.come_back || 0) * 3 + (sc.on_time || 0) * 2 + (sc.reliable || 0) + Math.min(sc.orders || 0, 200) / 10; };
 
@@ -3478,6 +3591,9 @@ async function route() {
     history.replaceState(null, "", "#order");
   }
   document.body.classList.remove("is-admin");
+  // The browser tab says which page this is
+  document.title = h === "rider-signup" ? "Rider sign-up · ChopPool" : h.startsWith("kitchen-") ? "Vendor · ChopPool" : h.startsWith("rider-") ? "Rider · ChopPool"
+    : h.startsWith("host-") ? "Drop point · ChopPool" : h === "admin" ? "Admin · ChopPool" : "ChopPool · " + TAGLINE;
   if (h === "rider-signup") return viewRiderSignup();
   const view = h.startsWith("kitchen-") ? "kitchen" : h.startsWith("rider-") ? "rider" : h.startsWith("host-") ? "host" : h === "admin" ? "admin" : "order";
   document.querySelectorAll("#demoBar a").forEach(a => { if (a.getAttribute("href") === "#" + h || (view === "order" && a.dataset.view === "order")) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
@@ -3540,6 +3656,7 @@ async function start() {
   const saved = local.get("cp_site");
   // No building chosen yet: the app opens on Home with a welcome card (no forced location sheet)
   S.siteId = S.sites.some(x => x.id === saved) ? saved : null; S.noSite = !S.siteId;
+  if (S.siteId && !(local.get("cp_recent_sites") || []).length) local.set("cp_recent_sites", [S.siteId]);
   $("#sheetBg").addEventListener("click", e => { if (e.target === $("#sheetBg")) closeSheet(); });
   initSheetDrag();
   document.addEventListener("keydown", e => { if (e.key === "Escape") closeSheet(); });

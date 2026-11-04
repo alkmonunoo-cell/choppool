@@ -587,6 +587,7 @@ end $$;
 grant execute on function rider_apply(text, text, text, text, text) to anon, authenticated;
 
 -- Kitchen scores from real orders only (last 90 days). Counts and percentages, no customer details.
+drop view if exists kitchen_scores;
 create or replace view kitchen_scores as
   with p as (
     select pl.kitchen_id, pl.id, pl.status, pl.delivered_at, pl.order_date,
@@ -1323,5 +1324,188 @@ language sql stable security definer set search_path = public as $$
 $$;
 grant execute on function my_orders(uuid[]) to anon, authenticated;
 
+-- ---------- from update16 ----------
+-- =====================================================================
+-- Update 16: customer ratings and photos (only from collected orders), hidden by the team when needed
+-- =====================================================================
+create table if not exists reviews (
+  id uuid primary key default gen_random_uuid(),
+  order_id uuid not null unique references orders(id),
+  kitchen_id uuid not null references kitchens(id),
+  site_id uuid references sites(id),
+  user_id uuid,
+  rating int not null check (rating between 1 and 5),
+  comment text check (comment is null or char_length(comment) <= 280),
+  photo_url text,
+  hidden boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists reviews_kitchen_idx on reviews (kitchen_id, created_at desc);
+alter table reviews enable row level security;
+drop policy if exists "team reviews" on reviews;
+create policy "team reviews" on reviews for all to authenticated using (is_admin()) with check (is_admin());
+grant select, update on reviews to authenticated;
+
+-- What customers see: rating, comment, photo and first name only (never phone numbers or accounts)
+create or replace view public_reviews as
+  select r.id, r.kitchen_id, r.rating, r.comment, r.photo_url, r.created_at,
+         split_part(trim(o.customer_name), ' ', 1) as name, o.item_name
+  from reviews r join orders o on o.id = r.order_id
+  where not r.hidden;
+grant select on public_reviews to anon, authenticated;
+
+-- Rate a collected order (and add a photo). Same phone or account that placed it; can be changed later.
+create or replace function submit_review(p_order uuid, p_phone text, p_rating int, p_comment text default null, p_photo text default null)
+returns json language plpgsql security definer set search_path = public as $$
+declare o orders; v_phone text := regexp_replace(coalesce(p_phone, ''), '\D', '', 'g');
+begin
+  select * into o from orders where id = p_order and parent_id is null;
+  if not found then raise exception 'Order not found.'; end if;
+  if not ((auth.uid() is not null and o.user_id = auth.uid()) or o.phone = v_phone) then raise exception 'Use the phone or account that placed the order.'; end if;
+  if o.status <> 'collected' then raise exception 'You can rate your lunch once you''ve collected it.'; end if;
+  if p_rating is null or p_rating not between 1 and 5 then raise exception 'Choose 1 to 5 stars.'; end if;
+  if p_photo is not null and position('/dish-photos/reviews/' || o.id::text || '/' in p_photo) = 0 then raise exception 'Upload the photo from your order.'; end if;
+  insert into reviews (order_id, kitchen_id, site_id, user_id, rating, comment, photo_url)
+  values (o.id, o.kitchen_id, o.site_id, o.user_id, p_rating, nullif(left(trim(coalesce(p_comment, '')), 280), ''), p_photo)
+  on conflict (order_id) do update set rating = excluded.rating, comment = excluded.comment,
+    photo_url = coalesce(excluded.photo_url, reviews.photo_url), updated_at = now();
+  return json_build_object('ok', true);
+end $$;
+grant execute on function submit_review(uuid, text, int, text, text) to anon, authenticated;
+
+-- Photos for a review go in dish-photos/reviews/<order id>/, only for an order collected in the last 7 days
+create or replace function review_folder_ok(p_order text) returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from orders where id::text = p_order and status = 'collected' and order_date > (now() at time zone 'utc')::date - 7);
+$$;
+grant execute on function review_folder_ok(text) to anon, authenticated;
+do $$ begin
+  if to_regclass('storage.objects') is not null then
+    execute 'drop policy if exists "review photos add" on storage.objects';
+    execute 'create policy "review photos add" on storage.objects for insert to anon, authenticated with check (bucket_id = ''dish-photos'' and (storage.foldername(name))[1] = ''reviews'' and public.review_folder_ok((storage.foldername(name))[2]))';
+  end if;
+end $$;
+
+-- Orders show whether you've rated them
+drop function if exists my_orders(uuid[]);
+create function my_orders(p_ids uuid[])
+returns table (id uuid, order_date date, code text, status text, qty int, item_name text, site_id uuid,
+               kitchen_id uuid, pool_seq int, pool_status text, special_request text, quote_price numeric,
+               amount_due numeric, cancel_reason text, unit_price numeric, addons jsonb, addons_total numeric,
+               max_fee numeric, service_fee numeric, wallet_used numeric, saving numeric, has_account boolean,
+               refund_needed boolean, parent_id uuid, fee_per_meal boolean, item_id uuid, pool_id uuid, created_at timestamptz,
+               refund_due numeric, my_rating int, my_photo text)
+language sql stable security definer set search_path = public as $$
+  select o.id, o.order_date, o.code, o.status, o.qty, o.item_name, o.site_id, o.kitchen_id, p.seq, p.status,
+         o.special_request, o.quote_price,
+         order_total(o) - o.wallet_used,
+         o.cancel_reason, o.unit_price, o.addons, o.addons_total, o.max_fee, o.service_fee, o.wallet_used,
+         case when o.status in ('pending', 'paid', 'collected') and p.status <> 'cancelled' then order_cashback(o.id) else 0 end,
+         o.user_id is not null, o.refund_needed, o.parent_id, o.fee_per_meal, o.item_id, o.pool_id, o.created_at, o.refund_due,
+         r.rating, r.photo_url
+  from orders o join pools p on p.id = o.pool_id left join reviews r on r.order_id = o.id
+  where (o.id = any(p_ids) or o.parent_id = any(p_ids) or (auth.uid() is not null and o.user_id = auth.uid()))
+    and o.order_date >= (now() at time zone 'utc')::date - 1
+  order by o.created_at desc;
+$$;
+grant execute on function my_orders(uuid[]) to anon, authenticated;
+
+-- Vendor scores now include the average rating (last 90 days, hidden reviews excluded)
+create or replace view kitchen_scores as
+  with p as (
+    select pl.kitchen_id, pl.id, pl.status, pl.delivered_at, pl.order_date,
+           exists (select 1 from orders o where o.pool_id = pl.id and o.cancel_reason in ('The seller did not confirm in time') ) as no_show
+    from pools pl where pl.order_date > (now() at time zone 'utc')::date - 90),
+  o as (select kitchen_id, phone, count(*) as n from orders where status in ('paid', 'collected') and order_date > (now() at time zone 'utc')::date - 90 group by 1, 2)
+  select k.id as kitchen_id,
+    coalesce((select sum(n) from o where o.kitchen_id = k.id), 0)::int as orders,
+    (select round(100.0 * count(*) filter (where p.delivered_at <= (p.order_date + s.delivery_time + interval '15 minutes')) / nullif(count(*) filter (where p.delivered_at is not null), 0))
+       from p cross join settings s where s.id = 1 and p.kitchen_id = k.id)::int as on_time,
+    (select round(100.0 * count(*) filter (where p.status <> 'cancelled') / nullif(count(*) filter (where p.status <> 'cancelled' or p.no_show), 0)) from p where p.kitchen_id = k.id)::int as reliable,
+    (select round(100.0 * count(*) filter (where o.n >= 2) / nullif(count(*), 0)) from o where o.kitchen_id = k.id)::int as come_back,
+    (select round(avg(r.rating), 1) from reviews r where r.kitchen_id = k.id and not r.hidden and r.created_at > now() - interval '90 days') as rating,
+    (select count(*) from reviews r where r.kitchen_id = k.id and not r.hidden and r.created_at > now() - interval '90 days')::int as ratings
+  from kitchens k where k.active and not k.archived;
+grant select on kitchen_scores to anon, authenticated;
+
+-- Weekly report: average rating per vendor
+create or replace function admin_weekly_report(p_week_start date) returns json
+language plpgsql stable security definer set search_path = public as $$
+declare s settings; w0 date := p_week_start; w1 date := p_week_start + 4; v0 date := p_week_start - 7; v1 date := p_week_start - 3;
+begin
+  if not is_admin() then raise exception 'Team members only.'; end if;
+  select * into s from settings where id = 1;
+  return (
+  with o as (select o.*, p.status as pool_status from orders o join pools p on p.id = o.pool_id where o.order_date between v0 and w1),
+  live as (select * from o where status in ('paid', 'collected', 'pending')),
+  cur as (select * from live where order_date between w0 and w1),
+  prev as (select * from live where order_date between v0 and v1),
+  pl as (select p.*, pool_meals(p.id) as meals from pools p where p.order_date between v0 and w1),
+  firsts as (select phone, min(order_date) as first_day from orders where status in ('paid', 'collected', 'pending') group by phone),
+  head as (
+    select wk, sum(qty)::int as meals, count(*) filter (where parent_id is null)::int as orders, count(distinct phone)::int as customers,
+           count(distinct phone) filter (where (select first_day from firsts f where f.phone = x.phone) >= x.ws)::int as new_customers
+    from (select *, 'cur' as wk, w0 as ws from cur union all select *, 'prev', v0 from prev) x group by wk),
+  rep as (
+    select wk, round(100.0 * count(*) filter (where n >= 2) / nullif(count(*), 0))::int as repeat_rate
+    from (select 'cur' as wk, phone, count(distinct order_date) as n from live where order_date between w0 - 7 and w1 and phone in (select phone from cur) group by phone
+          union all select 'prev', phone, count(distinct order_date) from live where order_date between v0 - 7 and v1 and phone in (select phone from prev) group by phone) r group by wk),
+  pools_w as (
+    select case when order_date >= w0 then 'cur' else 'prev' end as wk, round(avg(meals), 1) as avg_meals,
+           count(*) filter (where meals >= s.max_meals)::int as filled, count(*)::int as pools
+    from pl where status <> 'cancelled' and meals > 0 group by 1),
+  canc as (select case when order_date >= w0 then 'cur' else 'prev' end as wk, count(*)::int as n from o where status = 'cancelled' group by 1)
+  select json_build_object(
+    'week_start', w0, 'week_end', w1,
+    'headline', (select json_object_agg(h.wk, json_build_object('meals', h.meals, 'orders', h.orders, 'customers', h.customers, 'new_customers', h.new_customers,
+                    'repeat_rate', (select repeat_rate from rep where rep.wk = h.wk), 'avg_meals', (select avg_meals from pools_w where pools_w.wk = h.wk),
+                    'pools', (select pools from pools_w where pools_w.wk = h.wk), 'filled', (select filled from pools_w where pools_w.wk = h.wk),
+                    'cancelled', coalesce((select n from canc where canc.wk = h.wk), 0))) from head h),
+    'money', case when is_super() then (select json_build_object(
+        'food', round(coalesce(sum((coalesce(quote_price, unit_price) + addons_total) * qty), 0), 2),
+        'commission', round(coalesce(sum((coalesce(quote_price, unit_price) + addons_total) * qty), 0) * s.commission_rate, 2),
+        'service_fees', round(coalesce(sum(service_fee * case when fee_per_meal then qty else 1 end), 0), 2),
+        'cashback', round(coalesce(sum(case when parent_id is null and status in ('paid', 'collected') then order_cashback(id) else 0 end), 0), 2),
+        'refunds', round(coalesce((select sum(amount) from wallet_entries where amount > 0 and reason like 'Refund%' and created_at::date between w0 and w1 + 2), 0), 2),
+        'momo_refunds', (select count(*) from orders where refund_needed and order_date between w0 and w1),
+        'wallets_owed', round(coalesce((select sum(wallet_balance(u)) from (select distinct user_id as u from orders where user_id is not null union select distinct user_id from wallet_entries) us), 0), 2))
+      from cur) end,
+    'buildings', coalesce((select json_agg(b order by b.meals desc) from (
+        select si.name, sum(c.qty)::int as meals, count(distinct c.pool_id)::int as pools,
+               round(sum(c.qty)::numeric / nullif(count(distinct c.pool_id), 0), 1) as avg_pool,
+               coalesce((select sum(qty) from prev where prev.site_id = si.id), 0)::int as prev_meals
+        from cur c join sites si on si.id = c.site_id group by si.id, si.name order by 2 desc limit 15) b), '[]'::json),
+    'quiet', coalesce((select json_agg(q) from (
+        select si.name, sum(p.qty)::int as prev_meals from prev p join sites si on si.id = p.site_id
+        where not exists (select 1 from cur c where c.site_id = p.site_id) group by si.name order by 2 desc) q), '[]'::json),
+    'customers', coalesce((select json_agg(c2) from (
+        select (array_agg(customer_name order by created_at desc))[1] as name,
+               (select si.name from cur c3 join sites si on si.id = c3.site_id where c3.phone = c.phone group by si.name order by count(*) desc limit 1) as building,
+               case when is_super() then c.phone end as phone,
+               count(*) filter (where parent_id is null)::int as orders, sum(qty)::int as meals
+        from cur c group by c.phone order by sum(qty) desc, count(*) desc limit 15) c2), '[]'::json),
+    'vendors', coalesce((select json_agg(v order by v.meals desc) from (
+        select k.public_name as name, coalesce(sum(c.qty), 0)::int as meals,
+               (select count(*) from pl where pl.kitchen_id = k.id and pl.order_date >= w0 and pl.status <> 'cancelled' and pl.meals > 0)::int as pools,
+               (select count(*) from pl where pl.kitchen_id = k.id and pl.order_date >= w0 and pl.status = 'cancelled'
+                  and exists (select 1 from orders x where x.pool_id = pl.id and x.cancel_reason = 'The seller did not confirm in time'))::int as expired,
+               (select round(100.0 * count(*) filter (where pl.delivered_at <= pl.order_date + s.delivery_time + interval '15 minutes') / nullif(count(*) filter (where pl.delivered_at is not null), 0))
+                  from pl where pl.kitchen_id = k.id and pl.order_date >= w0)::int as on_time,
+               (select count(*) from o where o.kitchen_id = k.id and o.order_date >= w0 and o.cancel_reason like 'The seller can''t%')::int as declined,
+               (select count(*) from (select phone from live where live.kitchen_id = k.id and live.order_date between w0 - 28 and w1 group by phone having count(distinct order_date) >= 2) r)::int as repeat_customers,
+               cardinality(k.auto_days) > 0 as always_cooking,
+               (select round(avg(r.rating), 1) from reviews r where r.kitchen_id = k.id and not r.hidden and r.created_at::date between w0 and w1 + 2) as rating
+        from kitchens k left join cur c on c.kitchen_id = k.id where k.active
+        group by k.id, k.public_name, k.auto_days having coalesce(sum(c.qty), 0) > 0
+           or exists (select 1 from pl where pl.kitchen_id = k.id and pl.order_date >= w0)) v), '[]'::json),
+    'riders', coalesce((select json_agg(r) from (
+        select rd.name, count(*)::int as deliveries,
+               round(100.0 * count(*) filter (where pl.delivered_at <= pl.order_date + s.delivery_time + interval '15 minutes') / nullif(count(*), 0))::int as on_time
+        from pl join riders rd on rd.id = pl.rider_id where pl.order_date >= w0 and pl.delivered_at is not null group by rd.name order by 2 desc) r), '[]'::json)
+  ));
+end $$;
+grant execute on function admin_weekly_report(date) to authenticated;
+
 notify pgrst, 'reload schema';
-select 'ChopPool database is up to date (version 15)' as result;
+select 'ChopPool database is up to date (version 16)' as result;
