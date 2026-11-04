@@ -146,6 +146,13 @@ p { margin: 0; }
 .ptitle h3, .ptitle strong { color: #fff; font-family: var(--font-display); font-size: 22px; font-weight: 800; letter-spacing: -.3px; line-height: 1.15; }
 .pool-art.small .ptitle strong { font-size: 19px; }
 .ptitle span { font-size: 12.5px; opacity: .9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Home: the slim stats strip sticks under the top bar once the big dashboard has scrolled away */
+.homemini { position: -webkit-sticky; position: sticky; top: calc(var(--kh, 100px) + 6px); z-index: 6; margin-bottom: -54px; height: 40px; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 14px; border-radius: 14px;
+  background: radial-gradient(130% 160% at 85% 0%, #F7853C 0%, #E2561A 45%, #B93A0C 100%); color: #fff; font-size: 12.5px; box-shadow: 0 8px 18px rgba(185,58,12,.28);
+  opacity: 0; transform: translateY(-8px); pointer-events: none; transition: opacity .22s ease, transform .22s cubic-bezier(.2,.8,.2,1); will-change: opacity, transform; }
+.homemini.show { opacity: 1; transform: none; }
+.homemini b { font-family: var(--font-display); font-size: 15px; font-weight: 800; margin-right: 2px; }
+.homemini span { white-space: nowrap; }
 .waitbox { display: grid; gap: 8px; padding: 12px; border-radius: 18px; background: color-mix(in srgb, #F5B04A 14%, var(--surface)); border: 1.5px solid color-mix(in srgb, #F5B04A 55%, transparent); }
 .wb-top { display: flex; align-items: center; gap: 8px; font-size: 14.5px; }
 .wb-top strong { color: var(--ink); }
@@ -1394,7 +1401,7 @@ function setTab(t) {
     if (b) { if (x === t) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); }
   });
   // Fixed top area: "Delivering to" on Pools and Menus; Orders and Wallet show their own title
-  document.querySelectorAll("#topzone [data-for]").forEach(x => x.classList.toggle("hidden", x.dataset.for !== t || (!!S.noSite && x.classList.contains("section-title"))));
+  document.querySelectorAll("#topzone [data-for]").forEach(x => x.classList.toggle("hidden", x.dataset.for !== t));
   const titled = { orders: "Your orders", wallet: "Wallet" }[t];
   $("#placeBtn")?.classList.toggle("hidden", !!titled); $("#appTitle")?.classList.toggle("hidden", !titled); if ($("#appTitle")) $("#appTitle").textContent = titled || "";
   $("#topzone")?.classList.remove("compact");
@@ -1402,7 +1409,7 @@ function setTab(t) {
   if (t === "wallet") renderWallet();
   if (t === "kitchens") renderKitchens();
   window.scrollTo(0, 0);
-  if (t === "kitchens") requestAnimationFrame(setKTop);
+  requestAnimationFrame(() => { setKTop(); if (t === "home") watchHero(); });
 }
 async function viewOrder() {
   S.tab = S.tab || "home";
@@ -1416,12 +1423,13 @@ async function viewOrder() {
       <button class="iconbtn" id="bell" aria-pressed="${!!local.get("cp_alerts")}" aria-label="Alerts when people here order">${ICON.bell}</button>
       <button class="avatar guest" id="acct" aria-label="Sign in">${ICON.user}</button>
     </header>
-      <section class="hero" id="hero" data-for="home"></section>
-      <div class="section-title" data-for="home"><h2 id="poolsTitle">Active pools</h2><span class="small muted" id="poolCount"></span></div>
       <div data-for="kitchens" class="hidden"><h1>Menus near you</h1></div>
     </div>
 
     <section id="tabHome" class="stack">
+      <section class="hero" id="hero"></section>
+      <div class="homemini" id="homeMini" aria-hidden="true"></div>
+      <div class="section-title"><h2 id="poolsTitle">Active pools</h2><span class="small muted" id="poolCount"></span></div>
       <section id="pools" class="stack"></section>
     </section>
     <section id="tabKitchens" class="stack hidden">
@@ -1452,6 +1460,7 @@ async function viewOrder() {
   $("#tabOrders").addEventListener("click", e => { const b = e.target.closest("button[data-pay]"); if (b) openPayQuote(b.dataset.pay); const ro = e.target.closest("[data-reorder]"); if (ro) openOrder(ro.dataset.reorder);
     const ap = e.target.closest("[data-addplate]"); if (ap) { const o = (S.mine || []).find(x => x.id === ap.dataset.addplate); if (o) openOrder(o.kitchen_id, { join: o }); }
     const ag = e.target.closest("[data-again]"); if (ag) { const o = (S.mine || []).find(x => x.id === ag.dataset.again); if (o) openOrder(o.kitchen_id, { preset: { item_id: o.item_id, qty: o.qty, addons: (o.addons || []).map(a => a.name), site_id: o.site_id } }); } const cx = e.target.closest("[data-cancel]"); if (cx) openCancel(cx.dataset.cancel); const sh = e.target.closest("[data-share]"); if (sh) { const [a, c] = sh.dataset.share.split(","); sharePool(a, c); } if (e.target.closest("[data-keepcb]")) openAccount("Your cashback moves into your new wallet."); const h = e.target.closest("[data-gohome]"); if (h) setTab("home"); });
+  setKTop(); watchHero();
   renderWhen(); refreshUser(); if (S.board.pools.length) renderPools(); await refreshBoard(); await refreshMine();
   setTab(S.tab);
   if (S.pendingJoin) {
@@ -1678,6 +1687,7 @@ function renderHero() {
     <div class="hero-stats"><div class="hero-stat"><b class="num" id="countdown">--</b><span>until orders close</span></div>
       <div class="hero-stat"><b class="num">${meals}</b><span>meals ordered</span></div>
       ${S.noSite ? `<div class="hero-stat"><b class="num">${here.filter(p => p.status === "collecting" && p.meals > 0).length}</b><span>pools open</span></div>` : `<div class="hero-stat"><b class="num">${money(best)}</b><span>best delivery</span></div>`}</div>`;
+  if ($("#homeMini")) $("#homeMini").innerHTML = `<span><b class="num" id="countdownMini">--</b> to order</span><span><b class="num">${meals}</b> meals</span>${S.noSite ? "" : `<span><b class="num">${money(best)}</b> best</span>`}`;
   tickCountdown();
 }
 function tickCountdown() {
@@ -1687,6 +1697,7 @@ function tickCountdown() {
   const ms = Math.max(0, at(S.date, S.settings.cutoff) - new Date());
   const h = Math.floor(ms / 3.6e6), m = Math.floor(ms % 3.6e6 / 6e4), sec = Math.floor(ms % 6e4 / 1000);
   $("#countdown").textContent = (h ? h + ":" + String(m).padStart(2, "0") : String(m)) + ":" + String(sec).padStart(2, "0");
+  if ($("#countdownMini")) $("#countdownMini").textContent = $("#countdown").textContent;
   if ($("#ghNow")) $("#ghNow").textContent = ghanaNow();
 }
 const saveBoot = () => { if (!DEMO) local.set("cp_boot", { v: 2, date: S.date || orderDate(S.settings), board: S.board, load: { settings: S.settings, sites: S.sites, menus: S.menus, items: S.items, payMethods: S.payMethods, pop: S.pop, scores: S.scores, siteCounts: S.siteCounts } }); };
@@ -1738,7 +1749,15 @@ function openKJump() {
     setTimeout(() => { const t = document.getElementById(b.dataset.kgo); if (!t) return; window.scrollTo({ top: t.getBoundingClientRect().top + window.scrollY - (parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--kh")) || 0) + 1, behavior: "smooth" }); }, 380); };
 }
 // Menus: category headers stick right under the top bar (native sticky, no counts); the next one pushes the last one up
-window.addEventListener("resize", () => { if (S.tab === "kitchens") setKTop(); });
+window.addEventListener("resize", () => { setKTop(); watchHero(); });
+let heroObs = null;
+function watchHero() {
+  const h = $("#hero"), m = $("#homeMini"); if (!h || !m || !("IntersectionObserver" in window)) return;
+  if (heroObs) heroObs.disconnect();
+  const kh = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--kh")) || 100;
+  heroObs = new IntersectionObserver(([e]) => m.classList.toggle("show", !e.isIntersecting && e.boundingClientRect.top < kh), { rootMargin: `-${Math.round(kh) + 40}px 0px 0px 0px` });
+  heroObs.observe(h);
+}
 function setKTop() { const tz = $("#topzone"); if (!tz) return; const top = parseFloat(getComputedStyle(tz).top) || 0; document.documentElement.style.setProperty("--kh", Math.round(top + tz.offsetHeight) + "px"); }
 // Before a building is chosen: the best-rated vendors across Accra, without delivery prices
 function renderKitchensAnywhere(el) {
@@ -1794,7 +1813,7 @@ function wireWelcome() {
   q.addEventListener("focus", () => { const top = q.getBoundingClientRect().top; if (top > 220) window.scrollBy({ top: top - 160, behavior: "smooth" }); });
 }
 function renderPools() {
-  if ($("#poolsTitle")) { $("#poolsTitle").textContent = "Active pools"; $("#poolsTitle").parentElement.classList.toggle("hidden", !!S.noSite || S.tab !== "home"); }
+  if ($("#poolsTitle")) { $("#poolsTitle").textContent = "Active pools"; $("#poolsTitle").parentElement.classList.toggle("hidden", !!S.noSite); }
   if (S.noSite) { if ($("#poolCount")) $("#poolCount").textContent = ""; if (S.tab === "kitchens") renderKitchens();
     // Keep what's being typed: only refresh the busy chips on background updates
     if ($("#pools .welcome")) { if ($("#wChips")) $("#wChips").innerHTML = busyChips(); } else { $("#pools").innerHTML = welcomeCard(); wireWelcome(); }
@@ -3239,7 +3258,6 @@ window.addEventListener("scroll", () => {
   requestAnimationFrame(() => {
     topTick = false; const y = window.scrollY;
     document.querySelectorAll(".topzone").forEach(z => z.classList.toggle("scrolled", y > 4));
-    const tz = $("#topzone"); if (tz && S.tab === "home") { if (y > 90) tz.classList.add("compact"); else if (y < 16) tz.classList.remove("compact"); }
 
   });
 }, { passive: true });
