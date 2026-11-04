@@ -605,7 +605,7 @@ body.on-home .topzone { position: relative; top: 0; }
 .locchip span { overflow: hidden; text-overflow: ellipsis; }
 /* Active pool rows */
 .prow { display: flex; gap: 12px; align-items: center; background: var(--surface); border-radius: 20px; padding: 12px; box-shadow: var(--shadow); }
-.prow.mine { box-shadow: 0 0 0 1.5px var(--accent), var(--shadow); }
+body:not(.on-home) #bell, body:not(.on-home) #theme { display: none; }
 .prow .ptile { width: 58px; height: 58px; border-radius: 16px; display: grid; place-items: center; flex: none; }
 .prow .ptile svg { width: 48px; height: 48px; }
 .prow .ptx { flex: 1; min-width: 0; display: grid; gap: 2px; }
