@@ -636,6 +636,8 @@ body:not(.on-home) #bell, body:not(.on-home) #theme { display: none; }
 .ytag { font-size: 10.5px; vertical-align: 2px; white-space: nowrap; font-weight: 800; color: #fff; background: var(--accent); border-radius: 99px; padding: 2px 7px; }
 .iconround { width: 38px; height: 38px; border-radius: 99px; display: grid; place-items: center; background: var(--surface-2); border: 1px solid var(--line); color: var(--ink); padding: 0; flex: none; }
 .iconround svg { width: 18px; height: 18px; }
+.farlink { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 10px; margin-top: 14px; padding: 15px 16px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); color: var(--ink); font: 700 15px var(--font-body, inherit); text-align: left; cursor: pointer; }
+.farlink svg { transform: rotate(-90deg); color: var(--muted); flex: none; }
 .emptyrow { display: flex; gap: 12px; align-items: center; background: var(--surface); border: 1.5px dashed var(--line); border-radius: 20px; padding: 16px; }
 .emptyrow .eic { width: 46px; height: 46px; border-radius: 14px; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; flex: none; }
 .emptyrow .eic svg { width: 22px; height: 22px; }
@@ -2346,7 +2348,7 @@ const locChip = () => `<button class="locchip" aria-label="Change building">${IC
 const hasMineToday = () => (S.mine || []).some(o => o.order_date === S.date && o.status !== "cancelled");
 const favs = () => new Set(local.get("cp_favs") || []);
 function toggleFav(kid) { const f = favs(); f.has(kid) ? f.delete(kid) : f.add(kid); local.set("cp_favs", [...f]); return f.has(kid); }
-const VFILTERS = [["fav", "♥ Favourites"], ["near", "Nearest"], ["top", "Top rated"], ["pools", "Pools open"], ["local", "Local dishes"], ["healthy", "Salads and bowls"]];
+const VFILTERS = [["fav", "♥ Favourites"], ["near", "Nearest"], ["top", "Top rated"], ["pools", "Pools open"], ["local", "Local dishes"], ["healthy", "Salads and bowls"], ["far", "Further away"]];
 const LOCAL_KINDS = new Set(["jollof", "waakye", "banku", "fufu", "kenkey", "tuo", "omotuo", "redred", "gob3", "kelewele", "ampesi", "ricestew", "soup", "koko", "yam"]);
 const HEALTHY_KINDS = new Set(["salad", "bowl", "wrap"]);
 const kindsOf = k => new Set(S.items.filter(i => i.kitchen_id === k.id).map(i => dishKind(i)));
@@ -2464,12 +2466,16 @@ function renderPools() {
 /* ---------- Vendors tab: grid or list, typo-tolerant search, filters ---------- */
 function syncVChips() {
   S.vf = S.vf || "near";
-  document.querySelectorAll("#vchips [data-vf]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.vf === S.vf)));
+  // "Further away" only shows when some vendors deliver here at a higher cost
+  const hasFar = !S.noSite && nearRows().further.length > 0;
+  if (S.vf === "far" && !hasFar) S.vf = "near";
+  document.querySelectorAll("#vchips [data-vf]").forEach(b => { b.setAttribute("aria-pressed", String(b.dataset.vf === S.vf)); if (b.dataset.vf === "far") b.classList.toggle("hidden", !hasFar); });
   if ($("#vq") && S.vq === "") $("#vq").value = "";
 }
-function vendorPool() { return S.noSite ? S.menus.filter(k => !k.site_id) : nearRows().rows.map(r => r.k); }
+function vendorPool() { if (S.noSite) return S.menus.filter(k => !k.site_id); const nr = nearRows(); return nr.rows.concat(nr.further).map(r => r.k); }
 function renderKitchens() {
   const el = $("#kitchensList"); if (!el) return;
+  syncVChips();
   const view = local.get("cp_vview") || "grid", f = S.vf || "near", fv = favs(), site = siteOf(S.siteId);
   let rows, far = 0;
   let further = [];
@@ -2478,13 +2484,17 @@ function renderKitchens() {
   $("#kitchensSub").textContent = S.noSite ? "Top vendors across Accra. Choose your building to see delivery prices." : "Delivering to " + (site.name || "your building") + "." + (far ? " " + far + " more too far to deliver here." : "");
   const pick = list => list.filter(r => (f !== "fav" || fv.has(r.k.id)) && (f !== "pools" || (!S.noSite && activeHere(r.k)))
     && (f !== "local" || [...kindsOf(r.k)].some(x => LOCAL_KINDS.has(x))) && (f !== "healthy" || [...kindsOf(r.k)].some(x => HEALTHY_KINDS.has(x))));
-  rows = pick(rows); further = pick(further);
+  // Each filter shows nearby vendors only; vendors with a higher delivery cost have their own "Further away" tab
+  if (f === "far") { rows = further; further = []; } else rows = pick(rows);
+  const farCount = f === "near" ? further.length : 0;
   if (f === "top" || S.noSite) rows.sort((a, b) => (((S.scores || {})[b.k.id] || {}).rating || 0) - (((S.scores || {})[a.k.id] || {}).rating || 0) || rank(b.k) - rank(a.k));
   const nearestId = !S.noSite && nearRows().rows[0]?.k.id;
   const empty = { fav: ["No favourites yet", "Tap the heart on any vendor's page to keep them here."], pools: ["No pools open yet", "Start one from any vendor and others in your building can join."], local: ["No local dishes here yet", "Try another filter."], healthy: ["No healthy options here yet", "Try another filter."] }[f]
     || [S.noSite ? "Choose your building" : "No vendors deliver here yet", S.noSite ? "Then you'll see the menus that deliver there." : "Add a vendor you know below."];
   const block = list => view === "list" ? `<div class="vlist">${list.map(r => vendorRow(r.k)).join("")}</div>` : `<div class="vgrid">${list.map(r => vendorTile(r.k, r.k.id === nearestId)).join("")}</div>`;
-  el.innerHTML = rows.length || further.length ? (rows.length ? block(rows) : "") + (further.length ? `<h3 class="vcat" style="position:static;margin:18px 0 4px;padding:0">Further away</h3><p class="small muted" style="margin:-4px 0 10px">Delivery costs more than ${moneyShort(S.settings.near_max_fee || 50)} to ${esc(site.name || "your building")}.</p>` + block(further) : "")
+  const farNote = f === "far" ? `<p class="small muted" style="margin:2px 0 12px">Delivery from these vendors costs more than ${moneyShort(S.settings.near_max_fee || 50)} to ${esc(site.name || "your building")}. Joining a pool brings it down.</p>` : "";
+  const farLink = farCount ? `<button class="farlink" data-vf="far"><span>${farCount} more vendor${farCount === 1 ? "" : "s"} further away</span>${ICON.chev}</button>` : "";
+  el.innerHTML = rows.length || farCount ? farNote + (rows.length ? block(rows) : `<div class="emptyrow"><span class="eic">${ICON.store.replace(/width="\d+" height="\d+"/, 'width="22" height="22"')}</span><div><strong>No vendors nearby yet</strong><p>These vendors still deliver to ${esc(site.name || "your building")}, for a bit more.</p></div></div>`) + farLink
     : `<div class="emptyrow"><span class="eic">${f === "fav" ? ICON.heart : ICON.store.replace(/width="\d+" height="\d+"/, 'width="22" height="22"')}</span><div><strong>${esc(empty[0])}</strong><p>${esc(empty[1])}</p></div></div>`;
   setKTop();
 }
@@ -2510,7 +2520,7 @@ function wireVendors() {
   const t = $("#tabKitchens"); if (!t || t.dataset.wired) return; t.dataset.wired = "1";
   t.addEventListener("click", e => {
     const vw = e.target.closest("[data-view]"); if (vw) { local.set("cp_vview", vw.dataset.view); document.querySelectorAll("#tabKitchens [data-view]").forEach(b => b.setAttribute("aria-pressed", String(b === vw))); return renderKitchens(); }
-    const vf = e.target.closest("[data-vf]"); if (vf) { S.vf = vf.dataset.vf; syncVChips(); renderKitchens(); return; }
+    const vf = e.target.closest("[data-vf]"); if (vf) { S.vf = vf.dataset.vf; syncVChips(); renderKitchens(); if (vf.classList.contains("farlink")) { $("#vchips [data-vf=far]")?.scrollIntoView({ inline: "center", block: "nearest" }); window.scrollTo({ top: 0, behavior: "smooth" }); } return; }
     const sg = e.target.closest("#vsugg [data-vendor]"); if (sg) { $("#vsugg").classList.remove("on"); return openVendor(sg.dataset.vendor); }
   });
   $("#vq").addEventListener("input", vendorSuggest);
