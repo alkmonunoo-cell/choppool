@@ -120,7 +120,9 @@ p { margin: 0; }
 :root[data-theme="dark"] .hero-stat.hurry { box-shadow: 0 0 0 2px #FF6A2B; }
 button.hero-stat { padding-right: 22px !important; font: inherit; color: inherit; text-align: left; cursor: pointer; position: relative; }
 button.hero-stat::after { content: "›"; position: absolute; right: 9px; top: 6px; font-weight: 700; font-size: 17px; opacity: .85; }
-.hero-stat b { font-family: var(--font-display); font-size: 18px; font-weight: 800; line-height: 1.15; white-space: nowrap; }
+.hero-stat b { font-family: var(--font-display); font-size: 18px; font-weight: 800; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.hero-stat { min-width: 0; }
+.hero-stat b.long { font-size: 15px; line-height: 21px; }
 .hero-stat span { font-size: 11.5px; opacity: .9; line-height: 1.3; }
 :root[data-theme="dark"] .hero-stat { background: rgba(0,0,0,.12); }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .hero-stat { background: rgba(0,0,0,.12); } }
@@ -2182,7 +2184,7 @@ function heroDelivery(here, site) {
   if (hasPin(site)) {
     // Lowest delivery among the vendors near you (within the "near you" limit)
     const rows = nearRows().rows.map(r => ({ k: r.k, trip: tripTo(r.k, site) })).sort((a, b) => a.trip - b.trip);
-    if (rows.length) opts.push({ fee: rows[0].trip, label: rows[0].trip === 0 ? "free delivery near you" : rows.length > 1 ? "lowest delivery near you" : "delivery from " + shortName(rows[0].k.public_name), kid: rows[0].k.id });
+    if (rows.length) opts.push({ fee: rows[0].trip, label: rows[0].trip === 0 ? "free delivery nearby" : rows.length > 1 ? "lowest delivery nearby" : "delivery from " + shortName(rows[0].k.public_name), kid: rows[0].k.id });
   }
   return opts.sort((a, b) => a.fee - b.fee || (b.pool ? 1 : 0) - (a.pool ? 1 : 0))[0] || null;
 }
@@ -2200,7 +2202,7 @@ function renderHero() {
       <p class="small" style="opacity:.8">Ghana time (GMT) now <span class="num" id="ghNow">${ghanaNow()}</span></p></div>
     <div class="hero-stats"><div class="hero-stat" id="cdBox"><b class="num" id="countdown">--</b><span id="cdLabel">until orders close</span></div>
       ${hasMineToday() ? `<button class="hero-stat hlink" data-gomine aria-label="${meals} meals ordered. Open your orders"><b class="num">${meals}</b><span>meals ordered</span></button>` : `<div class="hero-stat"><b class="num">${meals}</b><span>meals ordered</span></div>`}
-      ${S.noSite ? `<div class="hero-stat"><b class="num">${here.filter(p => p.status === "collecting" && p.meals > 0).length}</b><span>pools open</span></div>` : (dlv ? `<button class="hero-stat hlink" data-vendor="${esc(dlv.kid)}"><b class="num">${dlv.fee === 0 ? "Free" : Number.isInteger(dlv.fee) ? "GHS " + dlv.fee : money(dlv.fee)}</b><span>${esc(dlv.label)}</span></button>` : `<div class="hero-stat"><b class="num">${menusHere().length}</b><span>vendors cooking</span></div>`)}</div>`;
+      ${S.noSite ? `<div class="hero-stat"><b class="num">${here.filter(p => p.status === "collecting" && p.meals > 0).length}</b><span>pools open</span></div>` : (dlv ? `<button class="hero-stat hlink" data-vendor="${esc(dlv.kid)}">${(v => `<b class="num${v.length > 7 ? " long" : ""}">${v}</b>`)(dlv.fee === 0 ? "Free" : Number.isInteger(dlv.fee) ? "GHS " + dlv.fee : money(dlv.fee))}<span>${esc(dlv.label)}</span></button>` : `<div class="hero-stat"><b class="num">${menusHere().length}</b><span>vendors cooking</span></div>`)}</div>`;
   tickCountdown();
 }
 function tickCountdown() {
@@ -2210,8 +2212,8 @@ function tickCountdown() {
   const ms = Math.max(0, at(S.date, S.settings.cutoff) - new Date());
   // Before the order day's countdown starts (6:00 by default), say when orders close instead of a long countdown
   if (new Date() < at(S.date, S.settings.countdown_start || "06:00")) {
-    const dl = dayLabel(S.date), when = (dl === "tomorrow" ? "Tomorrow" : new Date(S.date + "T00:00:00Z").toLocaleDateString("en-GB", { weekday: "short", timeZone: "UTC" })) + " " + fmtTime(S.settings.cutoff);
-    if ($("#countdown").textContent !== when) { $("#countdown").textContent = when; $("#cdLabel").textContent = "orders close"; }
+    const dl = dayLabel(S.date), day = dl === "tomorrow" ? "tomorrow" : new Date(S.date + "T00:00:00Z").toLocaleDateString("en-GB", { weekday: "short", timeZone: "UTC" }), when = fmtTime(S.settings.cutoff);
+    if ($("#countdown").textContent !== when) { $("#countdown").textContent = when; $("#cdLabel").textContent = "orders close " + day; }
     $("#cdBox")?.classList.remove("hurry");
   } else {
     const h = Math.floor(ms / 3.6e6), m = Math.floor(ms % 3.6e6 / 6e4), sec = Math.floor(ms % 6e4 / 1000);
