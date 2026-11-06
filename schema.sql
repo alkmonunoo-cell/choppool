@@ -1,5 +1,5 @@
 -- =====================================================================
--- ChopPool pilot database, version 17
+-- ChopPool pilot database, version 18
 -- Run once in Supabase: SQL Editor > New query > paste everything > Run.
 -- If you ran an earlier version, run the RESET block at the very bottom
 -- first (it deletes pilot test data), then run this whole file.
@@ -2415,3 +2415,508 @@ begin
     mute = coalesce(p_mute, push_subs.mute), updated_at = now();
 end $$;
 grant execute on function save_push_sub(text, text, text, uuid[], text, text, text[]) to anon, authenticated;
+
+-- ---------- update18: weekends, next-day deadline, vendor fee, free delivery, payment problems, waitlist ----------
+-- =====================================================================
+-- Update 18: weekends, next-day confirm deadline, vendor fee on bigger pools,
+-- free delivery by the vendor, payment not received, building waitlist + merge
+-- =====================================================================
+
+-- ---------- New settings (all editable in Admin › Settings) ----------
+alter table settings add column if not exists next_day_confirm_by time not null default '08:30';  -- pools for tomorrow: vendor confirms by this time on the day
+alter table settings add column if not exists countdown_start time not null default '06:00';      -- Home countdown starts on the order day
+alter table settings add column if not exists near_max_fee numeric not null default 50;           -- "Vendors near you": delivery at most this
+alter table settings add column if not exists free_max_m numeric not null default 1500;           -- furthest a vendor may deliver free (road metres)
+alter table settings add column if not exists vendor_fee_rate numeric not null default 0;         -- ChopPool fee on meals after the free ones (0.05 = 5%)
+alter table settings add column if not exists vendor_fee_free int not null default 5;             -- meals in each pool with no fee
+alter table settings drop constraint if exists settings_vendor_fee_check;
+alter table settings add constraint settings_vendor_fee_check check (vendor_fee_rate between 0 and 0.5 and vendor_fee_free between 0 and 100);
+
+-- ---------- Vendors ----------
+alter table kitchens add column if not exists free_m numeric;                     -- vendor's free-delivery distance by road (metres); null = off
+alter table kitchens add column if not exists free_min int not null default 0;   -- free from this many meals in the pool
+alter table kitchens add column if not exists fee_ack numeric not null default 0; -- fee rate the vendor has accepted
+alter table kitchens add column if not exists fee_free_ack int not null default 5;-- free meals the vendor has accepted
+
+-- ---------- Pools keep the fee terms they started with ----------
+alter table pools add column if not exists fee_rate numeric;
+alter table pools add column if not exists fee_free int;
+
+-- ---------- Orders: payment problems ----------
+alter table orders add column if not exists pay_issue text;            -- null | not_found | short
+alter table orders add column if not exists amount_received numeric;   -- what actually arrived when it was short
+alter table orders drop constraint if exists orders_pay_issue_check;
+alter table orders add constraint orders_pay_issue_check check (pay_issue is null or pay_issue in ('not_found', 'short'));
+
+-- ---------- Building waitlist ----------
+create table if not exists site_waiters (
+  site_id uuid not null references sites on delete cascade,
+  user_id uuid,
+  endpoint text,
+  created_at timestamptz not null default now(),
+  notified_at timestamptz);
+create unique index if not exists site_waiters_uniq on site_waiters (site_id, coalesce(user_id::text, ''), coalesce(endpoint, ''));
+alter table site_waiters enable row level security;
+drop policy if exists "team waiters" on site_waiters;
+create policy "team waiters" on site_waiters for select to authenticated using (is_admin());
+
+-- ---------- Lunch every day, weekends included ----------
+create or replace function current_order_date() returns date
+language sql stable set search_path = public as $$
+  select case when (now() at time zone 'utc')::time >= (select cutoff from settings where id = 1)
+              then (now() at time zone 'utc')::date + 1
+              else (now() at time zone 'utc')::date end;
+$$;
+
+-- ---------- How long a vendor has to confirm a new pool ----------
+-- Same-day pools: the usual minutes. Pools for a later day: until the "confirm by" time that morning (never after orders close).
+create or replace function wait_deadline(p_created timestamptz, p_date date) returns timestamptz
+language sql stable security definer set search_path = public as $$
+  select case when p_date > (p_created at time zone 'utc')::date
+              then (p_date + least(s.next_day_confirm_by, s.cutoff)) at time zone 'utc'
+              else p_created + make_interval(mins => s.accept_timeout_min) end
+  from settings s where s.id = 1;
+$$;
+
+-- ---------- Free delivery by the vendor ----------
+-- The vendor's own runner brings it when the building is within their free distance (and the admin limit) and the pool has enough meals.
+create or replace function pool_free(p uuid) returns boolean
+language sql stable security definer set search_path = public as $$
+  select coalesce(k.free_m > 0 and k.lat is not null and st.lat is not null
+           and dist_m(k.lat, k.lng, st.lat, st.lng) * 1.3 <= least(k.free_m, s.free_max_m)
+           and pool_meals(pl.id) >= coalesce(k.free_min, 0), false)
+  from pools pl join kitchens k on k.id = pl.kitchen_id join sites st on st.id = pl.site_id cross join settings s
+  where pl.id = p and s.id = 1;
+$$;
+
+create or replace function pool_trip(p uuid) returns numeric
+language sql stable security definer set search_path = public as $$
+  select case
+    when pool_free(p) then 0
+    when coalesce(k.lat, case when k.added_by_customer then st.lat end) is null or st.lat is null then s.trip_cost
+    else round(s.base_fare + s.per_km * dist_m(
+           coalesce(k.lat, case when k.added_by_customer then st.lat end),
+           coalesce(k.lng, case when k.added_by_customer then st.lng end),
+           st.lat, st.lng) / 1000 * 1.3)
+  end
+  from pools pl join kitchens k on k.id = pl.kitchen_id join sites st on st.id = pl.site_id cross join settings s
+  where pl.id = p and s.id = 1;
+$$;
+
+create or replace view public_menus as
+  select k.id, k.public_name, k.tagline, k.capacity, k.site_id, k.added_by_customer, k.lat, k.lng,
+         case when k.free_m > 0 then least(k.free_m, s.free_max_m) end as free_m, k.free_min
+  from kitchens k cross join settings s where k.active and s.id = 1;
+grant select on public_menus to anon, authenticated;
+
+-- Vendor sets their free-delivery distance (0 or null switches it off)
+create or replace function vendor_set_free(p_token text, p_m numeric, p_min int)
+returns json language plpgsql security definer set search_path = public as $$
+declare k kitchens; s settings;
+begin
+  select * into k from kitchens where token = p_token and active;
+  if not found then raise exception 'This vendor link is not valid.'; end if;
+  select * into s from settings where id = 1;
+  if k.lat is null then raise exception 'Ask ChopPool to pin your kitchen on the map first.'; end if;
+  update kitchens set free_m = case when coalesce(p_m, 0) <= 0 then null else least(round(p_m), s.free_max_m) end,
+                      free_min = greatest(0, least(coalesce(p_min, 0), 50))
+  where id = k.id returning * into k;
+  return json_build_object('free_m', k.free_m, 'free_min', k.free_min);
+end $$;
+grant execute on function vendor_set_free(text, numeric, int) to anon, authenticated;
+
+-- ---------- Vendor fee on bigger pools ----------
+-- A new pool starts with the better of the terms the vendor accepted and today's terms.
+create or replace function pools_fee_terms() returns trigger language plpgsql security definer set search_path = public as $$
+declare k kitchens; s settings;
+begin
+  select * into k from kitchens where id = new.kitchen_id; select * into s from settings where id = 1;
+  if new.fee_rate is null then new.fee_rate := least(coalesce(k.fee_ack, 0), s.vendor_fee_rate); end if;
+  if new.fee_free is null then new.fee_free := greatest(coalesce(k.fee_free_ack, 5), s.vendor_fee_free); end if;
+  return new;
+end $$;
+drop trigger if exists pools_fee_terms on pools;
+create trigger pools_fee_terms before insert on pools for each row execute function pools_fee_terms();
+
+-- ChopPool's fee for one pool: rate x the food value of the meals after the free ones (average meal price)
+create or replace function pool_fee(p uuid) returns numeric
+language sql stable security definer set search_path = public as $$
+  select coalesce(round(coalesce(pl.fee_rate, 0) * x.food * greatest(0, x.meals - coalesce(pl.fee_free, 5)) / nullif(x.meals, 0), 2), 0)
+  from pools pl,
+       lateral (select coalesce(sum((coalesce(quote_price, unit_price) + addons_total) * qty), 0) as food, coalesce(sum(qty), 0) as meals
+                from orders where pool_id = pl.id and status in ('paid', 'collected')) x
+  where pl.id = p;
+$$;
+
+create or replace function kitchen_accept_terms(p_token text)
+returns json language plpgsql security definer set search_path = public as $$
+declare k kitchens; s settings;
+begin
+  select * into k from kitchens where token = p_token and active;
+  if not found then raise exception 'This vendor link is not valid.'; end if;
+  select * into s from settings where id = 1;
+  update kitchens set fee_ack = s.vendor_fee_rate, fee_free_ack = s.vendor_fee_free where id = k.id;
+  -- Pools still waiting for this vendor take the terms they just accepted
+  update pools set fee_rate = s.vendor_fee_rate, fee_free = s.vendor_fee_free where kitchen_id = k.id and status = 'waiting';
+  return json_build_object('rate', s.vendor_fee_rate, 'free', s.vendor_fee_free);
+end $$;
+grant execute on function kitchen_accept_terms(text) to anon, authenticated;
+
+-- Confirming a day needs today's terms accepted when they are less favourable than the ones the vendor agreed
+create or replace function kitchen_open_day(p_token text, p_date date)
+returns void language plpgsql security definer set search_path = public as $$
+declare k kitchens; s settings;
+begin
+  select * into k from kitchens where token = p_token and active;
+  if not found then raise exception 'This vendor link is not valid.'; end if;
+  select * into s from settings where id = 1;
+  if s.vendor_fee_rate > k.fee_ack or s.vendor_fee_free < k.fee_free_ack then
+    raise exception 'Accept the new ChopPool fee terms first.';
+  end if;
+  update kitchens set paused_dates = array_remove(paused_dates, p_date) where id = k.id;
+  insert into kitchen_days (kitchen_id, order_date) values (k.id, p_date) on conflict do nothing;
+  update pools set status = 'collecting', fee_rate = least(k.fee_ack, s.vendor_fee_rate), fee_free = greatest(k.fee_free_ack, s.vendor_fee_free)
+  where kitchen_id = k.id and order_date = p_date and status = 'waiting';
+end $$;
+
+-- ---------- The vendor's own runner delivers free pools ----------
+create or replace function kitchen_update(p_token text, p_pool uuid, p_status text)
+returns void language plpgsql security definer set search_path = public as $$
+declare p pools; k kitchens;
+begin
+  select * into k from kitchens where token = p_token and active;
+  if not found then raise exception 'This seller link is not valid.'; end if;
+  select * into p from pools where id = p_pool and kitchen_id = k.id;
+  if not found then raise exception 'That pool is not for you.'; end if;
+  if p_status = 'accepted' then
+    if (now() at time zone 'utc') < p.order_date + (select cutoff from settings where id = 1) then
+      raise exception 'Orders are still coming in. Confirm the final batch once the pool closes.';
+    end if;
+  elsif p_status in ('picked_up', 'arriving', 'delivered') then
+    if k.delivery_mode <> 'runner' and not pool_free(p.id) then raise exception 'A ChopPool rider delivers this pool.'; end if;
+  elsif p_status <> 'ready' then
+    raise exception 'Unknown step.';
+  end if;
+  update pools set status = p_status,
+    accepted_at  = case when p_status = 'accepted'  then coalesce(accepted_at, now()) else accepted_at end,
+    ready_at     = case when p_status = 'ready'     then now() else ready_at end,
+    picked_up_at = case when p_status = 'picked_up' then now() else picked_up_at end,
+    arriving_at  = case when p_status = 'arriving'  then now() else arriving_at end,
+    delivered_at = case when p_status = 'delivered' then now() else delivered_at end
+  where id = p.id and status not in ('waiting', 'cancelled');
+end $$;
+
+create or replace function collect_code(p_token text, p_code text, p_date date, p_pool uuid default null)
+returns json language plpgsql security definer set search_path = public as $$
+declare v text := norm_code(p_code); n int; v_done int; who text; v_ids uuid[]; v_name text; v_items text; v_qty int; v_paid boolean;
+begin
+  select count(*), count(*) filter (where o2.status = 'collected'),
+         array_agg(o2.id order by o2.created_at) filter (where o2.status <> 'collected'),
+         (array_agg(o2.customer_name order by o2.created_at))[1],
+         string_agg(o2.qty || ' × ' || o2.item_name, ' + ' order by o2.created_at) filter (where o2.status <> 'collected'),
+         sum(o2.qty) filter (where o2.status <> 'collected'),
+         bool_and(o2.status in ('paid', 'collected'))
+    into n, v_done, v_ids, v_name, v_items, v_qty, v_paid
+    from orders o2
+    join pools p on p.id = o2.pool_id
+    left join riders r on r.id = p.rider_id
+    join sites si on si.id = o2.site_id
+    join kitchens k on k.id = o2.kitchen_id
+   where o2.order_date = p_date and o2.code = v and o2.status in ('pending', 'paid', 'collected')
+     and (p_pool is null or o2.pool_id = p_pool)
+     and (r.token = p_token or si.host_token = p_token or (k.token = p_token and (k.delivery_mode = 'runner' or pool_free(p.id))));
+  if n = 0 then raise exception 'No order with code % for you today.', coalesce(nullif(v, ''), p_code); end if;
+  if v_done = n then raise exception 'Code % was already collected.', v; end if;
+  who := case when exists (select 1 from riders where token = p_token) then 'rider'
+              when exists (select 1 from kitchens where token = p_token) then 'runner' else 'host' end;
+  update orders set status = 'collected', collected_at = now(), collected_by = who where id = any(v_ids);
+  return json_build_object('name', v_name, 'items', v_items, 'item_name', v_items, 'qty', v_qty, 'was_paid', v_paid, 'code', v);
+end $$;
+grant execute on function collect_code(text, text, date, uuid) to anon, authenticated;
+
+-- ---------- Housekeeping: next-day deadlines and unpaid orders at cut-off ----------
+create or replace function housekeeping() returns void
+language plpgsql volatile security definer set search_path = public as $$
+declare s settings;
+begin
+  select * into s from settings where id = 1;
+
+  -- Vendors who didn't confirm in time: confirmed payments come back to the wallet (account holders) or by MoMo (guests)
+  with expired as (
+    update pools set status = 'cancelled'
+    where status = 'waiting' and now() >= wait_deadline(created_at, order_date)
+    returning id)
+  update orders o set status = 'cancelled', cancel_reason = 'The seller did not confirm in time',
+                      refund_due = case when o.status in ('paid', 'collected') then greatest(0, order_total(o) - o.wallet_used) else 0 end,
+                      refund_needed = (o.momo_ref is not null and not (o.user_id is not null and o.status in ('paid', 'collected')))
+  from expired e where o.pool_id = e.id and o.status <> 'cancelled';
+
+  -- Payment never found by the time orders close: cancelled; anything that did arrive (short payment) goes back
+  update orders set status = 'cancelled', cancel_reason = 'Payment not received',
+                    refund_due = coalesce(amount_received, 0),
+                    refund_needed = coalesce(amount_received, 0) > 0 and user_id is null
+  where status = 'pending' and pay_issue is not null and (now() at time zone 'utc') >= order_date + s.cutoff;
+
+  insert into wallet_entries (user_id, amount, reason, order_id)
+  select o.user_id, o.refund_due, 'Money back: payment was short, code ' || o.code, o.id
+  from orders o
+  where o.status = 'cancelled' and o.cancel_reason = 'Payment not received' and o.refund_due > 0 and o.user_id is not null and not o.refund_needed
+    and not exists (select 1 from wallet_entries w where w.order_id = o.id and w.reason like 'Money back:%');
+
+  -- Wallet part of any cancelled order goes back to the wallet
+  insert into wallet_entries (user_id, amount, reason, order_id)
+  select o.user_id, o.wallet_used, 'Refund: ' || coalesce(o.cancel_reason, 'order cancelled'), o.id
+  from orders o
+  where o.status = 'cancelled' and o.wallet_used > 0 and o.user_id is not null
+    and not exists (select 1 from wallet_entries w where w.order_id = o.id and w.amount > 0 and w.reason like 'Refund:%');
+
+  -- MoMo part of a confirmed payment, for account holders, once (never when ChopPool refunds the MoMo instead)
+  insert into wallet_entries (user_id, amount, reason, order_id)
+  select o.user_id, o.refund_due, 'Money back: the vendor didn''t confirm, code ' || o.code, o.id
+  from orders o
+  where o.status = 'cancelled' and o.refund_due > 0 and o.user_id is not null and not o.refund_needed
+    and not exists (select 1 from wallet_entries w where w.order_id = o.id and w.reason like 'Money back:%');
+
+  update orders set status = 'cancelled', cancel_reason = 'Special request not paid before cut-off'
+  where status in ('quote_requested', 'quoted')
+    and (now() at time zone 'utc') >= order_date + s.cutoff;
+end $$;
+
+-- ---------- Customers fix a payment we couldn't find ----------
+create or replace function fix_payment(p_order uuid, p_phone text, p_ref text)
+returns json language plpgsql security definer set search_path = public as $$
+declare o orders; s settings; v_ref text := upper(regexp_replace(coalesce(p_ref, ''), '\s', '', 'g'));
+begin
+  select * into o from orders where id = p_order;
+  if not found then raise exception 'Order not found.'; end if;
+  if not ((auth.uid() is not null and o.user_id = auth.uid())
+          or regexp_replace(coalesce(p_phone, ''), '\D', '', 'g') = regexp_replace(coalesce(o.phone, ''), '\D', '', 'g')) then
+    raise exception 'This order isn''t yours.';
+  end if;
+  if o.status <> 'pending' or o.pay_issue is null then raise exception 'This payment doesn''t need fixing.'; end if;
+  select * into s from settings where id = 1;
+  if (now() at time zone 'utc') >= o.order_date + s.cutoff then raise exception 'Orders have closed for this day.'; end if;
+  if v_ref !~ '^[A-Z0-9.]{6,30}$' then raise exception 'Enter the MoMo transaction ID from your payment message.'; end if;
+  update orders set momo_ref = case when o.pay_issue = 'short' and o.momo_ref is not null then left(o.momo_ref || ' + ' || v_ref, 120) else v_ref end,
+                    pay_issue = null
+  where id = o.id;
+  return json_build_object('ok', true);
+end $$;
+grant execute on function fix_payment(uuid, text, text) to anon, authenticated;
+
+drop function if exists my_orders(uuid[]);
+create function my_orders(p_ids uuid[])
+returns table (id uuid, order_date date, code text, status text, qty int, item_name text, site_id uuid,
+               kitchen_id uuid, pool_seq int, pool_status text, special_request text, quote_price numeric,
+               amount_due numeric, cancel_reason text, unit_price numeric, addons jsonb, addons_total numeric,
+               max_fee numeric, service_fee numeric, wallet_used numeric, saving numeric, has_account boolean,
+               refund_needed boolean, parent_id uuid, fee_per_meal boolean, item_id uuid, pool_id uuid, created_at timestamptz,
+               refund_due numeric, my_rating int, my_photo text, pay_issue text, amount_received numeric, momo_ref text, wait_until timestamptz, vendor_delivers boolean)
+language sql stable security definer set search_path = public as $$
+  select o.id, o.order_date, o.code, o.status, o.qty, o.item_name, o.site_id, o.kitchen_id, p.seq, p.status,
+         o.special_request, o.quote_price,
+         order_total(o) - o.wallet_used,
+         o.cancel_reason, o.unit_price, o.addons, o.addons_total, o.max_fee, o.service_fee, o.wallet_used,
+         case when o.status in ('pending', 'paid', 'collected') and p.status <> 'cancelled' then order_cashback(o.id) else 0 end,
+         o.user_id is not null, o.refund_needed, o.parent_id, o.fee_per_meal, o.item_id, o.pool_id, o.created_at, o.refund_due,
+         r.rating, r.photo_url, o.pay_issue, o.amount_received, o.momo_ref,
+         case when p.status = 'waiting' then wait_deadline(p.created_at, p.order_date) end, pool_free(p.id)
+  from orders o join pools p on p.id = o.pool_id left join reviews r on r.order_id = o.id
+  where (o.id = any(p_ids) or o.parent_id = any(p_ids) or (auth.uid() is not null and o.user_id = auth.uid()))
+    and o.order_date >= (now() at time zone 'utc')::date - 1
+  order by o.created_at desc;
+$$;
+grant execute on function my_orders(uuid[]) to anon, authenticated;
+
+-- ---------- Home board: each pool says when the vendor must confirm by, and whether the vendor delivers free ----------
+create or replace function board_data(p_date date) returns json
+language plpgsql volatile security definer set search_path = public as $$
+begin
+  perform housekeeping();
+  return json_build_object(
+    'pools', coalesce((select json_agg(x) from (select p.id, p.order_date, p.site_id, p.kitchen_id, p.seq, p.status, p.created_at, pool_meals(p.id) as meals,
+                                                       case when p.status = 'waiting' then wait_deadline(p.created_at, p.order_date) end as wait_until,
+                                                       pool_free(p.id) as free
+                                                  from pools p where p.order_date = p_date and p.status <> 'cancelled') x), '[]'::json),
+    'load', coalesce((select json_object_agg(kitchen_id, meals) from (select kitchen_id, sum(qty)::int as meals from orders
+                                                  where order_date = p_date and status <> 'cancelled' group by 1) l), '{}'::json),
+    'activity', coalesce((select json_agg(a order by a.created_at desc) from (select * from recent_activity order by created_at desc limit 50) a), '[]'::json),
+    'open', coalesce((select json_agg(k.id) from kitchens k where k.active and kitchen_is_open(k.id, p_date)), '[]'::json));
+end $$;
+grant execute on function board_data(date) to anon, authenticated;
+
+-- ---------- Vendor page: fee terms, free delivery and deadlines ----------
+create or replace function kitchen_view(p_token text, p_date date)
+returns json language plpgsql volatile security definer set search_path = public as $$
+declare k kitchens; s settings;
+begin
+  perform housekeeping();
+  select * into k from kitchens where token = p_token and active;
+  if not found then raise exception 'This vendor link is not valid. Ask ChopPool for a new one.'; end if;
+  select * into s from settings where id = 1;
+  return json_build_object(
+    'kitchen', json_build_object('name', k.name, 'public_name', k.public_name, 'capacity', k.capacity,
+                                 'delivery_mode', k.delivery_mode, 'added_by_customer', k.added_by_customer,
+                                 'open', kitchen_is_open(k.id, p_date), 'listing_status', k.listing_status, 'listing', k.listing,
+                                 'auto_days', k.auto_days, 'paused', p_date = any(k.paused_dates),
+                                 'confirmed', exists (select 1 from kitchen_days where kitchen_id = k.id and order_date = p_date),
+                                 'has_pin', k.lat is not null, 'free_m', k.free_m, 'free_min', k.free_min, 'free_max_m', s.free_max_m,
+                                 'fee_ack', k.fee_ack, 'fee_free_ack', k.fee_free_ack, 'fee_rate', s.vendor_fee_rate, 'fee_free', s.vendor_fee_free,
+                                 'next_day_confirm_by', s.next_day_confirm_by),
+    'menu', coalesce((select json_agg(json_build_object('id', id, 'name', name, 'price', price, 'addons', addons,
+                                                        'photo_url', photo_url, 'icon', icon) order by name)
+                      from menu_items where kitchen_id = k.id and active), '[]'::json),
+    'pools', coalesce((
+      select json_agg(json_build_object(
+        'id', p.id, 'seq', p.seq, 'status', p.status, 'site', si.name, 'drop_point', si.drop_point,
+        'handoff', si.handoff, 'host_label', si.host_label, 'created_at', p.created_at,
+        'wait_until', case when p.status = 'waiting' then wait_deadline(p.created_at, p.order_date) end,
+        'free', pool_free(p.id), 'fee_rate', p.fee_rate, 'fee_free', p.fee_free, 'fee', pool_fee(p.id),
+        'orders', (select json_agg(json_build_object('id', o.id, 'code', o.code, 'qty', o.qty, 'item_name', o.item_name,
+                                                     'unit_price', o.unit_price, 'addons_total', o.addons_total,
+                                                     'addons', o.addons, 'note', o.note, 'special_request', o.special_request,
+                                                     'quote_price', o.quote_price, 'status', o.status, 'parent_id', o.parent_id,
+                                                     'paid', o.status in ('paid', 'collected'), 'collected', o.status = 'collected')
+                                   order by o.code, o.created_at)
+                   from orders o where o.pool_id = p.id and o.status <> 'cancelled'))
+        order by si.name, p.seq)
+      from pools p join sites si on si.id = p.site_id
+      where p.kitchen_id = k.id and p.order_date = p_date and p.status <> 'cancelled' and pool_meals(p.id) > 0
+    ), '[]'::json));
+end $$;
+
+-- ---------- Building requests join a waitlist ----------
+drop function if exists request_site(text, text, double precision, double precision, text);
+create or replace function request_site(p_name text, p_drop_point text, p_lat double precision, p_lng double precision,
+                                        p_note text default null, p_endpoint text default null)
+returns json language plpgsql security definer set search_path = public as $$
+declare si sites; v_joined boolean := false; v_n int;
+begin
+  if char_length(trim(coalesce(p_name, ''))) < 3 then raise exception 'Add the building''s name.'; end if;
+  if char_length(trim(coalesce(p_drop_point, ''))) < 3 then raise exception 'Say where the food should be dropped, like "Main gate".'; end if;
+  if p_lat is null or p_lng is null or p_lat not between -90 and 90 or p_lng not between -180 and 180 then raise exception 'Drop a pin on the map first.'; end if;
+  if p_endpoint is not null and (p_endpoint !~ '^https://' or length(p_endpoint) > 1000) then p_endpoint := null; end if;
+  -- Already requested? Same name, or a pending building within 80 m: join its waitlist instead
+  select * into si from sites
+   where status = 'pending' and not archived
+     and (lower(regexp_replace(name, '\s+', ' ', 'g')) = lower(regexp_replace(trim(p_name), '\s+', ' ', 'g'))
+          or (lat is not null and dist_m(lat, lng, p_lat, p_lng) <= 80))
+   order by created_at limit 1;
+  if found then
+    v_joined := true;
+  else
+    if (select count(*) from sites where status = 'pending' and created_at > now() - interval '1 day') >= 30 then
+      raise exception 'Too many building requests today. Please try again tomorrow.';
+    end if;
+    insert into sites (name, drop_point, lat, lng, status, requested_by, request_note)
+    values (trim(p_name), trim(p_drop_point), p_lat, p_lng, 'pending', auth.uid(), nullif(trim(coalesce(p_note, '')), ''))
+    returning * into si;
+  end if;
+  if auth.uid() is not null or p_endpoint is not null then
+    insert into site_waiters (site_id, user_id, endpoint) values (si.id, auth.uid(), p_endpoint) on conflict do nothing;
+  end if;
+  select count(*) into v_n from site_waiters where site_id = si.id;
+  return json_build_object('id', si.id, 'name', si.name, 'status', si.status, 'joined', v_joined, 'waiting', greatest(v_n, 1));
+end $$;
+grant execute on function request_site(text, text, double precision, double precision, text, text) to anon, authenticated;
+
+-- Merge a duplicate building into the right one (team only)
+create or replace function admin_merge_sites(p_from uuid, p_into uuid)
+returns text language plpgsql security definer set search_path = public as $$
+declare a sites; b sites; n int;
+begin
+  if not is_admin() then raise exception 'Team members only.'; end if;
+  if p_from = p_into then raise exception 'Pick two different buildings.'; end if;
+  select * into a from sites where id = p_from; select * into b from sites where id = p_into;
+  if a.id is null or b.id is null then raise exception 'Building not found.'; end if;
+  update pools set site_id = b.id, seq = seq + 100 where site_id = a.id;
+  update orders set site_id = b.id where site_id = a.id;
+  get diagnostics n = row_count;
+  update kitchens set site_id = b.id where site_id = a.id;
+  insert into site_waiters (site_id, user_id, endpoint, created_at)
+    select b.id, user_id, endpoint, created_at from site_waiters where site_id = a.id on conflict do nothing;
+  delete from site_waiters where site_id = a.id;
+  update sites set archived = true, status = case when status = 'pending' then 'declined' else status end,
+                   request_note = left(coalesce(request_note || ' · ', '') || 'Merged into ' || b.name, 300)
+  where id = a.id;
+  return a.name || ' merged into ' || b.name || (case when n > 0 then ' (' || n || ' orders moved)' else '' end) || '.';
+end $$;
+grant execute on function admin_merge_sites(uuid, uuid) to authenticated;
+
+-- Weekly report: full 7-day weeks now, and ChopPool's fee is the vendor fee actually charged on each pool
+create or replace function admin_weekly_report(p_week_start date) returns json
+language plpgsql stable security definer set search_path = public as $$
+declare s settings; w0 date := p_week_start; w1 date := p_week_start + 6; v0 date := p_week_start - 7; v1 date := p_week_start - 1;
+begin
+  if not is_admin() then raise exception 'Team members only.'; end if;
+  select * into s from settings where id = 1;
+  return (
+  with o as (select o.*, p.status as pool_status from orders o join pools p on p.id = o.pool_id where o.order_date between v0 and w1),
+  live as (select * from o where status in ('paid', 'collected', 'pending')),
+  cur as (select * from live where order_date between w0 and w1),
+  prev as (select * from live where order_date between v0 and v1),
+  pl as (select p.*, pool_meals(p.id) as meals from pools p where p.order_date between v0 and w1),
+  firsts as (select phone, min(order_date) as first_day from orders where status in ('paid', 'collected', 'pending') group by phone),
+  head as (
+    select wk, sum(qty)::int as meals, count(*) filter (where parent_id is null)::int as orders, count(distinct phone)::int as customers,
+           count(distinct phone) filter (where (select first_day from firsts f where f.phone = x.phone) >= x.ws)::int as new_customers
+    from (select *, 'cur' as wk, w0 as ws from cur union all select *, 'prev', v0 from prev) x group by wk),
+  rep as (
+    select wk, round(100.0 * count(*) filter (where n >= 2) / nullif(count(*), 0))::int as repeat_rate
+    from (select 'cur' as wk, phone, count(distinct order_date) as n from live where order_date between w0 - 7 and w1 and phone in (select phone from cur) group by phone
+          union all select 'prev', phone, count(distinct order_date) from live where order_date between v0 - 7 and v1 and phone in (select phone from prev) group by phone) r group by wk),
+  pools_w as (
+    select case when order_date >= w0 then 'cur' else 'prev' end as wk, round(avg(meals), 1) as avg_meals,
+           count(*) filter (where meals >= s.max_meals)::int as filled, count(*)::int as pools
+    from pl where status <> 'cancelled' and meals > 0 group by 1),
+  canc as (select case when order_date >= w0 then 'cur' else 'prev' end as wk, count(*)::int as n from o where status = 'cancelled' group by 1)
+  select json_build_object(
+    'week_start', w0, 'week_end', w1,
+    'headline', (select json_object_agg(h.wk, json_build_object('meals', h.meals, 'orders', h.orders, 'customers', h.customers, 'new_customers', h.new_customers,
+                    'repeat_rate', (select repeat_rate from rep where rep.wk = h.wk), 'avg_meals', (select avg_meals from pools_w where pools_w.wk = h.wk),
+                    'pools', (select pools from pools_w where pools_w.wk = h.wk), 'filled', (select filled from pools_w where pools_w.wk = h.wk),
+                    'cancelled', coalesce((select n from canc where canc.wk = h.wk), 0))) from head h),
+    'money', case when is_super() then (select json_build_object(
+        'food', round(coalesce(sum((coalesce(quote_price, unit_price) + addons_total) * qty), 0), 2),
+        'commission', round(coalesce((select sum(pool_fee(p2.id)) from pools p2 where p2.order_date between w0 and w1 and p2.status <> 'cancelled'), 0), 2),
+        'service_fees', round(coalesce(sum(service_fee * case when fee_per_meal then qty else 1 end), 0), 2),
+        'cashback', round(coalesce(sum(case when parent_id is null and status in ('paid', 'collected') then order_cashback(id) else 0 end), 0), 2),
+        'refunds', round(coalesce((select sum(amount) from wallet_entries where amount > 0 and reason like 'Refund%' and created_at::date between w0 and w1 + 2), 0), 2),
+        'momo_refunds', (select count(*) from orders where refund_needed and order_date between w0 and w1),
+        'wallets_owed', round(coalesce((select sum(wallet_balance(u)) from (select distinct user_id as u from orders where user_id is not null union select distinct user_id from wallet_entries) us), 0), 2))
+      from cur) end,
+    'buildings', coalesce((select json_agg(b order by b.meals desc) from (
+        select si.name, sum(c.qty)::int as meals, count(distinct c.pool_id)::int as pools,
+               round(sum(c.qty)::numeric / nullif(count(distinct c.pool_id), 0), 1) as avg_pool,
+               coalesce((select sum(qty) from prev where prev.site_id = si.id), 0)::int as prev_meals
+        from cur c join sites si on si.id = c.site_id group by si.id, si.name order by 2 desc limit 15) b), '[]'::json),
+    'quiet', coalesce((select json_agg(q) from (
+        select si.name, sum(p.qty)::int as prev_meals from prev p join sites si on si.id = p.site_id
+        where not exists (select 1 from cur c where c.site_id = p.site_id) group by si.name order by 2 desc) q), '[]'::json),
+    'customers', coalesce((select json_agg(c2) from (
+        select (array_agg(customer_name order by created_at desc))[1] as name,
+               (select si.name from cur c3 join sites si on si.id = c3.site_id where c3.phone = c.phone group by si.name order by count(*) desc limit 1) as building,
+               case when is_super() then c.phone end as phone,
+               count(*) filter (where parent_id is null)::int as orders, sum(qty)::int as meals
+        from cur c group by c.phone order by sum(qty) desc, count(*) desc limit 15) c2), '[]'::json),
+    'vendors', coalesce((select json_agg(v order by v.meals desc) from (
+        select k.public_name as name, coalesce(sum(c.qty), 0)::int as meals,
+               (select count(*) from pl where pl.kitchen_id = k.id and pl.order_date >= w0 and pl.status <> 'cancelled' and pl.meals > 0)::int as pools,
+               (select count(*) from pl where pl.kitchen_id = k.id and pl.order_date >= w0 and pl.status = 'cancelled'
+                  and exists (select 1 from orders x where x.pool_id = pl.id and x.cancel_reason = 'The seller did not confirm in time'))::int as expired,
+               (select round(100.0 * count(*) filter (where pl.delivered_at <= pl.order_date + s.delivery_time + interval '15 minutes') / nullif(count(*) filter (where pl.delivered_at is not null), 0))
+                  from pl where pl.kitchen_id = k.id and pl.order_date >= w0)::int as on_time,
+               (select count(*) from o where o.kitchen_id = k.id and o.order_date >= w0 and o.cancel_reason like 'The seller can''t%')::int as declined,
+               (select count(*) from (select phone from live where live.kitchen_id = k.id and live.order_date between w0 - 28 and w1 group by phone having count(distinct order_date) >= 2) r)::int as repeat_customers,
+               cardinality(k.auto_days) > 0 as always_cooking,
+               (select round(avg(r.rating), 1) from reviews r where r.kitchen_id = k.id and not r.hidden and r.created_at::date between w0 and w1 + 2) as rating
+        from kitchens k left join cur c on c.kitchen_id = k.id where k.active
+        group by k.id, k.public_name, k.auto_days having coalesce(sum(c.qty), 0) > 0
+           or exists (select 1 from pl where pl.kitchen_id = k.id and pl.order_date >= w0)) v), '[]'::json),
+    'riders', coalesce((select json_agg(r) from (
+        select rd.name, count(*)::int as deliveries,
+               round(100.0 * count(*) filter (where pl.delivered_at <= pl.order_date + s.delivery_time + interval '15 minutes') / nullif(count(*), 0))::int as on_time
+        from pl join riders rd on rd.id = pl.rider_id where pl.order_date >= w0 and pl.delivered_at is not null group by rd.name order by 2 desc) r), '[]'::json)
+  ));
+end $$;
+grant execute on function admin_weekly_report(date) to authenticated;

@@ -115,6 +115,9 @@ p { margin: 0; }
 .hero p { opacity: .92; position: relative; z-index: 1; }
 .hero-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; position: relative; z-index: 1; }
 .hero-stat { background: rgba(255,255,255,.16); border: 1px solid rgba(255,255,255,.22); border-radius: 16px; padding: 10px 12px; display: grid; align-content: start; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+.hero-stat.hurry { box-shadow: 0 0 0 2px #fff; animation: hurry 1.6s ease-in-out infinite; }
+@keyframes hurry { 50% { box-shadow: 0 0 0 2px rgba(255,255,255,.35); } }
+:root[data-theme="dark"] .hero-stat.hurry { box-shadow: 0 0 0 2px #FF6A2B; }
 button.hero-stat { padding-right: 22px !important; font: inherit; color: inherit; text-align: left; cursor: pointer; position: relative; }
 button.hero-stat::after { content: "›"; position: absolute; right: 9px; top: 6px; font-weight: 700; font-size: 17px; opacity: .85; }
 .hero-stat b { font-family: var(--font-display); font-size: 18px; font-weight: 800; line-height: 1.15; white-space: nowrap; }
@@ -247,6 +250,8 @@ input::placeholder, textarea::placeholder { color: color-mix(in srgb, var(--mute
 
 /* Sheet */
 .sheet-bg { position: fixed; inset: 0; background: rgba(12, 8, 6, .48); display: flex; align-items: flex-end; justify-content: center; z-index: 30; opacity: 0; visibility: hidden; transition: opacity .32s ease, visibility 0s linear .38s; overscroll-behavior: contain; touch-action: none; }
+.sheet.searching { min-height: 88%; }
+.sheet.searching .searchrow { position: sticky; top: -10px; z-index: 3; background: var(--surface); padding: 8px 0; margin: -8px 0; }
 .sheet-bg.open { opacity: 1; visibility: visible; transition: opacity .32s ease, visibility 0s; }
 .sheet { background: var(--surface); color: var(--ink); width: 100%; max-width: 560px; max-height: 94%; overflow-y: auto; border-radius: 28px 28px 0 0; padding: 10px 20px 0; display: grid; gap: 16px; align-content: start; }
 .sheet { transform: translateY(105%); transition: transform .4s cubic-bezier(.2,.9,.25,1); overscroll-behavior: contain; touch-action: pan-y; -webkit-overflow-scrolling: touch; padding-bottom: env(safe-area-inset-bottom); }
@@ -572,6 +577,11 @@ html.standalone, html.standalone body { overscroll-behavior: none; }
 @keyframes spSlide { from { transform: translateX(54px); opacity: 0; } to { transform: none; opacity: 1; } }
 @keyframes spUp { from { transform: translateY(12px); opacity: 0; } to { transform: none; opacity: 1; } }
 .splash.still * { animation: none !important; }
+/* Still loading after the intro: hold the final frame and breathe slowly (never replay the logo) */
+.splash.hold .sp-logo { animation: spBreathe 3.2s ease-in-out infinite; }
+@keyframes spBreathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(.97); } }
+.splash.hold .sp-tag { animation: spFade 3.2s ease-in-out infinite; }
+@keyframes spFade { 50% { opacity: .55; } }
 /* Premium motion: installed app only. One soft curve, short and small, never bouncy */
 .is-app .pane-in { animation: paneIn .32s cubic-bezier(.2,.8,.2,1) both; will-change: transform, opacity; }
 .is-app .pane-in.from-left { --dx: -24px; }
@@ -750,6 +760,9 @@ body:not(.on-home) #bell, body:not(.on-home) #theme { display: none; }
 .orate { font-size: 12px; font-weight: 800; color: var(--accent-2); background: none; border: none; padding: 0; }
 .ostars { display: flex; gap: 1px; }
 /* Account */
+.pdotx { display: inline-block; width: 9px; height: 9px; border-radius: 9px; background: var(--accent); margin-right: 6px; box-shadow: 0 0 0 3px var(--accent-soft); vertical-align: 1px; }
+.sumgrid { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; background: var(--surface-2); border-radius: 14px; padding: 10px 12px; }
+.sumgrid b:last-of-type { color: var(--ok); }
 .prof { display: flex; gap: 12px; align-items: center; background: none; border: none; padding: 0; text-align: left; color: inherit; font: inherit; width: 100%; cursor: pointer; }
 .pavatar { width: 56px; height: 56px; border-radius: 99px; background: var(--accent-soft); color: var(--accent-2); display: grid; place-items: center; font: 800 20px var(--font-display); flex: none; overflow: hidden; position: relative; }
 .pavatar img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
@@ -895,12 +908,11 @@ const hm = t => { const [h, m] = String(t).split(":").map(Number); return h * 60
 function orderDate(s, now = new Date()) {
   const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
   if (now.getUTCHours() * 60 + now.getUTCMinutes() >= hm(s.cutoff)) d.setUTCDate(d.getUTCDate() + 1);
-  while (d.getUTCDay() === 0 || d.getUTCDay() === 6) d.setUTCDate(d.getUTCDate() + 1);
   return d.toISOString().slice(0, 10);
 }
 const at = (date, t) => new Date(date + "T" + String(Math.floor(hm(t) / 60)).padStart(2, "0") + ":" + String(hm(t) % 60).padStart(2, "0") + ":00Z");
 const today = () => new Date().toISOString().slice(0, 10);
-const opsDate = () => { const wd = new Date().getUTCDay(); return wd === 0 || wd === 6 ? orderDate(S.settings) : today(); };
+const opsDate = () => today();
 const fmtDate = iso => new Date(iso + "T00:00:00Z").toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
 const fmtTime = t => String(t).slice(0, 5);
 const minus = (t, mins) => { const m = (hm(t) - mins + 1440) % 1440; return String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0"); };
@@ -923,7 +935,7 @@ const isoDow = d => { const w = new Date(d + "T00:00:00Z").getUTCDay(); return w
    ===================================================================================== */
 function makeDemoApi() {
   const settings = { cutoff: "10:30", special_cutoff: "10:00", delivery_time: "12:30", trip_cost: 60, base_fare: 20, per_km: 6, max_fee: 10, cap_km: 8, service_fee: 2, min_pool: 6, max_meals: 15,
-    commission_rate: 0.15, accept_timeout_min: 20, arrival_window_min: 10, notify_daily_cap: 5, momo_number: "024 000 0000", momo_name: "ChopPool Pilot", momo_network: "MTN" };
+    commission_rate: 0.15, vendor_fee_rate: 0, vendor_fee_free: 5, next_day_confirm_by: "08:30", countdown_start: "06:00", near_max_fee: 50, free_max_m: 1500, accept_timeout_min: 20, arrival_window_min: 10, notify_daily_cap: 5, momo_number: "024 000 0000", momo_name: "ChopPool Pilot", momo_network: "MTN" };
   const sites = [
     { id: "s1", name: "Heritage Tower, Ridge", drop_point: "Lobby security desk", handoff: "host", host_label: "the security desk in the lobby", host_token: "demoh1", lat: 5.5640, lng: -0.2010, status: "active", active: true },
     { id: "s2", name: "Pent Hostel, Legon", drop_point: "Porters' lodge", handoff: "host", host_label: "the porter on duty", host_token: "demoh2", lat: 5.6505, lng: -0.1870, status: "active", active: true },
@@ -947,7 +959,7 @@ function makeDemoApi() {
   ];
   const riders = [{ id: "r1", name: "Kwame (example rider)", phone: "0240000003", token: "demor1", active: true }];
   [...sites, ...kitchens, ...riders].forEach((x, n) => { if (!x.created_at) x.created_at = new Date(Date.now() - (40 - n * 3) * 864e5).toISOString(); });
-  const pools = [], orders = [], days = [], ledger = [], users = [], profiles = [], reviews = [];
+  const pools = [], orders = [], days = [], ledger = [], users = [], profiles = [], reviews = [], waiters = [];
   const payMethods = [{ id: "pm1", network: "MTN", number: "024 000 0000", name: "ChopPool Pilot", is_main: true, active: true, sort: 1, created_at: new Date().toISOString() }];
   const team = [{ email: "you@choppool.demo", role: "super" }, { email: "ops@choppool.demo", role: "coordinator" }];
   let me = null;
@@ -955,6 +967,13 @@ function makeDemoApi() {
   const pick = a => a[Math.floor(Math.random() * a.length)];
   const uid = () => Math.random().toString(36).slice(2, 10);
   const meals = pid => orders.filter(o => o.pool_id === pid && o.status !== "cancelled").reduce((t, o) => t + o.qty, 0);
+  // Free delivery by the vendor (same rule as the database's pool_free)
+  const pfree = pid => { const pl = pools.find(p => p.id === pid) || {}, k = kitchens.find(x => x.id === pl.kitchen_id) || {}, st = sites.find(x => x.id === pl.site_id) || {};
+    return Number(k.free_m) > 0 && hasPin(k) && hasPin(st) && distM(k, st) * ROAD_FACTOR <= Math.min(Number(k.free_m), Number(settings.free_max_m)) && meals(pid) >= Number(k.free_min || 0); };
+  // How long a vendor has to confirm: same day = minutes; a later day = the "confirm by" time that morning
+  const waitUntil = p => p.order_date > String(p.created_at).slice(0, 10) ? at(p.order_date, hm(settings.next_day_confirm_by) < hm(settings.cutoff) ? settings.next_day_confirm_by : settings.cutoff) : new Date(Date.parse(p.created_at) + settings.accept_timeout_min * 6e4);
+  const poolFee = p => { const os = orders.filter(o => o.pool_id === p.id && ["paid", "collected"].includes(o.status)), food = os.reduce((t, o) => t + (Number(o.quote_price ?? o.unit_price) + Number(o.addons_total || 0)) * o.qty, 0), n = os.reduce((t, o) => t + o.qty, 0);
+    return n ? Math.round(Number(p.fee_rate || 0) * food * Math.max(0, n - Number(p.fee_free ?? 5)) / n * 100) / 100 : 0; };
   const isOpen = (kid, d) => days.some(x => x.kitchen_id === kid && x.order_date === d) || (k => !!k && (k.auto_days || []).includes(isoDow(d)) && !(k.paused_dates || []).includes(d))(kitchens.find(x => x.id === kid));
   const nowIso = () => new Date().toISOString();
   const pastCutoff = d => new Date() >= at(d, settings.cutoff);
@@ -968,7 +987,7 @@ function makeDemoApi() {
       const near = orders.some(o => o.pool_id === pid && o.status !== "cancelled" && /^[A-Z]-\d\d$/.test(o.code) && ((o.code[0] === c[0] && (o.code[2] === c[2] || o.code[3] === c[3] || (o.code[2] === c[3] && o.code[3] === c[2]))) || o.code.slice(2) === c.slice(2)));
       if (!near) return c; } };
 
-  const tripOf = pid => { const pl = pools.find(p => p.id === pid) || {}; const k = kitchens.find(x => x.id === pl.kitchen_id) || {}, st = sites.find(x => x.id === pl.site_id) || {}; return tripFor(hasPin(k) ? k : k.added_by_customer ? st : {}, st, settings); };
+  const tripOf = pid => { if (pfree(pid)) return 0; const pl = pools.find(p => p.id === pid) || {}; const k = kitchens.find(x => x.id === pl.kitchen_id) || {}, st = sites.find(x => x.id === pl.site_id) || {}; return tripFor(hasPin(k) ? k : k.added_by_customer ? st : {}, st, settings); };
   function balance(user) {
     const led = ledger.filter(e => e.user_id === user).reduce((t, e) => t + e.amount, 0);
     const cb = orders.filter(o => o.user_id === user && ["paid", "collected"].includes(o.status) && pastCutoff(o.order_date) && pools.find(p => p.id === o.pool_id).status !== "cancelled")
@@ -983,7 +1002,12 @@ function makeDemoApi() {
     return { total, wallet_used: use, momo_due: total - use };
   }
   function housekeeping() {
-    pools.filter(p => p.status === "waiting" && minsAgo(p.created_at) >= settings.accept_timeout_min).forEach(p => {
+    // Payment never found by cut-off: cancelled; a short payment goes back
+    orders.filter(o => o.status === "pending" && o.pay_issue && pastCutoff(o.order_date)).forEach(o => {
+      o.status = "cancelled"; o.cancel_reason = "Payment not received"; o.refund_due = Number(o.amount_received || 0); o.refund_needed = o.refund_due > 0 && !o.user_id;
+      if (o.refund_due > 0 && o.user_id) ledger.push({ user_id: o.user_id, amount: o.refund_due, reason: "Money back: payment was short, code " + o.code, order_id: o.id, created_at: nowIso() });
+      if (o.wallet_used > 0 && o.user_id) ledger.push({ user_id: o.user_id, amount: o.wallet_used, reason: "Refund: payment not received", order_id: o.id, created_at: nowIso() }); });
+    pools.filter(p => p.status === "waiting" && new Date() >= waitUntil(p)).forEach(p => {
       p.status = "cancelled";
       orders.filter(o => o.pool_id === p.id && o.status !== "cancelled").forEach(o => {
         const wasPaid = ["paid", "collected"].includes(o.status);
@@ -1010,7 +1034,8 @@ function makeDemoApi() {
     // While the vendor hasn't confirmed, everyone at the building joins the same waiting pool
     const st = isOpen(k.id, d) ? "collecting" : "waiting";
     let pl = pools.filter(p => p.order_date === d && p.site_id === si.id && p.kitchen_id === k.id && p.status === st && meals(p.id) + r.qty <= settings.max_meals).sort((a, b) => a.seq - b.seq)[0];
-    if (!pl) { pl = { id: "p" + uid(), created_at: nowIso(), order_date: d, site_id: si.id, kitchen_id: k.id, seq: nextSeq(), status: st, rider_id: null, trip_ref: "", trip_cost: null }; pools.push(pl); }
+    if (!pl) { pl = { id: "p" + uid(), created_at: nowIso(), order_date: d, site_id: si.id, kitchen_id: k.id, seq: nextSeq(), status: st, rider_id: null, trip_ref: "", trip_cost: null,
+      fee_rate: Math.min(Number(k.fee_ack || 0), Number(settings.vendor_fee_rate)), fee_free: Math.max(Number(k.fee_free_ack ?? 5), Number(settings.vendor_fee_free)) }; pools.push(pl); }
     const code = newCode(si.id, d, pl.id);
     const o = { id: "o" + uid(), created_at: nowIso(), order_date: d, pool_id: pl.id, site_id: si.id, kitchen_id: k.id, item_id: m.id, user_id: sim ? null : (me ? me.id : null),
       item_name: m.name, unit_price: m.price, qty: r.qty, addons: add, addons_total: addT, note: (r.note || "").trim() || null, special_request: special, quote_price: null,
@@ -1058,7 +1083,8 @@ function makeDemoApi() {
     if (!p || meals(p.id) < settings.max_meals - 1) fake(s, k);
   }, 9000);
 
-  const pub = p => ({ id: p.id, order_date: p.order_date, site_id: p.site_id, kitchen_id: p.kitchen_id, seq: p.seq, status: p.status, created_at: p.created_at, meals: meals(p.id) });
+  const pub = p => ({ id: p.id, order_date: p.order_date, site_id: p.site_id, kitchen_id: p.kitchen_id, seq: p.seq, status: p.status, created_at: p.created_at, meals: meals(p.id),
+    wait_until: p.status === "waiting" ? waitUntil(p).toISOString() : null, free: pfree(p.id) });
   const byToken = (list, key, t) => { const x = list.find(v => v[key] === t && v.active !== false); if (!x) throw new Error("This link is not valid. Ask ChopPool for a new one."); return x; };
   const stamp = { accepted: "accepted_at", ready: "ready_at", picked_up: "picked_up_at", arriving: "arriving_at", delivered: "delivered_at" };
   const handOrders = pid => orders.filter(o => o.pool_id === pid && !["cancelled", "quote_requested", "quoted"].includes(o.status)).map(o => ({ code: o.code, name: o.customer_name, qty: o.qty, item_name: o.item_name, collected: o.status === "collected" }));
@@ -1084,7 +1110,8 @@ function makeDemoApi() {
           special_request: o.special_request, quote_price: o.quote_price, amount_due: dueOf(o) - o.wallet_used, cancel_reason: o.cancel_reason,
           unit_price: o.unit_price, addons: o.addons, addons_total: o.addons_total, max_fee: o.max_fee, service_fee: o.service_fee, wallet_used: o.wallet_used,
           saving: ["pending", "paid", "collected"].includes(o.status) && p.status !== "cancelled" ? cashOf(o) : 0,
-          has_account: !!o.user_id, refund_needed: !!o.refund_needed, refund_due: o.refund_due || 0, my_rating: (reviews.find(r => r.order_id === o.id) || {}).rating || null, my_photo: (reviews.find(r => r.order_id === o.id) || {}).photo_url || null, parent_id: o.parent_id || null, fee_per_meal: !!o.fee_per_meal, item_id: o.item_id, pool_id: o.pool_id, created_at: o.created_at };
+          has_account: !!o.user_id, refund_needed: !!o.refund_needed, refund_due: o.refund_due || 0, my_rating: (reviews.find(r => r.order_id === o.id) || {}).rating || null, my_photo: (reviews.find(r => r.order_id === o.id) || {}).photo_url || null, pay_issue: o.pay_issue || null, amount_received: o.amount_received ?? null, momo_ref: o.momo_ref || null,
+          wait_until: p.status === "waiting" ? waitUntil(p).toISOString() : null, vendor_delivers: pfree(p.id), parent_id: o.parent_id || null, fee_per_meal: !!o.fee_per_meal, item_id: o.item_id, pool_id: o.pool_id, created_at: o.created_at };
       });
     },
     async addVendor(r) {
@@ -1102,6 +1129,8 @@ function makeDemoApi() {
     async signUp(email, pw, name) { if (users.some(u => u.email === email)) throw new Error("That email already has an account. Sign in instead."); if (String(pw).length < 6) throw new Error("Use at least 6 characters for the password."); me = { id: "u" + uid(), email, name: name || null }; users.push({ ...me, pw }); return me; },
     async signIn(email, pw) { const u = users.find(x => x.email === email && x.pw === pw); if (!u) throw new Error("Wrong email or password."); me = { id: u.id, email, name: u.name }; return me; },
     async signInGoogle() { throw new Error("Google sign-in works once the app is live. In the demo, use email and password."); },
+    async sendReset(email) { if (!/^\S+@\S+\.\S+$/.test(email)) throw new Error("Enter a valid email address."); return true; },
+    async setNewPassword(pw) { const u = users.find(x => me && x.id === me.id); if (u) u.pw = pw; return true; },
     async signOut() { me = null; },
     async updateName(name) { if (!me) throw new Error("Sign in first."); me.name = name; const u = users.find(x => x.id === me.id); if (u) u.name = name; return me; },
     async accountStats() { const since = Date.now() - 30 * 864e5; return { accounts: users.length, active: new Set(orders.filter(o => o.user_id && new Date(o.created_at).getTime() >= since).map(o => o.user_id)).size }; },
@@ -1121,17 +1150,20 @@ function makeDemoApi() {
       housekeeping();
       const k = byToken(kitchens, "token", token);
       return { kitchen: { name: k.name, public_name: k.public_name, capacity: k.capacity, delivery_mode: k.delivery_mode, added_by_customer: k.added_by_customer, open: isOpen(k.id, date), listing_status: k.listing_status || "none", listing: k.listing || null,
-          auto_days: k.auto_days || [], paused: (k.paused_dates || []).includes(date), confirmed: days.some(x => x.kitchen_id === k.id && x.order_date === date) },
+          auto_days: k.auto_days || [], paused: (k.paused_dates || []).includes(date), confirmed: days.some(x => x.kitchen_id === k.id && x.order_date === date),
+          has_pin: hasPin(k), free_m: k.free_m || null, free_min: k.free_min || 0, free_max_m: settings.free_max_m, fee_ack: Number(k.fee_ack || 0), fee_free_ack: Number(k.fee_free_ack ?? 5),
+          fee_rate: Number(settings.vendor_fee_rate), fee_free: Number(settings.vendor_fee_free), next_day_confirm_by: settings.next_day_confirm_by },
         menu: items.filter(i => i.kitchen_id === k.id && i.active !== false).map(i => ({ id: i.id, name: i.name, price: i.price, addons: i.addons || [], photo_url: i.photo_url || null, icon: i.icon || null })),
         pools: pools.filter(p => p.kitchen_id === k.id && p.order_date === date && p.status !== "cancelled" && meals(p.id) > 0).map(p => {
           const si = sites.find(s => s.id === p.site_id);
           return { id: p.id, seq: p.seq, status: p.status, site: si.name, drop_point: si.drop_point, handoff: si.handoff, host_label: si.host_label, created_at: p.created_at,
+            wait_until: p.status === "waiting" ? waitUntil(p).toISOString() : null, free: pfree(p.id), fee_rate: p.fee_rate, fee_free: p.fee_free, fee: poolFee(p),
             orders: orders.filter(o => o.pool_id === p.id && o.status !== "cancelled").sort((a, b) => a.code < b.code ? -1 : a.code > b.code ? 1 : a.created_at < b.created_at ? -1 : 1).map(o => ({ id: o.id, code: o.code, qty: o.qty, item_name: o.item_name, unit_price: o.unit_price, addons_total: o.addons_total, addons: o.addons, note: o.note, special_request: o.special_request, quote_price: o.quote_price, status: o.status, parent_id: o.parent_id || null, paid: ["paid", "collected"].includes(o.status), collected: o.status === "collected" })) };
         }) };
     },
     async weeklyReport(w0) {
       const add = (d, n) => { const x = new Date(d + "T00:00:00Z"); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
-      const w1 = add(w0, 4), v0 = add(w0, -7), v1 = add(w0, -3), live = orders.filter(o => ["pending", "paid", "collected"].includes(o.status));
+      const w1 = add(w0, 6), v0 = add(w0, -7), v1 = add(w0, -1), live = orders.filter(o => ["pending", "paid", "collected"].includes(o.status));
       const cur = live.filter(o => o.order_date >= w0 && o.order_date <= w1), prev = live.filter(o => o.order_date >= v0 && o.order_date <= v1);
       const head = (L, from, to) => { const ps = pools.filter(p => p.order_date >= from && p.order_date <= to && p.status !== "cancelled" && meals(p.id) > 0);
         const firsts = {}; live.forEach(o => { if (!firsts[o.phone] || o.order_date < firsts[o.phone]) firsts[o.phone] = o.order_date; });
@@ -1144,7 +1176,7 @@ function makeDemoApi() {
       const grp = (L, key) => { const m = {}; L.forEach(o => { (m[o[key]] = m[o[key]] || []).push(o); }); return m; };
       const bs = grp(cur, "site_id"), bp = grp(prev, "site_id");
       return { week_start: w0, week_end: w1, headline: { cur: head(cur, w0, w1), prev: head(prev, v0, v1) },
-        money: { food, commission: Math.round(food * settings.commission_rate * 100) / 100, service_fees: cur.reduce((t, o) => t + o.service_fee * (o.fee_per_meal ? o.qty : 1), 0),
+        money: { food, commission: Math.round(pools.filter(p => p.order_date >= w0 && p.order_date <= w1 && p.status !== "cancelled").reduce((t, p) => t + poolFee(p), 0) * 100) / 100, service_fees: cur.reduce((t, o) => t + o.service_fee * (o.fee_per_meal ? o.qty : 1), 0),
           cashback: cur.filter(o => ["paid", "collected"].includes(o.status)).reduce((t, o) => t + cashOf(o), 0), refunds: ledger.filter(e => e.amount > 0 && /^Refund/.test(e.reason)).reduce((t, e) => t + e.amount, 0),
           momo_refunds: orders.filter(o => o.refund_needed && o.order_date >= w0 && o.order_date <= w1).length, wallets_owed: users.reduce((t, u) => t + Math.max(0, balance(u.id)), 0) },
         buildings: Object.entries(bs).map(([sid, L]) => ({ name: sites.find(x => x.id === sid).name, meals: L.reduce((t, o) => t + o.qty, 0), pools: new Set(L.map(o => o.pool_id)).size,
@@ -1178,10 +1210,15 @@ function makeDemoApi() {
     async uploadReviewPhoto(orderId, blob) { return await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(blob); }); },
     async vendorSetPhoto(token, itemId, url) { const k = byToken(kitchens, "token", token); const i = items.find(x => x.id === itemId && x.kitchen_id === k.id); if (!i) throw new Error("That dish is not on your menu."); i.photo_url = url; },
     async uploadPhoto(folder, blob) { return await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(blob); }); },
-    async kitchenOpenDay(token, date) { const k = byToken(kitchens, "token", token); k.paused_dates = (k.paused_dates || []).filter(x => x !== date); if (!isOpen(k.id, date)) days.push({ kitchen_id: k.id, order_date: date }); pools.filter(p => p.kitchen_id === k.id && p.order_date === date && p.status === "waiting").forEach(p => { p.status = "collecting"; }); },
+    async kitchenAcceptTerms(token) { const k = byToken(kitchens, "token", token); k.fee_ack = Number(settings.vendor_fee_rate); k.fee_free_ack = Number(settings.vendor_fee_free);
+      pools.filter(p => p.kitchen_id === k.id && p.status === "waiting").forEach(p => { p.fee_rate = k.fee_ack; p.fee_free = k.fee_free_ack; }); return { rate: k.fee_ack, free: k.fee_free_ack }; },
+    async vendorSetFree(token, m, min) { const k = byToken(kitchens, "token", token); if (!hasPin(k)) throw new Error("Ask ChopPool to pin your kitchen on the map first.");
+      k.free_m = Number(m) > 0 ? Math.min(Math.round(Number(m)), Number(settings.free_max_m)) : null; k.free_min = Math.max(0, Math.min(Number(min) || 0, 50)); return { free_m: k.free_m, free_min: k.free_min }; },
+    async kitchenOpenDay(token, date) { const k = byToken(kitchens, "token", token);
+      if (Number(settings.vendor_fee_rate) > Number(k.fee_ack || 0) || Number(settings.vendor_fee_free) < Number(k.fee_free_ack ?? 5)) throw new Error("Accept the new ChopPool fee terms first."); k.paused_dates = (k.paused_dates || []).filter(x => x !== date); if (!isOpen(k.id, date)) days.push({ kitchen_id: k.id, order_date: date }); pools.filter(p => p.kitchen_id === k.id && p.order_date === date && p.status === "waiting").forEach(p => { p.status = "collecting"; }); },
     async kitchenUpdate(token, pid, status) {
       const k = byToken(kitchens, "token", token); const p = pools.find(x => x.id === pid && x.kitchen_id === k.id);
-      if (["picked_up", "arriving", "delivered"].includes(status) && k.delivery_mode !== "runner") throw new Error("A ChopPool rider delivers this pool.");
+      if (["picked_up", "arriving", "delivered"].includes(status) && k.delivery_mode !== "runner" && !pfree(p.id)) throw new Error("A ChopPool rider delivers this pool.");
       p.status = status; p[stamp[status]] = nowIso();
     },
     async kitchenQuote(token, oid, price) {
@@ -1238,7 +1275,7 @@ function makeDemoApi() {
     async collectCode(token, code, date, pool) {
       const rid = (riders.find(r => r.token === token) || {}).id, kit = kitchens.find(k => k.token === token && k.delivery_mode === "runner"), c = normCode(code);
       const hit = orders.filter(x => x.order_date === date && x.code === c && ["pending", "paid", "collected"].includes(x.status) && (!pool || x.pool_id === pool) &&
-        (sites.find(s => s.id === x.site_id).host_token === token || (rid && pools.find(p => p.id === x.pool_id).rider_id === rid) || (kit && x.kitchen_id === kit.id))).sort((a, b) => a.created_at < b.created_at ? -1 : 1);
+        (sites.find(s => s.id === x.site_id).host_token === token || (rid && pools.find(p => p.id === x.pool_id).rider_id === rid) || (kit && x.kitchen_id === kit.id) || (kitchens.some(k => k.token === token && k.id === x.kitchen_id) && pfree(x.pool_id)))).sort((a, b) => a.created_at < b.created_at ? -1 : 1);
       if (!hit.length) throw new Error("No order with code " + (c || code) + " for you today.");
       const todo = hit.filter(o => o.status !== "collected"); if (!todo.length) throw new Error("Code " + c + " was already collected.");
       const wasPaid = hit.every(o => ["paid", "collected"].includes(o.status)); todo.forEach(o => { o.status = "collected"; o.collected_at = nowIso(); });
@@ -1249,8 +1286,18 @@ function makeDemoApi() {
     async adminData(date) {
       housekeeping();
       return { orders: orders.filter(o => o.order_date === date), pools: pools.filter(p => p.order_date === date).map(p => ({ ...p, meals: meals(p.id) })), riders, sites, kitchens,
-        wallets: profiles.map(p => ({ ...p, balance: balance(p.user_id) })), items, team, payment_methods: payMethods };
+        wallets: profiles.map(p => ({ ...p, balance: balance(p.user_id) })), items, team, payment_methods: payMethods, waiters };
     },
+    async setPayIssue(id, issue, amount) { const o = orders.find(x => x.id === id); if (issue === "found") Object.assign(o, { status: "paid", pay_issue: null, amount_received: null }); else Object.assign(o, { pay_issue: issue, amount_received: issue === "short" ? Number(amount) || 0 : null }); },
+    async unpaidPhones() { const m = {}; orders.filter(o => o.cancel_reason === "Payment not received").forEach(o => { m[o.phone] = (m[o.phone] || 0) + 1; }); return m; },
+    async fixPayment(id, phone, ref) { const o = orders.find(x => x.id === id); if (!o) throw new Error("Order not found.");
+      if (!(me && o.user_id === me.id) && String(phone).replace(/\D/g, "") !== String(o.phone).replace(/\D/g, "")) throw new Error("This order isn't yours.");
+      if (o.status !== "pending" || !o.pay_issue) throw new Error("This payment doesn't need fixing."); const r = String(ref).replace(/\s/g, "").toUpperCase();
+      if (!/^[A-Z0-9.]{6,30}$/.test(r)) throw new Error("Enter the MoMo transaction ID from your payment message.");
+      o.momo_ref = o.pay_issue === "short" && o.momo_ref ? o.momo_ref + " + " + r : r; o.pay_issue = null; return { ok: true }; },
+    async mergeSites(from, into) { const a = sites.find(x => x.id === from), b = sites.find(x => x.id === into); if (!a || !b || a === b) throw new Error("Pick two different buildings.");
+      pools.filter(p => p.site_id === a.id).forEach(p => { p.site_id = b.id; p.seq += 100; }); orders.filter(o => o.site_id === a.id).forEach(o => { o.site_id = b.id; }); kitchens.filter(k => k.site_id === a.id).forEach(k => { k.site_id = b.id; });
+      waiters.filter(w => w.site_id === a.id).forEach(w => { w.site_id = b.id; }); a.archived = true; if (a.status === "pending") a.status = "declined"; a.request_note = (a.request_note ? a.request_note + " · " : "") + "Merged into " + b.name; return a.name + " merged into " + b.name + "."; },
     async updateOrder(id, patch) { Object.assign(orders.find(o => o.id === id), patch); },
     async updatePool(id, patch) { const p = pools.find(x => x.id === id); Object.assign(p, patch); if (patch.status && stamp[patch.status]) p[stamp[patch.status]] = nowIso(); },
     async updateKitchen(id, patch) { Object.assign(kitchens.find(k => k.id === id), patch); },
@@ -1261,8 +1308,10 @@ function makeDemoApi() {
       if (!r.name || r.name.trim().length < 3) throw new Error("Add the building's name.");
       if (!r.drop_point || r.drop_point.trim().length < 3) throw new Error('Say where the food should be dropped, like "Main gate".');
       if (r.lat == null) throw new Error("Drop a pin on the map first.");
+      const same = sites.find(x => x.status === "pending" && !x.archived && (x.name.trim().toLowerCase().replace(/\s+/g, " ") === r.name.trim().toLowerCase().replace(/\s+/g, " ") || (hasPin(x) && distM(x, r) <= 80)));
+      if (same) { if (!waiters.some(w => w.site_id === same.id && w.who === (me ? me.id : "this phone"))) waiters.push({ site_id: same.id, who: me ? me.id : "this phone", created_at: nowIso() }); return { id: same.id, name: same.name, status: "pending", joined: true, waiting: waiters.filter(w => w.site_id === same.id).length }; }
       const si = { id: "s" + uid(), name: r.name.trim(), drop_point: r.drop_point.trim(), handoff: "meet_rider", host_label: null, host_token: "demo" + uid(), lat: r.lat, lng: r.lng, status: "pending", request_note: (r.note || "").trim() || null, created_at: nowIso(), active: true };
-      sites.push(si); return { id: si.id, name: si.name, status: "pending" };
+      sites.push(si); waiters.push({ site_id: si.id, who: me ? me.id : "this phone", created_at: nowIso() }); return { id: si.id, name: si.name, status: "pending", joined: false, waiting: 1 };
     },
     async addKitchen(k) { const x = { id: "k" + uid(), token: "demo" + uid(), active: true, added_by_customer: false, site_id: null, created_at: nowIso(), ...k }; kitchens.push(x); return x; },
     async saveItem(it) { if (it.id) Object.assign(items.find(i => i.id === it.id), it); else items.push({ id: "i" + uid(), addons: [], active: true, ...it }); },
@@ -1287,6 +1336,8 @@ function makeDemoApi() {
    ===================================================================================== */
 function makeSupabaseApi() {
   const sb = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+  // A password-reset email link signs the person in for one step: choose a new password
+  sb.auth.onAuthStateChange(ev => { if (ev === "PASSWORD_RECOVERY") { S.recovery = true; setTimeout(() => openNewPassword(), 600); } });
   const must = r => { if (r.error) throw new Error(r.error.message); return r.data; };
   const rpc = async (fn, args) => must(await sb.rpc(fn, args || {}));
   const stamp = { accepted: "accepted_at", ready: "ready_at", picked_up: "picked_up_at", arriving: "arriving_at", delivered: "delivered_at" };
@@ -1326,6 +1377,13 @@ function makeSupabaseApi() {
     async signUp(email, password, name) { const d = must(await sb.auth.signUp({ email, password, options: { data: { name: name || null } } })); if (!d.session) throw new Error("Check your email to confirm your account, then sign in."); return { id: d.user.id, email, name: name || null }; },
     async signIn(email, password) { const d = must(await sb.auth.signInWithPassword({ email, password })); return { id: d.user.id, email, name: (d.user.user_metadata && d.user.user_metadata.name) || null }; },
     async signInGoogle() { must(await sb.auth.signInWithOAuth({ provider: "google", options: { redirectTo: baseUrl() } })); },
+    async fixPayment(id, phone, ref) { return rpc("fix_payment", { p_order: id, p_phone: phone || "", p_ref: ref }); },
+    async setPayIssue(id, issue, amount) { const patch = issue === "found" ? { status: "paid", pay_issue: null, amount_received: null } : { pay_issue: issue, amount_received: issue === "short" ? Number(amount) || 0 : null };
+      must(await sb.from("orders").update(patch).eq("id", id).select("id")); },
+    async unpaidPhones() { const since = new Date(Date.now() - 60 * 864e5).toISOString().slice(0, 10);
+      const r = must(await sb.from("orders").select("phone").eq("cancel_reason", "Payment not received").gte("order_date", since)) || []; const m = {}; r.forEach(x => { m[x.phone] = (m[x.phone] || 0) + 1; }); return m; },
+    async sendReset(email) { must(await sb.auth.resetPasswordForEmail(email, { redirectTo: baseUrl() + "#reset" })); return true; },
+    async setNewPassword(pw) { must(await sb.auth.updateUser({ password: pw })); return true; },
     async signOut() { await sb.auth.signOut(); },
     async updateName(name) { const d = must(await sb.auth.updateUser({ data: { name } })); try { await this.saveProfile({ name }); } catch (e) {} return { id: d.user.id, email: d.user.email, name }; },
     async accountStats() { const r = await sb.rpc("admin_account_stats"); if (r.error && /function|schema cache/i.test(r.error.message)) throw new Error("Run update-7.sql in the Supabase SQL Editor once."); return must(r); },
@@ -1392,7 +1450,7 @@ function makeSupabaseApi() {
     isAdmin: () => rpc("is_admin"),
     async adminData(date) {
       await sb.rpc("housekeeping");
-      const [orders, pools, riders, sites, kitchens, wallets, items, team, payment_methods] = await Promise.all([
+      const [orders, pools, riders, sites, kitchens, wallets, items, team, payment_methods, waiters] = await Promise.all([
         sb.from("orders").select("*").eq("order_date", date).order("created_at").then(must),
         sb.from("pools").select("*").eq("order_date", date).order("seq").then(must),
         sb.from("riders").select("*").order("name").then(must),
@@ -1401,10 +1459,11 @@ function makeSupabaseApi() {
         rpc("admin_wallets"),
         sb.from("menu_items").select("*").order("name").then(must),
         sb.from("admins").select("*").order("role", { ascending: false }).then(must),
-        sb.from("payment_methods").select("*").order("sort").then(r => r.error ? [] : r.data, () => [])
+        sb.from("payment_methods").select("*").order("sort").then(r => r.error ? [] : r.data, () => []),
+        sb.from("site_waiters").select("site_id,created_at").then(r => r.error ? [] : r.data, () => [])
       ]);
       const m = {}; orders.forEach(o => { if (o.status !== "cancelled") m[o.pool_id] = (m[o.pool_id] || 0) + o.qty; });
-      return { orders, pools: pools.map(p => ({ ...p, meals: m[p.id] || 0 })), riders, sites, kitchens, wallets, items, team, payment_methods };
+      return { orders, pools: pools.map(p => ({ ...p, meals: m[p.id] || 0 })), riders, sites, kitchens, wallets, items, team, payment_methods, waiters };
     },
     async updateOrder(id, patch) { must(await sb.from("orders").update(patch).eq("id", id)); },
     async updatePool(id, patch) { if (patch.status && stamp[patch.status]) patch[stamp[patch.status]] = new Date().toISOString(); must(await sb.from("pools").update(patch).eq("id", id)); },
@@ -1414,7 +1473,12 @@ function makeSupabaseApi() {
     async creditWallet(user_id, amount, reason) { must(await sb.from("wallet_entries").insert({ user_id, amount: Number(amount), reason, created_by: "coordinator" })); },
     myRole: () => rpc("my_role"),
     claimOwner: () => rpc("claim_owner"),
-    requestSite: r => rpc("request_site", { p_name: r.name, p_drop_point: r.drop_point, p_lat: r.lat, p_lng: r.lng, p_note: r.note || null }),
+    requestSite: async r => { const base = { p_name: r.name, p_drop_point: r.drop_point, p_lat: r.lat, p_lng: r.lng, p_note: r.note || null };
+      let ep = null; try { const reg = await navigator.serviceWorker?.getRegistration(); const sub = reg && await reg.pushManager.getSubscription(); ep = sub ? sub.endpoint : null; } catch (e) {}
+      try { return await rpc("request_site", { ...base, p_endpoint: ep }); } catch (e) { if (/function|p_endpoint/i.test(String(e.message || e))) return rpc("request_site", base); throw e; } },
+    kitchenAcceptTerms: t => rpc("kitchen_accept_terms", { p_token: t }),
+    vendorSetFree: (t, m, min) => rpc("vendor_set_free", { p_token: t, p_m: m, p_min: min }),
+    mergeSites: (from, into) => rpc("admin_merge_sites", { p_from: from, p_into: into }),
     async addKitchen(k) { return must(await sb.from("kitchens").insert(k).select().single()); },
     async saveItem(it) { if (it.id) { const { id, ...p } = it; must(await sb.from("menu_items").update(p).eq("id", id)); } else must(await sb.from("menu_items").insert(it)); },
     async addRider(r) { must(await sb.from("riders").insert(r)); },
@@ -1456,7 +1520,7 @@ function every(fn, ms) { S.timers.push(setInterval(() => { if (!document.hidden)
 function clearTimers() { S.timers.forEach(clearInterval); S.timers = []; }
 function openSheet(html) {
   const sh = $("#sheet"), bg = $("#sheetBg");
-  sh.innerHTML = html; sh.scrollTop = 0; sh.scrollLeft = 0; sh.style.transform = "";
+  sh.innerHTML = html; sh.scrollTop = 0; sh.scrollLeft = 0; sh.style.transform = ""; sh.classList.remove("searching");
   if (!bg.classList.contains("open")) { lockPage(true); void sh.offsetWidth; bg.classList.add("open"); }
   $("#sheet").querySelectorAll("[data-close]").forEach(b => b.addEventListener("click", closeSheet));
 }
@@ -1466,7 +1530,9 @@ function initSheetDrag() {
   sh.addEventListener("touchstart", e => {
     if (e.touches.length !== 1 || e.target.closest(".map, input, textarea, select")) return;
     const top = e.touches[0].clientY - sh.getBoundingClientRect().top;
-    if (top > 64 && sh.scrollTop > 0) return;
+    // While typing (keyboard up) or scrolling a results list, only the top edge of the sheet closes it, so scrolling never collapses the search
+    const typing = sh.contains(document.activeElement) && /^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName);
+    if (top > 64 && (sh.scrollTop > 0 || typing || sh.classList.contains("searching") || e.target.closest(".places, #fbPlaces, [data-noswipe]"))) return;
     y0 = e.touches[0].clientY; t0 = Date.now(); dy = 0; dragging = false;
   }, { passive: true });
   sh.addEventListener("touchmove", e => {
@@ -1716,6 +1782,29 @@ function openChangeName() {
     catch (err) { $("#nameErr").textContent = cleanErr(err); }
   });
 }
+// Forgot password: email a link; the link opens the app on "Choose a new password"
+function openForgot(prefill) {
+  openSheet(`${sheetHead("Reset your password", "We'll email you a link to choose a new password.")}
+    <form id="fgForm" class="stack" novalidate><div><label for="fgEmail">Email</label><input id="fgEmail" type="email" autocomplete="email" value="${esc(prefill || "")}" placeholder="Email address"></div>
+    <p class="err" id="fgErr"></p><button class="btn wide">Send reset link</button></form>`);
+  $("#fgForm").addEventListener("submit", async ev => {
+    ev.preventDefault(); const em = $("#fgEmail").value.trim().toLowerCase();
+    if (!/^\S+@\S+\.\S+$/.test(em)) return ($("#fgErr").textContent = "Enter a valid email address.");
+    try { await api.sendReset(em); openSheet(`${sheetHead("Check your email", "")}<p>If <strong>${esc(em)}</strong> has a ChopPool account, a reset link is on its way. Open it on this phone to choose a new password.</p><p class="small muted">Nothing after a few minutes? Check spam, or try again.</p><button class="btn wide" data-close>OK</button>`); }
+    catch (e) { $("#fgErr").textContent = cleanErr(e); }
+  });
+}
+function openNewPassword() {
+  openSheet(`${sheetHead("Choose a new password", "You opened a reset link. Set your new password to finish.")}
+    <form id="npForm" class="stack" novalidate><div><label for="npPw">New password</label><input id="npPw" type="password" autocomplete="new-password" placeholder="At least 6 characters"></div>
+    <p class="err" id="npErr"></p><button class="btn wide">Save password</button></form>`);
+  $("#npForm").addEventListener("submit", async ev => {
+    ev.preventDefault(); const pw = $("#npPw").value;
+    if (pw.length < 6) return ($("#npErr").textContent = "Use at least 6 characters.");
+    try { await api.setNewPassword(pw); S.recovery = false; closeSheet(); toast("Password saved. You're signed in."); if (location.hash === "#reset") history.replaceState(null, "", location.pathname + location.search); refreshUser?.(); }
+    catch (e) { $("#npErr").textContent = cleanErr(e); }
+  });
+}
 function openAccount(reason, startMode) {
   // Phones that have signed in before open on Sign in; "I already have an account" always does
   let mode = startMode || (local.get("cp_had_account") ? "signin" : "signup");
@@ -1729,10 +1818,12 @@ function openAccount(reason, startMode) {
       <div><label for="aPw">Password</label><input id="aPw" type="password" autocomplete="${mode === "signup" ? "new-password" : "current-password"}" placeholder="At least 6 characters"></div>
       <p class="err" id="aErr"></p>
       <button class="btn wide" type="submit">${mode === "signup" ? "Create account" : "Sign in"}</button>
+      ${mode === "signin" ? `<button type="button" class="linkbtn" id="forgot" style="justify-self:center">Forgot password?</button>` : ""}
     </form>
     <p class="small center">${mode === "signup" ? "Already have an account?" : "New to ChopPool?"} <button class="linkbtn" id="swap">${mode === "signup" ? "Sign in" : "Create an account"}</button></p>`);
   const wire = () => {
     $("#swap").addEventListener("click", () => { mode = mode === "signup" ? "signin" : "signup"; draw(); wire(); });
+    $("#forgot")?.addEventListener("click", () => openForgot($("#aEmail").value.trim()));
     $("#google")?.addEventListener("click", async () => { try { await api.signInGoogle(); } catch (e) { $("#aErr").textContent = cleanErr(e); } });
     $("#authForm").addEventListener("submit", async ev => {
       ev.preventDefault();
@@ -1770,8 +1861,13 @@ function currentPool(siteId, kid) {
 const menusHere = () => S.menus.filter(k => !k.site_id || k.site_id === S.siteId);
 // Customer-added vendors sit at the building they were added for
 const kPin = (k, site) => hasPin(k) ? k : k.added_by_customer && hasPin(site) ? site : null;
-const tripTo = (k, site) => tripFor(kPin(k, site) || {}, site, S.settings);
-const poolTrip = p => tripTo(S.menus.find(k => k.id === p.kitchen_id) || {}, siteOf(p.site_id));
+// Free delivery by the vendor: the building is within the vendor's free distance (and the admin limit) and the pool has enough meals
+const freeReach = (k, site) => !!k && Number(k.free_m) > 0 && hasPin(k) && hasPin(site) && distM(k, site) * ROAD_FACTOR <= Math.min(Number(k.free_m), Number(S.settings.free_max_m || 1500));
+const isFreeFor = (k, site, meals = 1) => freeReach(k, site) && meals >= Number(k.free_min || 0);
+const tripTo = (k, site, meals = 1) => isFreeFor(k, site, meals) ? 0 : tripFor(kPin(k, site) || {}, site, S.settings);
+const poolTrip = (p, meals = p.meals) => p.free ? 0 : tripTo(S.menus.find(k => k.id === p.kitchen_id) || {}, siteOf(p.site_id), meals);
+// What a new order pays for delivery now: the server looks at the pool as it stands before this order
+const tripNow = (k, site) => tripTo(k, site, (S.board.pools.find(p => p.site_id === S.siteId && p.kitchen_id === k.id && ["waiting", "collecting"].includes(p.status)) || {}).meals || 0);
 function menuState(k) {
   return { full: (S.board.load[k.id] || 0) >= k.capacity, open: S.board.open.includes(k.id), waiting: S.board.pools.some(p => p.kitchen_id === k.id && p.site_id === S.siteId && p.status === "waiting" && p.meals > 0) };
 }
@@ -1855,6 +1951,7 @@ async function viewOrder() {
   $("#kitchensList").addEventListener("click", e => { if (mineClick(e)) return; const v = e.target.closest("[data-vendor]"); if (v) return openVendor(v.dataset.vendor); const b = e.target.closest("button[data-menu]"); if (b) openOrder(b.dataset.menu); });
   $("#tabOrders").addEventListener("click", e => { const sg = e.target.closest("[data-oseg]"); if (sg) { S.oseg = sg.dataset.oseg; S.osegPicked = true; renderOrders(); window.scrollTo(0, 0); return; }
     const vd = e.target.closest("[data-vendor]"); if (vd) return openVendor(vd.dataset.vendor);
+    const fx = e.target.closest("[data-fixpay]"); if (fx) return openFixPayment((S.mine || []).find(o => o.id === fx.dataset.fixpay), fx.dataset.mode);
     const b = e.target.closest("button[data-pay]"); if (b) openPayQuote(b.dataset.pay); const ro = e.target.closest("[data-reorder]"); if (ro) openOrder(ro.dataset.reorder);
     const ap = e.target.closest("[data-addplate]"); if (ap) { const o = (S.mine || []).find(x => x.id === ap.dataset.addplate); if (o) openOrder(o.kitchen_id, { join: o }); }
     const rt = e.target.closest("[data-rate]"); if (rt) { const o = (S.mine || []).find(x => x.id === rt.dataset.rate); if (o) openReview(o, +rt.dataset.n || 0); return; }
@@ -1998,7 +2095,7 @@ function openSitePicker(opt) {
   list();
   const pick = id => setSite(id, then);
   $("#siteList").addEventListener("click", e => { if (e.target.name === "site") pick(e.target.value); });
-  $("#fbQ").addEventListener("input", () => { const typing = !!$("#fbQ").value.trim(); $("#fbChips").classList.toggle("hidden", typing); if (typing) { $("#siteMap").classList.add("hidden"); $("#mapToggle").textContent = "Show on map"; } list(); });
+  $("#fbQ").addEventListener("input", () => { const typing = !!$("#fbQ").value.trim(); $("#sheet").classList.toggle("searching", typing); $("#fbChips").classList.toggle("hidden", typing); if (typing) { $("#siteMap").classList.add("hidden"); $("#mapToggle").textContent = "Show on map"; } list(); });
   placeSearch($("#fbQ"), $("#fbPlaces"), r => openRequestSite({ lat: r.lat, lng: r.lng }, { name: r.short, then }), { none: "No places found. Pin it on the map below." });
   $("#nearMe").addEventListener("click", async () => {
     $("#siteHint").textContent = "Finding buildings near you…";
@@ -2062,8 +2159,12 @@ function openRequestSite(here, opt = {}) {
     try {
       const r = await api.requestSite({ name: $("#bName").value, drop_point: $("#bDrop").value, lat: pin.lat, lng: pin.lng, note: $("#bNote").value });
       openSheet(`<div class="top" style="justify-content:flex-end"><button class="closex" data-close aria-label="Close">${ICON.close}</button></div><span class="success">${ICON.check}</span>
-        <div class="center" style="display:grid;gap:6px"><h2 id="sheetTitle">Request sent</h2><p class="muted">We'll check ${esc(r.name)} and add it to ChopPool, usually the same day. Until then, you can order to the nearest building.</p></div>
+        <div class="center" style="display:grid;gap:6px"><h2 id="sheetTitle">${r.joined ? "You're on the waitlist" : "Request sent"}</h2>
+          <p class="muted">${r.joined ? esc(r.name) + " has already been requested" + (r.waiting > 1 ? ", and " + r.waiting + " people are waiting for it" : "") + ". We've added you to the waitlist." : "We'll check " + esc(r.name) + " and add it to ChopPool, usually the same day."}
+          ${local.get("cp_alerts") ? " You'll get an alert when it's live." : ""} Until then, you can order to the nearest building.</p></div>
+        ${local.get("cp_alerts") ? "" : `<button class="ghost wide" id="bAlerts">Alert me when it's live</button>`}
         <button class="btn wide" data-close>OK</button>`);
+      $("#bAlerts")?.addEventListener("click", async () => { await toggleAlerts(); if (local.get("cp_alerts")) { try { await api.requestSite({ name: r.name, drop_point: $("#bDrop")?.value || "Main gate", lat: pin.lat, lng: pin.lng }); } catch (e2) {} toast("We'll alert you when " + r.name + " is live."); closeSheet(); } });
     } catch (e) { $("#bErr").textContent = cleanErr(e); }
   });
 }
@@ -2077,12 +2178,13 @@ function renderWhen() {
 function heroDelivery(here, site) {
   const s = S.settings, opts = [];
   here.filter(p => p.status === "collecting" && p.meals > 0 && p.meals < s.max_meals)
-    .forEach(p => opts.push({ fee: feeFor(p.meals + 1, s, poolTrip(p)), label: "a meal in a live pool", kid: p.kitchen_id }));
+    .forEach(p => opts.push({ fee: feeFor(p.meals + 1, s, poolTrip(p, p.meals + 1)), label: "a meal to join a pool", kid: p.kitchen_id, pool: true }));
   if (hasPin(site)) {
-    const near = menusHere().filter(k => hasPin(k)).sort((a, b) => distM(a, site) - distM(b, site))[0];
-    if (near) opts.push({ fee: tripFor(near, site, s), label: "delivery from " + shortName(near.public_name), kid: near.id });
+    // Lowest delivery among the vendors near you (within the "near you" limit)
+    const rows = nearRows().rows.map(r => ({ k: r.k, trip: tripTo(r.k, site) })).sort((a, b) => a.trip - b.trip);
+    if (rows.length) opts.push({ fee: rows[0].trip, label: rows[0].trip === 0 ? "free delivery near you" : rows.length > 1 ? "lowest delivery near you" : "delivery from " + shortName(rows[0].k.public_name), kid: rows[0].k.id });
   }
-  return opts.sort((a, b) => a.fee - b.fee)[0] || null;
+  return opts.sort((a, b) => a.fee - b.fee || (b.pool ? 1 : 0) - (a.pool ? 1 : 0))[0] || null;
 }
 function renderHero() {
   const el = $("#hero"); if (!el) return;
@@ -2096,9 +2198,9 @@ function renderHero() {
       <h1>Lunch for ${dl === "today" || dl === "tomorrow" ? dl : fmtDate(S.date)}</h1>
       <p class="small">Order by ${fmtTime(s.cutoff)}${dl === "today" ? "" : " " + (dl === "tomorrow" ? "tomorrow" : fmtDate(S.date))} · arrives ${fmtTime(s.delivery_time)}${site.drop_point ? " at " + esc(site.drop_point) : ""}</p>
       <p class="small" style="opacity:.8">Ghana time (GMT) now <span class="num" id="ghNow">${ghanaNow()}</span></p></div>
-    <div class="hero-stats"><div class="hero-stat"><b class="num" id="countdown">--</b><span>until orders close</span></div>
+    <div class="hero-stats"><div class="hero-stat" id="cdBox"><b class="num" id="countdown">--</b><span id="cdLabel">until orders close</span></div>
       ${hasMineToday() ? `<button class="hero-stat hlink" data-gomine aria-label="${meals} meals ordered. Open your orders"><b class="num">${meals}</b><span>meals ordered</span></button>` : `<div class="hero-stat"><b class="num">${meals}</b><span>meals ordered</span></div>`}
-      ${S.noSite ? `<div class="hero-stat"><b class="num">${here.filter(p => p.status === "collecting" && p.meals > 0).length}</b><span>pools open</span></div>` : (dlv ? `<button class="hero-stat hlink" data-vendor="${esc(dlv.kid)}"><b class="num">${Number.isInteger(dlv.fee) ? "GHS " + dlv.fee : money(dlv.fee)}</b><span>${esc(dlv.label)}</span></button>` : `<div class="hero-stat"><b class="num">${menusHere().length}</b><span>vendors cooking</span></div>`)}</div>`;
+      ${S.noSite ? `<div class="hero-stat"><b class="num">${here.filter(p => p.status === "collecting" && p.meals > 0).length}</b><span>pools open</span></div>` : (dlv ? `<button class="hero-stat hlink" data-vendor="${esc(dlv.kid)}"><b class="num">${dlv.fee === 0 ? "Free" : Number.isInteger(dlv.fee) ? "GHS " + dlv.fee : money(dlv.fee)}</b><span>${esc(dlv.label)}</span></button>` : `<div class="hero-stat"><b class="num">${menusHere().length}</b><span>vendors cooking</span></div>`)}</div>`;
   tickCountdown();
 }
 function tickCountdown() {
@@ -2106,8 +2208,17 @@ function tickCountdown() {
   const fresh = orderDate(S.settings);
   if (fresh !== S.date) { S.date = fresh; renderWhen(); refreshBoard(); }
   const ms = Math.max(0, at(S.date, S.settings.cutoff) - new Date());
-  const h = Math.floor(ms / 3.6e6), m = Math.floor(ms % 3.6e6 / 6e4), sec = Math.floor(ms % 6e4 / 1000);
-  $("#countdown").textContent = (h ? h + ":" + String(m).padStart(2, "0") : String(m)) + ":" + String(sec).padStart(2, "0");
+  // Before the order day's countdown starts (6:00 by default), say when orders close instead of a long countdown
+  if (new Date() < at(S.date, S.settings.countdown_start || "06:00")) {
+    const dl = dayLabel(S.date), when = (dl === "tomorrow" ? "Tomorrow" : new Date(S.date + "T00:00:00Z").toLocaleDateString("en-GB", { weekday: "short", timeZone: "UTC" })) + " " + fmtTime(S.settings.cutoff);
+    if ($("#countdown").textContent !== when) { $("#countdown").textContent = when; $("#cdLabel").textContent = "orders close"; }
+    $("#cdBox")?.classList.remove("hurry");
+  } else {
+    const h = Math.floor(ms / 3.6e6), m = Math.floor(ms % 3.6e6 / 6e4), sec = Math.floor(ms % 6e4 / 1000);
+    $("#countdown").textContent = (h ? h + ":" + String(m).padStart(2, "0") : String(m)) + ":" + String(sec).padStart(2, "0");
+    if ($("#cdLabel").textContent !== "until orders close") $("#cdLabel").textContent = "until orders close";
+    $("#cdBox")?.classList.toggle("hurry", ms > 0 && ms <= 30 * 6e4);
+  }
   if ($("#countdownMini")) $("#countdownMini").textContent = $("#countdown").textContent;
   if ($("#ghNow")) $("#ghNow").textContent = ghanaNow();
 }
@@ -2164,13 +2275,20 @@ const myOrderIn = k => (S.mine || []).find(o => !o.parent_id && o.kitchen_id ===
   && ["pending", "paid"].includes(o.status) && ["waiting", "collecting"].includes(o.pool_status));
 const SHARE = SV('<path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M12 3v13"/><path d="m7 8 5-5 5 5"/>', 20);
 const mineBtns = (o, k) => `<div class="minebtns"><button class="btn wide" data-addplate="${esc(o.id)}">${SV('<path d="M12 5v14M5 12h14"/>', 18)} Add to my order</button><button class="ghost sharebtn" data-share="${esc(o.site_id)},${esc(k.id)}" aria-label="Share this pool">${SHARE}</button></div>`;
+// When a waiting pool's vendor must confirm by: same-day pools get minutes; pools for a later day get until the "confirm by" time that morning
+const confirmBy = () => { const s = S.settings, by = s.next_day_confirm_by || "08:30"; return hm(by) < hm(s.cutoff) ? by : s.cutoff; };
+const waitUntilOf = p => p && p.wait_until ? new Date(p.wait_until) : p ? (p.order_date > String(p.created_at).slice(0, 10) ? at(p.order_date, confirmBy()) : new Date(Date.parse(p.created_at) + S.settings.accept_timeout_min * 6e4)) : null;
+const waitLeftMin = p => p ? Math.max(0, Math.round((waitUntilOf(p) - Date.now()) / 6e4)) : S.settings.accept_timeout_min;
+// "within 20 minutes" today, "by 08:30 tomorrow" for a later day
+const confirmText = d => d > today() ? "by " + fmtTime(confirmBy()) + " " + (dayLabel(d) === "tomorrow" ? "tomorrow" : "on " + fmtDate(d)) : "within " + S.settings.accept_timeout_min + " minutes";
+const leftText = p => { const m = waitLeftMin(p); return m > 90 ? "confirms by " + fmtTime(confirmBy()) + (dayLabel((p || {}).order_date || S.date) === "tomorrow" ? " tomorrow" : "") : m + " min left"; };
 // Waiting for the vendor: status, time left and the button together in one box
 function waitBox(k) {
   const s = S.settings, wp = S.board.pools.find(x => x.site_id === S.siteId && x.kitchen_id === k.id && x.status === "waiting");
-  const left = wp ? Math.max(0, s.accept_timeout_min - minsAgo(wp.created_at)) : s.accept_timeout_min, n = wp ? wp.meals : 0;
-  const mine = myOrderIn(k), C = 2 * Math.PI * 19, frac = Math.max(0, Math.min(1, left / s.accept_timeout_min)), first = !(S.seenWait = S.seenWait || new Set()).has(k.id); S.seenWait.add(k.id);
+  const left = waitLeftMin(wp), n = wp ? wp.meals : 0, total = wp ? Math.max(1, (waitUntilOf(wp) - Date.parse(wp.created_at)) / 6e4) : s.accept_timeout_min, big = left > 90;
+  const mine = myOrderIn(k), C = 2 * Math.PI * 19, frac = Math.max(0, Math.min(1, left / total)), first = !(S.seenWait = S.seenWait || new Set()).has(k.id); S.seenWait.add(k.id);
   return `<div class="waitbox${first ? " fresh" : ""}"><div class="wb-row">
-      <span class="wb-ring" role="img" aria-label="${left} minutes left"><svg viewBox="0 0 44 44"><circle class="trk" cx="22" cy="22" r="19"/><circle class="arc" cx="22" cy="22" r="19" style="stroke-dasharray:${C.toFixed(1)};stroke-dashoffset:${(C * (1 - frac)).toFixed(1)};--c:${C.toFixed(1)}"/></svg><b class="num">${left}</b><small>min</small></span>
+      <span class="wb-ring" role="img" aria-label="${left} minutes left"><svg viewBox="0 0 44 44"><circle class="trk" cx="22" cy="22" r="19"/><circle class="arc" cx="22" cy="22" r="19" style="stroke-dasharray:${C.toFixed(1)};stroke-dashoffset:${(C * (1 - frac)).toFixed(1)};--c:${C.toFixed(1)}"/></svg><b class="num">${big ? fmtTime(confirmBy()) : left}</b><small>${big ? "by" : "min"}</small></span>
       <span class="wb-text"><strong>Waiting for ${esc(k.public_name)} to confirm</strong><span>${mine ? "You're in · code " + esc(mine.code) + " · " + n + (n === 1 ? " meal" : " meals") + " so far" : n + " " + (n === 1 ? "meal" : "meals") + " so far · full refund if they don't"}</span></span></div>
     ${mine ? mineBtns(mine, k) : `<button class="btn wide wb-btn" data-menu="${esc(k.id)}">Join anyway</button>`}</div>`;
 }
@@ -2221,7 +2339,7 @@ const locChip = () => `<button class="locchip" aria-label="Change building">${IC
 const hasMineToday = () => (S.mine || []).some(o => o.order_date === S.date && o.status !== "cancelled");
 const favs = () => new Set(local.get("cp_favs") || []);
 function toggleFav(kid) { const f = favs(); f.has(kid) ? f.delete(kid) : f.add(kid); local.set("cp_favs", [...f]); return f.has(kid); }
-const VFILTERS = [["fav", "♥ Favourites"], ["near", "Nearest"], ["top", "Top rated"], ["pools", "Pools open"], ["local", "Local dishes"], ["healthy", "Healthy"]];
+const VFILTERS = [["fav", "♥ Favourites"], ["near", "Nearest"], ["top", "Top rated"], ["pools", "Pools open"], ["local", "Local dishes"], ["healthy", "Salads and bowls"]];
 const LOCAL_KINDS = new Set(["jollof", "waakye", "banku", "fufu", "kenkey", "tuo", "omotuo", "redred", "gob3", "kelewele", "ampesi", "ricestew", "soup", "koko", "yam"]);
 const HEALTHY_KINDS = new Set(["salad", "bowl", "wrap"]);
 const kindsOf = k => new Set(S.items.filter(i => i.kitchen_id === k.id).map(i => dishKind(i)));
@@ -2270,9 +2388,12 @@ function vInfo(k) {
   let dl, short = "", unit = "";
   if (S.noSite) dl = "Choose your building to see delivery";
   else if (st.full) dl = "Fully booked " + dayLabel(S.date);
-  else if (active) { const j = feeFor(p.meals + 1, s, poolTrip(p)); dl = "Delivery " + money(j) + " a meal if you join"; short = money(j); unit = "a meal"; }
+  else if (active && poolTrip(p, p.meals + 1) === 0) { dl = "Free delivery by the vendor"; short = "Free"; unit = "delivery"; }
+  else if (active) { const j = feeFor(p.meals + 1, s, poolTrip(p, p.meals + 1)); dl = "Delivery " + money(j) + " a meal if you join"; short = money(j); unit = "a meal"; }
+  else if (trip === 0) { dl = "Free delivery by the vendor"; short = "Free"; unit = "delivery"; }
+  else if (freeReach(k, siteOf(S.siteId))) { dl = "Free delivery from " + k.free_min + " meals"; short = moneyShort(trip); unit = "delivery"; }
   else { dl = "Delivery ~" + moneyShort(trip) + ", shared"; short = moneyShort(trip); unit = "delivery"; }
-  return { km, st, active, p, trip, dl, short, unit, long: !S.noSite && isLong(s, trip) };
+  return { km, st, active, p, trip, dl, short, unit, long: !S.noSite && isLong(s, trip), free: !S.noSite && freeReach(k, siteOf(S.siteId)) };
 }
 const kmText = km => km == null ? "" : km < 1 ? "under 1 km" : km.toFixed(1) + " km";
 const rateHtml = k => { const sc = (S.scores || {})[k.id] || {}; return sc.ratings >= 3 ? `<span class="rs">${STAR(true, 12)} ${Number(sc.rating).toFixed(1)}</span>` : `<span>New</span>`; };
@@ -2291,19 +2412,22 @@ function vendorRow(k) {
 }
 // Vendors with a pin near this building, nearest first
 function nearRows() {
-  const site = siteOf(S.siteId), base = hasPin(site) ? site : S.here || null;
-  const rows = menusHere().map(k => ({ k, pin: kPin(k, site) })).filter(r => r.pin).map(r => ({ k: r.k, d: base ? distM(base, r.pin) : null }));
-  const far = rows.filter(r => r.k.site_id !== S.siteId && r.d != null && r.d > NEAR_KITCHEN_M).length;
-  return { far, rows: rows.filter(r => r.k.site_id === S.siteId || r.d == null || r.d <= NEAR_KITCHEN_M).sort((a, b) => (a.d ?? 1e12) - (b.d ?? 1e12)) };
+  const site = siteOf(S.siteId), base = hasPin(site) ? site : S.here || null, lim = Number(S.settings.near_max_fee || 50);
+  const rows = menusHere().map(k => ({ k, pin: kPin(k, site) })).filter(r => r.pin).map(r => ({ k: r.k, d: base ? distM(base, r.pin) : null, trip: tripTo(r.k, site) }));
+  const inArea = r => r.k.site_id === S.siteId || r.d == null || r.d <= NEAR_KITCHEN_M;
+  const byD = (a, b) => (a.d ?? 1e12) - (b.d ?? 1e12);
+  // Near you: delivery at or under the limit (or free). Further away: still orderable, delivery above the limit.
+  const near = rows.filter(r => inArea(r) && (r.trip <= lim || !hasPin(site))).sort(byD), further = rows.filter(r => inArea(r) && !(r.trip <= lim || !hasPin(site))).sort(byD);
+  return { far: rows.filter(r => !inArea(r)).length, rows: near, further };
 }
 function poolRow(k) {
   const s = S.settings, max = Number(s.max_meals), st = menuState(k), p = currentPool(S.siteId, k.id), trip = poolTrip(p), mo = myOrderIn(k), i = menuIndex(k.id);
-  const now = feeFor(Math.max(p.meals, 1), s, trip), j = feeFor(p.meals + 1, s, trip);
+  const now = feeFor(Math.max(p.meals, 1), s, trip), j = feeFor(p.meals + 1, s, poolTrip(p, p.meals + 1));
   let l2, warn = false;
   if (st.full) { l2 = "Fully booked " + dayLabel(S.date); warn = true; }
   else if (st.waiting) {
-    const wp = S.board.pools.find(x => x.site_id === S.siteId && x.kitchen_id === k.id && x.status === "waiting"), left = wp ? Math.max(0, s.accept_timeout_min - minsAgo(wp.created_at)) : s.accept_timeout_min;
-    l2 = mo ? "Waiting for the vendor to confirm · " + left + " min left" : "Waiting for the vendor · " + left + " min left. Full refund if they don't confirm"; warn = true;
+    const wp = S.board.pools.find(x => x.site_id === S.siteId && x.kitchen_id === k.id && x.status === "waiting");
+    l2 = mo ? "Waiting for the vendor · " + leftText(wp) : "Waiting for the vendor · " + leftText(wp) + ". Full refund if they don't confirm"; warn = true;
   } else if (mo) l2 = j < now ? "Add and delivery drops to " + money(j) + " a meal" : "Delivery is " + money(now) + " a meal right now";
   else l2 = j < now ? "Join and delivery drops to " + money(j) + " a meal" : "Delivery " + money(j) + " a meal if you join";
   const act = mo ? `<button class="btn" data-addplate="${esc(mo.id)}">Add</button>` : st.full ? `<button class="btn" disabled>Full</button>` : `<button class="btn" data-vendor="${esc(k.id)}">Join</button>`;
@@ -2341,18 +2465,19 @@ function renderKitchens() {
   const el = $("#kitchensList"); if (!el) return;
   const view = local.get("cp_vview") || "grid", f = S.vf || "near", fv = favs(), site = siteOf(S.siteId);
   let rows, far = 0;
+  let further = [];
   if (S.noSite) rows = S.menus.filter(k => !k.site_id).map(k => ({ k, d: null }));
-  else { const nr = nearRows(); rows = nr.rows; far = nr.far; }
+  else { const nr = nearRows(); rows = nr.rows; far = nr.far; further = nr.further; }
   $("#kitchensSub").textContent = S.noSite ? "Top vendors across Accra. Choose your building to see delivery prices." : "Delivering to " + (site.name || "your building") + "." + (far ? " " + far + " more too far to deliver here." : "");
-  if (f === "fav") rows = rows.filter(r => fv.has(r.k.id));
-  if (f === "pools") rows = rows.filter(r => !S.noSite && activeHere(r.k));
-  if (f === "local") rows = rows.filter(r => [...kindsOf(r.k)].some(x => LOCAL_KINDS.has(x)));
-  if (f === "healthy") rows = rows.filter(r => [...kindsOf(r.k)].some(x => HEALTHY_KINDS.has(x)));
+  const pick = list => list.filter(r => (f !== "fav" || fv.has(r.k.id)) && (f !== "pools" || (!S.noSite && activeHere(r.k)))
+    && (f !== "local" || [...kindsOf(r.k)].some(x => LOCAL_KINDS.has(x))) && (f !== "healthy" || [...kindsOf(r.k)].some(x => HEALTHY_KINDS.has(x))));
+  rows = pick(rows); further = pick(further);
   if (f === "top" || S.noSite) rows.sort((a, b) => (((S.scores || {})[b.k.id] || {}).rating || 0) - (((S.scores || {})[a.k.id] || {}).rating || 0) || rank(b.k) - rank(a.k));
   const nearestId = !S.noSite && nearRows().rows[0]?.k.id;
   const empty = { fav: ["No favourites yet", "Tap the heart on any vendor's page to keep them here."], pools: ["No pools open yet", "Start one from any vendor and others in your building can join."], local: ["No local dishes here yet", "Try another filter."], healthy: ["No healthy options here yet", "Try another filter."] }[f]
     || [S.noSite ? "Choose your building" : "No vendors deliver here yet", S.noSite ? "Then you'll see the menus that deliver there." : "Add a vendor you know below."];
-  el.innerHTML = rows.length ? (view === "list" ? `<div class="vlist">${rows.map(r => vendorRow(r.k)).join("")}</div>` : `<div class="vgrid">${rows.map(r => vendorTile(r.k, r.k.id === nearestId)).join("")}</div>`)
+  const block = list => view === "list" ? `<div class="vlist">${list.map(r => vendorRow(r.k)).join("")}</div>` : `<div class="vgrid">${list.map(r => vendorTile(r.k, r.k.id === nearestId)).join("")}</div>`;
+  el.innerHTML = rows.length || further.length ? (rows.length ? block(rows) : "") + (further.length ? `<h3 class="vcat" style="position:static;margin:18px 0 4px;padding:0">Further away</h3><p class="small muted" style="margin:-4px 0 10px">Delivery costs more than ${moneyShort(S.settings.near_max_fee || 50)} to ${esc(site.name || "your building")}.</p>` + block(further) : "")
     : `<div class="emptyrow"><span class="eic">${f === "fav" ? ICON.heart : ICON.store.replace(/width="\d+" height="\d+"/, 'width="22" height="22"')}</span><div><strong>${esc(empty[0])}</strong><p>${esc(empty[1])}</p></div></div>`;
   setKTop();
 }
@@ -2415,7 +2540,7 @@ function vendorBanner(k) {
   if (mo) return `<div class="vbanner"><span><b>You're in this pool</b> · code <b class="num">${esc(mo.code)}</b>. ${v.active ? "Delivery is " + money(feeFor(Math.max(v.p.meals, 1), s, poolTrip(v.p))) + " a meal right now." : ""} Add a plate or share it so delivery drops.</span></div>`;
   if (v.st.full) return `<div class="vbanner bad"><span><b>Fully booked ${esc(day)}.</b> Try another vendor near you.</span></div>`;
   if (v.st.waiting) return `<div class="vbanner w"><span><b>Waiting for ${esc(k.public_name)} to confirm</b> · ${v.p ? v.p.meals : 0} meals so far. Join anyway: if they don't confirm in time, everyone gets their money back.</span></div>`;
-  if (v.active) { const j = feeFor(v.p.meals + 1, s, poolTrip(v.p)); return `<div class="vbanner"><span><b>${v.p.meals} meal${v.p.meals > 1 ? "s" : ""} from ${esc(site.name || "your building")}</b> in a pool. Join now and delivery is ${money(j)} a meal.</span></div>`; }
+  if (v.active) { const j = feeFor(v.p.meals + 1, s, poolTrip(v.p, v.p.meals + 1)); return `<div class="vbanner"><span><b>${v.p.meals} meal${v.p.meals > 1 ? "s" : ""} from ${esc(site.name || "your building")}</b> in a pool. Join now and delivery is ${money(j)} a meal.</span></div>`; }
   if (v.st.open) return `<div class="vbanner o"><span><b>Cooking ${esc(day)}.</b> Start a pool and share it: delivery gets cheaper for everyone who joins.</span></div>`;
   return `<div class="vbanner o"><span><b>No pool yet ${esc(day)}.</b> Start one and we'll ask ${esc(k.public_name)} to confirm. Others in your building can join.</span></div>`;
 }
@@ -2494,6 +2619,8 @@ function orderCard(o, all, next) {
       ${["quote_requested", "quoted"].includes(o.status) ? "" : `<div class="steps4" aria-label="Progress ${s4} of 4">${[1, 2, 3, 4].map(n => `<i class="${n <= s4 ? "on" : ""}"></i>`).join("")}</div><div class="steps4l">${STEP_LABELS.map((l, n) => `<span class="${n < s4 ? "on" : ""}">${l}</span>`).join("")}</div>`}
       <p class="status-text">${esc(statusLine(o))}</p>
       ${o.status === "quoted" ? quoteBreakdown(o) + `<button class="btn wide" data-pay="${esc(o.id)}">Pay ${money(o.amount_due)}</button>` : ""}
+      ${o.status === "pending" && o.pay_issue ? `<div class="vbanner w" style="display:grid;gap:10px"><span><b>${o.pay_issue === "short" ? "Your payment was short" : "Payment not found"}</b></span>
+        <div class="row" style="gap:8px;flex-wrap:wrap">${o.pay_issue === "short" ? `<button class="btn" data-fixpay="${esc(o.id)}" data-mode="rest">Pay the rest</button>` : `<button class="btn" data-fixpay="${esc(o.id)}" data-mode="ref">Fix the reference</button><button class="ghost" data-fixpay="${esc(o.id)}" data-mode="again">Pay again</button>`}</div></div>` : ""}
       ${liveKids.filter(c => c.status === "pending").length ? `<p class="small muted">Added plate: payment being checked.</p>` : ""}
       ${savingLine(o)}
       ${canAddPlate(o) || shareablePool(o) ? `<div class="minebtns">${canAddPlate(o) ? `<button class="btn wide" data-addplate="${esc(o.id)}">${SV('<path d="M12 5v14M5 12h14"/>', 18)} Add a plate</button>` : ""}${shareablePool(o) ? `<button class="ghost sharebtn" data-share="${esc(o.site_id)},${esc(o.kitchen_id)}" aria-label="Share this pool">${SHARE}</button>` : ""}</div>` : ""}
@@ -2512,6 +2639,27 @@ function pastRow(o) {
       ${cancelled && /^The seller can't/.test(o.cancel_reason || "") && S.menus.some(m => m.id === o.kitchen_id) ? `<button class="linkbtn" data-reorder="${esc(o.kitchen_id)}" style="justify-self:start">Order the standard meal instead</button>` : ""}
       ${canOrderAgain(o) ? `<button class="linkbtn" data-again="${esc(o.id)}" style="justify-self:start">Order again</button>` : !cancelled && k.id ? `<button class="linkbtn" data-vendor="${esc(k.id)}" style="justify-self:start">Order again</button>` : ""}</span>
     <span class="oend">${end}</span></div>`;
+}
+// Payment we couldn't find, or short: fix the reference, or pay (again / the rest) and send the new reference
+function openFixPayment(o, mode) {
+  if (!o) return;
+  const owed = mode === "rest" ? Math.max(0, Number(o.amount_due) - Number(o.amount_received || 0)) : Number(o.amount_due);
+  const pm = (S.payMethods || []).find(x => x.is_main) || (S.payMethods || [])[0] || { network: S.settings.momo_network, number: S.settings.momo_number, name: S.settings.momo_name };
+  const me = meNow();
+  openSheet(`${sheetHead(mode === "ref" ? "Fix the payment reference" : mode === "rest" ? "Pay the rest" : "Pay again", "Code " + o.code + " · " + (menuOf(o.kitchen_id).public_name || ""))}
+    ${mode === "ref" ? `<p class="small">We couldn't find <strong class="num">${esc(o.momo_ref || "")}</strong> on our MoMo statement. Copy the transaction ID from your MoMo payment message and enter it below.</p>`
+      : `<div class="vbanner o" style="display:grid;gap:4px"><span>Send <b class="num">${money(owed)}</b> by MoMo to</span><b class="num" style="font-size:18px">${esc(pm.number || "")}</b><span class="small">${esc([pm.network, pm.name].filter(Boolean).join(" · "))}</span></div>`}
+    <form id="fxForm" class="stack" novalidate>
+      <div><label for="fxRef">${mode === "ref" ? "Correct transaction ID" : "Transaction ID of this payment"}</label><input id="fxRef" inputmode="text" autocomplete="off" placeholder="e.g. 5123456789"></div>
+      ${S.user ? "" : `<div><label for="fxPhone">Phone number on the order</label><input id="fxPhone" inputmode="tel" value="${esc(me.phone || "")}" placeholder="024 123 4567"></div>`}
+      <p class="small muted">We'll check it again. This needs to be done before orders close at ${fmtTime(S.settings.cutoff)}.</p>
+      <p class="err" id="fxErr"></p><button class="btn wide">Send for checking</button></form>`);
+  $("#fxForm").addEventListener("submit", async ev => {
+    ev.preventDefault(); const ref = $("#fxRef").value.trim(), ph = (S.user ? me.phone : $("#fxPhone").value) || "";
+    if (ref.replace(/\s/g, "").length < 6) return ($("#fxErr").textContent = "Enter the transaction ID from your MoMo payment message.");
+    try { await api.fixPayment(o.id, ph, ref); closeSheet(); toast("Thanks. We'll check the payment again."); refreshMine(); }
+    catch (e) { $("#fxErr").textContent = cleanErr(e); }
+  });
 }
 function dateHead(d) { const t = today(), tm = new Date(Date.parse(t + "T00:00:00Z") + 864e5).toISOString().slice(0, 10); return (d === t ? "Today · " : d === tm ? "Tomorrow · " : "") + fmtDate(d); }
 function renderOrders() {
@@ -2686,7 +2834,7 @@ async function openUpdates() {
   openSheet(`${sheetHead("Notifications", "")}
     ${local.get("cp_alerts") ? "" : `<div class="vbanner o" style="justify-content:space-between"><span>Alerts are off on this phone.</span><button class="btn" id="updOn" style="padding:8px 14px">Turn on</button></div>`}
     <div>${list.map(x => `<div class="nupd"><span class="dot${seen.has(x.id) ? " r" : ""}"></span><div><b>${esc(x.title)}</b><p>${esc(x.body || "")}</p><small>${esc(ago(x.at))}</small></div></div>`).join("") || `<p class="small muted" style="padding:12px 2px">Nothing new. Updates about your orders and your building show here.</p>`}</div>
-    <button class="ghost wide" id="updSet">Choose what you get</button>`);
+    <button class="ghost wide" id="updSet">Choose alerts</button>`);
   local.set("cp_seen_upd", list.map(x => x.id).concat([...seen]).slice(0, 80)); updateBellDot();
   $("#updSet").addEventListener("click", () => { closeSheet(); setTimeout(openNotifSettings, 350); });
   $("#updOn")?.addEventListener("click", async () => { closeSheet(); setTimeout(toggleAlerts, 350); });
@@ -2743,11 +2891,17 @@ function statusLine0(o) {
     if (o.refund_needed) return "The vendor didn't confirm in time. ChopPool will check your MoMo payment and refund it.";
     return "The vendor didn't confirm in time. Nothing was charged.";
   }
+  if (o.status === "cancelled" && o.cancel_reason === "Payment not received") {
+    if (Number(o.refund_due) > 0) return "We didn't receive the full payment before orders closed, so this order was cancelled. " + (o.has_account && !o.refund_needed ? money(o.refund_due) + " is back in your wallet." : "ChopPool will refund the " + money(o.refund_due) + " you sent to your MoMo.");
+    return "We didn't receive your payment before orders closed, so this order was cancelled.";
+  }
+  if (o.status === "pending" && o.pay_issue === "short") return "We received " + money(o.amount_received || 0) + ", so " + money(Math.max(0, Number(o.amount_due) - Number(o.amount_received || 0))) + " is still owed. Pay the rest before " + fmtTime(S.settings.cutoff) + " so your lunch counts.";
+  if (o.status === "pending" && o.pay_issue) return "We couldn't find a MoMo payment with reference " + (o.momo_ref || "") + ". Fix the reference or pay again before " + fmtTime(S.settings.cutoff) + ".";
   if (o.status === "cancelled") return (o.cancel_reason || "Cancelled") + ". " + (S.user ? "Any wallet payment is back in your wallet; MoMo payments are refunded by ChopPool." : "ChopPool will refund your MoMo payment.");
   if (o.status === "collected") return "Collected. Enjoy your lunch.";
   if (o.status === "quote_requested") return "Waiting for " + seller + " to price your special request.";
   if (o.status === "quoted") return seller + " priced your request at " + money(o.quote_price) + " a meal. Check the total and pay before " + fmtTime(S.settings.cutoff) + " to confirm.";
-  if (st === "waiting") return "Waiting for " + seller + " to confirm today. If they don't within " + S.settings.accept_timeout_min + " minutes, you get your money back.";
+  if (st === "waiting") return "Waiting for " + seller + " to confirm. If they don't " + confirmText(o.order_date) + ", you get your money back.";
   if (o.status === "pending" && st === "collecting") return "Payment being checked.";
   if (st === "collecting") return "Confirmed. Pool " + o.pool_seq + " closes at " + fmtTime(S.settings.cutoff) + ".";
   if (st === "accepted") return "The kitchen is cooking.";
@@ -2898,8 +3052,8 @@ function openOrder(menuId, opt = {}) {
     ${join ? `<p class="note">Your plate joins code <strong>${esc(join.code)}</strong>. You pay only for the plate and its service fee: delivery is already paid, and the final split counts every meal under your code.</p>` : ""}
     ${!join && k.added_by_customer ? `<p class="note">A local vendor added by a customer. ChopPool doesn't inspect their kitchen.</p>` : ""}
     ${!join && isLong(s, tripTo(k, site)) ? `<p class="note"><strong>Long-distance vendor:</strong> delivery is shared at cost (about ${money(tripTo(k, site))} for the trip). The more people join, the less each pays.</p>` : ""}
-    ${join || st.open ? "" : waitingHere ? `<p class="note"><strong>${esc(k.public_name)} hasn't confirmed yet.</strong> Join anyway: if they don't confirm within ${s.accept_timeout_min} minutes of the first order, everyone gets their money back.</p>`
-      : `<p class="note">You're first today. We'll ask ${esc(k.public_name)} to confirm within ${s.accept_timeout_min} minutes. Others here can join while you wait. If they don't confirm, you get your money back.</p>`}
+    ${join || st.open ? "" : waitingHere ? `<p class="note"><strong>${esc(k.public_name)} hasn't confirmed yet.</strong> Join anyway: if they don't confirm ${confirmText(S.date)}, everyone gets their money back.</p>`
+      : `<p class="note">You're first today. We'll ask ${esc(k.public_name)} to confirm ${confirmText(S.date)}. Others here can join while you wait. If they don't confirm, you get your money back.</p>`}
     <form id="orderForm" class="stack" novalidate>
       <div class="group"><p class="group-title">Choose your meal</p><div class="dishes">
         ${dishes.map((d, n) => `<label class="dish"><input type="radio" name="dish" value="${esc(d.id)}"${d === item ? " checked" : ""}><span class="tile" style="background:${tint(i0)}">${art(dishKind(d))}</span><span>${esc(d.name)}</span><span class="price num">${money(d.price)}</span></label>`).join("")}
@@ -2941,18 +3095,20 @@ function openOrder(menuId, opt = {}) {
     $("#saveTxt").classList.remove("hidden");
     const addT = (item.addons || []).filter(a => extras.has(a.name)).reduce((t, a) => t + Number(a.price), 0);
     // Full delivery at checkout: the lower of the max per meal and the whole trip by distance. What the pool saves comes back as cashback after the cut-off.
-    const dFee = join ? 0 : feeFor(1, s, tripTo(k, site)), sFee = Number(s.service_fee);
+    const tripN = tripNow(k, site), dFee = join ? 0 : feeFor(1, s, tripN), sFee = Number(s.service_fee);
     const total = (Number(item.price) + addT) * qty + dFee * qty + sFee * qty;
     const useW = $("#fWallet")?.checked ? Math.min(S.balance, total) : 0, due = total - useW;
     $("#sum").innerHTML = `<div><span>${qty} × ${esc(item.name)}</span><span class="num">${money(item.price * qty)}</span></div>` +
       (addT ? `<div><span>Extras</span><span class="num">${money(addT * qty)}</span></div>` : "") +
-      (join ? `<div><span>Delivery</span><span class="num">Already paid</span></div>` : `<div><span>Delivery, full price${qty > 1 ? " (" + money(dFee) + " a meal)" : ""}</span><span class="num">${money(dFee * qty)}</span></div>`) +
+      (join ? `<div><span>Delivery</span><span class="num">Already paid</span></div>` : tripN === 0 ? `<div><span>Delivery, by the vendor</span><span class="num">Free</span></div>` : `<div><span>Delivery, full price${qty > 1 ? " (" + money(dFee) + " a meal)" : ""}</span><span class="num">${money(dFee * qty)}</span></div>`) +
       `<div><span>Service fee${qty > 1 ? " (" + money(sFee) + " a meal)" : ""}</span><span class="num">${money(sFee * qty)}</span></div>` +
       (useW ? `<div><span>From wallet</span><span class="num">−${money(useW)}</span></div>` : "");
     $("#payPart").classList.toggle("hidden", due <= 0);
     $("#dueTxt").textContent = money(due);
-    $("#totTxt").textContent = money(due); $("#totSub").textContent = due <= 0 ? "Paid from your wallet" : "Pay by MoMo";
-    $("#submitBtn").textContent = join ? "Add to my order" : waitingHere ? "Join anyway" : st.open ? "Join the pool" : "Order and ask them to cook";
+    $("#totTxt").textContent = due <= 0 ? money(useW) : money(due);
+    $("#totSub").textContent = due <= 0 ? money(useW) + " from your wallet" : useW ? "Pay by MoMo, after " + money(useW) + " from your wallet" : "Pay by MoMo";
+    const startsPool = !join && !S.board.pools.some(p => p.site_id === S.siteId && p.kitchen_id === k.id && ["waiting", "collecting"].includes(p.status) && p.meals > 0);
+    $("#submitBtn").textContent = join ? "Add to pool" : startsPool ? "Create pool" : "Join pool";
   };
   drawExtras(); draw(); if (!join && !opt.fromPage) loadReviews(k);
   $("#orderForm").addEventListener("change", e => { if (e.target.name === "dish") { item = dishes.find(d => d.id === e.target.value); extras = new Set(); drawExtras(); } draw(); });
@@ -3014,7 +3170,7 @@ function showConfirmation(r, k, site, special) {
   const waiting = r.pool_status === "waiting", back = S.user ? "your money goes straight back to your wallet" : "you get your money back";
   const head = special ? "Request sent" : waiting ? (r.meals > r.myQty ? "You're in the pool" : "You've started a pool") : "You're in the pool";
   const body = special ? `${esc(k.public_name)} will price your request before ${fmtTime(s.special_cutoff)}. You'll see the price under Orders, then pay to confirm.`
-    : waiting ? `We've asked ${esc(k.public_name)} to confirm they're cooking. Share the pool now: every person who joins makes delivery cheaper. If they don't confirm within ${s.accept_timeout_min} minutes, ${back}.`
+    : waiting ? `We've asked ${esc(k.public_name)} to confirm they're cooking. Share the pool now: every person who joins makes delivery cheaper. If they don't confirm ${confirmText(S.date)}, ${back}.`
     : `${esc(collectLine(site))} ${r.meals} of ${s.max_meals} seats are taken and delivery is now ${money(fee)} a meal.`;
   openSheet(`
     <div class="top" style="justify-content:flex-end"><button class="closex" data-close aria-label="Close">${ICON.close}</button></div>
@@ -3129,8 +3285,10 @@ async function viewAdmin() {
         <div><label for="email">Email</label><input id="email" type="email" autocomplete="username" placeholder="Email address"></div>
         <div><label for="pw">Password</label><input id="pw" type="password" autocomplete="${mode === "signin" ? "current-password" : "new-password"}" placeholder="At least 6 characters"></div>
         <p class="err" id="loginErr"></p><button class="btn wide" id="loginBtn">${mode === "signin" ? "Sign in" : "Create account"}</button>
+        ${mode === "signin" ? `<button class="linkbtn" id="forgotT" style="justify-self:center">Forgot password?</button>` : ""}
         <p class="small center">${mode === "signin" ? "First time here?" : "Already have an account?"} <button class="linkbtn" id="swapMode">${mode === "signin" ? "Create an account" : "Sign in"}</button></p></section>`;
       $("#swapMode").addEventListener("click", () => { mode = mode === "signin" ? "signup" : "signin"; draw(); });
+      $("#forgotT")?.addEventListener("click", () => openForgot($("#email").value.trim()));
       $("#loginBtn").addEventListener("click", async () => {
         const email = $("#email").value.trim().toLowerCase(), pw = $("#pw").value;
         try { mode === "signin" ? await api.signIn(email, pw) : await api.signUp(email, pw, ($("#aname")?.value || "").trim()); viewAdmin(); } catch (e) { $("#loginErr").textContent = cleanErr(e); }
@@ -3292,7 +3450,7 @@ async function renderAdmin(cached) {
   adminMaps.forEach(m => { try { m.remove(); } catch (e) {} }); adminMaps = [];
   const K = id => A.kitchens.find(k => k.id === id) || {}, sName = id => (A.sites.find(x => x.id === id) || {}).name || "";
   const aTrip = p => { const k = K(p.kitchen_id), st = A.sites.find(x => x.id === p.site_id) || {}; return tripFor(hasPin(k) ? k : k.added_by_customer ? st : {}, st, s); };
-  const pending = A.sites.filter(x => x.status === "pending");
+  const pending = A.sites.filter(x => x.status === "pending" && !x.archived);
   const badge = document.querySelector('[data-atab="buildings"]'); if (badge) badge.textContent = "Buildings" + (pending.length ? " (" + pending.length + " new)" : "");
   const livePools = A.pools.filter(p => p.status !== "cancelled" && p.meals > 0);
   const listReq = A.kitchens.filter(k => k.listing_status === "pending"), riderApps = A.riders.filter(r => r.status === "pending");
@@ -3341,7 +3499,7 @@ async function renderAdmin(cached) {
   /* ---------- Dashboard ---------- */
   if (tab === "dash") {
     const live = A.orders.filter(o => o.status !== "cancelled"), meals = live.reduce((t, o) => t + o.qty, 0);
-    const waiting = livePools.filter(p => p.status === "waiting"), minsLeft = p => Math.max(0, s.accept_timeout_min - minsAgo(p.created_at));
+    const waiting = livePools.filter(p => p.status === "waiting"), minsLeft = p => waitLeftMin(p);
     const nearCut = new Date() > new Date(at(d, s.cutoff).getTime() - 60 * 6e4);
     const small = livePools.filter(p => p.status === "collecting" && p.meals < s.min_pool && nearCut);
     const acts = [
@@ -3373,7 +3531,7 @@ async function renderAdmin(cached) {
         </div></section>
       ${isSuper ? `<section class="stack" style="gap:10px"><h2>Money and customers <span class="small muted">(owner only)</span></h2>
         <div class="dash-grid">
-          ${tile("Food value", money(food), "today:orders")}${tile("ChopPool commission", money(food * Number(s.commission_rate || 0)), "", "", Math.round(Number(s.commission_rate || 0) * 100) + "% of food value")}
+          ${tile("Food value", money(food), "today:orders")}${tile("ChopPool vendor fee", money(A.pools.filter(p => p.status !== "cancelled").reduce((t, p) => { const os = A.orders.filter(o => o.pool_id === p.id && ["paid", "collected"].includes(o.status)), n = os.reduce((a, o) => a + o.qty, 0), fd = os.reduce((a, o) => a + (Number(o.quote_price ?? o.unit_price) + Number(o.addons_total || 0)) * o.qty, 0); return t + (n ? Number(p.fee_rate || 0) * fd * Math.max(0, n - Number(p.fee_free ?? 5)) / n : 0); }, 0)), "", "", Number(s.vendor_fee_rate) > 0 ? pct(s.vendor_fee_rate) + " after " + s.vendor_fee_free + " meals a pool" : "Off for now")}
           ${tile("Cashback for this day", cashback == null ? "After " + fmtTime(s.cutoff) : money(cashback), "today:wallets")}
           ${tile("Wallet balances owed", money(owed), "today:wallets", "", "Money customers hold with ChopPool")}
           <button class="dtile" data-go="team:accounts" id="dashAccts"><b class="num">…</b><span>Customer accounts</span></button>
@@ -3404,17 +3562,34 @@ async function renderAdmin(cached) {
           <div class="row" style="justify-content:flex-start;gap:8px;flex-wrap:wrap"><button class="ghost" data-act="ticket">Send ticket</button><button class="ghost" data-act="arrival">Arrival message</button>
             <select data-act="pool-status" aria-label="Set pool step" style="width:auto">${(p.status === "waiting" ? ["waiting"] : []).concat(STEPS).map(x => `<option value="${x}"${x === p.status ? " selected" : ""}>${STEP_LABEL[x]}</option>`).join("")}<option value="cancelled">Cancel pool</option></select></div></article>`; }).join("") || `<p class="card muted">No pools for this date yet.</p>`}</div>`;
     if (sub === "orders") {
-      const toCheck = live.filter(o => o.status === "pending").length;
-      body.innerHTML = `
-      <div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:8px"><h2>Orders for ${fmtDate(d)}</h2><button class="ghost" data-act="csv">Copy orders as CSV</button></div>
-      ${toCheck ? `<p class="note">${toCheck} MoMo payment${toCheck > 1 ? "s" : ""} to check. Find each reference on the MoMo statement, then set the order to <strong>paid</strong>.</p>` : ""}
-      <div class="table-wrap"><table><tr><th>Time</th><th>Name</th><th>MoMo no.</th><th>Building</th><th>Order</th><th>Extras and requests</th><th>Paid by</th><th>Code</th><th>Status</th></tr>
-      ${A.orders.map(o => { const p = A.pools.find(x => x.id === o.pool_id) || {}, k = K(o.kitchen_id);
+      // Payments to confirm first (with a dot), then everything else sorted the way you pick; newest first by default
+      const sortBy = (S.ls || {}).osort || "new", unpaid = S.unpaidPhones || {};
+      const toCheckL = A.orders.filter(o => o.status === "pending" && !o.pay_issue), issueL = A.orders.filter(o => o.status === "pending" && o.pay_issue);
+      const rest = A.orders.filter(o => !(o.status === "pending")).slice();
+      const cmp = { new: (a, b) => a.created_at < b.created_at ? 1 : -1, old: (a, b) => a.created_at < b.created_at ? -1 : 1,
+        status: (a, b) => ST.indexOf(a.status) - ST.indexOf(b.status) || (a.created_at < b.created_at ? 1 : -1),
+        building: (a, b) => sName(a.site_id).localeCompare(sName(b.site_id)) || (a.created_at < b.created_at ? 1 : -1),
+        vendor: (a, b) => String(K(a.kitchen_id).public_name || "").localeCompare(String(K(b.kitchen_id).public_name || "")) || (a.created_at < b.created_at ? 1 : -1) }[sortBy] || ((a, b) => a.created_at < b.created_at ? 1 : -1);
+      rest.sort(cmp); toCheckL.sort((a, b) => a.created_at < b.created_at ? -1 : 1);
+      const row = (o, flag) => { const p = A.pools.find(x => x.id === o.pool_id) || {}, k = K(o.kitchen_id);
         const extras = [addonText(o.addons), o.note ? "Note: " + o.note : "", o.special_request ? "Special: " + o.special_request + (o.quote_price ? " (" + money(o.quote_price) + ")" : " (not priced)") : ""].filter(Boolean).join(" · ");
         const paid = [o.wallet_used > 0 ? "Wallet " + money(o.wallet_used) : "", o.momo_ref ? "MoMo " + o.momo_ref : ""].filter(Boolean).join(" + ");
-        return `<tr><td class="num">${clock(o.created_at)}</td><td>${esc(o.customer_name)}</td><td class="num">${esc(o.phone)}</td><td>${esc(sName(o.site_id))}</td>
-          <td>${o.qty} × ${esc(o.item_name)}<br><span class="small muted">${esc(k.public_name || "")} Pool ${p.seq || ""}</span></td><td style="white-space:normal;min-width:180px">${esc(extras)}</td><td class="num">${esc(paid || "—")}</td><td class="num">${esc(o.code)}</td>
-          <td><select data-order="${esc(o.id)}" aria-label="Order status">${ST.map(x => `<option${x === o.status ? " selected" : ""}>${x}</option>`).join("")}</select></td></tr>`; }).join("") || `<tr><td colspan="9" class="muted">No orders yet.</td></tr>`}</table></div>`;
+        const due = Math.max(0, orderTotal(o) - Number(o.wallet_used || 0)), bad = unpaid[o.phone] || 0;
+        const payCell = o.status === "pending" ? `<div class="stack" style="gap:6px;min-width:190px"><span class="num">${esc(paid || "—")}<br><span class="small muted">Expect ${money(due)}</span></span>
+            ${o.pay_issue ? `<span class="chip warn">${o.pay_issue === "short" ? "Short: " + money(o.amount_received || 0) + " received" : "Not found"} · customer told</span>` : ""}
+            <div class="row" style="gap:6px;flex-wrap:wrap;justify-content:flex-start"><button class="btn" data-act="pay-found" style="padding:7px 12px">Payment found</button><button class="ghost" data-act="pay-issue" style="padding:7px 12px">Not found / short</button></div></div>` : `<span class="num">${esc(paid || "—")}</span>`;
+        return `<tr data-orow="${esc(o.id)}"><td class="num">${flag ? `<span class="pdotx" title="Payment to confirm"></span>` : ""}${clock(o.created_at)}</td><td>${esc(o.customer_name)}${bad ? `<br><span class="chip bad" title="Payments not received in the last 60 days">${bad} unpaid before</span>` : ""}</td><td class="num">${esc(o.phone)}</td><td>${esc(sName(o.site_id))}</td>
+          <td>${o.qty} × ${esc(o.item_name)}<br><span class="small muted">${esc(k.public_name || "")} Pool ${p.seq || ""}</span></td><td style="white-space:normal;min-width:180px">${esc(extras)}</td><td>${payCell}</td><td class="num">${esc(o.code)}</td>
+          <td><select data-order="${esc(o.id)}" aria-label="Order status">${ST.map(x => `<option${x === o.status ? " selected" : ""}>${x}</option>`).join("")}</select></td></tr>`; };
+      const head = `<tr><th>Time</th><th>Name</th><th>MoMo no.</th><th>Building</th><th>Order</th><th>Extras and requests</th><th>Paid by</th><th>Code</th><th>Status</th></tr>`;
+      body.innerHTML = `
+      <div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:8px"><h2>Orders for ${fmtDate(d)}</h2><div class="row" style="gap:8px"><label class="small muted" for="oSort" style="margin:0">Sort</label><select id="oSort" data-ls="osort" style="width:auto">${[["new", "Newest first"], ["old", "Oldest first"], ["status", "Status"], ["building", "Building"], ["vendor", "Vendor"]].map(([v2, l]) => `<option value="${v2}"${v2 === sortBy ? " selected" : ""}>${l}</option>`).join("")}</select><button class="ghost" data-act="csv">Copy as CSV</button></div></div>
+      ${toCheckL.length ? `<h3 class="row" style="gap:8px;justify-content:flex-start"><span class="pdotx"></span>Payments to confirm · ${toCheckL.length}</h3><p class="small muted">Find each reference on the MoMo statement. Found it: <strong>Payment found</strong>. Not there, or too little: <strong>Not found / short</strong>, and the customer is told how to fix it.</p>
+        <div class="table-wrap"><table>${head}${toCheckL.map(o => row(o, true)).join("")}</table></div>` : ""}
+      ${issueL.length ? `<h3>Waiting for the customer to fix · ${issueL.length}</h3><p class="small muted">Cancelled automatically at ${fmtTime(s.cutoff)} if nothing changes.</p><div class="table-wrap"><table>${head}${issueL.map(o => row(o, false)).join("")}</table></div>` : ""}
+      <h3>${toCheckL.length || issueL.length ? "All other orders" : "Orders"}</h3>
+      <div class="table-wrap"><table>${head}${rest.map(o => row(o, false)).join("") || `<tr><td colspan="9" class="muted">No other orders yet.</td></tr>`}</table></div>`;
+      if (!S.unpaidLoaded) { S.unpaidLoaded = true; api.unpaidPhones().then(m => { S.unpaidPhones = m; if (Object.keys(m).length) renderAdmin(true); }).catch(() => {}); }
     }
     if (sub === "wallets") {
       const refunds = A.orders.filter(o => o.refund_needed);
@@ -3483,6 +3658,7 @@ async function renderAdmin(cached) {
         <div class="row" style="justify-content:flex-start;gap:10px"><span class="small ${hasPin(k) ? "" : "muted"}">${hasPin(k) ? "Location pinned on the map" : "No map pin yet. Customers only see kitchens that have a pin."}</span><button class="ghost" data-act="kitchen-pin" style="padding:6px 12px">${hasPin(k) ? "Move pin" : "Set on map"}</button></div>
         <div class="inline" style="grid-template-columns:1fr 1fr .6fr auto"><div><label>WhatsApp</label><input data-f="whatsapp" inputmode="tel" value="${esc(k.whatsapp || "")}"></div>
           <div><label>Delivery</label><select data-f="delivery_mode"><option value="rider"${k.delivery_mode === "rider" ? " selected" : ""}>ChopPool rider</option><option value="runner"${k.delivery_mode === "runner" ? " selected" : ""}>Own runner</option></select></div>
+          <div><label>Free delivery by their runner within (m, 0 = off)</label><input data-f="free_m" inputmode="numeric" value="${esc(k.free_m || 0)}"></div>
           <div><label>Meals</label><input data-f="capacity" inputmode="numeric" value="${esc(k.capacity)}"></div>
           <label class="choice" style="padding:8px 10px"><input type="checkbox" data-f="active"${k.active ? " checked" : ""}><span>Active</span></label></div>
         <div class="group"><p class="group-title">Days they cook (pools open without the vendor confirming)</p>${autoPicker(k.auto_days)}
@@ -3497,12 +3673,15 @@ async function renderAdmin(cached) {
   /* ---------- Buildings ---------- */
   if (tab === "buildings") {
     const active = A.sites.filter(x => x.status !== "pending" && x.status !== "declined");
-    if (sub === "requests") body.innerHTML = pending.length ? `<h2>New building requests</h2>${pending.map(x => { const n = active.filter(hasPin).map(a => ({ a, d: hasPin(x) ? distM(x, a) : 1e12 })).sort((p, q) => p.d - q.d)[0];
-        return `<article class="card" data-site="${esc(x.id)}" style="border:2px solid var(--hint)"><div class="top" style="align-items:flex-start"><div><h3>${esc(x.name)}</h3><p class="small muted">Drop: ${esc(x.drop_point)}${x.request_note ? " · " + esc(x.request_note) : ""} · asked ${minsAgo(x.created_at) < 120 ? minsAgo(x.created_at) + " min ago" : fmtDate(String(x.created_at).slice(0, 10))}</p></div>${pill("Pending", "warn")}</div>
+    // Waitlist: how many people want each requested building; busiest first
+    const waitN = id => (A.waiters || []).filter(w => w.site_id === id).length;
+    const pendingW = pending.filter(x => !x.archived).slice().sort((a, b) => waitN(b.id) - waitN(a.id) || (a.created_at < b.created_at ? -1 : 1));
+    if (sub === "requests") body.innerHTML = pendingW.length ? `<h2>New building requests</h2><p class="small muted">Busiest first. Everyone waiting gets an alert when you approve.</p>${pendingW.map(x => { const n = active.filter(hasPin).map(a => ({ a, d: hasPin(x) ? distM(x, a) : 1e12 })).sort((p, q) => p.d - q.d)[0];
+        return `<article class="card" data-site="${esc(x.id)}" style="border:2px solid var(--hint)"><div class="top" style="align-items:flex-start"><div><h3>${esc(x.name)} <span class="chip ${waitN(x.id) > 1 ? "warn" : ""}">${Math.max(1, waitN(x.id))} ${Math.max(1, waitN(x.id)) === 1 ? "person" : "people"} waiting</span></h3><p class="small muted">Drop: ${esc(x.drop_point)}${x.request_note ? " · " + esc(x.request_note) : ""} · asked ${minsAgo(x.created_at) < 120 ? minsAgo(x.created_at) + " min ago" : fmtDate(String(x.created_at).slice(0, 10))}</p></div>${pill("Pending", "warn")}</div>
           ${n && n.d < 1e12 ? `<p class="small">${n.d <= 600 ? `<strong>Close to ${esc(n.a.name)} (${fmtDist(n.d)}).</strong> Consider declining and pointing them there so pools stay full.` : `Nearest ChopPool building: ${esc(n.a.name)}, ${fmtDist(n.d)} away.`}</p>` : ""}
           ${hasPin(x) ? `<a class="linkbtn" href="${osmLink(x)}" target="_blank" rel="noopener">See the pin on the map</a>` : ""}
           <div class="grid2"><div><label>Handoff</label><select data-f="handoff"><option value="meet_rider">Meet the rider</option><option value="host">Drop-point host</option></select></div><div><label>Host (if any)</label><input data-f="host_label" placeholder="the security guard at the gate"></div></div>
-          <div class="row" style="justify-content:flex-start;gap:8px"><button class="btn" data-act="site-approve">Approve</button><button class="ghost" data-act="site-decline">Decline</button></div></article>`; }).join("")}` : `<div class="note">No building requests waiting.</div>`;
+          <div class="row" style="justify-content:flex-start;gap:8px;flex-wrap:wrap"><button class="btn" data-act="site-approve">Approve</button><button class="ghost" data-act="site-decline">Decline</button><button class="ghost" data-act="site-merge">Merge into another building</button></div></article>`; }).join("")}` : `<div class="note">No building requests waiting.</div>`;
     const addForm = `
       <form class="card" data-form="site"><h2>Add a building</h2>
         <div class="grid2"><div><label for="nsName">Building name</label><input id="nsName" name="name" placeholder="Heritage Tower, Ridge"></div><div><label for="nsDrop">Drop point</label><input id="nsDrop" name="drop_point" placeholder="Lobby security desk"></div></div>
@@ -3520,7 +3699,7 @@ async function renderAdmin(cached) {
         <div class="grid2"><div><label>Name</label><input data-f="name" value="${esc(x.name)}"></div><div><label>Drop point</label><input data-f="drop_point" value="${esc(x.drop_point)}"></div></div>
         <div class="grid2"><div><label>Handoff</label><select data-f="handoff"><option value="host"${x.handoff === "host" ? " selected" : ""}>Drop-point host</option><option value="meet_rider"${x.handoff === "meet_rider" ? " selected" : ""}>Meet the rider</option></select></div><div><label>Host</label><input data-f="host_label" value="${esc(x.host_label || "")}"></div></div>
         <div class="row" style="justify-content:flex-start;gap:8px;flex-wrap:wrap"><label class="choice" style="padding:8px 10px"><input type="checkbox" data-f="active"${x.active ? " checked" : ""}><span>Live</span></label><button class="ghost" data-act="site-save">Save</button>
-          ${x.handoff === "host" ? `<button class="ghost" data-act="host-copy">Copy host link</button>` : ""}<button class="ghost" data-act="site-remove" style="color:var(--danger)">Remove</button>${hasPin(x) ? `<a class="linkbtn" href="${osmLink(x)}" target="_blank" rel="noopener">Map</a>` : ""}</div>
+          ${x.handoff === "host" ? `<button class="ghost" data-act="host-copy">Copy host link</button>` : ""}<button class="ghost" data-act="site-merge">Merge into…</button><button class="ghost" data-act="site-remove" style="color:var(--danger)">Remove</button>${hasPin(x) ? `<a class="linkbtn" href="${osmLink(x)}" target="_blank" rel="noopener">Map</a>` : ""}</div>
         </div></details>`; }).join("") || `<p class="muted">No buildings match.</p>`}</div>`;
       makeMap($("#adminMap"), ACCRA, 11).then(m => {
         adminMaps.push(m); const L = window.L, pts = [];
@@ -3554,7 +3733,20 @@ async function renderAdmin(cached) {
           <div><label for="pfCapKm">Cap applies up to (km by road)</label><input id="pfCapKm" name="cap_km" inputmode="decimal" value="${esc(s.cap_km ?? "")}"></div></div>
         <p class="small muted">Trips up to ${esc(s.cap_km ?? "the set")} km: nobody pays more than the cap per meal for delivery. Longer trips (long-distance vendors) are shared at cost, with no cap. Leave the km box empty to cap every trip. Changes only affect new orders.</p>
         ${s.base_fare != null ? `<p class="small" style="color:var(--hint)">Examples: 2 km trip ${money(ex(2))} · 5 km ${money(ex(5))} · 10 km ${money(ex(10))}</p>` : ""}
-        <p class="err" data-err></p><button class="btn">Save pricing</button></form>`; }
+        <p class="err" data-err></p><button class="btn">Save pricing</button></form>
+      <form class="card" data-form="rules"><h2>Vendors near you and free delivery</h2>
+        <div class="grid2"><div><label for="rlNear">"Vendors near you": delivery up to (GHS)</label><input id="rlNear" name="near_max_fee" inputmode="decimal" value="${esc(s.near_max_fee ?? 50)}"></div>
+          <div><label for="rlFree">Vendors may deliver free up to (km by road)</label><input id="rlFree" name="free_max_km" inputmode="decimal" value="${esc((Number(s.free_max_m ?? 1500) / 1000))}"></div></div>
+        <p class="small muted">Vendors with a higher delivery cost still show on the Vendors tab under "Further away". Each vendor picks their own free-delivery distance on their page, up to this limit.</p>
+        <h2 style="margin-top:8px">Timing</h2>
+        <div class="grid2"><div><label for="rlBy">Orders for a later day: vendor confirms by</label><input id="rlBy" name="next_day_confirm_by" type="time" value="${esc(String(s.next_day_confirm_by || "08:30").slice(0, 5))}"></div>
+          <div><label for="rlCd">Home countdown starts at</label><input id="rlCd" name="countdown_start" type="time" value="${esc(String(s.countdown_start || "06:00").slice(0, 5))}"></div></div>
+        <p class="small muted">Same-day pools still give vendors ${esc(s.accept_timeout_min)} minutes. Before the countdown starts, Home shows "Tomorrow ${fmtTime(s.cutoff)}" instead.</p>
+        ${isSuper ? `<h2 style="margin-top:8px">ChopPool fee on bigger pools <span class="small muted">(owner only)</span></h2>
+        <div class="grid2"><div><label for="rlRate">Fee on each meal after the free ones (%)</label><input id="rlRate" name="vendor_fee_pct" inputmode="decimal" value="${esc(Math.round(Number(s.vendor_fee_rate || 0) * 1000) / 10)}"></div>
+          <div><label for="rlFreeN">Free meals in every pool</label><input id="rlFreeN" name="vendor_fee_free" inputmode="numeric" value="${esc(s.vendor_fee_free ?? 5)}"></div></div>
+        <p class="small muted">0% switches it off. Vendors see new terms before they confirm their next pool; pools they've already confirmed keep the old terms.</p>` : ""}
+        <p class="err" data-err></p><button class="btn">Save</button></form>`; }
     if (sub === "apply") body.innerHTML = riderApps.length ? `<div class="stack" style="gap:10px">${riderApps.map(r => `<article class="card" data-rider="${esc(r.id)}"><div class="top" style="align-items:flex-start"><div><h3>${esc(r.name)}</h3><p class="small muted">${esc(added(r))}</p></div>${pill("Applied", "warn")}</div>
         <div class="grid2 small"><p><strong>Phone:</strong> <span class="num">${esc(r.phone || "")}</span></p><p><strong>MoMo:</strong> <span class="num">${esc(r.momo || "—")}</span></p><p><strong>Motorbike:</strong> ${esc(r.bike || "—")}</p><p><strong>Area:</strong> ${esc(r.area || "—")}</p></div>
         <p class="small muted">Call them, check their licence and bike papers, then approve.</p>
@@ -3595,7 +3787,7 @@ async function renderAdmin(cached) {
         <p class="small muted">They then open ${esc(baseUrl())}/#admin, choose "Create an account" with this email, and sign in.</p><p class="err" data-err></p><button class="btn">Add to team</button></form>` : `<p class="note">Only the owner can add or remove team members.</p>`}
       <div class="table-wrap"><table><tr><th>Email</th><th>Role</th><th></th></tr>${team.map(t => `<tr data-member="${esc(t.email)}"><td>${esc(t.email)}${t.email === me ? ' <span class="muted small">(you)</span>' : ""}</td>
         <td>${isSuper && t.email !== me ? `<select data-act="team-role"><option value="coordinator"${t.role === "coordinator" ? " selected" : ""}>Coordinator</option><option value="super"${t.role === "super" ? " selected" : ""}>Owner</option></select>` : (t.role === "super" ? "Owner" : "Coordinator")}</td>
-        <td>${isSuper && t.email !== me ? `<button class="ghost" data-act="team-remove">Remove</button>` : ""}</td></tr>`).join("")}</table></div>`;
+        <td>${isSuper && t.email !== me ? `<div class="row" style="gap:8px;flex-wrap:nowrap"><button class="ghost" data-act="team-reset">Send password reset</button><button class="ghost" data-act="team-remove">Remove</button></div>` : ""}</td></tr>`).join("")}</table></div>`;
     if (sub === "payments" && isSuper) {
       const pm = (A.payment_methods || []).slice().sort((a, b) => (b.is_main - a.is_main) || (a.sort || 0) - (b.sort || 0));
       body.innerHTML = `
@@ -3711,7 +3903,7 @@ async function adminClick(e) {
       if (w && !/^0\d{9}$/.test(w)) return toast("Enter a 10-digit WhatsApp number starting with 0.");
       if ((fval(kc, "name") || "").length < 2 || (fval(kc, "public_name") || "").length < 2) return toast("Add both the real name and the menu name.");
       return run(() => api.updateKitchen(k.id, { name: fval(kc, "name"), public_name: fval(kc, "public_name"), tagline: fval(kc, "tagline") || null, address: fval(kc, "address") || null,
-        whatsapp: w || null, delivery_mode: fval(kc, "delivery_mode"), capacity: Number(fval(kc, "capacity")) || k.capacity, active: fval(kc, "active"),
+        whatsapp: w || null, delivery_mode: fval(kc, "delivery_mode"), capacity: Number(fval(kc, "capacity")) || k.capacity, active: fval(kc, "active"), free_m: Number(fval(kc, "free_m")) > 0 ? Math.min(Math.round(Number(fval(kc, "free_m"))), Number(S.settings.free_max_m || 1500)) : null,
         ...(kc.querySelector("[data-autopick]") ? { auto_days: pickedDays(kc.querySelector("[data-autopick]")) } : {}) }).then(async () => Object.assign(S, await api.load())), "Saved");
     }
     if (act === "kitchen-pin") return openPinSheet("Where is " + k.name + "?", hasPin(k) ? k : null, pin => run(() => api.updateKitchen(k.id, { lat: pin.lat, lng: pin.lng }).then(async () => Object.assign(S, await api.load())), "Location saved"));
@@ -3729,6 +3921,14 @@ async function adminClick(e) {
     const x = A.sites.find(y => y.id === sc.dataset.site);
     if (act === "site-approve") return run(() => api.updateSite(x.id, { status: "active", handoff: fval(sc, "handoff"), host_label: fval(sc, "host_label") || null }), x.name + " is now live");
     if (act === "site-decline") return run(() => api.updateSite(x.id, { status: "declined", active: false }), "Request declined");
+    if (act === "site-merge") {
+      const others = A.sites.filter(y => y.id !== x.id && !y.archived && y.status !== "declined").map(y => ({ y, d: hasPin(x) && hasPin(y) ? distM(x, y) : 1e12 })).sort((a, b) => a.d - b.d);
+      openSheet(`${sheetHead("Merge " + x.name, "Its orders, pools, vendors and waitlist move to the building you pick. This can't be undone.")}
+        <div><label for="mgInto">Merge into</label><select id="mgInto">${others.map(({ y, d: dd }) => `<option value="${esc(y.id)}">${esc(y.name)}${dd < 1e12 ? " · " + fmtDist(dd) : ""}${y.status === "pending" ? " (requested)" : ""}</option>`).join("")}</select></div>
+        <p class="err" id="mgErr"></p><button class="btn wide" id="mgGo">Merge</button>`);
+      $("#mgGo").addEventListener("click", async () => { try { const msg = await api.mergeSites(x.id, $("#mgInto").value); closeSheet(); toast(msg || "Merged"); renderAdmin(); } catch (err) { $("#mgErr").textContent = cleanErr(err); } });
+      return;
+    }
     if (act === "site-save") return run(() => api.updateSite(x.id, { name: fval(sc, "name"), drop_point: fval(sc, "drop_point"), handoff: fval(sc, "handoff"), host_label: fval(sc, "host_label") || null, active: fval(sc, "active") }), "Building saved");
     if (act === "host-copy") return copy(baseUrl() + "/#host-" + x.host_token, "Host link copied");
     if (act === "site-remove") return confirmRemove("Remove " + x.name + "?", "Customers will no longer be able to deliver here, and sellers added only for this building are removed too. Past orders stay in your records.", () => api.removeSite(x.id));
@@ -3743,6 +3943,21 @@ async function adminClick(e) {
   }
   const mr = t.closest("[data-member]");
   if (mr && act === "team-remove") return run(() => api.removeTeam(mr.dataset.member), "Removed from the team");
+  const orow = e.target.closest("[data-orow]");
+  if (orow && act === "pay-found") return run(() => api.setPayIssue(orow.dataset.orow, "found").then(() => notifyServer({ order_id: orow.dataset.orow })), "Marked paid");
+  if (orow && act === "pay-issue") { const id = orow.dataset.orow, o = S.admin.orders.find(x => x.id === id), due = Math.max(0, orderTotal(o) - Number(o.wallet_used || 0));
+    openSheet(`${sheetHead("Payment problem", o.customer_name + " · code " + o.code + " · expected " + money(due))}
+      <div class="stack"><label class="choice"><input type="radio" name="pi" value="not_found" checked> No payment with reference ${esc(o.momo_ref || "")}</label>
+        <label class="choice"><input type="radio" name="pi" value="short"> Amount is short</label>
+        <div id="piAmtBox" class="hidden"><label for="piAmt">Amount received (GHS)</label><input id="piAmt" inputmode="decimal"></div>
+        <p class="small muted">The customer is told straight away and can fix it until ${fmtTime(S.settings.cutoff)}. After that the order is cancelled and anything received is refunded.</p>
+        <p class="err" id="piErr"></p><button class="btn wide" id="piGo">Tell the customer</button></div>`);
+    $("#sheet").querySelectorAll("[name=pi]").forEach(r => r.addEventListener("change", () => $("#piAmtBox")?.classList.toggle("hidden", $("#sheet").querySelector("[name=pi]:checked")?.value !== "short")));
+    $("#piGo").addEventListener("click", async () => { const kind = $("#sheet").querySelector("[name=pi]:checked").value, amt = Number($("#piAmt").value);
+      if (kind === "short" && !(amt > 0 && amt < due)) return ($("#piErr").textContent = "Enter the amount that arrived (less than " + money(due) + ").");
+      try { await api.setPayIssue(id, kind, amt); notifyServer({ order_id: id }); closeSheet(); toast("Customer told"); renderAdmin(); } catch (err) { $("#piErr").textContent = cleanErr(err); } });
+    return; }
+  if (mr && act === "team-reset") { try { await api.sendReset(mr.dataset.member); toast("Reset link sent to " + mr.dataset.member + ". It works once they've created their account."); } catch (err) { toast(cleanErr(err)); } return; }
 }
 async function adminChange(e) {
   const t = e.target;
@@ -3777,6 +3992,17 @@ async function adminSubmit(e) {
       const ck = v("cap_km"); if (ck !== "" && (!isFinite(Number(ck)) || Number(ck) <= 0)) return fail("Enter the cap distance in km, or leave it empty.");
       vals.push(["cap_km", ck === "" ? null : Number(ck)]);
       await api.updateSettings(Object.fromEntries(vals)); Object.assign(S, await api.load()); toast("Pricing saved");
+    }
+    if (f.dataset.form === "rules") {
+      const near = Number(v("near_max_fee")), fkm = Number(v("free_max_km")), by = v("next_day_confirm_by"), cd = v("countdown_start");
+      if (!(near > 0) || !(fkm >= 0) || fkm > 10) return fail("Enter a delivery limit above 0 and a free-delivery distance up to 10 km.");
+      if (!/^\d{2}:\d{2}$/.test(by) || !/^\d{2}:\d{2}$/.test(cd)) return fail("Enter both times.");
+      if (hm(by) >= hm(S.settings.cutoff)) return fail("The confirm-by time must be before orders close at " + fmtTime(S.settings.cutoff) + ".");
+      const patch = { near_max_fee: near, free_max_m: Math.round(fkm * 1000), next_day_confirm_by: by, countdown_start: cd };
+      if (f.querySelector("[name=vendor_fee_pct]")) { const pc = Number(v("vendor_fee_pct")), fr = Number(v("vendor_fee_free"));
+        if (!(pc >= 0 && pc <= 50) || !(Number.isInteger(fr) && fr >= 0 && fr <= 100)) return fail("Enter a fee between 0 and 50% and a whole number of free meals.");
+        patch.vendor_fee_rate = Math.round(pc * 10) / 1000; patch.vendor_fee_free = fr; }
+      await api.updateSettings(patch); Object.assign(S, await api.load()); toast("Saved");
     }
     if (f.dataset.form === "credit") {
       const amt = Number(v("amt")); if (!v("user") || !amt || v("why").length < 3) return fail("Pick a customer, an amount and a reason.");
@@ -3828,7 +4054,7 @@ function reportHtml(R, isSuper) {
   const flag = v => v.expired >= 2 || (v.on_time != null && v.on_time < 70) ? pill("Unreliable", "bad") : v.always_cooking ? pill("Set cooking days", "ok") : "";
   return `<div class="stack" style="gap:14px"><p class="small muted">${fmtDate(R.week_start)}–${fmtDate(R.week_end)}, compared with the week before.</p>
     <div class="dash-grid">${tile("Meals", "meals")}${tile("Orders", "orders")}${tile("Active customers", "customers")}${tile("New customers", "new_customers")}${tile("Repeat rate", "repeat_rate", true)}${tile("Average meals per pool", "avg_meals")}${tile("Pools that filled", "filled")}${tile("Cancelled orders", "cancelled")}</div>
-    ${isSuper && M ? `<section class="stack" style="gap:10px"><h3>Money <span class="small muted">(owner only)</span></h3><div class="dash-grid">${[["Food value", M.food], ["ChopPool commission", M.commission], ["Service fees", M.service_fees], ["Cashback paid", M.cashback], ["Wallet refunds", M.refunds], ["Wallet balances owed", M.wallets_owed]].map(([l, v]) => `<div class="dtile"><b class="num" style="font-size:18px;white-space:nowrap">${money(v || 0)}</b><span>${esc(l)}</span></div>`).join("")}<div class="dtile"><b class="num">${M.momo_refunds || 0}</b><span>MoMo refunds to send</span></div></div></section>` : ""}
+    ${isSuper && M ? `<section class="stack" style="gap:10px"><h3>Money <span class="small muted">(owner only)</span></h3><div class="dash-grid">${[["Food value", M.food], ["ChopPool vendor fee", M.commission], ["Service fees", M.service_fees], ["Cashback paid", M.cashback], ["Wallet refunds", M.refunds], ["Wallet balances owed", M.wallets_owed]].map(([l, v]) => `<div class="dtile"><b class="num" style="font-size:18px;white-space:nowrap">${money(v || 0)}</b><span>${esc(l)}</span></div>`).join("")}<div class="dtile"><b class="num">${M.momo_refunds || 0}</b><span>MoMo refunds to send</span></div></div></section>` : ""}
     ${table("Top buildings", [["Building", r => esc(r.name)], ["Meals", r => trend(r.meals, r.prev_meals)], ["Pools", r => r.pools], ["Avg pool", r => r.avg_pool ?? "—"]], R.buildings || [], "No orders this week.")}
     ${(R.quiet || []).length ? table("Went quiet", [["Building", r => esc(r.name)], ["Meals last week", r => r.prev_meals]], R.quiet, "") : ""}
     ${table("Top customers", [["Name", r => esc(r.name)], ["Building", r => esc(r.building || "")], ...(isSuper ? [["Phone", r => esc(r.phone || "")]] : []), ["Orders", r => r.orders], ["Meals", r => r.meals]], R.customers || [], "No customers this week.")}
@@ -3890,22 +4116,27 @@ async function viewKitchen(token) {
       ${k.open ? `<p><span class="chip ok">You're taking orders for ${dayLabel(d)}</span></p>`
         : k.paused ? `<section class="card"><h2>You're not cooking ${dayLabel(d)}</h2><p class="small muted">Customers can't order from you for ${fmtDate(d)}.</p><button class="ghost wide" id="unpause">I'm cooking ${dayLabel(d)} after all</button></section>`
         : `<section class="card" style="border-color:var(--accent)"><h2>${waiting.length ? "Customers are waiting for you" : "Are you cooking " + dayLabel(d) + "?"}</h2>
-          <p>${waiting.length ? waiting.map(p => esc(p.site)).join(", ") + " want" + (waiting.length > 1 ? "" : "s") + " to order. Confirm within " + S.settings.accept_timeout_min + " minutes so the pool can open." : "Confirm so people can start ordering from you."}</p>
-          <button class="btn wide" id="openDay">Yes, I'm cooking ${dayLabel(d)}</button></section>`}
+          <p>${waiting.length ? waiting.map(p => esc(p.site)).join(", ") + " want" + (waiting.length > 1 ? "" : "s") + " to order. Confirm " + (d > today() ? "by " + fmtTime(confirmBy()) + " " + (dayLabel(d) === "tomorrow" ? "tomorrow" : fmtDate(d)) : "within " + S.settings.accept_timeout_min + " minutes") + " so the pool can open." : "Confirm so people can start ordering from you."}</p>
+          ${termsNeed(k) ? termsBox(k, K.menu) : ""}
+          ${termsNeed(k) ? `<button class="btn wide" id="acceptTerms">Accept terms and confirm I'm cooking ${dayLabel(d)}</button>` : `${Number(k.fee_rate) > 0 ? `<p class="small muted">${esc(termsLine(k))}</p>` : ""}<button class="btn wide" id="openDay">Yes, I'm cooking ${dayLabel(d)}</button>`}</section>`}
+      ${termsNeed(k) && (k.open || k.paused) ? `<section class="card stack">${termsBox(k, K.menu)}<button class="btn wide" id="acceptTermsOnly">Accept the new terms</button></section>` : ""}
       ${autoCard(k, d)}
+      ${freeCard(k)}
       ${K.pools.map(p => {
         const tally = {}; p.orders.filter(o => !o.special_request || o.status !== "quote_requested").forEach(o => { const key = o.item_name + (o.addons?.length ? " (" + addonText(o.addons) + ")" : "") + (o.special_request ? " · Special: " + o.special_request : ""); tally[key] = (tally[key] || 0) + o.qty; });
         const n = p.orders.reduce((a, o) => a + o.qty, 0), quotes = p.orders.filter(o => ["quote_requested", "quoted"].includes(o.status));
         const btns = p.status === "waiting" ? "" : p.status === "collecting" ? (afterCut ? `<button class="btn wide" data-k="accepted" data-pool="${esc(p.id)}">Confirm final batch</button>` : `<p class="small muted">Orders close at ${fmtTime(S.settings.cutoff)}. Then confirm the final batch.</p>`)
           : p.status === "accepted" ? `<button class="btn wide" data-k="ready" data-pool="${esc(p.id)}">Mark packed</button>`
-          : k.delivery_mode === "runner" && p.status === "ready" ? `<button class="btn wide" data-k="picked_up" data-pool="${esc(p.id)}">Runner has picked up</button>`
-          : k.delivery_mode === "runner" && p.status === "picked_up" ? `<button class="btn wide" data-k="arriving" data-pool="${esc(p.id)}">5 minutes away</button>`
-          : k.delivery_mode === "runner" && p.status === "arriving" ? `<button class="btn wide" data-k="delivered" data-pool="${esc(p.id)}">Arrived</button>`
+          : (k.delivery_mode === "runner" || p.free) && p.status === "ready" ? `<button class="btn wide" data-k="picked_up" data-pool="${esc(p.id)}">Runner has picked up</button>`
+          : (k.delivery_mode === "runner" || p.free) && p.status === "picked_up" ? `<button class="btn wide" data-k="arriving" data-pool="${esc(p.id)}">5 minutes away</button>`
+          : (k.delivery_mode === "runner" || p.free) && p.status === "arriving" ? `<button class="btn wide" data-k="delivered" data-pool="${esc(p.id)}">Arrived</button>`
           : `<p><span class="chip ok">${STEP_LABEL[p.status]}</span></p>`;
-        const runnerHand = k.delivery_mode === "runner" && ["arriving", "delivered"].includes(p.status)
+        const runnerHand = (k.delivery_mode === "runner" || p.free) && ["arriving", "delivered"].includes(p.status)
           ? (p.handoff === "host" ? `<p>Hand the bag to <strong>${esc(p.host_label || p.drop_point)}</strong>.</p>` : `<p>At <strong>${esc(p.drop_point)}</strong>, hand each meal over against its code.</p>${codeBox("rc-" + p.id)}`) : "";
+        const food = p.orders.filter(o => o.paid).reduce((t, o) => t + (Number(o.quote_price ?? o.unit_price) + Number(o.addons_total || 0)) * o.qty, 0);
         return `<article class="card"><div class="top"><h2>${esc(p.site)} · Pool ${p.seq}</h2><span class="chip">${n} meals</span></div>${stepsHtml(p.status)}
-          <p class="small muted">One sealed bag for ${esc(p.drop_point)}</p>
+          <p class="small muted">One sealed bag for ${esc(p.drop_point)}${p.free ? ` · <strong style="color:var(--ok)">free delivery: your runner takes it</strong>` : ""}</p>
+          ${food > 0 ? `<div class="sumgrid small"><span>Food paid for</span><b class="num">${money(food)}</b>${Number(p.fee) > 0 ? `<span>ChopPool fee (${Math.round(Number(p.fee_rate) * 1000) / 10}% after ${p.fee_free} meals)</span><b class="num">−${money(p.fee)}</b>` : ""}<span>Due to you</span><b class="num">${money(food - Number(p.fee || 0))}</b></div>` : ""}
           ${Object.keys(tally).length ? `<ul style="margin:0;padding-left:20px">${Object.entries(tally).map(([nm, q]) => `<li class="num"><strong>${q} ×</strong> ${esc(nm)}</li>`).join("")}</ul>` : ""}
           ${quotes.map(o => `<form class="quote" data-quote="${esc(o.id)}"><p><strong>Special request, code ${esc(o.code)}</strong>${o.status === "quoted" ? ` <span class="chip warn">Priced ${money(o.quote_price)}, waiting for payment</span>` : ""}</p>
             <div class="stack small" style="gap:2px"><span><strong>${o.qty} × ${esc(o.item_name)}</strong>${o.unit_price != null ? ` <span class="muted">(menu price ${money(o.unit_price)})</span>` : ""}</span>
@@ -3928,6 +4159,9 @@ async function viewKitchen(token) {
     let autoT = null; $("#autoDays")?.addEventListener("autochange", e => { const days = pickedDays(e.target.closest("[data-autopick]")); clearTimeout(autoT); autoT = setTimeout(() => saveAuto(days), 700); });
     $("#pauseDay")?.addEventListener("click", async () => { try { await api.kitchenPause(token, d, true); toast("Paused. Customers can't order from you for " + fmtDate(d) + "."); draw(); } catch (e) { toast(cleanErr(e)); } });
     $("#unpause")?.addEventListener("click", async () => { try { await api.kitchenPause(token, d, false); if (!(k.auto_days || []).includes(isoDow(d))) await api.kitchenOpenDay(token, d); notifyServer({ kitchen_token: token, date: d }); toast("You're taking orders for " + dayLabel(d) + "."); draw(); } catch (e) { toast(cleanErr(e)); } });
+    $("#acceptTerms")?.addEventListener("click", async () => { try { await api.kitchenAcceptTerms(token); await api.kitchenOpenDay(token, d); notifyServer({ kitchen_token: token, date: d }); toast("Terms accepted. Customers can now order from you for " + dayLabel(d) + "."); draw(); } catch (e) { toast(cleanErr(e)); } });
+    $("#acceptTermsOnly")?.addEventListener("click", async () => { try { await api.kitchenAcceptTerms(token); toast("Terms accepted"); draw(); } catch (e) { toast(cleanErr(e)); } });
+    $("#freeForm")?.addEventListener("change", async () => { try { await api.vendorSetFree(token, Number($("#freeM").value), Number($("#freeMin").value)); toast(Number($("#freeM").value) > 0 ? "Free delivery saved" : "Free delivery is off"); draw(); } catch (e) { toast(cleanErr(e)); draw(); } });
     $("#openDay")?.addEventListener("click", async () => { try { await api.kitchenOpenDay(token, d); notifyServer({ kitchen_token: token, date: d }); toast("Thank you. Customers can now order from you for " + dayLabel(d) + "."); draw(); } catch (e) { toast(cleanErr(e)); } });
     document.querySelectorAll(".photogrid").forEach(g => g.setAttribute("data-medit", "vendor:" + token));
   };
@@ -3988,6 +4222,27 @@ document.addEventListener("change", e => {
   syncPicker(root); root.dispatchEvent(new CustomEvent("autochange", { bubbles: true }));
 });
 const daysText = list => { const l = [...list].sort(); if (l.join() === "1,2,3,4,5") return "Mon–Fri"; if (l.join() === "1,2,3,4,5,6,7") return "every day"; return l.map(n => DOW[n - 1][1]).join(", "); };
+// ChopPool fee terms for vendors: the first N meals in each pool are free, then X% of each meal
+const pct = r => Math.round(Number(r) * 1000) / 10 + "%";
+const termsNeed = k => Number(k.fee_rate) > Number(k.fee_ack || 0) || Number(k.fee_free) < Number(k.fee_free_ack ?? 5);
+const termsLine = k => "ChopPool fee: the first " + k.fee_free + " meals in each pool are free, then " + pct(k.fee_rate) + " of each meal.";
+function termsBox(k, menu) {
+  const ex = (menu || []).slice().sort((a, b) => b.price - a.price).slice(0, 4);
+  return `<div class="vbanner o" style="display:grid;gap:8px"><span><b>${Number(k.fee_ack) > 0 || Number(k.fee_free_ack ?? 5) !== 5 ? "New ChopPool fee terms" : "ChopPool fee terms"}</b></span>
+    <span>The first <b>${k.fee_free} meals</b> in every pool are free. After that, ChopPool takes <b>${pct(k.fee_rate)}</b> of each meal (food and paid extras, not delivery). It's taken off before you're paid.</span>
+    ${ex.length ? `<span class="small">${ex.map(i => esc(i.name) + " " + money(i.price) + " → " + money(Math.round(i.price * k.fee_rate * 100) / 100) + " a meal after the " + ordinal(k.fee_free)).join("<br>")}</span>` : ""}
+    <span class="small">Pools you've already confirmed keep the terms they started with.</span></div>`;
+}
+const ordinal = n => n + (n % 100 >= 11 && n % 100 <= 13 ? "th" : ({ 1: "st", 2: "nd", 3: "rd" })[n % 10] || "th");
+// Free delivery by the vendor's own runner, up to a distance the vendor picks (the admin sets the furthest allowed)
+function freeCard(k) {
+  if (!k.has_pin) return "";
+  const max = Number(k.free_max_m || 1500), opts = [0, 300, 500, 800, 1000, 1500, 2000, 3000].filter(m => m <= max), cur = Number(k.free_m || 0);
+  return `<section class="card stack" style="gap:10px"><div style="display:grid;gap:2px"><strong>Free delivery by you</strong><span class="small muted">If your runner can bring food to buildings close by, offer free delivery to them. No ChopPool rider is sent; your runner hands each meal over against its code.</span></div>
+    <form id="freeForm" class="grid2" onsubmit="return false"><div><label for="freeM">Deliver free within</label><select id="freeM">${opts.map(m => `<option value="${m}"${m === cur ? " selected" : ""}>${m ? (m < 1000 ? m + " m" : m / 1000 + " km") + " by road" : "Off"}</option>`).join("")}${cur && !opts.includes(cur) ? `<option value="${cur}" selected>${cur} m</option>` : ""}</select></div>
+      <div><label for="freeMin">From</label><select id="freeMin">${[0, 2, 3, 4, 5, 6, 8, 10].map(n => `<option value="${n}"${n === Number(k.free_min || 0) ? " selected" : ""}>${n ? n + " meals in the pool" : "any order"}</option>`).join("")}</select></div></form>
+    ${cur ? `<p class="small muted">Buildings further away, or pools under ${k.free_min || 1} meal${(k.free_min || 1) > 1 ? "s" : ""}, use a ChopPool rider as usual.</p>` : ""}</section>`;
+}
 function autoCard(k, d) {
   const today_ = (k.auto_days || []).includes(isoDow(d));
   return `<section class="card stack" style="gap:10px"><div style="display:grid;gap:2px"><strong>Days I cook</strong><span class="small muted">Tick the days you cook. On those days pools open straight away, with no need to confirm each morning.</span></div>
@@ -4156,8 +4411,10 @@ function openListingForm(token, k) {
 function splash() {
   // Installed app: every time it opens. Website: the first visit only, so shared links open fast.
   const app = isStandalone(), key = app ? "cp_splash_s" : "cp_splash_v";
-  try { if (app ? sessionStorage.getItem(key) : localStorage.getItem(key)) return; (app ? sessionStorage : localStorage).setItem(key, "1"); } catch (e) {}
-  const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  // A quiet update reload in the middle of the intro: carry on from the final frame instead of replaying it
+  let cont = false; try { cont = sessionStorage.getItem("cp_sp_cont") === "1"; sessionStorage.removeItem("cp_sp_cont"); } catch (e) {}
+  try { if (!cont && (app ? sessionStorage.getItem(key) : localStorage.getItem(key))) return; (app ? sessionStorage : localStorage).setItem(key, "1"); } catch (e) {}
+  const still = cont || matchMedia("(prefers-reduced-motion: reduce)").matches;
   const pk = (cls, x, y, c) => `<i class="sp-p ${cls}" style="left:${x}%;top:${y}%;background:${c}"></i>`;
   const el = document.createElement("div"); el.className = "splash wait" + (still ? " still" : ""); el.setAttribute("aria-hidden", "true");
   el.innerHTML = `<div class="sp-in"><div class="sp-logo">${pk("sp-p1", 20, 61, "#FFF7EE")}${pk("sp-p3", 21, 27, "#FFF7EE")}${pk("sp-p2", 25, 44, "#F5B04A")}</div>
@@ -4170,7 +4427,7 @@ function splash() {
   let gone = false, minDone = false; const done = () => { if (gone) return; gone = true; el.classList.add("out"); setTimeout(() => { el.remove(); S.splashing = false; revealScan(); }, 380); };
   const tryDone = () => { if (minDone && S.appReady) done(); };
   el.addEventListener("click", () => { if (S.appReady) done(); });
-  function startMin() { setTimeout(() => { minDone = true; tryDone(); }, still ? 600 : 1900); }
+  function startMin() { setTimeout(() => { minDone = true; tryDone(); if (!gone && !matchMedia("(prefers-reduced-motion: reduce)").matches) el.classList.add("hold"); }, still ? 600 : 1900); }
   S.onReady = tryDone;
   setTimeout(done, 15000);   // never stay stuck
 }
@@ -4295,7 +4552,7 @@ async function start() {
   // New version published: the app picks it up and reloads once, so phones never stay on an old copy
   if (!DEMO && "serviceWorker" in navigator && location.protocol === "https:") {
     const hadSW = !!navigator.serviceWorker.controller; let reloaded = false;
-    navigator.serviceWorker.addEventListener("controllerchange", () => { if (hadSW && !reloaded && !document.body.classList.contains("locked")) { reloaded = true; location.reload(); } });
+    navigator.serviceWorker.addEventListener("controllerchange", () => { if (hadSW && !reloaded && !document.body.classList.contains("locked")) { reloaded = true; try { if (S.splashing) sessionStorage.setItem("cp_sp_cont", "1"); } catch (e) {} location.reload(); } });
     navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).then(r => { r.update().catch(() => {}); document.addEventListener("visibilitychange", () => { if (!document.hidden) r.update().catch(() => {}); }); }).catch(() => {});
   }
   // Opened from the home-screen icon: go to the page this phone installed (seller, rider or team), else the customer app
