@@ -556,23 +556,29 @@ input, select, textarea { font-size: 16px; min-width: 0; max-width: 100%; }
    So every page is at least a touch taller than the screen. */
 html.standalone body { min-height: calc(100vh + 1px); min-height: calc(100lvh + 1px); }
 html.standalone, html.standalone body { overscroll-behavior: none; }
-/* Launch animation: the logo is already in place on the first frame (it matches the phone's own launch screen, so it never
-   appears twice); only the name and tagline rise in */
+/* Launch animation: the orange tile is there from the first frame, the packs drop and slide in one by one, then the name
+   and tagline rise. Soft ease-out, no bounce, transforms on the GPU only */
 .splash { position: fixed; inset: 0; z-index: 100; background: var(--bg); display: grid; place-items: center; transition: opacity .35s cubic-bezier(.2,.8,.2,1); cursor: pointer; }
 .splash.out { opacity: 0; pointer-events: none; }
 .sp-in { display: grid; justify-items: center; gap: 12px; padding: 24px; text-align: center; }
-.sp-logo { position: relative; width: 96px; height: 96px; border-radius: 23px; background: #D9480F; }
-.sp-p { position: absolute; width: 56%; height: 15%; border-radius: 4px; }
+.sp-logo { position: relative; width: 96px; height: 96px; border-radius: 23px; background: #D9480F; transform: translateZ(0); }
+.splash { --sp-ease: cubic-bezier(.22,1,.36,1); }
+.sp-p { position: absolute; width: 56%; height: 15%; border-radius: 4px; backface-visibility: hidden; will-change: transform, opacity; }
+.sp-p1 { animation: spDrop .62s var(--sp-ease) .05s both; }
+.sp-p3 { animation: spDrop .62s var(--sp-ease) .2s both; }
+.sp-p2 { animation: spSlide .66s var(--sp-ease) .38s both; }
 .sp-p::before { content: ""; position: absolute; left: 0; right: 0; top: 46%; height: 2.4px; background: #D9480F; }
 .sp-p::after { content: ""; position: absolute; left: 43%; top: 33%; width: 14%; height: 33%; border-radius: 1.5px; background: #D9480F; }
 .splash.wait * { animation-play-state: paused !important; }
 .sp-word, .sp-tag span { will-change: transform, opacity; }
-.sp-word { font-family: var(--font-display); font-weight: 800; font-size: 40px; letter-spacing: -1.5px; color: var(--ink); animation: spUp .45s cubic-bezier(.2,.8,.2,1) .12s both; }
+.sp-word { font-family: var(--font-display); font-weight: 800; font-size: 40px; letter-spacing: -1.5px; color: var(--ink); animation: spUp .7s var(--sp-ease) .78s both; }
 .sp-word span { color: var(--accent); }
 .sp-tag { margin: 0; font-weight: 700; color: var(--muted); display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
-.sp-tag span { display: inline-block; animation: spUp .38s cubic-bezier(.2,.8,.2,1) both; }
-.sp-tag span:nth-child(1) { animation-delay: .4s; color: var(--accent-2); } .sp-tag span:nth-child(2) { animation-delay: .55s; } .sp-tag span:nth-child(3) { animation-delay: .7s; }
-@keyframes spUp { from { transform: translateY(12px); opacity: 0; } to { transform: none; opacity: 1; } }
+.sp-tag span { display: inline-block; animation: spUp .6s var(--sp-ease) both; }
+.sp-tag span:nth-child(1) { animation-delay: 1s; color: var(--accent-2); } .sp-tag span:nth-child(2) { animation-delay: 1.12s; } .sp-tag span:nth-child(3) { animation-delay: 1.24s; }
+@keyframes spDrop { from { transform: translate3d(0,-30px,0); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes spSlide { from { transform: translate3d(46px,0,0); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes spUp { from { transform: translate3d(0,14px,0); opacity: 0; } to { transform: none; opacity: 1; } }
 .splash.still * { animation: none !important; }
 /* Still loading after the intro: hold the final frame and breathe slowly (never replay the logo) */
 .splash.hold .sp-logo { animation: spBreathe 3.2s ease-in-out infinite; }
@@ -4421,14 +4427,20 @@ function splash() {
   el.innerHTML = `<div class="sp-in"><div class="sp-logo">${pk("sp-p1", 20, 61, "#FFF7EE")}${pk("sp-p3", 21, 27, "#FFF7EE")}${pk("sp-p2", 25, 44, "#F5B04A")}</div>
     <div class="sp-word">chop<span>pool</span></div><p class="sp-tag"><span>Split delivery.</span><span>One order.</span><span>One building.</span></p></div>`;
   document.body.appendChild(el); S.splashing = true;
-  // Start the animation once the heading font is ready (at most 450 ms), so nothing swaps mid-animation
-  const go = () => { if (el.classList.contains("wait")) { el.classList.remove("wait"); startMin(); } };
-  try { document.fonts.load('800 40px "Bricolage Grotesque"').then(go, go); } catch (e) { go(); }
-  setTimeout(go, 450);
+  // Start the animation once the heading font is ready and the first screen has been built behind it (at most 1.2 s),
+  // so no heavy work runs while the packs are moving. If the app's data is slow, the first screen waits until they've landed.
+  let fontOk = false, paintOk = false, began = 0;
+  const go = () => { if (!el.classList.contains("wait")) return; el.classList.remove("wait"); began = Date.now(); startMin(); };
+  const maybe = () => { if (fontOk && paintOk) go(); };
+  try { document.fonts.load('800 40px "Bricolage Grotesque"').then(() => { fontOk = true; maybe(); }, () => { fontOk = true; maybe(); }); } catch (e) { fontOk = true; }
+  setTimeout(() => { fontOk = true; maybe(); }, 450);
+  setTimeout(go, 1200);
+  S.splashPainted = () => { paintOk = true; maybe(); };
+  S.splashCalm = () => { if (!began || gone || still) return Promise.resolve(); const left = 1100 - (Date.now() - began); return left > 0 ? new Promise(r => setTimeout(r, left)) : Promise.resolve(); };
   let gone = false, minDone = false; const done = () => { if (gone) return; gone = true; el.classList.add("out"); setTimeout(() => { el.remove(); S.splashing = false; revealScan(); }, 380); };
   const tryDone = () => { if (minDone && S.appReady) done(); };
   el.addEventListener("click", () => { if (S.appReady) done(); });
-  function startMin() { setTimeout(() => { minDone = true; tryDone(); if (!gone && !matchMedia("(prefers-reduced-motion: reduce)").matches) el.classList.add("hold"); }, still ? 500 : 1400); }
+  function startMin() { setTimeout(() => { minDone = true; tryDone(); if (!gone && !matchMedia("(prefers-reduced-motion: reduce)").matches) el.classList.add("hold"); }, still ? 500 : 1900); }
   S.onReady = tryDone;
   setTimeout(done, 15000);   // never stay stuck
 }
@@ -4564,7 +4576,9 @@ async function start() {
     const al = e.target.closest("[data-alerts]"); if (al) { if (await pushSubscribe(JSON.parse(al.dataset.alerts || "{}"))) { toast("Alerts are on for this phone."); al.textContent = "Alerts are on"; } }
   });
   if (!DEMO) { try { window.supabase && (await api.user()) && afterSignIn(); } catch (e) {} }
+  if (S.splashCalm) await S.splashCalm();
   await route();
+  S.splashPainted && S.splashPainted();
   S.appReady = true; if (S.onReady) S.onReady();
 }
 start();
