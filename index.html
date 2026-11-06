@@ -4413,9 +4413,12 @@ function openListingForm(token, k) {
 function splash() {
   // Installed app: every time it opens. Website: the first visit only, so shared links open fast.
   const app = isStandalone(), key = app ? "cp_splash_s" : "cp_splash_v";
-  // A quiet update reload in the middle of the intro: carry on from the final frame instead of replaying it
-  let cont = false; try { cont = sessionStorage.getItem("cp_sp_cont") === "1"; sessionStorage.removeItem("cp_sp_cont"); } catch (e) {}
-  try { if (!cont && (app ? sessionStorage.getItem(key) : localStorage.getItem(key))) return; (app ? sessionStorage : localStorage).setItem(key, "1"); } catch (e) {}
+  // Never play the intro twice: if it started in the last 20 seconds (an update reload, or the phone reopening the app), skip it.
+  // If the intro was still on screen when the page reloaded, show its final frame (no animation) until the app is ready.
+  let cont = false, recent = false;
+  try { cont = localStorage.getItem("cp_sp_cont") === "1"; localStorage.removeItem("cp_sp_cont"); recent = Date.now() - Number(localStorage.getItem("cp_sp_t") || 0) < 20000; } catch (e) {}
+  if (recent && !cont) return;
+  try { if (!cont && (app ? sessionStorage.getItem(key) : localStorage.getItem(key))) return; (app ? sessionStorage : localStorage).setItem(key, "1"); if (!cont) localStorage.setItem("cp_sp_t", String(Date.now())); } catch (e) {}
   const still = cont || matchMedia("(prefers-reduced-motion: reduce)").matches;
   const pk = (cls, x, y, c) => `<i class="sp-p ${cls}" style="left:${x}%;top:${y}%;background:${c}"></i>`;
   const el = document.createElement("div"); el.className = "splash wait" + (still ? " still" : ""); el.setAttribute("aria-hidden", "true");
@@ -4554,7 +4557,7 @@ async function start() {
   // New version published: the app picks it up and reloads once, so phones never stay on an old copy
   if (!DEMO && "serviceWorker" in navigator && location.protocol === "https:") {
     const hadSW = !!navigator.serviceWorker.controller; let reloaded = false;
-    navigator.serviceWorker.addEventListener("controllerchange", () => { if (hadSW && !reloaded && !document.body.classList.contains("locked")) { reloaded = true; try { if (S.splashing) sessionStorage.setItem("cp_sp_cont", "1"); } catch (e) {} location.reload(); } });
+    navigator.serviceWorker.addEventListener("controllerchange", () => { if (hadSW && !reloaded && !document.body.classList.contains("locked")) { reloaded = true; try { if (S.splashing) localStorage.setItem("cp_sp_cont", "1"); } catch (e) {} location.reload(); } });
     navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).then(r => { r.update().catch(() => {}); document.addEventListener("visibilitychange", () => { if (!document.hidden) r.update().catch(() => {}); }); }).catch(() => {});
   }
   // Opened from the home-screen icon: go to the page this phone installed (seller, rider or team), else the customer app
