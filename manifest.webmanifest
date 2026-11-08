@@ -1,7 +1,7 @@
 {
   "name": "ChopPool",
   "short_name": "ChopPool",
-  "description": "Split delivery. One order. One building.",
+  "description": "Order together, pay less.",
   "start_url": "./?app=1",
   "scope": "./",
   "display": "standalone",

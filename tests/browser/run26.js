@@ -9,16 +9,16 @@ const { chromium, devices } = require('playwright');
   await step('weekend order date', async () => { console.log('  ', await p.evaluate(() => [orderDate({ cutoff: "10:30" }, new Date("2026-11-07T09:00:00Z")), orderDate({ cutoff: "10:30" }, new Date("2026-11-07T11:00:00Z"))].join(' ')));  });
   await step('hero lowest delivery', async () => { console.log('  ', (await p.locator('#hero .hero-stat').last().innerText()).replace(/\n/g, ' | ')); });
   await step('free delivery set by vendor', async () => {
-    await p.evaluate(() => location.hash = '#kitchen-demok1'); await p.waitForTimeout(1500);
+    await p.evaluate(() => { S.kset = true; location.hash = '#kitchen-demok1'; }); await p.waitForTimeout(1500);
     await p.selectOption('#freeM', '3000').catch(async () => { await p.selectOption('#freeM', { index: 4 }); }); await p.waitForTimeout(1200);
     console.log('  freeM now', await p.locator('#freeM').inputValue(), '|', await p.locator('#toast').innerText());
   });
   await step('customer sees free', async () => { await p.evaluate(() => { location.hash = '#order'; }); await p.waitForTimeout(1500); await p.evaluate(() => setTab('kitchens')); await p.waitForTimeout(400);
     console.log('  ', (await p.locator('#kitchensList').innerText()).replace(/\n+/g, ' | ').slice(0, 260)); });
   await step('admin fee + timing settings', async () => { await p.evaluate(() => location.hash = '#admin'); await p.waitForTimeout(1500);
-    await p.evaluate(() => { const b = document.querySelector('[data-atab="riders"]'); b && b.click(); }); await p.waitForTimeout(400); await p.evaluate(() => { const b = document.querySelector('[data-asub="pricing"]'); b && b.click(); }); await p.waitForTimeout(400);
-    await p.fill('#rlRate', '5'); await p.fill('#rlFreeN', '5'); await p.click('[data-form=rules] button.btn'); await p.waitForTimeout(600); console.log('  settings', await p.evaluate(() => [S.settings.vendor_fee_rate, S.settings.vendor_fee_free, S.settings.near_max_fee].join(','))); });
-  await step('vendor sees terms', async () => { await p.evaluate(() => location.hash = '#kitchen-demok2'); await p.waitForTimeout(1500);
+    await p.evaluate(() => { const b = document.querySelector('[data-atab="settings"]'); b && b.click(); }); await p.waitForTimeout(400);
+    await p.fill('#rlRate', '5'); await p.fill('#rlFreeN', '5'); await p.click('[data-form=settings] button.btn'); await p.waitForTimeout(600); console.log('  settings', await p.evaluate(() => [S.settings.vendor_fee_rate, S.settings.vendor_fee_free, S.settings.near_max_fee].join(','))); });
+  await step('vendor sees terms', async () => { await p.evaluate(() => { S.kset = true; location.hash = '#kitchen-demok2'; }); await p.waitForTimeout(1500);
     const t = await p.locator('text=ChopPool fee terms').count(); console.log('  terms boxes', t, '| accept btn', await p.locator('#acceptTerms, #acceptTermsOnly').count());
     const btn = p.locator('#acceptTerms, #acceptTermsOnly').first(); if (await btn.count()) { await btn.click(); await p.waitForTimeout(800); console.log('  ', await p.locator('#toast').innerText()); } });
   await step('payment not found flow', async () => {

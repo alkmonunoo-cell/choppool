@@ -11,8 +11,8 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="ChopPool">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>ChopPool · Split delivery. One order. One building.</title>
-<meta name="description" content="Split delivery. One order. One building. Order lunch with people in your building and share one delivery.">
+<title>ChopPool · Order together, pay less.</title>
+<meta name="description" content="Order together, pay less. Order lunch with people in your building and share one delivery.">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Crect%20width%3D%22100%22%20height%3D%22100%22%20rx%3D%2224%22%20fill%3D%22%23D9480F%22/%3E%3Crect%20x%3D%2220%22%20y%3D%2261%22%20width%3D%2256%22%20height%3D%2215%22%20rx%3D%224%22%20fill%3D%22%23FFF7EE%22/%3E%3Cpath%20d%3D%22M20%2068h56%22%20stroke%3D%22%23D9480F%22%20stroke-width%3D%222.5%22/%3E%3Crect%20x%3D%2244%22%20y%3D%2266%22%20width%3D%228%22%20height%3D%225%22%20rx%3D%221.5%22%20fill%3D%22%23D9480F%22/%3E%3Crect%20x%3D%2225%22%20y%3D%2244%22%20width%3D%2256%22%20height%3D%2215%22%20rx%3D%224%22%20fill%3D%22%23F5B04A%22/%3E%3Cpath%20d%3D%22M25%2051h56%22%20stroke%3D%22%23D9480F%22%20stroke-width%3D%222.5%22/%3E%3Crect%20x%3D%2249%22%20y%3D%2249%22%20width%3D%228%22%20height%3D%225%22%20rx%3D%221.5%22%20fill%3D%22%23D9480F%22/%3E%3Crect%20x%3D%2221%22%20y%3D%2227%22%20width%3D%2256%22%20height%3D%2215%22%20rx%3D%224%22%20fill%3D%22%23FFF7EE%22/%3E%3Cpath%20d%3D%22M21%2034h56%22%20stroke%3D%22%23D9480F%22%20stroke-width%3D%222.5%22/%3E%3Crect%20x%3D%2245%22%20y%3D%2232%22%20width%3D%228%22%20height%3D%225%22%20rx%3D%221.5%22%20fill%3D%22%23D9480F%22/%3E%3C/svg%3E">
 <!-- Fonts are served from this site (Latin subset, cached by the app), no Google Fonts call -->
 <link rel="preload" href="fonts/plus-jakarta-sans.woff" as="font" type="font/woff" crossorigin>
@@ -32,8 +32,8 @@
   --ink: #23160F;
   --muted: #7C685C;
   --line: #EEE3D8;
-  --accent: #D9480F;
-  --accent-2: #B83A08;
+  --accent: #C2410C;
+  --accent-2: #9A3412;
   --on-accent: #FFFFFF;
   --accent-soft: #FDEADF;
   --hint: #A3620B;
@@ -51,7 +51,7 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #0E0E10; --surface: #17171A; --surface-2: #202024; --ink: #F4F4F5; --muted: #A1A1AA; --line: #2C2C31;
-    --accent: #F2652A; --accent-2: #FF7A45; --on-accent: #FFFFFF; --accent-soft: #2E1A12; --hint: #F5B04A; --hint-soft: #2B2314;
+    --accent: #F2652A; --accent-2: #FF7A45; --on-accent: #1A0B04; --accent-soft: #2E1A12; --hint: #F5B04A; --hint-soft: #2B2314;
     --ok: #62D394; --ok-soft: #15291E; --danger: #FF8A80; --danger-soft: #34191A;
     --tint-1: #24201E; --tint-2: #1C2420; --tint-3: #26231C; --tint-4: #22201F;
     --shadow: 0 1px 2px rgba(0,0,0,.5), 0 10px 28px rgba(0,0,0,.45);
@@ -60,7 +60,7 @@
 }
 :root[data-theme="dark"] {
   --bg: #0E0E10; --surface: #17171A; --surface-2: #202024; --ink: #F4F4F5; --muted: #A1A1AA; --line: #2C2C31;
-  --accent: #F2652A; --accent-2: #FF7A45; --on-accent: #FFFFFF; --accent-soft: #2E1A12; --hint: #F5B04A; --hint-soft: #2B2314;
+  --accent: #F2652A; --accent-2: #FF7A45; --on-accent: #1A0B04; --accent-soft: #2E1A12; --hint: #F5B04A; --hint-soft: #2B2314;
   --ok: #62D394; --ok-soft: #15291E; --danger: #FF8A80; --danger-soft: #34191A;
   --tint-1: #24201E; --tint-2: #1C2420; --tint-3: #26231C; --tint-4: #22201F;
   --shadow: 0 1px 2px rgba(0,0,0,.5), 0 10px 28px rgba(0,0,0,.45);
@@ -128,7 +128,7 @@ button.hero-stat::after { content: "›"; position: absolute; right: 9px; top: 6
 .solo .row .btn, .solo .row .ghost { padding: 9px 12px; }
 .sumhint { display: block; font-size: 12px; font-weight: 500; color: var(--muted); margin-top: 1px; }
 .hero-stat b .ampm { font-size: .6em; font-weight: 700; margin-left: 2px; letter-spacing: -.02em; }
-.hero-stat span { font-size: 11.5px; opacity: .9; line-height: 1.3; }
+.hero-stat span { font-size: 12px; opacity: .9; line-height: 1.3; }
 :root[data-theme="dark"] .hero-stat { background: rgba(0,0,0,.12); }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .hero-stat { background: rgba(0,0,0,.12); } }
 
@@ -153,8 +153,8 @@ button.hero-stat::after { content: "›"; position: absolute; right: 9px; top: 6
 .ptag.dim { background: rgba(255,255,255,.85); color: #5A4A40; }
 .pool-art .fee-tag { position: absolute; right: 14px; top: 14px; z-index: 1; background: rgba(30,14,6,.34); border: 1px solid rgba(255,255,255,.28); border-radius: 14px; padding: 6px 10px; text-align: right; color: #fff; -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
 .fee-tag b { display: block; font-family: var(--font-display); font-size: 18px; font-weight: 800; line-height: 1.1; }
-.fee-tag s { opacity: .85; font-size: 11px; }
-.fee-tag span { font-size: 11px; opacity: .9; }
+.fee-tag s { opacity: .85; font-size: 12px; }
+.fee-tag span { font-size: 12px; opacity: .9; }
 .ptitle { position: absolute; left: 16px; right: 16px; bottom: 12px; z-index: 1; display: grid; gap: 1px; text-align: left; }
 .ptitle h3, .ptitle strong { color: #fff; font-family: var(--font-display); font-size: 22px; font-weight: 800; letter-spacing: -.3px; line-height: 1.15; }
 .pool-art.small .ptitle strong { font-size: 19px; }
@@ -185,7 +185,7 @@ button.hero-stat::after { content: "›"; position: absolute; right: 9px; top: 6
 .photostrip::-webkit-scrollbar { display: none; }
 .pshot { position: relative; flex: none; width: 104px; height: 104px; padding: 0; border: none; border-radius: 16px; overflow: hidden; background: var(--surface-2); scroll-snap-align: start; cursor: pointer; }
 .pshot img { width: 100%; height: 100%; object-fit: cover; }
-.pshot span { position: absolute; left: 6px; bottom: 6px; padding: 2px 6px; border-radius: 8px; background: rgba(0,0,0,.55); color: #fff; font-size: 10px; font-weight: 700; display: inline-flex; gap: 1px; }
+.pshot span { position: absolute; left: 6px; bottom: 6px; padding: 2px 6px; border-radius: 8px; background: rgba(0,0,0,.55); color: #fff; font-size: 12px; font-weight: 700; display: inline-flex; gap: 1px; }
 .revnote { margin: 0; font-size: 13.5px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
 .rstar { display: inline-flex; align-items: center; gap: 2px; font-weight: 800; color: var(--ink); }
 .lightbox { position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,.88); display: grid; place-items: center; align-content: center; gap: 12px; padding: 24px; animation: fadeIn .2s ease-out; }
@@ -203,7 +203,7 @@ button.hero-stat::after { content: "›"; position: absolute; right: 9px; top: 6
 .wb-ring .trk { stroke: color-mix(in srgb, #F5B04A 22%, transparent); }
 .wb-ring .arc { stroke: #F5B04A; stroke-linecap: round; transition: stroke-dashoffset .9s cubic-bezier(.16,1,.3,1); }
 .wb-ring b { position: relative; font: 800 17px var(--font-display); color: var(--ink); }
-.wb-ring small { position: relative; font-size: 9px; font-weight: 700; color: var(--muted); letter-spacing: .04em; }
+.wb-ring small { position: relative; font-size: 12px; font-weight: 700; color: var(--muted); letter-spacing: .04em; }
 .wb-text { display: grid; gap: 2px; min-width: 0; }
 .wb-text strong { font: 700 15.5px var(--font-display); color: var(--ink); line-height: 1.25; }
 .wb-text span { font-size: 13px; color: var(--muted); }
@@ -268,7 +268,7 @@ input::placeholder, textarea::placeholder { color: color-mix(in srgb, var(--mute
 .sheet::before { content: ""; width: 44px; height: 5px; border-radius: 99px; background: var(--line); justify-self: center; margin-top: 2px; }
 body.locked { position: fixed; left: 0; right: 0; overflow: hidden; }
 .sheet > :last-child { margin-bottom: 20px; }
-.sheet-foot { position: sticky; bottom: 0; background: color-mix(in srgb, var(--surface) 84%, transparent); -webkit-backdrop-filter: blur(20px) saturate(160%); backdrop-filter: blur(20px) saturate(160%); padding: 12px 0 calc(18px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); display: flex; align-items: center; gap: 14px; margin-bottom: 0 !important; }
+.sheet-foot { position: sticky; bottom: 0; background: var(--surface); -webkit-backdrop-filter: blur(20px) saturate(160%); backdrop-filter: blur(20px) saturate(160%); padding: 12px 0 calc(18px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); display: flex; align-items: center; gap: 14px; margin-bottom: 0 !important; }
 .sheet-foot .tot { display: grid; line-height: 1.2; }
 .sheet-foot .tot b { font-family: var(--font-display); font-size: 22px; font-weight: 800; }
 .sheet-foot .tot span { font-size: 12px; color: var(--muted); }
@@ -324,7 +324,7 @@ body.locked { position: fixed; left: 0; right: 0; overflow: hidden; }
 .order-card .tile svg { width: 34px; height: 34px; }
 .order-card .c { margin-left: auto; text-align: right; flex: none; }
 .order-card .c b { font-family: var(--font-display); font-size: 24px; font-weight: 800; letter-spacing: .08em; display: block; line-height: 1; white-space: nowrap; }
-.order-card .c span { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.order-card .c span { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
 .track { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
 .track i { height: 6px; border-radius: 99px; background: var(--line); display: block; }
 .track i.on { background: var(--accent); }
@@ -348,7 +348,7 @@ body.locked { position: fixed; left: 0; right: 0; overflow: hidden; }
 .kcard .tile svg { width: 46px; height: 46px; }
 .tabbar button { background: none; border: none; color: var(--muted); display: grid; justify-items: center; gap: 2px; padding: 8px 4px; font-size: 12px; font-weight: 700; border-radius: 16px; position: relative; }
 .tabbar button[aria-current="page"] { color: var(--accent); background: var(--accent-soft); }
-.badge { position: absolute; top: 4px; left: calc(50% + 8px); min-width: 18px; height: 18px; border-radius: 99px; background: var(--accent); color: var(--on-accent); font-size: 11px; display: grid; place-items: center; padding: 0 5px; }
+.badge { position: absolute; top: 4px; left: calc(50% + 8px); min-width: 18px; height: 18px; border-radius: 99px; background: var(--accent); color: var(--on-accent); font-size: 12px; display: grid; place-items: center; padding: 0 5px; }
 
 /* Toast */
 .toast { position: fixed; left: 50%; bottom: 92px; transform: translateX(-50%); width: min(480px, calc(100% - 24px)); background: var(--ink); color: var(--bg); border-radius: 16px; padding: 12px 16px; font-size: 14.5px; z-index: 40; display: none; box-shadow: 0 10px 30px rgba(0,0,0,.25); }
@@ -373,7 +373,7 @@ body.locked { position: fixed; left: 0; right: 0; overflow: hidden; }
 .table-wrap { overflow-x: auto; background: var(--surface); border-radius: 18px; box-shadow: var(--shadow); }
 table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
 th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
-th { font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 700; }
+th { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 700; }
 td select { padding: 6px 8px; width: auto; }
 .labels { display: grid; gap: 8px; }
 .labels > div { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; background: var(--surface-2); border-radius: 14px; padding: 10px 12px; }
@@ -383,8 +383,9 @@ td select { padding: 6px 8px; width: auto; }
 .codebox input { font-family: var(--font-display); font-size: 24px; letter-spacing: .2em; text-align: center; text-transform: uppercase; }
 .labels .lc { min-width: 3.4em; }
 .labels .items { display: grid; gap: 2px; }
-.quote { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: end; background: var(--hint-soft); border-radius: 16px; padding: 12px; }
-.quote p { grid-column: 1 / -1; }
+.quote { display: grid; grid-template-columns: 1fr; gap: 10px; background: var(--hint-soft); border-radius: 16px; padding: 14px; }
+.quote .qbtns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.quote .qbtns > * { width: 100%; justify-content: center; }
 .menurow { display: grid; grid-template-columns: 1fr 90px auto; gap: 8px; align-items: center; }
 .choice { display: flex; align-items: center; gap: 10px; background: var(--surface-2); border-radius: 14px; padding: 10px 12px; margin: 0; font-size: 15px; font-weight: 600; color: var(--ink); cursor: pointer; }
 .choice input { width: 18px; height: 18px; accent-color: var(--accent); flex: none; }
@@ -397,6 +398,27 @@ td select { padding: 6px 8px; width: auto; }
 .leaflet-container { font-family: var(--font-body); }
 .leaflet-popup-content { font-size: 14px; }
 .admintabs { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
+@media (max-width: 640px) {
+  .cardtable, .cardtable tbody { display: block; width: 100%; }
+  .cardtable tr:first-child:has(th) { display: none; }
+  .cardtable tr { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; background: var(--surface); border-radius: 16px; padding: 14px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  .cardtable td { display: block; padding: 0 !important; border: 0 !important; min-width: 0 !important; white-space: normal !important; }
+  .cardtable td[data-label]::before { content: attr(data-label); display: block; font-size: 12px; color: var(--muted); margin-bottom: 2px; }
+  .cardtable td:nth-child(5), .cardtable td:nth-child(6), .cardtable td:nth-child(7) { grid-column: 1 / -1; }
+  .cardtable td:empty, .cardtable td[data-label]:has(> :only-child:empty) { display: none; }
+  .cardtable .table-wrap, .table-wrap:has(> .cardtable) { overflow: visible; box-shadow: none; background: none; }
+}
+.nextup { display: grid; gap: 12px; border-left: 4px solid var(--accent); }
+.nextup p { margin: 0; font-size: 18px; font-weight: 650; line-height: 1.35; }
+.settingsfold > summary { list-style: none; cursor: pointer; display: grid; gap: 2px; padding-right: 28px; position: relative; }
+.settingsfold > summary::-webkit-details-marker { display: none; }
+.settingsfold > summary::after { content: ""; position: absolute; right: 6px; top: 10px; width: 9px; height: 9px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); transition: transform .2s; opacity: .6; }
+.settingsfold[open] > summary::after { transform: rotate(-135deg); top: 14px; }
+.settingsfold > summary h2 { margin: 0; }
+.settingsfold:not([open]) { display: block; }
+.settingsfold[open] { display: grid; gap: 18px; }
+.settingsfold .card { box-shadow: none; padding: 0; background: none; border: 0; }
+.tog .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); margin-left: 4px; vertical-align: middle; }
 .admintabs button { white-space: nowrap; background: var(--surface); box-shadow: var(--shadow); border: none; color: var(--ink); border-radius: 999px; padding: 8px 14px; font-size: 14px; }
 .admintabs button[aria-current="page"] { background: var(--ink); color: var(--bg); }
 .medit { display: grid; gap: 10px; }
@@ -405,12 +427,13 @@ form[data-form="kitchen"] [data-msave] { display: none; }
 .autopick .presets { display: grid; gap: 6px; }
 .autopick .choice { padding: 10px 12px; }
 .contactpick { display: inline-flex; align-items: center; gap: 4px; margin-top: 6px; font-size: 13px; }
+.dishprice { display: grid; grid-template-columns: minmax(0, 72fr) minmax(76px, 28fr); gap: 8px; }
 .mdish { display: grid; gap: 8px; padding: 10px; border-radius: 16px; background: var(--surface-2); }
 .mtop { display: grid; grid-template-columns: 52px minmax(0, 1fr) 84px 32px; gap: 8px; align-items: center; }
 .mphoto { position: relative; width: 52px; height: 52px; padding: 0; border: none; border-radius: 14px; overflow: hidden; background: var(--surface); display: grid; place-items: center; cursor: pointer; }
 .mphoto img { width: 100%; height: 100%; object-fit: cover; }
 .mphoto .dishpic { background: none; }
-.mphoto .cam { position: absolute; right: 2px; bottom: 2px; width: 20px; height: 20px; border-radius: 50%; background: var(--accent); color: #fff; display: grid; place-items: center; }
+.mphoto .cam { position: absolute; right: 2px; bottom: 2px; width: 20px; height: 20px; border-radius: 50%; background: var(--accent); color: var(--on-accent); display: grid; place-items: center; }
 .mphoto.busy { opacity: .5; pointer-events: none; }
 .mmeta { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .mmeta select { width: auto; }
@@ -447,7 +470,7 @@ details.item[open] > summary { border-bottom: 1px solid var(--line); }
 .ibody { padding: 14px 16px 16px; display: grid; gap: 12px; }
 .tablewrap { overflow-x: auto; margin: 0 -4px; }
 .rtable { width: 100%; border-collapse: collapse; font-size: 13.5px; }
-.rtable th { text-align: left; font-size: 11.5px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.rtable th { text-align: left; font-size: 12px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
 .rtable td { padding: 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
 .rtable tr:last-child td { border-bottom: none; }
 .up { color: var(--ok); font-size: 12px; font-weight: 700; white-space: nowrap; }
@@ -478,6 +501,7 @@ button.dtile:not([disabled]):hover { outline: 2px solid var(--accent-soft); }
   .aframe.has-sub .asub { flex-direction: column; position: sticky; top: 12px; overflow: visible; }
   .aframe.has-sub .asub button { text-align: left; border-radius: 12px; white-space: normal; }
   .dash-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .dash-grid.rep-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .dtile.wide { grid-column: span 3; }
   .cards2 { grid-template-columns: repeat(auto-fill, minmax(440px, 1fr)); }
   body.is-admin .tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); }
@@ -504,7 +528,7 @@ button.dtile:not([disabled]):hover { outline: 2px solid var(--accent-soft); }
 .topzone.compact .hero .hero-text { max-height: 0; opacity: 0; }
 .topzone.compact .hero-stat { padding: 6px 10px; }
 .topzone.compact .hero-stat b { font-size: 15px; }
-.topzone.compact .hero-stat span { font-size: 10.5px; }
+.topzone.compact .hero-stat span { font-size: 12px; }
 .topzone.compact .section-title { margin-top: 0; }
 .kgroup { display: grid; gap: 12px; }
 .kghead { position: -webkit-sticky; position: sticky; top: var(--kh, 120px); z-index: 6; display: flex; align-items: center; justify-content: space-between; gap: 8px; width: calc(100% + 32px); margin: 0 -16px; padding: 10px 16px; border: none; border-radius: 0; text-align: left; cursor: pointer;
@@ -518,6 +542,32 @@ button.dtile:not([disabled]):hover { outline: 2px solid var(--accent-soft); }
 .pagebrand .brand { margin: 0; }
 .pagehead .iconbtn { width: 38px; height: 38px; border-radius: 12px; flex: none; }
 .admintop { gap: 10px; }
+.poolhead { display: grid; gap: 2px; }
+.legal h3 { font-size: 15px; margin: 10px 0 0; }
+.legal ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
+.legal p { margin: 0; }
+.installhint { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--surface-2); border-radius: 16px; padding: 10px 12px; }
+.installhint > span { display: flex; align-items: center; gap: 10px; }
+.installhint .ghost { padding: 8px 14px; flex: none; }
+.setform { gap: 12px; }
+.setform .grid2 { align-items: end; }
+.savebar { position: sticky; bottom: calc(10px + env(safe-area-inset-bottom)); z-index: 5; display: grid; gap: 6px; }
+.savebar .err:empty { display: none; }
+.savebar .btn { box-shadow: 0 8px 24px rgba(0,0,0,.18); }
+.poolhead .ph-t { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.poolhead h3 { margin: 0; }
+.poolrider { grid-template-columns: 1fr 1fr; }
+.poolrider .full, .poolrider > button { grid-column: 1 / -1; }
+.ahead { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.ahead-id { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.ahead-id h1 { font-size: 22px; margin: 0; line-height: 1.1; }
+.ahead-id p { margin: 2px 0 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 56vw; }
+.ahead-act { display: flex; gap: 6px; flex: none; }
+.adaybar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.adaybar .chips { margin: 0; flex-wrap: nowrap; }
+.adaybar input[type=date] { width: 150px; max-width: 150px; min-width: 0; flex: none; padding: 8px 10px; font-size: 14px; }
+.adaybar .iconbtn { width: 40px; height: 40px; }
+.adaybar .linkbtn { margin-left: auto; }
 /* App card: logo beside the text, buttons in one row */
 .toolhead { display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 12px; align-items: start; }
 .toolhead p { margin: 2px 0 0; }
@@ -543,7 +593,7 @@ button.dtile:not([disabled]):hover { outline: 2px solid var(--accent-soft); }
 .siterow { position: relative; }
 .siterow input { position: absolute; opacity: 0; pointer-events: none; }
 .siterow:has(input:checked) { background: var(--accent-soft); }
-.onchop { font-style: normal; font-size: 11px; font-weight: 800; color: var(--accent); background: var(--accent-soft); border-radius: 999px; padding: 2px 7px; margin-left: 4px; vertical-align: 2px; white-space: nowrap; }
+.onchop { font-style: normal; font-size: 12px; font-weight: 800; color: var(--accent); background: var(--accent-soft); border-radius: 999px; padding: 2px 7px; margin-left: 4px; vertical-align: 2px; white-space: nowrap; }
 #wRes:not(:empty) { margin-top: -2px; }
 .pdot { width: 36px; height: 36px; border-radius: 12px; display: grid; place-items: center; background: var(--surface-2); color: var(--accent); }
 .placeload { padding: 6px 0; }
@@ -580,7 +630,7 @@ html.standalone, html.standalone body { overscroll-behavior: none; }
 .sp-word span { color: var(--accent); }
 .sp-tag { margin: 0; font-weight: 700; color: var(--muted); display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
 .sp-tag span { display: inline-block; animation: spUp .6s var(--sp-ease) both; }
-.sp-tag span:nth-child(1) { animation-delay: 1s; color: var(--accent-2); } .sp-tag span:nth-child(2) { animation-delay: 1.12s; } .sp-tag span:nth-child(3) { animation-delay: 1.24s; }
+.sp-tag span:nth-child(1) { animation-delay: 1s; color: var(--accent-2); } .sp-tag span:nth-child(2) { animation-delay: 1.32s; } .sp-tag span:nth-child(3) { animation-delay: 1.24s; }
 @keyframes spDrop { from { transform: translate3d(0,-30px,0); opacity: 0; } to { transform: none; opacity: 1; } }
 @keyframes spSlide { from { transform: translate3d(46px,0,0); opacity: 0; } to { transform: none; opacity: 1; } }
 @keyframes spUp { from { transform: translate3d(0,14px,0); opacity: 0; } to { transform: none; opacity: 1; } }
@@ -630,13 +680,13 @@ body:not(.on-home) #bell, body:not(.on-home) #theme { display: none; }
 .prow .ptx strong { font-size: 15px; line-height: 1.25; }
 .prow .l1 { font-size: 12.5px; color: var(--muted); display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .prow .l2 { font-size: 12.5px; font-weight: 700; color: var(--ok); line-height: 1.35; }
-.prow.mine .l2 { color: var(--accent-2); }
+.prow.mine .l2 { color: var(--ok); }
 .prow .l2.warn { color: var(--hint); }
 .prow .pbar { height: 4px; border-radius: 9px; background: var(--surface-2); overflow: hidden; margin-top: 6px; }
 .prow .pbar i { display: block; height: 100%; border-radius: 9px; background: var(--ok); }
 .prow .acts { display: flex; gap: 6px; align-items: center; flex: none; }
 .prow .acts .btn { padding: 9px 15px; font-size: 13.5px; border-radius: 99px; }
-.ytag { font-size: 10.5px; vertical-align: 2px; white-space: nowrap; font-weight: 800; color: #fff; background: var(--accent); border-radius: 99px; padding: 2px 7px; }
+.ytag { font-size: 12px; vertical-align: 2px; white-space: nowrap; font-weight: 800; color: var(--on-accent); background: var(--accent); border-radius: 99px; padding: 2px 7px; }
 .iconround { width: 38px; height: 38px; border-radius: 99px; display: grid; place-items: center; background: var(--surface-2); border: 1px solid var(--line); color: var(--ink); padding: 0; flex: none; }
 .iconround svg { width: 18px; height: 18px; }
 .farlink { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 10px; margin-top: 14px; padding: 15px 16px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); color: var(--ink); font: 700 15px var(--font-body, inherit); text-align: left; cursor: pointer; }
@@ -651,17 +701,23 @@ body:not(.on-home) #bell, body:not(.on-home) #theme { display: none; }
 .vtile { background: var(--surface); border: none; border-radius: 22px; overflow: hidden; text-align: left; padding: 0; color: inherit; font: inherit; box-shadow: var(--shadow); display: grid; align-content: start; cursor: pointer; transition: transform .15s; }
 .vtile:active { transform: scale(.97); }
 .vtile .vph { position: relative; aspect-ratio: 1.15; display: grid; place-items: center; }
+.photoplate { display: block; aspect-ratio: 1; border-radius: 50%; overflow: hidden; background: #fff; box-shadow: 0 0 0 4px rgba(255,255,255,.9), 0 8px 14px rgba(60,30,10,.18); }
+.photoplate img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.vtile .vph .photoplate { width: 68%; } .vrow .vph .photoplate { width: 58px; } .vsg .vph .photoplate { width: 34px; } .vpage .vplate .photoplate { width: 100%; } .ptile .photoplate, .dish .vph .photoplate { width: 82%; }
 .vtile .vph svg { width: 72%; height: 72%; filter: drop-shadow(0 8px 10px rgba(60,30,10,.18)); }
 .vtile .vb { padding: 10px 12px 12px; display: grid; gap: 3px; }
 .vtile strong { font-size: 14px; line-height: 1.25; }
 .vmeta { font-size: 12px; color: var(--muted); display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
 .vmeta .rs { color: #C77700; font-weight: 800; display: inline-flex; gap: 2px; align-items: center; }
-.vdl { font-size: 12px; font-weight: 800; color: var(--accent-2); line-height: 1.3; margin-top: 3px; }
+.num, .lc, [class*="code"] b { white-space: nowrap; }
+#vchips { -webkit-mask-image: linear-gradient(90deg, #000 88%, transparent); mask-image: linear-gradient(90deg, #000 88%, transparent); }
+.steps4l span { font-size: 12px !important; }
+.vdl { font-size: 12px; font-weight: 800; color: var(--ok); line-height: 1.3; margin-top: 3px; }
 .vdl.dim { color: var(--muted); font-weight: 600; }
-.vbadge { position: absolute; left: 8px; top: 8px; font-size: 10.5px; font-weight: 800; background: var(--surface); color: var(--ok); border-radius: 99px; padding: 4px 8px; display: flex; gap: 5px; align-items: center; }
+.vbadge { position: absolute; left: 8px; top: 8px; font-size: 12px; font-weight: 800; background: var(--surface); color: var(--ok); border-radius: 99px; padding: 4px 8px; display: flex; gap: 5px; align-items: center; }
 .vbadge.ok::before { content: ""; width: 6px; height: 6px; border-radius: 9px; background: var(--ok); }
 .vbadge.bad { color: var(--danger); }
-.vnear { position: absolute; right: 8px; top: 8px; font-size: 10.5px; font-weight: 800; background: var(--ink); color: var(--bg); border-radius: 99px; padding: 4px 8px; }
+.vnear { position: absolute; right: 8px; top: 8px; font-size: 12px; font-weight: 800; background: var(--ink); color: var(--bg); border-radius: 99px; padding: 4px 8px; }
 .vlist { display: grid; gap: 10px; }
 .vrow { display: flex; gap: 12px; align-items: center; background: var(--surface); border: none; border-radius: 20px; padding: 10px; text-align: left; color: inherit; font: inherit; box-shadow: var(--shadow); cursor: pointer; width: 100%; }
 .vrow .vph { width: 76px; height: 76px; border-radius: 16px; display: grid; place-items: center; flex: none; }
@@ -671,7 +727,7 @@ body:not(.on-home) #bell, body:not(.on-home) #theme { display: none; }
 .vrow .cu { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vrow .vr { text-align: right; flex: none; display: grid; }
 .vrow .vr b { font-size: 13px; color: var(--accent-2); }
-.vrow .vr small { font-size: 10.5px; color: var(--muted); }
+.vrow .vr small { font-size: 12px; color: var(--muted); }
 .vhead { display: flex; justify-content: space-between; align-items: flex-end; gap: 10px; }
 .vseg { display: flex; background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 3px; flex: none; }
 .vseg button { width: 38px; height: 32px; border-radius: 9px; border: none; background: none; color: var(--muted); display: grid; place-items: center; padding: 0; }
@@ -713,7 +769,7 @@ body:not(.on-home) #bell, body:not(.on-home) #theme { display: none; }
 .vfacts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .vfacts div { background: var(--surface); border-radius: 16px; padding: 10px 11px; box-shadow: var(--shadow); }
 .vfacts b { font: 800 16px var(--font-display); display: block; white-space: nowrap; }
-.vfacts span { font-size: 11.5px; color: var(--muted); line-height: 1.3; display: block; }
+.vfacts span { font-size: 12px; color: var(--muted); line-height: 1.3; display: block; }
 .vfacts b .rs { color: #C77700; font-size: inherit; display: inline; }
 .vfoot .btn > span:first-child { display: grid; text-align: left; }
 .vfoot .btn > span:last-child { display: grid; text-align: right; }
@@ -736,10 +792,10 @@ body:not(.on-home) #bell, body:not(.on-home) #theme { display: none; }
 .vitem .plus { width: 36px; height: 36px; border-radius: 99px; background: var(--accent-soft); color: var(--accent-2); display: grid; place-items: center; flex: none; font: 800 21px/1 var(--font-body); }
 .vfoot { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(12px + env(safe-area-inset-bottom)); width: min(460px, calc(100% - 24px)); z-index: 27; }
 .vfoot .btn { width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 15px 18px; font-size: 15.5px; border-radius: 20px; box-shadow: 0 14px 28px -12px rgba(185,58,8,.7); }
-.vfoot .btn small { display: block; font-size: 11.5px; font-weight: 600; opacity: .88; text-align: left; }
+.vfoot .btn small { display: block; font-size: 12px; font-weight: 600; opacity: .88; text-align: left; }
 .rsum { display: flex; gap: 16px; align-items: center; background: var(--surface); border-radius: 18px; padding: 14px; box-shadow: var(--shadow); }
-.rsum .big { text-align: center; } .rsum .big b { font: 800 36px/1 var(--font-display); display: block; } .rsum .big span { font-size: 11.5px; color: var(--muted); }
-.rbars { flex: 1; display: grid; gap: 4px; } .rbars div { display: flex; gap: 6px; align-items: center; font-size: 11px; color: var(--muted); }
+.rsum .big { text-align: center; } .rsum .big b { font: 800 36px/1 var(--font-display); display: block; } .rsum .big span { font-size: 12px; color: var(--muted); }
+.rbars { flex: 1; display: grid; gap: 4px; } .rbars div { display: flex; gap: 6px; align-items: center; font-size: 12px; color: var(--muted); }
 .rbars i { flex: 1; height: 5px; border-radius: 9px; background: var(--surface-2); overflow: hidden; } .rbars i u { display: block; height: 100%; background: #F2A53A; }
 .rcm { background: var(--surface); border-radius: 18px; padding: 12px 14px; box-shadow: var(--shadow); display: grid; gap: 4px; }
 .rcm .h { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); } .rcm .h b { color: var(--ink); font-size: 13.5px; }
@@ -754,7 +810,7 @@ body:not(.on-home) #bell, body:not(.on-home) #theme { display: none; }
 .steps4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
 .steps4 i { height: 5px; border-radius: 9px; background: var(--surface-2); display: block; }
 .steps4 i.on { background: var(--ok); }
-.steps4l { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; font-size: 10.5px; color: var(--muted); margin-top: -6px; }
+.steps4l { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; font-size: 12px; color: var(--muted); margin-top: -6px; }
 .steps4l span.on { color: var(--ok); font-weight: 800; }
 .olist { background: var(--surface); border-radius: 20px; box-shadow: var(--shadow); overflow: hidden; }
 .orow { display: flex; gap: 12px; align-items: center; padding: 11px 12px; width: 100%; border: none; background: none; text-align: left; color: inherit; font: inherit; }
@@ -765,7 +821,7 @@ body:not(.on-home) #bell, body:not(.on-home) #theme { display: none; }
 .orow .otx strong { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .orow .otx small { font-size: 12px; color: var(--muted); line-height: 1.35; }
 .orow .oend { flex: none; display: grid; justify-items: end; gap: 4px; }
-.otag { font-size: 11px; font-weight: 800; border-radius: 99px; padding: 4px 9px; white-space: nowrap; background: var(--surface-2); color: var(--muted); }
+.otag { font-size: 12px; font-weight: 800; border-radius: 99px; padding: 4px 9px; white-space: nowrap; background: var(--surface-2); color: var(--muted); }
 .otag.ok { background: var(--ok-soft); color: var(--ok); } .otag.o { background: var(--accent-soft); color: var(--accent-2); }
 .orate { font-size: 12px; font-weight: 800; color: var(--accent-2); background: none; border: none; padding: 0; }
 .ostars { display: flex; gap: 1px; }
@@ -798,11 +854,12 @@ body:not(.on-home) #bell, body:not(.on-home) #theme { display: none; }
 .gtitle { font: 800 13px var(--font-body); color: var(--muted); margin: 6px 4px -4px; letter-spacing: .02em; }
 .tgl { width: 46px; height: 28px; border-radius: 99px; background: var(--line); position: relative; flex: none; transition: background .2s; }
 .tgl::after { content: ""; position: absolute; left: 3px; top: 3px; width: 22px; height: 22px; border-radius: 99px; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,.18); transition: transform .2s; }
-.tgl.on { background: var(--ok); } .tgl.on::after { transform: translateX(18px); }
+.tgl.on { background: var(--accent); }
+.glist.dim .grow { opacity: .5; } .glist.dim .tgl.on { background: var(--muted); } .tgl.on::after { transform: translateX(18px); }
 .nupd { display: flex; gap: 12px; padding: 12px 2px; border-bottom: 1px solid var(--line); }
 .nupd .dot { width: 9px; height: 9px; border-radius: 9px; background: var(--accent); margin-top: 6px; flex: none; }
 .nupd .dot.r { background: transparent; }
-.nupd b { font-size: 14px; display: block; } .nupd p { font-size: 13px; color: var(--muted); line-height: 1.4; } .nupd small { font-size: 11.5px; color: var(--muted); }
+.nupd b { font-size: 14px; display: block; } .nupd p { font-size: 13px; color: var(--muted); line-height: 1.4; } .nupd small { font-size: 12px; color: var(--muted); }
 #bell { position: relative; }
 #bell .bdot { position: absolute; top: 7px; right: 8px; width: 8px; height: 8px; border-radius: 9px; background: var(--accent); border: 2px solid var(--bg); }
 .hero { transition: background .45s, box-shadow .45s; }
@@ -879,13 +936,9 @@ const cleanErr = e => String(e && e.message || e).replace(/^.*?:\s*(?=[A-Z])/, "
 /* ---------- Theme: Auto / Light (Jollof) / Dark (Plantain) ---------- */
 const THEMES = ["auto", "light", "dark"];
 // Theme switch shared by every page (customer, team, seller, rider, host)
-const themeBtn = () => { const t = local.get("cp_theme") || "auto"; return `<button class="iconbtn" data-theme-cycle aria-label="Colour theme: ${t}" title="Theme: ${t}">${ICON[t]}</button>`; };
-function cycleTheme() {
-  const next = THEMES[(THEMES.indexOf(local.get("cp_theme") || "auto") + 1) % 3];
-  local.set("cp_theme", next); applyTheme(next);
-  document.querySelectorAll("[data-theme-cycle], #theme").forEach(b => { b.innerHTML = ICON[next]; b.setAttribute("aria-label", "Colour theme: " + next); b.title = "Theme: " + next; });
-  toast(next === "auto" ? "Theme follows your phone" : next === "light" ? "Light theme" : "Dark theme");
-}
+// Moon in light mode, sun in dark mode, on every page
+const themeBtn = () => { const d = themeNow() === "dark"; return `<button class="iconbtn" data-theme-cycle aria-label="${d ? "Switch to light mode" : "Switch to dark mode"}">${ICON[d ? "light" : "dark"]}</button>`; };
+function cycleTheme() { toggleTheme(); }
 function applyTheme(t) {
   if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
   else document.documentElement.removeAttribute("data-theme");
@@ -1162,6 +1215,7 @@ function makeDemoApi() {
       if (diff > 0) { if (o.user_id && wasPaid) ledger.push({ user_id: o.user_id, amount: diff, reason: "Money back: moved to a cheaper order, code " + n.code, order_id: n.id, created_at: nowIso() }); else { o.refund_due = diff; o.refund_needed = true; } }
       void wu; return { ...res, status: n.status, to_pay: Math.max(0, -diff), refund: Math.max(0, diff) };
     },
+    async setNamePrivacy(ids, hide) { orders.filter(o => ids.includes(o.id)).forEach(o => { o.hide_name = !!hide; reviews.filter(r => r.order_id === o.id).forEach(r => { r.name = hide ? null : o.customer_name.split(" ")[0]; }); }); return null; },
     async recordUnmatched(r) { unmatched.push({ id: "u" + uid(), created_at: nowIso(), name: r.name, phone: String(r.phone || "").replace(/\D/g, ""), amount: Number(r.amount) || 0, momo_ref: r.ref, reason: r.reason }); },
     async addVendor(r) {
       const wa_ = String(r.whatsapp || "").replace(/\D/g, "");
@@ -1206,7 +1260,7 @@ function makeDemoApi() {
           const si = sites.find(s => s.id === p.site_id);
           return { id: p.id, seq: p.seq, status: p.status, site: si.name, drop_point: si.drop_point, handoff: si.handoff, host_label: si.host_label, created_at: p.created_at,
             wait_until: p.status === "waiting" ? waitUntil(p).toISOString() : null, free: pfree(p.id), fee_rate: p.fee_rate, fee_free: p.fee_free, fee: poolFee(p),
-            orders: orders.filter(o => o.pool_id === p.id && o.status !== "cancelled").sort((a, b) => a.code < b.code ? -1 : a.code > b.code ? 1 : a.created_at < b.created_at ? -1 : 1).map(o => ({ id: o.id, code: o.code, qty: o.qty, item_name: o.item_name, unit_price: o.unit_price, addons_total: o.addons_total, addons: o.addons, note: o.note, special_request: o.special_request, quote_price: o.quote_price, status: o.status, parent_id: o.parent_id || null, paid: ["paid", "collected"].includes(o.status), collected: o.status === "collected" })) };
+            orders: orders.filter(o => o.pool_id === p.id && o.status !== "cancelled").sort((a, b) => a.code < b.code ? -1 : a.code > b.code ? 1 : a.created_at < b.created_at ? -1 : 1).map(o => ({ id: o.id, code: o.code, created_at: o.created_at, qty: o.qty, item_name: o.item_name, unit_price: o.unit_price, addons_total: o.addons_total, addons: o.addons, note: o.note, special_request: o.special_request, quote_price: o.quote_price, status: o.status, parent_id: o.parent_id || null, paid: ["paid", "collected"].includes(o.status), collected: o.status === "collected" })) };
         }) };
     },
     async weeklyReport(w0) {
@@ -1225,7 +1279,7 @@ function makeDemoApi() {
       const bs = grp(cur, "site_id"), bp = grp(prev, "site_id");
       return { week_start: w0, week_end: w1, headline: { cur: head(cur, w0, w1), prev: head(prev, v0, v1) },
         money: { food, commission: Math.round(pools.filter(p => p.order_date >= w0 && p.order_date <= w1 && p.status !== "cancelled").reduce((t, p) => t + poolFee(p), 0) * 100) / 100, service_fees: cur.reduce((t, o) => t + o.service_fee * (o.fee_per_meal ? o.qty : 1), 0),
-          cashback: cur.filter(o => ["paid", "collected"].includes(o.status)).reduce((t, o) => t + cashOf(o), 0), refunds: ledger.filter(e => e.amount > 0 && /^Refund/.test(e.reason)).reduce((t, e) => t + e.amount, 0),
+          cashback: cur.filter(o => ["paid", "collected"].includes(o.status) && o.cashback_posted).reduce((t, o) => t + cashOf(o), 0), cashback_pending: cur.filter(o => ["paid", "collected"].includes(o.status) && !o.cashback_posted).reduce((t, o) => t + cashOf(o), 0), refunds: ledger.filter(e => e.amount > 0 && /^Refund/.test(e.reason)).reduce((t, e) => t + e.amount, 0),
           momo_refunds: orders.filter(o => o.refund_needed && o.order_date >= w0 && o.order_date <= w1).length, wallets_owed: users.reduce((t, u) => t + Math.max(0, balance(u.id)), 0) },
         buildings: Object.entries(bs).map(([sid, L]) => ({ name: sites.find(x => x.id === sid).name, meals: L.reduce((t, o) => t + o.qty, 0), pools: new Set(L.map(o => o.pool_id)).size,
           avg_pool: Math.round(L.reduce((t, o) => t + o.qty, 0) / new Set(L.map(o => o.pool_id)).size * 10) / 10, prev_meals: (bp[sid] || []).reduce((t, o) => t + o.qty, 0) })).sort((a, b) => b.meals - a.meals),
@@ -1248,7 +1302,7 @@ function makeDemoApi() {
       const o = orders.find(x => x.id === id && !x.parent_id); if (!o) throw new Error("Order not found.");
       if (!((me && o.user_id === me.id) || o.phone === String(phone || "").replace(/\D/g, ""))) throw new Error("Use the phone or account that placed the order.");
       if (o.status !== "collected") throw new Error("You can rate your lunch once you've collected it.");
-      const ex = reviews.find(r => r.order_id === id), row = { order_id: id, kitchen_id: o.kitchen_id, site_id: o.site_id, rating, comment: (comment || "").trim() || null, photo_url: photo || (ex && ex.photo_url) || null, name: o.customer_name.split(" ")[0], item_name: o.item_name };
+      const ex = reviews.find(r => r.order_id === id), row = { order_id: id, kitchen_id: o.kitchen_id, site_id: o.site_id, rating, comment: (comment || "").trim() || null, photo_url: photo || (ex && ex.photo_url) || null, name: o.hide_name ? null : o.customer_name.split(" ")[0], item_name: o.item_name };
       if (ex) Object.assign(ex, row); else reviews.push({ id: "r" + uid(), hidden: false, created_at: nowIso(), ...row });
       return { ok: true };
     },
@@ -1256,7 +1310,7 @@ function makeDemoApi() {
     async adminReviews() { return reviews.slice().sort((a, b) => a.created_at < b.created_at ? 1 : -1).map(r => ({ ...r })); },
     async hideReview(id, hidden) { Object.assign(reviews.find(r => r.id === id), { hidden }); },
     async uploadReviewPhoto(orderId, blob) { return await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(blob); }); },
-    async vendorSetPhoto(token, itemId, url) { const k = byToken(kitchens, "token", token); const i = items.find(x => x.id === itemId && x.kitchen_id === k.id); if (!i) throw new Error("That dish is not on your menu."); i.photo_url = url; },
+    async vendorSetPhoto(token, itemId, url) { const k = byToken(kitchens, "token", token); const i = items.find(x => x.id === itemId && x.kitchen_id === k.id); if (!i) throw new Error("That dish is not on your menu."); i.photo_url = url; i.photo_status = "pending"; },
     async uploadPhoto(folder, blob) { return await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(blob); }); },
     async kitchenAcceptTerms(token) { const k = byToken(kitchens, "token", token); k.fee_ack = Number(settings.vendor_fee_rate); k.fee_free_ack = Number(settings.vendor_fee_free);
       pools.filter(p => p.kitchen_id === k.id && p.status === "waiting").forEach(p => { p.fee_rate = k.fee_ack; p.fee_free = k.fee_free_ack; }); return { rate: k.fee_ack, free: k.fee_free_ack }; },
@@ -1442,6 +1496,7 @@ function makeSupabaseApi() {
       p_addons: r.addons || [], p_note: r.note || null, p_special: r.special || null, p_use_wallet: !!r.useWallet, ...(r.join ? { p_join: r.join } : {}) }),
     payQuote: (id, ref, useWallet) => rpc("pay_quote", { p_order: id, p_ref: ref || null, p_use_wallet: !!useWallet }),
     myOrders: ids => rpc("my_orders", { p_ids: ids }),
+    setNamePrivacy: (ids, hide) => rpc("set_name_privacy", { p_ids: ids, p_hide: !!hide }),
     addVendor: r => rpc("add_vendor", { p_site: r.site, p_name: r.name, p_whatsapp: r.whatsapp, p_items: r.items, p_lat: r.lat ?? null, p_lng: r.lng ?? null }),
     async user() { const { data } = await sb.auth.getUser(); const u = data && data.user; return u ? { id: u.id, email: u.email, name: (u.user_metadata && (u.user_metadata.name || u.user_metadata.full_name)) || null } : null; },
     async signUp(email, password, name) { const d = must(await sb.auth.signUp({ email, password, options: { data: { name: name || null } } })); if (!d.session) throw new Error("Check your email to confirm your account, then sign in."); return { id: d.user.id, email, name: name || null }; },
@@ -1692,7 +1747,12 @@ function dishKind(x) {
   const hit = rules.find(([r]) => r.test(n)); return hit ? hit[1] : "bowl";
 }
 // The kitchen's picture is its most-ordered dish
-const topDish = kid => { const ds = S.items.filter(i => i.kitchen_id === kid), pop = S.pop || {}; return ds.slice().sort((a, b) => (pop[b.id] || 0) - (pop[a.id] || 0))[0]; };
+// Real dish photos sit in the same round plate frame as the drawings, and only once most of a vendor's dishes have approved photos
+const photoOk = i => !!(i && i.photo_url && (i.photo_status == null || i.photo_status === "approved"));
+const photoReady = kid => { const ds = S.items.filter(i => i.kitchen_id === kid && i.active !== false); return ds.length > 0 && ds.filter(photoOk).length / ds.length >= 0.6; };
+const plate = (item, kid) => { const it = typeof item === "string" ? null : item; const k = kid || (it && it.kitchen_id);
+  return it && photoOk(it) && photoReady(k) ? `<span class="photoplate"><img src="${esc(it.photo_url)}" alt="" loading="lazy"></span>` : art(dishKind(item)); };
+const topDish = kid => { const ds = S.items.filter(i => i.kitchen_id === kid); return ds.find(i => i.photo_url && i.photo_ok !== false) || ds.slice().sort((a, b) => String(a.id) < String(b.id) ? -1 : 1)[0]; };
 /* Rich dish illustrations (one per type of food): plate or bowl from above, same light and shadow on every one */
 const DISH_ART = (() => {
 // ChopPool rich dish icons (proposal). Each icon: 100x100, top-down plate/bowl with gradients, highlights and soft shadow.
@@ -1905,7 +1965,7 @@ function openAccount(reason, startMode) {
     ${reason ? `<p class="note">${esc(reason)}</p>` : ""}
     ${CONFIG.GOOGLE_SIGN_IN || DEMO ? `<button class="ghost wide" id="google">Continue with Google</button><p class="small muted center">or use your email</p>` : ""}
     <form id="authForm" class="stack" novalidate>
-      ${mode === "signup" ? `<div><label for="aName">Your name</label><input id="aName" autocomplete="name" placeholder="Your name"></div>` : ""}
+      ${mode === "signup" ? `<div><label for="aName">Your name</label><input id="aName" autocomplete="name" placeholder="e.g. Ama Mensah"></div>` : ""}
       <div><label for="aEmail">Email</label><input id="aEmail" type="email" autocomplete="email" placeholder="Email address"></div>
       <div><label for="aPw">Password</label><input id="aPw" type="password" autocomplete="${mode === "signup" ? "new-password" : "current-password"}" placeholder="At least 6 characters"></div>
       <p class="err" id="aErr"></p>
@@ -1965,6 +2025,23 @@ function menuState(k) {
 }
 function collectLine(site) {
   return site.handoff === "host" ? "Collect from " + (site.host_label || site.drop_point) + " with your code." : "Meet the rider at " + site.drop_point + " with your code when you get the arrival alert.";
+}
+// On phones, wide admin tables turn into one card per row: each cell is labelled with its column
+function cardTables(root) {
+  root.querySelectorAll(".table-wrap > table").forEach(t => {
+    const hs = [...t.querySelectorAll("tr:first-child th")].map(h => h.textContent.trim());
+    if (!hs.length) return;
+    t.classList.add("cardtable");
+    t.querySelectorAll("tr").forEach(r => r.querySelectorAll("td").forEach((c, i) => { if (hs[i] && !c.hasAttribute("colspan")) c.dataset.label = hs[i]; }));
+  });
+}
+// Tapping the tab you're already on takes it back to its starting view
+function resetTab(t) {
+  closeSheet();
+  if (t === "kitchens") { S.vq = ""; if ($("#vq")) { $("#vq").value = ""; $("#vq").blur(); } $("#vsugg")?.classList.add("hidden"); }
+  if (t === "orders") S.oseg = "up";
+  setTab(t);
+  window.scrollTo({ top: 0, behavior: "smooth" });
 }
 function setTab(t) {
   if ($("#vpage")) closeVendor();
@@ -2026,7 +2103,7 @@ async function viewOrder() {
       <button data-tab="orders">${ICON.receipt}<span>Orders</span><span class="badge hidden" id="ordBadge"></span></button>
       <button data-tab="wallet">${ICON.user.replace('width="20" height="20"', 'width="22" height="22"')}<span>Account</span></button>
     </nav>`;
-  document.querySelectorAll(".tabbar button").forEach(b => b.addEventListener("click", () => setTab(b.dataset.tab)));
+  document.querySelectorAll(".tabbar button").forEach(b => b.addEventListener("click", () => { if (b.dataset.tab === S.tab) return resetTab(b.dataset.tab); setTab(b.dataset.tab); }));
   $("#placeBtn").addEventListener("click", openSitePicker);
   $("#bell").addEventListener("click", openUpdates);
   $("#theme").addEventListener("click", toggleTheme);
@@ -2278,7 +2355,7 @@ function renderWhen() {
 function heroDelivery(here, site) {
   const s = S.settings, opts = [];
   here.filter(p => p.status === "collecting" && p.meals > 0 && p.meals < s.max_meals)
-    .forEach(p => opts.push({ fee: feeFor(p.meals + 1, s, poolTrip(p, p.meals + 1)), label: "a meal to join a pool", kid: p.kitchen_id, pool: true }));
+    .forEach(p => opts.push({ fee: feeFor(p.meals + 1, s, poolTrip(p, p.meals + 1)), label: "to join a pool", kid: p.kitchen_id, pool: true }));
   if (hasPin(site)) {
     // Lowest delivery among the vendors near you (within the "near you" limit)
     const rows = nearRows().rows.map(r => ({ k: r.k, trip: tripTo(r.k, site) })).sort((a, b) => a.trip - b.trip);
@@ -2301,8 +2378,8 @@ function renderHero() {
   const dl = dayLabel(S.date);
   el.innerHTML = `<div class="hero-text"><p class="small">${greeting()}${name ? ", " + esc(name) : ""}</p>
       <h1>Lunch for ${dl === "today" || dl === "tomorrow" ? dl : fmtDate(S.date)}</h1>
-      <p class="small">Order by ${fmtTime(s.cutoff)}${dl === "today" ? "" : " " + (dl === "tomorrow" ? "tomorrow" : fmtDate(S.date))} · arrives ${fmtTime(s.delivery_time)}${site.drop_point ? " at " + esc(site.drop_point) : ""}</p>
-      <p class="small" style="opacity:.8">Ghana time (GMT) now <span class="num" id="ghNow">${ghanaNow()}</span></p></div>
+      <p class="small">Order by ${fmtTime(s.cutoff)}${dl === "today" ? "" : " " + (dl === "tomorrow" ? "tomorrow" : fmtDate(S.date))} · lunch at ${fmtTime(s.delivery_time)}</p>
+</div>
     <div class="hero-stats"><div class="hero-stat" id="cdBox"><b class="num" id="countdown">--</b><span id="cdLabel">until orders close</span></div>
       ${myLive ? `<button class="hero-stat hlink" data-gomine aria-label="Your lunch: ${esc(myLive.label)}. Open your order"><b class="${myLive.label.length > 7 ? "long" : ""}">${esc(myLive.label)}</b><span>your lunch${myLive.more ? " · +" + myLive.more + " more" : ""}</span></button>`
       : hasMineToday() ? `<button class="hero-stat hlink" data-gomine aria-label="${meals} meals ordered. Open your orders"><b class="num">${meals}</b><span>meals ordered</span></button>` : `<div class="hero-stat"><b class="num">${meals}</b><span>meals ordered</span></div>`}
@@ -2310,7 +2387,7 @@ function renderHero() {
   tickCountdown(); fitStats();
 }
 // Small phones: a figure that doesn't fit its box steps down a size instead of being cut off
-function fitStats() { requestAnimationFrame(() => document.querySelectorAll(".hero-stat b").forEach(b => { if (b.id === "countdown" && !b.querySelector(".ampm")) return; if (!b.dataset.fit && b.classList.contains("long")) return; b.dataset.fit = "1"; b.classList.remove("long", "tiny"); if (b.scrollWidth > b.clientWidth + 1) b.classList.add("long"); if (b.scrollWidth > b.clientWidth + 1) b.classList.add("tiny"); })); }
+function fitStats() { requestAnimationFrame(() => document.querySelectorAll(".hero-stat b").forEach(b => { if (b.id === "countdown" && !b.querySelector(".ampm")) return; b.classList.remove("long", "tiny"); if (b.scrollWidth > b.clientWidth + 1) b.classList.add("long"); if (b.scrollWidth > b.clientWidth + 1) b.classList.add("tiny"); })); }
 function tickCountdown() {
   document.querySelectorAll("[data-paywin]").forEach(el => { el.textContent = payWindowText(el.dataset.paywin); });
   if (!$("#countdown")) return;
@@ -2377,7 +2454,7 @@ function renderKitchensAnywhere(el) {
 const photoOf = k => { const t = topDish(k.id); return (t && t.photo_url) || (S.items.find(i => i.kitchen_id === k.id && i.photo_url) || {}).photo_url || null; };
 function photoHead(k, i, inner, small) {
   // Cards always use the illustration so Pools and Menus stay consistent; real photos are in the vendor's menu sheet
-  return `<div class="pool-art g${i % 4}${small ? " small" : ""}"><span class="illus">${art(dishKind(topDish(k.id)))}</span><span class="shade"></span>${inner}</div>`;
+  return `<div class="pool-art g${i % 4}${small ? " small" : ""}"><span class="illus">${plate(topDish(k.id), k.id)}</span><span class="shade"></span>${inner}</div>`;
 }
 // Your own live order in this vendor's pool here (then the card offers "Add to my order" instead of joining again)
 const myOrderIn = k => (S.mine || []).find(o => !o.parent_id && o.kitchen_id === k.id && o.site_id === S.siteId && o.order_date === S.date
@@ -2440,8 +2517,8 @@ const shortName = n => String(n || "").split(/\s+/).slice(0, 2).join(" ");
 const moneyShort = v => Number.isInteger(Number(v)) ? "GHS " + Number(v) : money(v);
 const themeNow = () => { const t = local.get("cp_theme") || "auto"; return t === "auto" ? (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light") : t; };
 function syncThemeBtns() {
-  const d = themeNow() === "dark", b = $("#theme");
-  if (b) { b.innerHTML = ICON[d ? "light" : "dark"]; b.setAttribute("aria-label", d ? "Switch to light mode" : "Switch to dark mode"); }
+  const d = themeNow() === "dark";
+  document.querySelectorAll("[data-theme-cycle], #theme").forEach(b => { b.innerHTML = ICON[d ? "light" : "dark"]; b.setAttribute("aria-label", d ? "Switch to light mode" : "Switch to dark mode"); });
 }
 function toggleTheme() { const next = themeNow() === "dark" ? "light" : "dark"; local.set("cp_theme", next); applyTheme(next); syncThemeBtns(); }
 const locChip = () => `<button class="locchip" aria-label="Change building">${ICON.pin}<span class="locname">${esc(siteOf(S.siteId).name || "")}</span></button>`;
@@ -2498,7 +2575,7 @@ function vInfo(k) {
   if (S.noSite) dl = "Choose your building to see delivery";
   else if (st.full) dl = "Fully booked " + dayLabel(S.date);
   else if (active && poolTrip(p, p.meals + 1) === 0) { dl = "Free delivery by the vendor"; short = "Free"; unit = "delivery"; }
-  else if (active) { const j = feeFor(p.meals + 1, s, poolTrip(p, p.meals + 1)); dl = "Delivery " + money(j) + " a meal if you join"; short = money(j); unit = "a meal"; }
+  else if (active) { const j = feeFor(p.meals + 1, s, poolTrip(p, p.meals + 1)); dl = money(j) + " a meal in a pool"; short = money(j); unit = "a meal"; }
   else if (trip === 0) { dl = "Free delivery by the vendor"; short = "Free"; unit = "delivery"; }
   else if (freeReach(k, siteOf(S.siteId))) { dl = "Free delivery from " + k.free_min + " meals"; short = moneyShort(trip); unit = "delivery"; }
   else { dl = "Delivery ~" + moneyShort(trip) + ", shared"; short = moneyShort(trip); unit = "delivery"; }
@@ -2509,12 +2586,12 @@ const rateHtml = k => { const sc = (S.scores || {})[k.id] || {}; return sc.ratin
 function vendorTile(k, nearest) {
   const v = vInfo(k), i = menuIndex(k.id);
   const badge = v.st.full ? `<span class="vbadge bad">Fully booked</span>` : v.st.waiting ? `<span class="vbadge">Waiting to confirm</span>` : v.active ? `<span class="vbadge ok">${v.p.meals} in a pool</span>` : "";
-  return `<button class="vtile" data-vendor="${esc(k.id)}"><span class="vph" style="background:${tint(i)}">${badge}${nearest ? `<span class="vnear">Nearest</span>` : ""}${art(dishKind(topDish(k.id)))}</span>
+  return `<button class="vtile" data-vendor="${esc(k.id)}"><span class="vph" style="background:${tint(i)}">${badge}${nearest ? `<span class="vnear">Nearest</span>` : ""}${plate(topDish(k.id), k.id)}</span>
     <span class="vb"><strong>${esc(k.public_name)}</strong><span class="vmeta">${rateHtml(k)}${v.km != null ? ` · ${kmText(v.km)}` : ""}</span><span class="vdl${S.noSite || v.st.full ? " dim" : ""}">${esc(v.dl)}</span></span></button>`;
 }
 function vendorRow(k) {
   const v = vInfo(k), i = menuIndex(k.id), dishes = S.items.filter(it => it.kitchen_id === k.id);
-  return `<button class="vrow" data-vendor="${esc(k.id)}"><span class="vph" style="background:${tint(i)}">${art(dishKind(topDish(k.id)))}</span>
+  return `<button class="vrow" data-vendor="${esc(k.id)}"><span class="vph" style="background:${tint(i)}">${plate(topDish(k.id), k.id)}</span>
     <span class="vtx"><strong>${esc(k.public_name)}</strong><span class="cu">${esc(k.tagline || dishes.slice(0, 2).map(d => d.name).join(", "))}</span><span class="vmeta">${rateHtml(k)}${v.km != null ? ` · ${kmText(v.km)}` : ""}</span>
       ${v.active ? `<span class="small" style="color:var(--ok);font-weight:800">${v.p.meals} in a pool</span>` : v.st.full ? `<span class="small" style="color:var(--danger);font-weight:700">Fully booked</span>` : ""}</span>
     ${S.noSite || v.st.full ? "" : `<span class="vr"><b>${esc(v.short)}</b><small>${esc(v.unit)}</small></span>`}</button>`;
@@ -2537,11 +2614,11 @@ function poolRow(k) {
   else if (st.waiting) {
     const wp = S.board.pools.find(x => x.site_id === S.siteId && x.kitchen_id === k.id && x.status === "waiting");
     l2 = mo ? "Waiting for the vendor · " + leftText(wp) : "Waiting for the vendor · " + leftText(wp) + ". Full refund if they don't confirm"; warn = true;
-  } else if (mo) l2 = j < now ? "Add and delivery drops to " + money(j) + " a meal" : "Delivery is " + money(now) + " a meal right now";
-  else l2 = j < now ? "Join and delivery drops to " + money(j) + " a meal" : "Delivery " + money(j) + " a meal if you join";
+  } else if (mo) l2 = j < now ? "Add and delivery drops to " + money(j) + " a meal" : "Your share " + money(now) + " a meal";
+  else l2 = j < now ? "Join and delivery drops to " + money(j) + " a meal" : money(j) + " a meal in this pool";
   const act = mo ? `<button class="btn" data-addplate="${esc(mo.id)}">Add</button>` : st.full ? `<button class="btn" disabled>Full</button>` : `<button class="btn" data-vendor="${esc(k.id)}">Join</button>`;
-  return `<article class="prow${mo ? " mine" : ""}"><span class="ptile" data-vendor="${esc(k.id)}" style="background:${tint(i)}">${art(dishKind(topDish(k.id)))}</span>
-    <span class="ptx" data-vendor="${esc(k.id)}"><strong>${esc(k.public_name)}${mo ? ` <span class="ytag">Your pool</span>` : ""}</strong><span class="l1"><span class="num">${p.meals} of ${max} meals${mo ? " · code " + esc(mo.code) : ""}</span></span>
+  return `<article class="prow${mo ? " mine" : ""}"><span class="ptile" data-vendor="${esc(k.id)}" style="background:${tint(i)}">${plate(topDish(k.id), k.id)}</span>
+    <span class="ptx" data-vendor="${esc(k.id)}"><strong>${esc(k.public_name)}${mo ? ` <span class="ytag">Your pool</span>` : ""}</strong><span class="l1"><span class="num">${p.meals} of ${max} meals</span>${mo ? ` · <span class="num">code ${esc(mo.code)}</span>` : ""}</span>
       <span class="l2${warn ? " warn" : ""}">${esc(l2)}</span><span class="pbar"><i style="width:${Math.min(100, Math.round(p.meals / max * 100))}%"></i></span></span>
     <span class="acts">${act}${st.full ? "" : `<button class="iconround" data-share="${esc(S.siteId)},${esc(k.id)}" aria-label="Share this pool">${ICON.share}</button>`}</span></article>`;
 }
@@ -2559,7 +2636,8 @@ function renderPools() {
   const site = siteOf(S.siteId);
   $("#pools").innerHTML = list.map(poolRow).join("") || `<div class="emptyrow"><span class="eic">${ICON.store.replace(/width="\d+" height="\d+"/, 'width="22" height="22"')}</span><div><strong>No active pools at ${esc(site.name || "your building")} yet today.</strong><p>Start one and others in your building can join it.</p></div></div>`;
   const nr = nearRows().rows.slice(0, 6);
-  $("#nearGrid").innerHTML = nr.map((r, n) => vendorTile(r.k, n === 0)).join("") || `<p class="small muted">No vendors deliver here yet. Add one you know from the Vendors tab.</p>`;
+  $("#nearGrid").classList.toggle("vlist", nr.length > 0 && nr.length < 3); $("#nearGrid").classList.toggle("vgrid", nr.length >= 3);
+  $("#nearGrid").innerHTML = (nr.length < 3 ? nr.map(r => vendorRow(r.k)) : nr.map((r, n) => vendorTile(r.k, n === 0))).join("") || `<p class="small muted">No vendors deliver here yet. Add one you know from the Vendors tab.</p>`;
   if (S.vp) drawVendorLive();
 }
 
@@ -2581,7 +2659,7 @@ function renderKitchens() {
   let further = [];
   if (S.noSite) rows = S.menus.filter(k => !k.site_id).map(k => ({ k, d: null }));
   else { const nr = nearRows(); rows = nr.rows; far = nr.far; further = nr.further; }
-  $("#kitchensSub").textContent = S.noSite ? "Top vendors across Accra. Choose your building to see delivery prices." : "Delivering to " + (site.name || "your building") + "." + (far ? " " + far + " more too far to deliver here." : "");
+  $("#kitchensSub").textContent = S.noSite ? "Top vendors across Accra. Choose your building to see delivery prices." : (far ? far + " more too far to deliver here." : "");
   const pick = list => list.filter(r => (f !== "fav" || fv.has(r.k.id)) && (f !== "pools" || (!S.noSite && activeHere(r.k)))
     && (f !== "local" || [...kindsOf(r.k)].some(x => LOCAL_KINDS.has(x))) && (f !== "healthy" || [...kindsOf(r.k)].some(x => HEALTHY_KINDS.has(x))));
   // Each filter shows nearby vendors only; vendors with a higher delivery cost have their own "Further away" tab
@@ -2591,7 +2669,7 @@ function renderKitchens() {
   const nearestId = !S.noSite && nearRows().rows[0]?.k.id;
   const empty = { fav: ["No favourites yet", "Tap the heart on any vendor's page to keep them here."], pools: ["No pools open yet", "Start one from any vendor and others in your building can join."], local: ["No local dishes here yet", "Try another filter."], healthy: ["No healthy options here yet", "Try another filter."] }[f]
     || [S.noSite ? "Choose your building" : "No vendors deliver here yet", S.noSite ? "Then you'll see the menus that deliver there." : "Add a vendor you know below."];
-  const block = list => view === "list" ? `<div class="vlist">${list.map(r => vendorRow(r.k)).join("")}</div>` : `<div class="vgrid">${list.map(r => vendorTile(r.k, r.k.id === nearestId)).join("")}</div>`;
+  const block = list => view === "list" || list.length < 3 ? `<div class="vlist">${list.map(r => vendorRow(r.k)).join("")}</div>` : `<div class="vgrid">${list.map(r => vendorTile(r.k, r.k.id === nearestId)).join("")}</div>`;
   const farNote = f === "far" ? `<p class="small muted" style="margin:2px 0 12px">Delivery from these vendors costs more than ${moneyShort(S.settings.near_max_fee || 50)} to ${esc(site.name || "your building")}. Joining a pool brings it down.</p>` : "";
   const farLink = farCount ? `<button class="farlink" data-vf="far"><span>${farCount} more vendor${farCount === 1 ? "" : "s"} further away</span>${ICON.chev}</button>` : "";
   el.innerHTML = rows.length || farCount ? farNote + (rows.length ? block(rows) : `<div class="emptyrow"><span class="eic">${ICON.store.replace(/width="\d+" height="\d+"/, 'width="22" height="22"')}</span><div><strong>No vendors nearby yet</strong><p>These vendors still deliver to ${esc(site.name || "your building")}, for a bit more.</p></div></div>`) + farLink
@@ -2654,10 +2732,10 @@ window.addEventListener("popstate", () => { if ($("#vpage")) closeVendor(true); 
 function vendorBanner(k) {
   const s = S.settings, v = vInfo(k), mo = S.noSite ? null : myOrderIn(k), site = siteOf(S.siteId), day = dayLabel(S.date);
   if (S.noSite) return `<div class="vbanner o"><span>Choose your building to order from <b>${esc(k.public_name)}</b> and see delivery prices.</span></div>`;
-  if (mo) return `<div class="vbanner"><span><b>You're in this pool</b> · code <b class="num">${esc(mo.code)}</b>. ${v.active ? "Delivery is " + money(feeFor(Math.max(v.p.meals, 1), s, poolTrip(v.p))) + " a meal right now." : ""} Add a plate or share it so delivery drops.</span></div>`;
+  if (mo) return `<div class="vbanner"><span><b>You're in this pool</b> · code <b class="num">${esc(mo.code)}</b>. ${v.active ? "Your share now " + money(feeFor(Math.max(v.p.meals, 1), s, poolTrip(v.p))) + " a meal." : ""} Add a plate or share it so delivery drops.</span></div>`;
   if (v.st.full) return `<div class="vbanner bad"><span><b>Fully booked ${esc(day)}.</b> Try another vendor near you.</span></div>`;
   if (v.st.waiting) return `<div class="vbanner w"><span><b>Waiting for ${esc(k.public_name)} to confirm</b> · ${v.p ? v.p.meals : 0} meals so far. Join anyway: if they don't confirm in time, everyone gets their money back.</span></div>`;
-  if (v.active) { const j = feeFor(v.p.meals + 1, s, poolTrip(v.p, v.p.meals + 1)); return `<div class="vbanner"><span><b>${v.p.meals} meal${v.p.meals > 1 ? "s" : ""} from ${esc(site.name || "your building")}</b> in a pool. Join now and delivery is ${money(j)} a meal.</span></div>`; }
+  if (v.active) { const j = feeFor(v.p.meals + 1, s, poolTrip(v.p, v.p.meals + 1)); return `<div class="vbanner"><span><b>${v.p.meals} meal${v.p.meals > 1 ? "s" : ""} from ${esc(site.name || "your building")}</b> in a pool. Join now and your share is ${money(j)} a meal.</span></div>`; }
   if (v.st.open) return `<div class="vbanner o"><span><b>Cooking ${esc(day)}.</b> Start a pool and share it: delivery gets cheaper for everyone who joins.</span></div>`;
   return `<div class="vbanner o"><span><b>No pool yet ${esc(day)}.</b> Start one and we'll ask ${esc(k.public_name)} to confirm. Others in your building can join.</span></div>`;
 }
@@ -2665,7 +2743,7 @@ function vendorFoot(k) {
   const v = vInfo(k), mo = S.noSite ? null : myOrderIn(k);
   const label = S.noSite ? "Choose your building" : mo ? "Add to my order" : v.st.full ? "Fully booked" : v.st.waiting ? "Join anyway" : v.active ? "Join the pool" : v.st.open ? "Start a pool" : "Order and ask them to cook";
   const sub = S.noSite ? "Then pick your meal" : mo ? "Same bag, code " + mo.code : v.st.full ? "Try another vendor" : "Pick your meal next";
-  return `<button class="btn" data-vgo${v.st.full && !mo ? " disabled" : ""}><span><span>${esc(label)}</span><small>${esc(sub)}</small></span>${S.noSite || v.st.full ? "" : `<span class="num">${esc(v.short)}<small style="text-align:right">${esc(v.unit)}</small></span>`}</button>`;
+  return `<button class="btn" data-vgo${v.st.full && !mo ? " disabled" : ""}><span><span>${esc(label)}</span><small>${esc(sub)}</small></span></button>`;
 }
 function drawVendorLive() {
   const k = menuOf(S.vp && S.vp.id); if (!k.id) return;
@@ -2680,12 +2758,12 @@ function drawVendor() {
   const facts = [
     sc.ratings >= 1 ? [`<span class="rs">★ ${Number(sc.rating).toFixed(1)}</span>`, sc.ratings + " rating" + (sc.ratings > 1 ? "s" : "")] : ["New", "on ChopPool"],
     v.km != null ? [kmText(v.km).replace(/^u/, "U"), "by road"] : [String(dishes.length), "dish" + (dishes.length === 1 ? "" : "es") + " on the menu"],
-    S.noSite ? ["Choose", "your building for prices"] : ["~" + moneyShort(v.trip), v.long ? "delivery, shared at cost" : "delivery, shared by the pool"]];
+    S.noSite ? ["Choose", "your building for prices"] : [moneyShort(v.trip), "trip, shared by the pool"]];
   el.innerHTML = `<div class="vhero" style="background:${tint(i0)}">
       <button class="vfab" data-vback style="left:14px" aria-label="Back">${ICON.back}</button>
       <button class="vfab${fav ? " fav" : ""}" data-vfav style="right:${S.noSite ? 14 : 64}px" aria-label="${fav ? "Remove from favourites" : "Add to favourites"}" aria-pressed="${fav}">${ICON.heart}</button>
       ${S.noSite ? "" : `<button class="vfab" data-share="${esc(S.siteId)},${esc(k.id)}" style="right:14px" aria-label="Share">${ICON.share}</button>`}
-      <div class="vplate">${art(dishKind(topDish(k.id)))}</div></div>
+      <div class="vplate">${plate(topDish(k.id), k.id)}</div></div>
     <div class="vbody">
       <h1>${esc(k.public_name)}</h1>
       <p class="cu">${esc(k.added_by_customer ? "A local vendor added by a customer. ChopPool doesn't inspect their kitchen." : k.tagline || "")}</p>
@@ -2693,7 +2771,7 @@ function drawVendor() {
       <div id="vpBanner">${vendorBanner(k)}</div>
       <div class="vtabs" role="tablist"><button data-vtab="menu" aria-pressed="${S.vp.tab === "menu"}">Menu</button><button data-vtab="rev" aria-pressed="${S.vp.tab === "rev"}">Reviews${sc.ratings ? " · " + sc.ratings : ""}</button></div>
       <div id="vpBody" class="stack" style="gap:8px">${S.vp.tab === "menu" ? groups.map(([t, ds]) => `<h3 class="vcat">${esc(t)}</h3>` + ds.map(d => `<button class="vitem" data-dish="${esc(d.id)}">
-          <span class="vph" style="background:${tint(i0)}">${art(dishKind(d))}</span><span class="vtx"><strong>${esc(d.name)}</strong>${(d.addons || []).length ? `<span class="ds">Extras: ${esc(d.addons.map(a => a.name).join(", "))}</span>` : ""}<span class="pr num">${money(d.price)}</span></span><span class="plus" aria-hidden="true">+</span></button>`).join("")).join("")
+          <span class="vph" style="background:${tint(i0)}">${plate(d, k.id)}</span><span class="vtx"><strong>${esc(d.name)}</strong>${(d.addons || []).length ? `<span class="ds">Extras: ${esc(d.addons.map(a => a.name).join(", "))}</span>` : ""}<span class="pr num">${money(d.price)}</span></span><span class="plus" aria-hidden="true">+</span></button>`).join("")).join("")
         || `<p class="small muted">No dishes on the menu yet.</p>` : `<p class="small muted">Loading reviews…</p>`}</div>
     </div>`;
   if ($("#vfoot")) $("#vfoot").innerHTML = vendorFoot(k);
@@ -2708,7 +2786,7 @@ async function loadVendorReviews(k) {
   const avg = sc.ratings ? Number(sc.rating) : n ? rs.reduce((t, r) => t + r.rating, 0) / n : 0;
   box.innerHTML = (avg ? `<div class="rsum"><div class="big"><b>${avg.toFixed(1)}</b><span>${sc.ratings || n} rating${(sc.ratings || n) > 1 ? "s" : ""}</span></div><div class="rbars">${dist.map(([x, pc]) => `<div>${x}<i><u style="width:${pc}%"></u></i></div>`).join("")}</div></div>` : "")
     + (pics.length ? `<h3 class="vcat">Photos</h3><div class="photostrip">${pics.map((r, m) => `<button type="button" class="pshot" data-shot="${m}"><img src="${esc(r.photo_url)}" alt="" loading="lazy"><span>${r.vendor ? "From the vendor" : starsOf(r.rating, 10)}</span></button>`).join("")}</div>` : "")
-    + (notes.length ? `<h3 class="vcat">What people say</h3>` + notes.slice(0, 20).map(r => `<div class="rcm"><div class="h"><b>${esc(r.name || "Customer")}</b><span>${esc(r.created_at ? fmtDate(String(r.created_at).slice(0, 10)) : "")}</span></div><span class="stars">${starsOf(r.rating, 13)}</span>${r.comment ? `<p>${esc(r.comment)}</p>` : ""}${r.item_name ? `<span class="small muted">${esc(r.item_name)}</span>` : ""}</div>`).join("") : "")
+    + (notes.length ? `<h3 class="vcat">What people say</h3>` + notes.slice(0, 20).map(r => `<div class="rcm"><div class="h"><b>${esc(r.name || "Someone")}</b><span>${esc(r.created_at ? fmtDate(String(r.created_at).slice(0, 10)) : "")}</span></div><span class="stars">${starsOf(r.rating, 13)}</span>${r.comment ? `<p>${esc(r.comment)}</p>` : ""}${r.item_name ? `<span class="small muted">${esc(r.item_name)}</span>` : ""}</div>`).join("") : "")
     || `<div class="emptyrow"><span class="eic">${STAR(false, 22)}</span><div><strong>No reviews yet</strong><p>Customers can rate ${esc(k.public_name)} after they collect their lunch.</p></div></div>`;
   box.onclick = e => { const b = e.target.closest("[data-shot]"); if (!b) return; const r = pics[+b.dataset.shot];
     const lb = document.createElement("div"); lb.className = "lightbox"; lb.innerHTML = `<img src="${esc(r.photo_url)}" alt=""><p>${r.vendor ? "From the vendor · " + esc(r.item_name || "") : starsOf(r.rating, 14) + " " + esc(r.item_name || "") + (r.comment ? " · “" + esc(r.comment) + "”" : "")}</p>`;
@@ -2796,7 +2874,7 @@ function pickSwitchDish(o, t) {
   $("#swForm").addEventListener("submit", async ev => { ev.preventDefault(); const { d, diff } = upd(), ref = ($("#swRef")?.value || "").trim();
     if (diff > 0.004 && ref.length < 6) return ($("#swErr").textContent = "Enter the transaction ID of the extra payment.");
     try { const r = await api.switchOrder(o.id, { site: t.p.site_id, item: d.id, qty: o.qty, ref: diff > 0.004 ? ref : null });
-      const saved = local.get("cp_orders") || []; saved.push({ id: r.id, order_date: r.order_date || S.date }); local.set("cp_orders", saved);
+      const saved = local.get("cp_orders") || []; saved.push({ id: r.id, order_date: r.order_date || S.date }); local.set("cp_orders", saved); if (local.get("cp_hide_name")) syncNamePrivacy();
       closeSheet(); toast("Moved. Your new code is " + r.code + "."); notifyServer({ order_id: r.id }); if (local.get("cp_push")) pushSubscribe({ order_ids: (local.get("cp_orders") || []).map(x => x.id) }, true); await refreshBoard(); await refreshMine();
     } catch (e) { $("#swErr").textContent = cleanErr(e); } });
 }
@@ -2886,7 +2964,7 @@ const MUTE_TYPES = [["Your orders", [["confirm", "The vendor confirms or cancels
   ["Your building", [["building", "Someone orders at your building"]]]];
 const muted = () => new Set(local.get("cp_mute") || []);
 const notifOn = type => !muted().has(type);
-const alertsSummary = () => { const all = MUTE_TYPES.flatMap(g => g[1]).length, on = all - muted().size; return (local.get("cp_alerts") ? "On" : "Off on this phone") + " · " + on + " of " + all + " types"; };
+const alertsSummary = () => { const all = MUTE_TYPES.flatMap(g => g[1]).length, on = all - muted().size; return local.get("cp_alerts") ? "On · " + on + " alert type" + (on === 1 ? "" : "s") : "Off"; };
 const themeLabel = () => ({ auto: "Match my phone", light: "Light", dark: "Dark" })[local.get("cp_theme") || "auto"];
 async function renderWallet() {
   const el = $("#tabWallet"); if (!el) return;
@@ -2896,20 +2974,22 @@ async function renderWallet() {
   const entries = (w && w.entries) || [];
   const recent = recentSites().map(id => siteOf(id).name).filter(Boolean);
   el.innerHTML = `
-    <button class="prof" id="profBtn">${avatarHtml(name)}<span class="ptx"><b>${esc(name || "Add your name")}</b><small>${esc([me.phone, site.name].filter(Boolean).join(" · ") || (S.user ? S.user.email : "Guest on this phone"))}</small></span><span class="ed">Edit</span></button>
+    <button class="prof" id="profBtn">${avatarHtml(name)}<span class="ptx"><b>${esc(name || "Add your name")}</b><small>${esc([fmtPhone(me.phone), site.name].filter(Boolean).join(" · ") || (S.user ? S.user.email : "Guest on this phone"))}</small></span><span class="ed">Edit</span></button>
     <div class="wcard"><small>ChopPool wallet</small><b class="num">${money(S.user ? S.balance : 0)}</b><p>${S.user ? (w && Number(w.pending) > 0 ? "Coming back: " + money(w.pending) + " once you've got your lunch. " : "") + "Used first at checkout. Credit can't be withdrawn as cash." : "When others join your pool, your share of the trip comes back here."}</p>
-      ${S.user ? "" : `<button class="btn" id="wSign">Create an account to collect cashback</button>`}</div>
+      ${S.user ? "" : `<button class="btn" id="wSign">Keep my cashback</button>`}</div>
     ${S.user ? `<p class="gtitle">Activity</p><div class="glist">${entries.length ? entries.slice(0, 3).map(txRow).join("") + `<button class="grow seeall" id="txAll">See all transactions</button>` : `<div class="grow"><span class="gtx"><small>No activity yet. Order from a pool to start earning cashback.</small></span></div>`}</div>`
       : `<button class="linkbtn" id="wIn" style="justify-self:center">I already have an account</button>`}
     <p class="gtitle">Settings</p>
     <div class="glist">
       <button class="grow" data-acc="notif"><span class="gic">${ICON.bell}</span><span class="gtx">Notifications<small>${esc(alertsSummary())}</small></span><span class="ch">›</span></button>
-      <button class="grow" data-acc="profile"><span class="gic">${ICON.phone}</span><span class="gtx">MoMo number<small>${esc(me.phone || "Add the number you pay with")}</small></span><span class="ch">›</span></button>
+      <button class="grow" data-acc="payments"><span class="gic">${ICON.phone}</span><span class="gtx">Payments<small>${esc(me.phone ? "MoMo " + fmtPhone(me.phone) + (me.network ? " · " + me.network : "") : "Add the number you pay with")}</small></span><span class="ch">›</span></button>
+      <button class="grow" data-acc="privacy"><span class="gic">${ICON.user || ICON.help}</span><span class="gtx">Name privacy<small>${local.get("cp_hide_name") ? "Hidden from other customers" : "First name shown"}</small></span><span class="ch">›</span></button>
       <button class="grow" data-acc="building"><span class="gic">${ICON.pin.replace('width="13" height="13"', 'width="18" height="18"')}</span><span class="gtx">My buildings<small>${esc(recent.slice(0, 2).join(", ") || site.name || "Choose your building")}</small></span><span class="ch">›</span></button>
       <button class="grow" data-acc="theme"><span class="gic">${ICON.dark}</span><span class="gtx">Appearance<small>${esc(themeLabel())}</small></span><span class="ch">›</span></button>
       ${isStandalone() ? "" : `<button class="grow" data-install="#order"><span class="gic">${ICON.download}</span><span class="gtx">Get the app<small>One tap from your home screen${pushReady() ? ", with alerts" : ""}</small></span><span class="ch">›</span></button>`}
       <button class="grow" data-acc="help"><span class="gic">${ICON.help}</span><span class="gtx">How ChopPool works</span><span class="ch">›</span></button>
-      ${S.user ? `<button class="grow" data-acc="signout"><span class="gic">${ICON.out}</span><span class="gtx">Sign out<small>${esc(S.user.email || "")}</small></span></button>` : `<button class="grow" data-acc="signin"><span class="gic">${ICON.user}</span><span class="gtx">Sign in or create an account</span><span class="ch">›</span></button>`}
+      <button class="grow" data-acc="legal"><span class="gic">${ICON.list}</span><span class="gtx">Privacy and terms</span><span class="ch">›</span></button>
+      ${S.user ? `<button class="grow" data-acc="signout"><span class="gic">${ICON.out}</span><span class="gtx">Sign out<small>${esc(S.user.email || "")}</small></span></button>` : ""}
     </div>`;
   if (!el.dataset.wired) { el.dataset.wired = "1"; el.addEventListener("click", accountClick); }
 }
@@ -2922,11 +3002,98 @@ async function accountClick(e) {
   const t = a.dataset.acc;
   if (t === "notif") return openNotifSettings();
   if (t === "profile") return openProfile(true);
+  if (t === "payments") return openPayments();
+  if (t === "privacy") return openNamePrivacy();
   if (t === "building") return openSitePicker();
   if (t === "theme") return openAppearance();
   if (t === "help") return openHelp();
+  if (t === "legal") return openLegal("privacy");
   if (t === "signin") return openAccount();
   if (t === "signout") { await api.signOut(); S.user = null; await refreshUser(); refreshMine(); renderWallet(); toast("Signed out"); }
+}
+// Payments: the MoMo number you pay with and its network; built to hold more methods later
+function openPayments() {
+  const me = meNow();
+  openSheet(`${sheetHead("Payments", "How you pay for lunch.")}
+    <form id="payForm" class="stack" novalidate>
+      <p class="gtitle" style="margin:0">MoMo</p>
+      <div class="grid2"><div><label for="payPhone">Number you pay with</label><input id="payPhone" inputmode="tel" value="${esc(fmtPhone(me.phone || ""))}" placeholder="024 123 4567"></div>
+        <div><label for="payNet">Network</label><select id="payNet">${["", ...NETWORKS].map(n => `<option value="${esc(n)}"${(me.network || "") === n ? " selected" : ""}>${n || "Choose"}</option>`).join("")}</select></div></div>
+      <p class="small muted">We fill this in at checkout and use it for MoMo refunds. Card payments and a second number are coming later.</p>
+      <p class="err" id="payErr"></p><button class="btn wide">Save</button></form>`);
+  $("#payForm").addEventListener("submit", async ev => { ev.preventDefault(); const ph = $("#payPhone").value.replace(/\D/g, ""), net = $("#payNet").value;
+    if (ph && !/^0\d{9}$/.test(ph)) return ($("#payErr").textContent = "Enter a 10-digit MoMo number starting with 0, like 024 123 4567.");
+    local.set("cp_me", { ...meNow(), phone: ph, network: net });
+    if (S.user) { try { await api.saveProfile({ phone: ph || null }); } catch (e) {} }
+    closeSheet(); toast("Saved"); renderWallet(); });
+}
+// Name privacy: show my first name to other customers, or keep it hidden (riders and hosts always see it for the handover)
+function openNamePrivacy() {
+  const hidden = !!local.get("cp_hide_name");
+  openSheet(`${sheetHead("Name privacy", "Riders and drop-point hosts always see your name so they hand over the right meal.")}
+    <div class="stack" style="gap:8px"><label class="grow"><input type="radio" name="np" value="show"${hidden ? "" : " checked"}> <span class="gtx">Show my first name<small>Shown next to ratings you leave for vendors</small></span></label>
+    <label class="grow"><input type="radio" name="np" value="hide"${hidden ? " checked" : ""}> <span class="gtx">Hide my name<small>Your ratings show as "Someone"</small></span></label></div>`);
+  $("#sheet").addEventListener("change", e => { if (e.target.name !== "np") return; local.set("cp_hide_name", e.target.value === "hide"); syncNamePrivacy(); renderWallet(); toast(e.target.value === "hide" ? "Your name is hidden from other customers" : "Your first name shows in pools"); });
+}
+/* ---------- Privacy notice and terms of use (plain language; have a lawyer check before launch) ---------- */
+const LEGAL_UPDATED = "8 November 2026";
+function legalHtml(which) {
+  const s = S.settings || {}, contact = s.momo_number || "";
+  const P = `<h3>What we collect</h3>
+    <ul><li><strong>Your name and phone number</strong>, so the rider can hand over the right meal and we can reach you about your order.</li>
+      <li><strong>Your building and drop point</strong>, to group orders into pools.</li>
+      <li><strong>Your MoMo transaction ID</strong>, to match your payment. We never ask for your MoMo PIN.</li>
+      <li><strong>Your email</strong>, only if you create an account, to sign you in and keep your wallet.</li>
+      <li><strong>Your location</strong>, only when you tap "Use my location" (customers) or while a rider's page is open, to find nearby buildings and tell customers lunch is close. We don't track you in the background.</li>
+      <li><strong>Ratings and photos</strong> you choose to add.</li></ul>
+    <h3>Who sees it</h3>
+    <ul><li>The vendor sees your order and code. For special requests, they see what you asked for.</li>
+      <li>The rider or drop-point host sees your first name, code and phone number to hand over your meal.</li>
+      <li>Other customers never see your phone number. Your first name shows next to ratings you leave, unless you hide it under Account › Name privacy.</li>
+      <li>The ChopPool team sees orders and payments to run deliveries, refunds and support.</li>
+      <li>We don't sell your data or share it for advertising.</li></ul>
+    <h3>How long we keep it</h3>
+    <p>Order and payment records are kept for up to 6 years for accounting. Alert subscriptions are removed when they stop working. You can ask us to delete your account and personal details at any time; we keep only what the law requires for payments.</p>
+    <h3>Your rights</h3>
+    <p>Under Ghana's Data Protection Act, 2012 (Act 843) you can ask to see, correct or delete your personal data, and object to how we use it. Contact us${contact ? ` on <strong class="num">${esc(contact)}</strong>` : ""} and we'll respond within 21 days.</p>
+    <h3>Security</h3>
+    <p>Data is stored with our hosting provider over encrypted connections. Team access is limited, logged and signs out automatically.</p>`;
+  const T = `<h3>How ChopPool works</h3>
+    <p>ChopPool groups lunch orders from the same building so one delivery trip is shared. Vendors cook and pack your food; riders or your vendor's runner deliver it to your building's drop point.</p>
+    <h3>Paying</h3>
+    <ul><li>You pay for your meal, the full delivery trip and the service fee when you order, by MoMo to the number shown.</li>
+      <li>Your order is confirmed once we find your payment. If we can't find it, or it's short, we'll tell you how to fix it before orders close.</li>
+      <li>Once you've got your lunch, your fair share of the trip is worked out. What you paid above it comes back to your ChopPool wallet as cashback. Wallet credit is used first on your next order and can't be withdrawn as cash, except as a refund we agree.</li></ul>
+    <h3>Cancellations and refunds</h3>
+    <ul><li>You can cancel before orders close. Paid orders go back to your wallet, or to MoMo if you ask.</li>
+      <li>If a vendor doesn't confirm, can't cook, or your pool is cancelled, you get your money back in full.</li>
+      <li>Special requests are priced by the vendor first. You then have ${esc(s.quote_pay_min || 15)} minutes to pay, or the request is released and nothing is charged.</li>
+      <li>If something is wrong with your meal, tap <strong>Report a problem</strong> on the order the same day. We'll look into it and credit you where it's fair.</li></ul>
+    <h3>Collecting your meal</h3>
+    <p>Bring your code to the drop point. Meals not collected within ${esc(s.auto_receive_min || 120)} minutes of delivery are treated as received. Please check allergies and ingredients with the vendor before ordering; ChopPool doesn't prepare food.</p>
+    <h3>Fair use</h3>
+    <p>Don't place orders you don't intend to pay for, reuse someone else's payment ID, or misuse codes. We may block numbers or accounts that do.</p>
+    <h3>Vendors and riders</h3>
+    <p>Vendors and riders agree to the terms shown on their own pages, including the ChopPool fee and payout timing.</p>
+    <h3>Changes</h3>
+    <p>We may update these terms. The date below shows the latest version; orders already placed keep the terms they were placed under.</p>`;
+  return `<div class="legal stack small">${which === "terms" ? T : P}<p class="muted">Last updated ${LEGAL_UPDATED}.</p></div>`;
+}
+function viewLegal(which) {
+  document.title = (which === "terms" ? "Terms of use" : "Privacy notice") + " · ChopPool";
+  $("#view").innerHTML = `<header class="topzone pagetop"><div class="pagehead"><div class="pagebrand">${LOGO(30)}<p class="brand" style="font-size:18px">ChopPool</p></div>${themeBtn()}</div><h1>${which === "terms" ? "Terms of use" : "Privacy notice"}</h1></header>
+    <section class="card">${legalHtml(which)}</section><p class="small"><a href="#${which === "terms" ? "privacy" : "terms"}">${which === "terms" ? "Privacy notice" : "Terms of use"}</a> · <a href="#order">Open ChopPool</a></p>`;
+  window.scrollTo(0, 0);
+}
+function openLegal(which) {
+  const draw = w => { $("#legalBody").innerHTML = legalHtml(w); document.querySelectorAll("#legalTabs [data-lt]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.lt === w))); };
+  openSheet(`${sheetHead("Privacy and terms", "")}<div class="chips" id="legalTabs" role="group"><button type="button" class="tog" data-lt="privacy">Privacy notice</button><button type="button" class="tog" data-lt="terms">Terms of use</button></div><div id="legalBody"></div>`);
+  draw(which); $("#legalTabs").addEventListener("click", e => { const b = e.target.closest("[data-lt]"); if (b) draw(b.dataset.lt); });
+}
+// Applies the name privacy choice to every order on this phone (and the account's orders on the server)
+function syncNamePrivacy() {
+  const ids = (local.get("cp_orders") || []).map(o => o.id);
+  if (ids.length || S.user) api.setNamePrivacy(ids, !!local.get("cp_hide_name")).catch(() => {});
 }
 function openProfile(focusPhone) {
   const me = meNow(), name = (S.user && S.user.name) || me.name || "";
@@ -2935,7 +3102,7 @@ function openProfile(focusPhone) {
     <div style="display:grid;justify-items:center;gap:8px"><span id="pfAv">${avatarHtml(name, true)}</span>
       <div class="row" style="gap:16px;justify-content:center"><button type="button" class="linkbtn" id="pfPick">${pic ? "Change photo" : "Add a photo"}</button><button type="button" class="linkbtn${pic ? "" : " hidden"}" id="pfRm" style="color:var(--muted)">Use initials</button></div></div>
     <form id="pfForm" class="stack" novalidate>
-      <div><label for="pfName">Your name</label><input id="pfName" autocomplete="name" maxlength="60" value="${esc(name)}" placeholder="Your name"></div>
+      <div><label for="pfName">Your name</label><input id="pfName" autocomplete="name" maxlength="60" value="${esc(name)}" placeholder="e.g. Ama Mensah"></div>
       <div><label for="pfPhone">MoMo number</label><input id="pfPhone" inputmode="tel" value="${esc(me.phone || "")}" placeholder="024 123 4567"></div>
       <p class="small muted">Your photo stays on this phone.</p><p class="err" id="pfErr"></p><button class="btn wide">Save</button></form>`);
   const redraw = () => { $("#pfAv").innerHTML = avatarHtml($("#pfName").value, true, pic); $("#pfRm").classList.toggle("hidden", !pic); $("#pfPick").textContent = pic ? "Change photo" : "Add a photo"; };
@@ -2992,7 +3159,7 @@ function openNotifSettings() {
   const draw = () => {
     const m = muted(), on = !!local.get("cp_alerts");
     $("#nsBody").innerHTML = `<div class="glist"><button class="grow" data-ns="__all"><span class="gic">${ICON.bell}</span><span class="gtx">Alerts on this phone<small>${on ? (pushReady() ? "Including when the app is closed" : "While the app is open") : "Off"}</small></span><span class="tgl${on ? " on" : ""}"></span></button></div>`
-      + MUTE_TYPES.map(([g, rows]) => `<p class="gtitle">${esc(g)}</p><div class="glist">${rows.map(([t, l]) => `<button class="grow" data-ns="${t}"${on ? "" : " style=\"opacity:.55\""}><span class="gtx">${esc(l)}</span><span class="tgl${m.has(t) ? "" : " on"}"></span></button>`).join("")}</div>`).join("")
+      + MUTE_TYPES.map(([g, rows]) => `<p class="gtitle">${esc(g)}</p><div class="glist${on ? "" : " dim"}">${rows.map(([t, l]) => `<button class="grow" data-ns="${t}"${on ? "" : ' aria-disabled="true"'}><span class="gtx">${esc(l)}</span><span class="tgl${m.has(t) ? "" : " on"}"></span></button>`).join("")}</div>`).join("")
       + `<p class="small muted">Everything you leave on also shows under the bell on Home.</p>`;
   };
   openSheet(`${sheetHead("Notifications", "Choose what reaches you.")}<div id="nsBody" class="stack" style="gap:10px"></div>`);
@@ -3000,6 +3167,7 @@ function openNotifSettings() {
   $("#nsBody").addEventListener("click", async e => {
     const b = e.target.closest("[data-ns]"); if (!b) return;
     if (b.dataset.ns === "__all") { await toggleAlerts(); draw(); if (S.tab === "wallet") renderWallet(); return; }
+    if (b.getAttribute("aria-disabled")) return toast("Turn on alerts first");
     const m = muted(), t = b.dataset.ns; m.has(t) ? m.delete(t) : m.add(t); local.set("cp_mute", [...m]); draw();
     if (local.get("cp_push")) pushSubscribe({ order_ids: (local.get("cp_orders") || []).map(o => o.id) }, true);
     if (S.tab === "wallet") renderWallet(); updateBellDot();
@@ -3016,20 +3184,22 @@ function updatesList() {
     else if (["arriving", "delivered"].includes(o.pool_status) && o.status !== "collected") { t = "arriving"; title = o.pool_status === "arriving" ? "Lunch is 5 minutes away" : "Lunch is here"; }
     else if (o.pool_status === "waiting") { t = "confirm"; title = "Waiting for " + name; }
     else if (["collecting", "accepted", "ready", "picked_up"].includes(o.pool_status) && o.status !== "collected") { t = "confirm"; title = name + " is cooking"; }
-    if (t) out.push({ id: o.id + o.status + o.pool_status, t, title, body: statusLine(o), at });
+    if (t) out.push({ id: o.id + o.status + o.pool_status, t, title, body: statusLine(o), at, act: o.status === "quoted" || (t === "arriving" && o.status !== "collected") });
   });
-  (S.board.activity || []).filter(a => a.site_id === S.siteId && !mineIds.has(a.id) && !(S.mineFp || new Set()).has(a.id)).slice(-4).reverse().forEach(a => out.push({ id: "a" + a.id, t: "building", title: "New order at " + (siteOf(a.site_id).name || "your building"), body: "Someone ordered " + a.item_name + ".", at: a.created_at }));
+  // Building activity is one grouped line, not one per order
+  const act = (S.board.activity || []).filter(a => a.site_id === S.siteId && !mineIds.has(a.id) && !(S.mineFp || new Set()).has(a.id));
+  if (act.length) { const last = act[act.length - 1], dishes = [...new Set(act.map(a => a.item_name))]; out.push({ id: "a" + last.id + act.length, t: "building", title: act.length === 1 ? "1 new order at " + (siteOf(S.siteId).name || "your building") : act.length + " new orders at " + (siteOf(S.siteId).name || "your building"), body: "Including " + dishes.slice(0, 2).join(" and ") + (dishes.length > 2 ? " and more" : "") + ". Join a pool to share the trip.", at: last.created_at }); }
   (S.walletEntries || []).filter(e => e.amount > 0).slice(0, 3).forEach(e => out.push({ id: "w" + e.at + e.amount, t: "cashback", title: money(e.amount) + " in your wallet", body: e.reason, at: e.at }));
   return out.filter(x => notifOn(x.t));
 }
-function updateBellDot() { const seen = new Set(local.get("cp_seen_upd") || []), fresh = updatesList().some(x => !seen.has(x.id)); $("#bellDot")?.classList.toggle("hidden", !fresh); }
+function updateBellDot() { const seen = new Set(local.get("cp_seen_upd") || []), fresh = updatesList().some(x => x.act && !seen.has(x.id)); $("#bellDot")?.classList.toggle("hidden", !fresh); }
 async function openUpdates() {
   if (S.user && !S.walletEntries) { try { S.walletEntries = (await api.wallet()).entries || []; } catch (e) {} }
   const list = updatesList(), seen = new Set(local.get("cp_seen_upd") || []);
   const ago = t => { if (!t) return ""; const m = Math.max(0, Math.round((Date.now() - Date.parse(t)) / 6e4)); return m < 1 ? "Just now" : m < 60 ? m + " min ago" : m < 1440 ? Math.round(m / 60) + " hr ago" : fmtDate(String(t).slice(0, 10)); };
   openSheet(`${sheetHead("Notifications", "")}
     ${local.get("cp_alerts") ? "" : `<div class="vbanner o" style="justify-content:space-between"><span>Alerts are off on this phone.</span><button class="btn" id="updOn" style="padding:8px 14px">Turn on</button></div>`}
-    <div>${list.map(x => `<div class="nupd"><span class="dot${seen.has(x.id) ? " r" : ""}"></span><div><b>${esc(x.title)}</b><p>${esc(x.body || "")}</p><small>${esc(ago(x.at))}</small></div></div>`).join("") || `<p class="small muted" style="padding:12px 2px">Nothing new. Updates about your orders and your building show here.</p>`}</div>
+    <div>${list.map(x => `<div class="nupd"><span class="dot${x.act && !seen.has(x.id) ? "" : " r"}"></span><div><b>${esc(x.title)}</b><p>${esc(x.body || "")}</p><small>${esc(ago(x.at))}</small></div></div>`).join("") || `<p class="small muted" style="padding:12px 2px">Nothing new. Updates about your orders and your building show here.</p>`}</div>
     <button class="ghost wide" id="updSet">Choose alerts</button>`);
   local.set("cp_seen_upd", list.map(x => x.id).concat([...seen]).slice(0, 80)); updateBellDot();
   $("#updSet").addEventListener("click", () => { closeSheet(); setTimeout(openNotifSettings, 350); });
@@ -3230,7 +3400,7 @@ async function loadReviews(k) {
   if (!pics.length && !notes.length && !(sc.ratings > 0)) { el.remove(); return; }
   el.innerHTML = `${sc.ratings ? `<p class="ratingline">${starsOf(sc.rating, 15)} <strong class="num">${Number(sc.rating).toFixed(1)}</strong> <span class="muted">· ${sc.ratings} rating${sc.ratings > 1 ? "s" : ""}</span></p>` : ""}
     ${pics.length ? `<div class="photostrip">${pics.map((r, n) => `<button type="button" class="pshot" data-shot="${n}"><img src="${esc(r.photo_url)}" alt="" loading="lazy"><span>${r.vendor ? "From the vendor" : starsOf(r.rating, 10)}</span></button>`).join("")}</div>` : ""}
-    ${notes.map(r => `<p class="revnote">${starsOf(r.rating, 11)} “${esc(r.comment)}” <span class="muted">· ${esc(r.name || "")}</span></p>`).join("")}`;
+    ${notes.map(r => `<p class="revnote">${starsOf(r.rating, 11)} “${esc(r.comment)}” <span class="muted">· ${esc(r.name || "Someone")}</span></p>`).join("")}`;
   el.onclick = e => { const b = e.target.closest("[data-shot]"); if (!b) return; const r = pics[+b.dataset.shot];
     const lb = document.createElement("div"); lb.className = "lightbox"; lb.innerHTML = `<img src="${esc(r.photo_url)}" alt=""><p>${r.vendor ? "From the vendor · " + esc(r.item_name || "") : starsOf(r.rating, 14) + " " + esc(r.item_name || "") + (r.comment ? " · “" + esc(r.comment) + "”" : "")}</p>`;
     lb.addEventListener("click", () => lb.remove()); document.body.appendChild(lb); };
@@ -3263,7 +3433,7 @@ function openOrder(menuId, opt = {}) {
       : `<p class="note">You're first today. We'll ask ${esc(k.public_name)} to confirm ${confirmText(S.date)}. Others here can join while you wait. If they don't confirm, you get your money back.</p>`}
     <form id="orderForm" class="stack" novalidate>
       <div class="group"><p class="group-title">Choose your meal</p><div class="dishes">
-        ${dishes.map((d, n) => `<label class="dish"><input type="radio" name="dish" value="${esc(d.id)}"${d === item ? " checked" : ""}><span class="tile" style="background:${tint(i0)}">${art(dishKind(d))}</span><span>${esc(d.name)}</span><span class="price num">${money(d.price)}</span></label>`).join("")}
+        ${dishes.map((d, n) => `<label class="dish"><input type="radio" name="dish" value="${esc(d.id)}"${d === item ? " checked" : ""}><span class="tile" style="background:${tint(i0)}">${plate(d, k.id)}</span><span>${esc(d.name)}</span><span class="price num">${money(d.price)}</span></label>`).join("")}
       </div></div>
       <div class="group" id="extrasGroup"></div>
       <div class="row"><p class="group-title">How many</p><div class="qty"><button type="button" id="minus" aria-label="One less">−</button><output id="q">${qty}</output><button type="button" id="plus" aria-label="One more">+</button></div></div>
@@ -3275,7 +3445,7 @@ function openOrder(menuId, opt = {}) {
       </div>
       <div class="group"><p class="group-title">Your details</p>
         ${known ? `<div class="me-row" id="meRow"><span class="avatar">${esc(me.name.slice(0, 1).toUpperCase())}</span><span style="flex:1;display:grid"><strong>${esc(me.name)}</strong><span class="small muted num">${esc(me.phone)}</span></span><button type="button" class="linkbtn" id="meEdit">Change</button></div>` : ""}
-        <div class="grid2${known ? " hidden" : ""}" id="meFields"><div><label for="fName">Your name</label><input id="fName" autocomplete="name" value="${esc(me.name || "")}" placeholder="Your name"></div>
+        <div class="grid2${known ? " hidden" : ""}" id="meFields"><div><label for="fName">Your name</label><input id="fName" autocomplete="name" value="${esc(me.name || "")}" placeholder="e.g. Ama Mensah"></div>
           <div><label for="fPhone">MoMo number</label><input id="fPhone" inputmode="tel" placeholder="024 123 4567" value="${esc(me.phone || "")}"></div></div>
         ${S.user && S.balance > 0 ? `<label class="switch"><span>Use wallet <span class="muted num">(${money(S.balance)})</span></span><input type="checkbox" id="fWallet" checked></label>` : ""}
       </div>
@@ -3283,7 +3453,8 @@ function openOrder(menuId, opt = {}) {
         <div class="pay" id="payPart"><div class="momo"><span class="logo">MoMo</span><span style="flex:1;display:grid"><span class="small muted">Send <strong id="dueTxt"></strong> to</span><strong class="num">${esc(payList()[0].number)}</strong><span class="small muted">${esc(payList()[0].name)}${payList()[0].network ? " · " + esc(payList()[0].network) : ""}</span></span>
           <button type="button" class="ghost" data-copynum="${esc(payList()[0].number)}" style="padding:8px 10px" aria-label="Copy MoMo number">${ICON.copy}</button></div>${payAlts()}
           <div><label for="fRef">Transaction ID from your MoMo SMS</label><input id="fRef" placeholder="e.g. 51234567890"></div></div>
-        <p class="small muted" id="saveTxt">What the pool saves on delivery comes back to your ChopPool wallet after ${fmtTime(s.cutoff)}.</p>
+        <p class="small muted" id="saveTxt">What the pool saves on delivery comes back to your ChopPool wallet once you've got your lunch.</p>
+        <p class="small muted">By paying you agree to our <a href="#terms" target="_blank" rel="noopener">terms</a> and <a href="#privacy" target="_blank" rel="noopener">privacy notice</a>.</p>
       </div>
       <p class="err" id="formErr"></p>
       <div class="sheet-foot"><div class="tot"><b class="num" id="totTxt"></b><span id="totSub"></span></div><button class="btn" type="submit" id="submitBtn">Join the pool</button></div>
@@ -3351,7 +3522,7 @@ function openOrder(menuId, opt = {}) {
     try {
       const r = await api.placeOrder({ site: site.id, item: item.id, qty, name, phone, ref, addons: [...extras], note: $("#fNote").value, special: sp || null, useWallet: !!$("#fWallet")?.checked, join: join ? join.id : null });
       local.set("cp_me", { name, phone });
-      const mine = (local.get("cp_orders") || []).filter(o => o.order_date >= today()); mine.push({ id: r.id, order_date: r.order_date }); local.set("cp_orders", mine);
+      const mine = (local.get("cp_orders") || []).filter(o => o.order_date >= today()); mine.push({ id: r.id, order_date: r.order_date }); local.set("cp_orders", mine); if (local.get("cp_hide_name")) syncNamePrivacy();
       if (S.user) { try { await api.saveProfile({ name, phone }); } catch (e) {} }
       await refreshBoard(); refreshMine(); refreshUser();
       notifyServer({ order_id: r.id }); if (local.get("cp_push")) pushSubscribe({ order_ids: [r.id] }, true);
@@ -3406,6 +3577,8 @@ function shareablePool(o) {
   return p && p.meals < Number(S.settings.max_meals) && new Date() < at(o.order_date, S.settings.cutoff) ? p : null;
 }
 function showConfirmation(r, k, site, special) {
+  // The install suggestion appears once, after the first order on this phone
+  const askInstall = !isStandalone() && !local.get("cp_install_asked"); if (askInstall) local.set("cp_install_asked", true);
   const s = S.settings, trip = tripTo(k, site), fee = feeFor(r.meals, s, trip), drop = nextDrop(r.meals, s, trip);
   const waiting = r.pool_status === "waiting", back = S.user ? "your money goes straight back to your wallet" : "you get your money back";
   const head = special ? "Request sent" : waiting ? (r.meals > r.myQty ? "You're in the pool" : "You've started a pool") : "You're in the pool";
@@ -3420,7 +3593,8 @@ function showConfirmation(r, k, site, special) {
     ${!special && drop ? `<p class="note center">${drop.more} more ${drop.more === 1 ? "person" : "people"} and everyone's delivery drops to ${money(drop.fee)}.</p>` : ""}
     ${!special && r.meals < s.max_meals ? `<button class="btn wide" id="sharePool">Share this pool</button>` : ""}
     ${!S.user && !special ? `<button class="ghost wide" id="toAccount">Create an account to keep your cashback</button>` : ""}
-    <button class="linkbtn" id="toOrders" style="justify-self:center">Track this order</button>`);
+    <button class="linkbtn" id="toOrders" style="justify-self:center">Track this order</button>
+    ${askInstall ? `<div class="installhint"><span>${LOGO(28)}<span class="small">Get ChopPool on your home screen for one-tap lunch${pushReady() ? " and alerts" : ""}.</span></span><button class="ghost" data-install="#order">Install</button></div>` : ""}`);
   $("#toAccount")?.addEventListener("click", () => openAccount("Your order is saved. Create an account to keep your delivery cashback."));
   $("#toOrders").addEventListener("click", () => { closeSheet(); setTab("orders"); });
   $("#sharePool")?.addEventListener("click", async () => { await refreshBoard(); sharePool(site.id, k.id); });
@@ -3464,7 +3638,7 @@ function openAddVendor() {
       <p class="note">ChopPool doesn't inspect vendors added by customers. Others will see "Added by a customer".</p>
       <p class="err" id="vErr"></p><button class="btn wide" type="submit">Add vendor</button>
     </form>`);
-  const row = () => { const d = document.createElement("div"); d.className = "grid2"; d.innerHTML = `<input aria-label="Dish" placeholder="Waakye full"><input aria-label="Price in cedis" inputmode="decimal" placeholder="Price (GHS)">`; $("#vItems").appendChild(d); };
+  const row = () => { const d = document.createElement("div"); d.className = "dishprice"; d.innerHTML = `<input aria-label="Dish" placeholder="e.g. Waakye full"><input aria-label="Price in cedis" inputmode="decimal" placeholder="GHS">`; $("#vItems").appendChild(d); };
   row(); row();
   $("#vMore").addEventListener("click", row);
   // Optional pin: vendors can be anywhere; the delivery estimate updates with the distance
@@ -3504,13 +3678,13 @@ function openAddVendor() {
 /* =====================================================================================
    COORDINATOR VIEW (#admin): Today, Menus, Buildings, Riders, Team
    ===================================================================================== */
-const ADMIN_TABS = [["dash", "Dashboard"], ["today", "Today"], ["menus", "Vendors & menus"], ["buildings", "Buildings"], ["riders", "Riders"], ["reports", "Reports"], ["team", "Team"]];
+const ADMIN_TABS = [["dash", "Dashboard"], ["today", "Today"], ["menus", "Vendors & menus"], ["buildings", "Buildings"], ["riders", "Riders"], ["reports", "Reports"], ["settings", "Settings"], ["team", "Team"]];
 // Sub-sections per tab; a third value marks owner-only sections
 const ADMIN_SUBS = {
   today: [["pools", "Pools"], ["orders", "Orders & payments"], ["wallets", "Refunds & problems"], ["owed", "Money owed"]],
   menus: [["list", "Vendors"], ["reviews", "Ratings & photos"], ["requests", "Listing requests"]],
   buildings: [["list", "Active"], ["requests", "Requests"]],
-  riders: [["list", "Riders"], ["apply", "Applications"], ["pricing", "Delivery pricing"]],
+  riders: [["list", "Riders"], ["apply", "Applications"]],
   team: [["members", "Team members"], ["payments", "Payment options", true], ["accounts", "Customer accounts", true], ["activity", "Activity log", true]]
 };
 const NETWORKS = ["MTN", "Telecel", "AirtelTigo"];
@@ -3543,7 +3717,7 @@ async function viewAdmin() {
     const draw = () => {
       $("#view").innerHTML = `<section class="card"><div class="pagehead"><div class="pagebrand">${LOGO(30)}<p class="brand" style="font-size:18px">ChopPool team</p></div>${themeBtn()}</div><h1>${mode === "signin" ? "Sign in" : "Create your team account"}</h1>
         <p class="muted small">${mode === "signin" ? "For the owner and coordinators." : "Use the email the owner added you with. The very first account can become the owner."}</p>
-        ${mode === "signup" ? `<div><label for="aname">Your name</label><input id="aname" autocomplete="name" placeholder="Your name"></div>` : ""}
+        ${mode === "signup" ? `<div><label for="aname">Your name</label><input id="aname" autocomplete="name" placeholder="e.g. Ama Mensah"></div>` : ""}
         <div><label for="email">Email</label><input id="email" type="email" autocomplete="username" placeholder="Email address"></div>
         <div><label for="pw">Password</label><input id="pw" type="password" autocomplete="${mode === "signin" ? "current-password" : "new-password"}" placeholder="At least 6 characters"></div>
         <p class="err" id="loginErr"></p><button class="btn wide" id="loginBtn">${mode === "signin" ? "Sign in" : "Create account"}</button>
@@ -3577,10 +3751,10 @@ async function viewAdmin() {
   document.body.classList.add("is-admin");
   S.adminTab = ADMIN_TABS.some(t => t[0] === S.adminTab) ? S.adminTab : "dash";
   $("#view").innerHTML = `
-    <div class="topzone admintop"><div class="row small" style="justify-content:space-between;gap:8px;flex-wrap:wrap"><span class="muted">Signed in as <strong style="color:var(--ink)">${esc(S.user?.email || "")}</strong> · ${role === "super" ? "Owner" : "Coordinator"}</span><span class="row" style="gap:6px">${themeBtn()}${isStandalone() ? "" : `<button class="ghost" data-install="#admin" style="padding:6px 14px">Install app</button>`}<button class="ghost" id="aSignOut" style="padding:6px 14px">Sign out</button></span></div>
-    <header class="row" style="flex-wrap:wrap;gap:10px"><div class="row" style="gap:12px;justify-content:flex-start">${LOGO(44)}<div><p class="brand" style="font-size:16px">ChopPool ${role === "super" ? "owner" : "coordinator"}</p><h1>Operations</h1></div></div>
-      <div class="row" style="gap:8px"><input id="aDate" type="date" value="${day}" aria-label="Delivery date" style="width:auto"><button class="ghost" id="aRefresh">Refresh</button></div></header>
-    <div id="aDays"></div>
+    <div class="topzone admintop">
+    <header class="ahead"><div class="ahead-id">${LOGO(36)}<div><h1>Operations</h1><p class="small muted">${esc(S.user?.email || "")} · ${role === "super" ? "Owner" : "Coordinator"}${isStandalone() ? "" : ` · <button class="linkbtn small" data-install="#admin" style="padding:0">Install app</button>`}</p></div></div>
+      <div class="ahead-act"><button class="iconbtn" id="aRefresh" aria-label="Refresh">${SV('<path d="M21 12a9 9 0 1 1-2.6-6.4L21 8"/><path d="M21 3v5h-5"/>')}</button>${themeBtn()}<button class="iconbtn" id="aSignOut" aria-label="Sign out" title="Sign out">${ICON.out}</button></div></header>
+    <div class="adaybar"><span id="aDays"></span><input id="aDate" type="date" value="${day}" aria-label="Delivery date"></div>
     <nav class="admintabs" aria-label="Team sections">${ADMIN_TABS.map(([k, l]) => `<button data-atab="${k}">${l}</button>`).join("")}</nav></div>
     <div class="aframe" id="aFrame"><nav class="asub" id="aSub" aria-label="Sub-sections"></nav><div id="aBody" class="stack"></div></div>`;
   $("#aDays").addEventListener("click", e => { const b = e.target.closest("[data-aday]"); if (!b) return; S.adminDate = b.dataset.aday; $("#aDate").value = S.adminDate; renderAdmin(); });
@@ -3666,6 +3840,29 @@ async function compressImage(file) {
     return blob;
   } finally { URL.revokeObjectURL(url); }
 }
+// Dish photos: centred square, 800 px, lightly evened out; too small, too dark or blurry photos are turned away with a reason
+async function prepareDishPhoto(file) {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => rej(new Error("That file isn't a photo.")); im.src = url; });
+    const side = Math.min(img.naturalWidth, img.naturalHeight);
+    if (side < 400) throw new Error("This photo is too small. Use the camera, or a photo at least 400 pixels wide.");
+    const N = Math.min(800, side), c = document.createElement("canvas"); c.width = c.height = N; const g = c.getContext("2d");
+    g.drawImage(img, (img.naturalWidth - side) / 2, (img.naturalHeight - side) / 2, side, side, 0, 0, N, N);
+    const d = g.getImageData(0, 0, N, N), px = d.data; let sum = 0, lo = 255, hi = 0; const L = new Float32Array(N * N);
+    for (let i = 0, j = 0; i < px.length; i += 4, j++) { const y = 0.2126 * px[i] + 0.7152 * px[i + 1] + 0.0722 * px[i + 2]; L[j] = y; sum += y; }
+    const mean = sum / (N * N); if (mean < 45) throw new Error("This photo is too dark. Take it in daylight or under a bright light.");
+    let v = 0, n = 0; for (let y = 1; y < N - 1; y += 2) for (let x = 1; x < N - 1; x += 2) { const k = y * N + x, lap = 4 * L[k] - L[k - 1] - L[k + 1] - L[k - N] - L[k + N]; v += lap * lap; n++; }
+    if (v / n < 25) throw new Error("This photo looks blurry. Hold the phone still and try again.");
+    const sorted = Array.from(L).sort((a, b) => a - b); lo = sorted[Math.floor(sorted.length * 0.01)]; hi = sorted[Math.floor(sorted.length * 0.99)];
+    const span = Math.max(1, hi - lo), gain = Math.min(1.25, 255 / span);   // light auto-levels, never harsh
+    for (let i = 0; i < px.length; i += 4) for (let ch = 0; ch < 3; ch++) px[i + ch] = Math.max(0, Math.min(255, (px[i + ch] - lo * 0.6) * gain));
+    g.putImageData(d, 0, 0);
+    let blob = null;
+    for (const q of [0.8, 0.7, 0.6]) { blob = await new Promise(r => c.toBlob(r, "image/webp", q)); if (!blob || blob.type !== "image/webp") blob = await new Promise(r => c.toBlob(r, "image/jpeg", q)); if (blob.size <= 160 * 1024) break; }
+    return blob;
+  } finally { URL.revokeObjectURL(url); }
+}
 const sha256 = async t => [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(t)))].map(b => b.toString(16).padStart(2, "0")).join("");
 function pickPhoto(ctx, row) {
   const inp = document.createElement("input"); inp.type = "file"; inp.accept = "image/*";
@@ -3673,8 +3870,8 @@ function pickPhoto(ctx, row) {
     const f = inp.files && inp.files[0]; if (!f) return;
     const btn = row.querySelector("[data-photo]"); btn.classList.add("busy");
     try {
-      const blob = await compressImage(f), id = row.dataset.item;
-      if (ctx.startsWith("vendor:")) { const tok = ctx.slice(7), url = await api.uploadPhoto(await sha256(tok), blob); await api.vendorSetPhoto(tok, id, url); setPhotoThumb(btn, url); }
+      const blob = await prepareDishPhoto(f), id = row.dataset.item;
+      if (ctx.startsWith("vendor:")) { const tok = ctx.slice(7), url = await api.uploadPhoto(await sha256(tok), blob); await api.vendorSetPhoto(tok, id, url); setPhotoThumb(btn, url); toast("Photo sent. It shows to customers once ChopPool approves it."); return; }
       else { const url = await api.uploadPhoto("admin", blob); await api.saveItem({ id, photo_url: url }); const it = S.items.find(x => x.id === id); if (it) it.photo_url = url; setPhotoThumb(btn, url); }
       toast("Photo saved");
     } catch (e) { toast(cleanErr(e)); } finally { btn.classList.remove("busy"); }
@@ -3685,7 +3882,7 @@ const setPhotoThumb = (btn, url) => { btn.innerHTML = `<img src="${esc(url)}" al
 const addonsToText = list => (list || []).map(a => a.name + ":" + Number(a.price || 0)).join(", ");
 const textToAddons = t => String(t || "").split(",").map(x => x.trim()).filter(Boolean).map(x => { const [n, p] = x.split(":"); return { name: n.trim(), price: Number(p) || 0 }; }).filter(a => a.name.length > 1);
 const sendLink = (num, msg) => num ? `<a class="wa quiet" style="padding:8px 12px" href="${wa(num)}?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener">${ICON.wa} Send link</a>` : "";
-const TAGLINE = "Split delivery. One order. One building.";
+const TAGLINE = "Order together, pay less.";
 // ChopPool mark: three takeaway packs travelling together, yours in amber
 const LOGO = (n, bg = "#D9480F") => `<svg width="${n}" height="${n}" viewBox="0 0 100 100" role="img" aria-label="ChopPool" style="flex:none"><rect width="100" height="100" rx="24" fill="${bg}"/>${[[20, 61, "#FFF7EE"], [25, 44, "#F5B04A"], [21, 27, "#FFF7EE"]].map(([x, y, c]) => `<rect x="${x}" y="${y}" width="56" height="15" rx="4" fill="${c}"/><path d="M${x} ${y + 7}h56" stroke="${bg}" stroke-width="2.5"/><rect x="${x + 24}" y="${y + 5}" width="8" height="5" rx="1.5" fill="${bg}"/>`).join("")}</svg>`;
 const pill = (txt, cls) => `<span class="chip ${cls || ""}">${esc(txt)}</span>`;
@@ -3706,7 +3903,7 @@ async function renderAdmin(cached) {
   }
   const d = S.adminDate || dToday, isSuper = S.role === "super";
   if ($("#aDate") && $("#aDate").value !== d) $("#aDate").value = d;
-  if ($("#aDays")) $("#aDays").innerHTML = dNext !== dToday ? `<nav class="admintabs" aria-label="Day">${[[dToday, "Today's deliveries"], [dNext, "Orders for " + dayLabel(dNext)]].map(([x, l]) => `<button data-aday="${x}"${x === d ? ' aria-current="page"' : ""}>${esc(l)}${x !== d && otherWait.length ? " (" + otherWait.length + " waiting)" : ""}</button>`).join("")}</nav>` : "";
+  if ($("#aDays")) $("#aDays").innerHTML = dNext !== dToday ? `<span class="chips" role="group" aria-label="Day">${[[dToday, "Today"], [dNext, dayLabel(dNext)[0].toUpperCase() + dayLabel(dNext).slice(1)]].map(([x, l]) => `<button type="button" class="tog" data-aday="${x}" aria-pressed="${x === d}">${esc(l)}${x !== d && otherWait.length ? ` <span class="dot" aria-label="${otherWait.length} waiting"></span>` : ""}</button>`).join("")}</span>` : "";
   document.querySelectorAll("[data-atab]").forEach(b => { if (b.dataset.atab === S.adminTab) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
   let A = S.admin;
   if (!cached || !A) { try { A = await api.adminData(d); } catch (e) { toast("Couldn't load: " + cleanErr(e)); return; } S.admin = A; A.kitchens = A.kitchens.filter(k => !k.archived); A.sites = A.sites.filter(x => !x.archived); }
@@ -3750,7 +3947,7 @@ async function renderAdmin(cached) {
     const weeks = Array.from({ length: 10 }, (_, n) => mondayOf(today(), -n));
     const wk = S.reportWeek && weeks.includes(S.reportWeek) ? S.reportWeek : weeks[0];
     body.innerHTML = `<section class="stack" style="gap:12px"><div class="row" style="gap:8px;flex-wrap:wrap;justify-content:space-between"><h2>Weekly report</h2>
-        <div class="row" style="gap:8px;flex-wrap:wrap"><select id="repWeek" aria-label="Week" style="width:auto">${weeks.map((w, n) => `<option value="${w}"${w === wk ? " selected" : ""}>${n === 0 ? "This week" : n === 1 ? "Last week" : "Week of " + fmtDate(w)} (${fmtDate(w)}–${fmtDate(mondayOf(w, 0, 4))})</option>`).join("")}</select>
+        <div class="row" style="gap:8px;flex-wrap:wrap"><select id="repWeek" aria-label="Week" style="width:auto">${weeks.map((w, n) => `<option value="${w}"${w === wk ? " selected" : ""}>${n === 0 ? "This week" : n === 1 ? "Last week" : "Week of " + fmtDate(w)} (${fmtDate(w)}–${fmtDate(mondayOf(w, 0, 6))})</option>`).join("")}</select>
         <button class="ghost" data-act="report-copy">Copy for Excel</button><button class="ghost" data-act="report-csv">Download CSV</button></div></div>
       <div id="repBody"><div class="skeleton" style="height:180px"></div></div></section>`;
     $("#repWeek").addEventListener("change", e => { S.reportWeek = e.target.value; renderAdmin(); });
@@ -3828,10 +4025,10 @@ async function renderAdmin(cached) {
       <h2>Pools for ${fmtDate(d)}</h2>
       <div class="cards2">${pools.map(p => { const k = K(p.kitchen_id), fl = poolFlags(p, s, d);
         return `<article class="card" data-pool="${esc(p.id)}">
-          <div class="top" style="align-items:flex-start"><div><h3>${esc(sName(p.site_id))}</h3><p class="small muted">${esc(k.public_name)} Pool ${p.seq} · ${k.added_by_customer ? "seller added by a customer" : "cooked by " + esc(k.name)}${p.runner ? " · own runner" : ""}</p></div>
-            <div class="fee"><b class="num" style="font-size:22px">${p.meals}/${s.max_meals}</b><span>${money(feeFor(p.meals, s, aTrip(p)))} a meal · trip est. ${money(aTrip(p))}</span></div></div>
+          <div class="poolhead"><div class="ph-t"><h3>${esc(sName(p.site_id))} · Pool ${p.seq}</h3><span class="chip num">${p.meals}/${s.max_meals} meals</span></div>
+            <p class="small muted">${esc(k.public_name)}${k.added_by_customer ? " (added by a customer)" : k.name !== k.public_name ? " · " + esc(k.name) : ""}${p.runner ? " · own runner" : ""} · ${money(feeFor(p.meals, s, aTrip(p)))} a meal · trip est. ${money(aTrip(p))}</p></div>
           ${stepsHtml(p.status)}${fl.length ? `<p class="small" style="color:var(--danger)">${fl.map(esc).join(" · ")}</p>` : ""}
-          ${p.runner ? "" : `<div class="inline"><div><label for="rd-${p.id}">Rider</label><select id="rd-${p.id}" data-f="rider_id"><option value="">Bolt Send / Yango</option>${ridersOk.filter(r => r.active).map(r => `<option value="${esc(r.id)}"${r.id === p.rider_id ? " selected" : ""}>${esc(r.name)}</option>`).join("")}</select></div>
+          ${p.runner ? "" : `<div class="inline poolrider"><div class="full"><label for="rd-${p.id}">Rider</label><select id="rd-${p.id}" data-f="rider_id"><option value="">Bolt Send / Yango</option>${ridersOk.filter(r => r.active).map(r => `<option value="${esc(r.id)}"${r.id === p.rider_id ? " selected" : ""}>${esc(r.name)}</option>`).join("")}</select></div>
             <div><label for="tr-${p.id}">Trip ref</label><input id="tr-${p.id}" data-f="trip_ref" value="${esc(p.trip_ref || "")}" placeholder="Booking code"></div>
             <div><label for="tc-${p.id}">Trip cost</label><input id="tc-${p.id}" data-f="trip_cost" inputmode="decimal" value="${esc(p.trip_cost ?? "")}" placeholder="GHS"></div>
             <button class="ghost" data-act="pool-save">Save</button></div>`}
@@ -3858,7 +4055,7 @@ async function renderAdmin(cached) {
         return `<tr data-orow="${esc(o.id)}"><td class="num">${flag ? `<span class="pdotx" title="Payment to confirm"></span>` : ""}${clock(o.created_at)}</td><td>${esc(o.customer_name)}${bad ? `<br><span class="chip bad" title="Payments not received in the last 60 days">${bad} unpaid before</span>` : ""}</td><td class="num">${esc(o.phone)}</td><td>${esc(sName(o.site_id))}</td>
           <td>${o.qty} × ${esc(o.item_name)}<br><span class="small muted">${esc(k.public_name || "")} Pool ${p.seq || ""}</span></td><td style="white-space:normal;min-width:180px">${esc(extras)}</td><td>${payCell}</td><td class="num">${esc(o.code)}</td>
           <td><select data-order="${esc(o.id)}" aria-label="Order status">${ST.map(x => `<option${x === o.status ? " selected" : ""}>${x}</option>`).join("")}</select></td></tr>`; };
-      const head = `<tr><th>Time</th><th>Name</th><th>MoMo no.</th><th>Building</th><th>Order</th><th>Extras and requests</th><th>Paid by</th><th>Code</th><th>Status</th></tr>`;
+      const head = `<tr><th>Time</th><th>Customer</th><th>MoMo no.</th><th>Building</th><th>Order</th><th>Extras and requests</th><th>Paid by</th><th>Code</th><th>Status</th></tr>`;
       body.innerHTML = `
       <div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:8px"><h2>Orders for ${fmtDate(d)}</h2><div class="row" style="gap:8px"><label class="small muted" for="oSort" style="margin:0">Sort</label><select id="oSort" data-ls="osort" style="width:auto">${[["new", "Newest first"], ["old", "Oldest first"], ["status", "Status"], ["building", "Building"], ["vendor", "Vendor"]].map(([v2, l]) => `<option value="${v2}"${v2 === sortBy ? " selected" : ""}>${l}</option>`).join("")}</select><button class="ghost" data-act="csv">Copy as CSV</button></div></div>
       ${toCheckL.length ? `<h3 class="row" style="gap:8px;justify-content:flex-start"><span class="pdotx"></span>Payments to confirm · ${toCheckL.length}</h3><p class="small muted">Find each reference on the MoMo statement. Found it: <strong>Payment found</strong>. Not there, or too little: <strong>Not found / short</strong>, and the customer is told how to fix it.</p>
@@ -3866,6 +4063,7 @@ async function renderAdmin(cached) {
       ${issueL.length ? `<h3>Waiting for the customer to fix · ${issueL.length}</h3><p class="small muted">Cancelled automatically at ${fmtTime(s.cutoff)} if nothing changes.</p><div class="table-wrap"><table>${head}${issueL.map(o => row(o, false)).join("")}</table></div>` : ""}
       <h3>${toCheckL.length || issueL.length ? "All other orders" : "Orders"}</h3>
       <div class="table-wrap"><table>${head}${rest.map(o => row(o, false)).join("") || `<tr><td colspan="9" class="muted">No other orders yet.</td></tr>`}</table></div>`;
+      cardTables(body);
       const refs = [...new Set(A.orders.filter(o => o.status === "pending" && o.momo_ref).map(o => String(o.momo_ref).trim()))], rk = refs.join("|");
       if (refs.length && S.refsKey !== rk) { S.refsKey = rk; api.refsSeen(refs, d).then(m => { S.refsSeen = m || {}; if (Object.keys(S.refsSeen).length) renderAdmin(true); }).catch(() => {}); }
       if (!S.unpaidLoaded) { S.unpaidLoaded = true; api.unpaidPhones().then(m => { S.unpaidPhones = m; if (Object.keys(m).length) renderAdmin(true); }).catch(() => {}); }
@@ -3912,7 +4110,10 @@ async function renderAdmin(cached) {
 
   /* ---------- Kitchens & menus ---------- */
   if (tab === "menus" && sub === "reviews") {
-    body.innerHTML = `<section class="stack" style="gap:12px"><div><h2>Ratings & photos</h2><p class="small muted">From customers who collected their lunch. Hide anything that isn't right: it disappears from the app and from the vendor's rating.</p></div><div id="revAdmin"><div class="skeleton" style="height:160px"></div></div></section>`;
+    const waitPh = (A.items || []).filter(i => i.photo_url && i.photo_status === "pending");
+    body.innerHTML = (waitPh.length ? `<section class="stack" style="gap:10px;margin-bottom:18px"><h2>Dish photos waiting · ${waitPh.length}</h2><p class="small muted">Approve photos that are clear, well lit and show the dish on a plain background. A vendor switches from drawings to photos once most of their dishes have approved photos.</p>
+      <div class="revgrid">${waitPh.map(i => `<article class="card revcard" data-ph="${esc(i.id)}"><img src="${esc(i.photo_url)}" alt=""><p class="small"><strong>${esc(i.name)}</strong> · ${esc((A.kitchens.find(k => k.id === i.kitchen_id) || {}).public_name || "")}</p>
+        <div class="row" style="gap:8px"><button class="btn" data-act="ph-ok">Approve</button><button class="ghost" data-act="ph-no">Hide</button></div></article>`).join("")}</div></section>` : "") + `<section class="stack" style="gap:12px"><div><h2>Ratings & photos</h2><p class="small muted">From customers who collected their lunch. Hide anything that isn't right: it disappears from the app and from the vendor's rating.</p></div><div id="revAdmin"><div class="skeleton" style="height:160px"></div></div></section>`;
     api.adminReviews().then(list => { const el = $("#revAdmin"); if (!el) return; const kn = id => (A.kitchens.find(k => k.id === id) || {}).public_name || "";
       el.innerHTML = list.length ? `<div class="revgrid">${list.map(r => `<article class="card revcard${r.hidden ? " hiddenrev" : ""}" data-review="${esc(r.id)}">
           ${r.photo_url ? `<img src="${esc(r.photo_url)}" alt="" loading="lazy">` : ""}
@@ -4026,11 +4227,10 @@ async function renderAdmin(cached) {
     }
   }
 
-  /* ---------- Riders ---------- */
-  if (tab === "riders") {
-    if (sub === "pricing") { const ex = (km) => Math.round(Number(s.base_fare ?? 0) + Number(s.per_km ?? 0) * km);
+  /* ---------- Settings: every rule on one page, one Save ---------- */
+  if (tab === "settings") { const ex = (km) => Math.round(Number(s.base_fare ?? 0) + Number(s.per_km ?? 0) * km);
       body.innerHTML = `
-      <form class="card" data-form="pricing"><h2>Delivery pricing</h2>
+      <form class="stack setform" data-form="settings"><section class="card stack"><h2>Delivery pricing</h2>
         <p class="small muted">Each trip is priced by distance, like Bolt and Yango: base fare + rate per km of road from the kitchen to the building. The trip is then shared across the meals in the pool. Check a few real Bolt or Yango quotes and match them.</p>
         <div class="grid2"><div><label for="pfBase">Base fare (GHS)</label><input id="pfBase" name="base_fare" inputmode="decimal" value="${esc(s.base_fare ?? "")}"></div>
           <div><label for="pfKm">Rate per km (GHS)</label><input id="pfKm" name="per_km" inputmode="decimal" value="${esc(s.per_km ?? "")}"></div>
@@ -4040,21 +4240,25 @@ async function renderAdmin(cached) {
           <div><label for="pfRecv">"Got my food" confirms itself after (minutes)</label><input id="pfRecv" name="auto_receive_min" inputmode="numeric" value="${esc(s.auto_receive_min ?? 120)}"></div></div>
         <p class="small muted">Customers pay the full trip at checkout. Once lunch is received, each person's share is worked out and the rest comes back as cashback. No trip is charged above the highest trip price. Changes only affect new orders.</p>
         ${s.base_fare != null ? `<p class="small" style="color:var(--hint)">Examples: 2 km trip ${money(ex(2))} · 5 km ${money(ex(5))} · 10 km ${money(ex(10))}</p>` : ""}
-        <p class="err" data-err></p><button class="btn">Save pricing</button></form>
-      <form class="card" data-form="rules"><h2>Vendors near you and free delivery</h2>
+      </section>
+      <section class="card stack"><h2>Vendors near you and free delivery</h2>
         <div class="grid2"><div><label for="rlNear">"Vendors near you": delivery up to (GHS)</label><input id="rlNear" name="near_max_fee" inputmode="decimal" value="${esc(s.near_max_fee ?? 50)}"></div>
           <div><label for="rlFree">Vendors may deliver free up to (km by road)</label><input id="rlFree" name="free_max_km" inputmode="decimal" value="${esc((Number(s.free_max_m ?? 1500) / 1000))}"></div></div>
         <p class="small muted">Vendors with a higher delivery cost still show on the Vendors tab under "Further away". Each vendor picks their own free-delivery distance on their page, up to this limit.</p>
-        <h2 style="margin-top:8px">Timing</h2>
+      </section><section class="card stack"><h2>Timing</h2>
         <div class="grid2"><div><label for="rlBy">Orders for a later day: vendor confirms by</label><input id="rlBy" name="next_day_confirm_by" type="time" value="${esc(String(s.next_day_confirm_by || "08:30").slice(0, 5))}"></div>
           <div><label for="rlCd">Home countdown starts at</label><input id="rlCd" name="countdown_start" type="time" value="${esc(String(s.countdown_start || "06:00").slice(0, 5))}"></div></div>
         <p class="small muted">Same-day pools still give vendors ${esc(s.accept_timeout_min)} minutes. Before the countdown starts, Home shows "Tomorrow ${fmtTime(s.cutoff)}" instead.</p>
-        ${isSuper ? `<h2 style="margin-top:8px">ChopPool fee on bigger pools <span class="small muted">(owner only)</span></h2>
+      </section>
+        ${isSuper ? `<section class="card stack"><h2>ChopPool fee on bigger pools <span class="small muted">(owner only)</span></h2>
         <div class="grid2"><div><label for="rlRate">Fee on each meal after the free ones (%)</label><input id="rlRate" name="vendor_fee_pct" inputmode="decimal" value="${esc(Math.round(Number(s.vendor_fee_rate || 0) * 1000) / 10)}"></div>
           <div><label for="rlFreeN">Free meals in every pool</label><input id="rlFreeN" name="vendor_fee_free" inputmode="numeric" value="${esc(s.vendor_fee_free ?? 5)}"></div></div>
         <p class="small muted">0% switches it off. Vendors see new terms before they confirm their next pool; pools they've already confirmed keep the old terms.</p>
-        <h3>Team screen timeout</h3><div><label for="rlIdle">Sign out after this many quiet minutes (5-60)</label><input id="rlIdle" name="admin_idle_min" inputmode="numeric" value="${esc(s.admin_idle_min ?? 15)}"></div>` : ""}
-        <p class="err" data-err></p><button class="btn">Save</button></form>`; }
+        <h3>Team screen timeout</h3><div><label for="rlIdle">Sign out after this many quiet minutes (5-60)</label><input id="rlIdle" name="admin_idle_min" inputmode="numeric" value="${esc(s.admin_idle_min ?? 15)}"></div></section>` : ""}
+        <div class="savebar"><p class="err" data-err></p><button class="btn wide">Save settings</button></div></form>`; }
+  /* ---------- Riders ---------- */
+  if (tab === "riders") {
+
     if (sub === "apply") body.innerHTML = riderApps.length ? `<div class="stack" style="gap:10px">${riderApps.map(r => `<article class="card" data-rider="${esc(r.id)}"><div class="top" style="align-items:flex-start"><div><h3>${esc(r.name)}</h3><p class="small muted">${esc(added(r))}</p></div>${pill("Applied", "warn")}</div>
         <div class="grid2 small"><p><strong>Phone:</strong> <span class="num">${esc(r.phone || "")}</span></p><p><strong>MoMo:</strong> <span class="num">${esc(r.momo || "—")}</span></p><p><strong>Motorbike:</strong> ${esc(r.bike || "—")}</p><p><strong>Area:</strong> ${esc(r.area || "—")}</p></div>
         <p class="small muted">Call them, check their licence and bike papers, then approve.</p>
@@ -4172,6 +4376,8 @@ async function adminClick(e) {
   const A = S.admin, s = S.settings, act = t.dataset.act;
   const run = async (fn, ok) => { try { await fn(); if (ok) toast(ok); renderAdmin(); } catch (err) { toast(cleanErr(err)); } };
   if (t.dataset.refunded) return run(() => api.updateOrder(t.dataset.refunded, { refund_needed: false, refund_due: 0 }), "Marked refunded");
+  const ph = t.closest("[data-ph]");
+  if (ph && (act === "ph-ok" || act === "ph-no")) return run(async () => { await api.saveItem({ id: ph.dataset.ph, photo_status: act === "ph-ok" ? "approved" : "rejected" }); const it = A.items.find(x => x.id === ph.dataset.ph); if (it) it.photo_status = act === "ph-ok" ? "approved" : "rejected"; }, act === "ph-ok" ? "Photo approved" : "Photo hidden");
   const rv = t.closest("[data-review]");
   if (rv && (act === "rev-hide" || act === "rev-show")) return run(() => api.hideReview(rv.dataset.review, act === "rev-hide"), act === "rev-hide" ? "Hidden from the app" : "Shown again");
   if (act === "csv") return copy(ordersCsv(), "Orders copied. Paste them into Excel or Google Sheets.");
@@ -4303,24 +4509,21 @@ async function adminSubmit(e) {
       await api.savePayMethod({ number: num, name, network: net, active: true, is_main: !(S.admin.payment_methods || []).some(p => p.is_main && p.active) });
       Object.assign(S, await api.load()); toast("Payment option added");
     }
-    if (f.dataset.form === "pricing") {
+    if (f.dataset.form === "settings") {
       const vals = ["base_fare", "per_km", "trip_max", "trip_cost", "quote_pay_min", "auto_receive_min"].map(n => [n, Number(v(n))]);
       if (vals.some(([, x]) => !isFinite(x) || x < 0) || !Number(v("trip_max")) || !Number(v("per_km"))) return fail("Enter numbers in every box.");
       const qm = Number(v("quote_pay_min")); if (qm < 10 || qm > 20) return fail("Give customers 10 to 20 minutes to pay for a special order.");
       if (Number(v("auto_receive_min")) < 30) return fail("Allow at least 30 minutes before \"Got my food\" confirms itself.");
-      await api.updateSettings(Object.fromEntries(vals)); Object.assign(S, await api.load()); toast("Pricing saved");
-    }
-    if (f.dataset.form === "rules") {
       const near = Number(v("near_max_fee")), fkm = Number(v("free_max_km")), by = v("next_day_confirm_by"), cd = v("countdown_start");
       if (!(near > 0) || !(fkm >= 0) || fkm > 10) return fail("Enter a delivery limit above 0 and a free-delivery distance up to 10 km.");
       if (!/^\d{2}:\d{2}$/.test(by) || !/^\d{2}:\d{2}$/.test(cd)) return fail("Enter both times.");
       if (hm(by) >= hm(S.settings.cutoff)) return fail("The confirm-by time must be before orders close at " + fmtTime(S.settings.cutoff) + ".");
-      const patch = { near_max_fee: near, free_max_m: Math.round(fkm * 1000), next_day_confirm_by: by, countdown_start: cd };
+      const patch = { ...Object.fromEntries(vals), near_max_fee: near, free_max_m: Math.round(fkm * 1000), next_day_confirm_by: by, countdown_start: cd };
       if (f.querySelector("[name=admin_idle_min]")) { const im = Number(v("admin_idle_min")); if (!(im >= 5 && im <= 60)) return fail("Choose 5 to 60 minutes for the team screen timeout."); patch.admin_idle_min = im; }
       if (f.querySelector("[name=vendor_fee_pct]")) { const pc = Number(v("vendor_fee_pct")), fr = Number(v("vendor_fee_free"));
         if (!(pc >= 0 && pc <= 50) || !(Number.isInteger(fr) && fr >= 0 && fr <= 100)) return fail("Enter a fee between 0 and 50% and a whole number of free meals.");
         patch.vendor_fee_rate = Math.round(pc * 10) / 1000; patch.vendor_fee_free = fr; }
-      await api.updateSettings(patch); Object.assign(S, await api.load()); toast("Saved");
+      await api.updateSettings(patch); Object.assign(S, await api.load()); toast("Settings saved");
     }
     if (f.dataset.form === "refund") {
       const ref = v("ref"); if (ref.length < 4) return fail("Enter the MoMo reference of the refund you sent.");
@@ -4373,6 +4576,7 @@ function mondayOf(d, n = 0, plus = 0) { const x = new Date(d + "T00:00:00Z"), w 
 function trend(c, p, pct) {
   if (c == null) return "—";
   const v = pct ? c + "%" : c; if (p == null || p === c) return `${v}`;
+  if (!Number(p) && Number(c) > 0) return `${v} <span class="up">New</span>`;
   return `${v} <span class="${c > p ? "up" : "down"}">${c > p ? "↑" : "↓"} ${pct ? Math.abs(c - p) + " pts" : Math.abs(Math.round((c - p) * 10) / 10)}</span>`;
 }
 function reportHtml(R, isSuper) {
@@ -4381,8 +4585,8 @@ function reportHtml(R, isSuper) {
   const table = (title, cols, rows, empty) => `<section class="card stack" style="gap:8px"><h3>${esc(title)}</h3>${rows.length ? `<div class="tablewrap"><table class="rtable"><thead><tr>${cols.map(x => `<th>${esc(x[0])}</th>`).join("")}</tr></thead><tbody>${rows.map(r => `<tr>${cols.map(x => `<td>${x[1](r)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>` : `<p class="small muted">${esc(empty)}</p>`}</section>`;
   const flag = v => v.expired >= 2 || (v.on_time != null && v.on_time < 70) ? pill("Unreliable", "bad") : v.always_cooking ? pill("Set cooking days", "ok") : "";
   return `<div class="stack" style="gap:14px"><p class="small muted">${fmtDate(R.week_start)}–${fmtDate(R.week_end)}, compared with the week before.</p>
-    <div class="dash-grid">${tile("Meals", "meals")}${tile("Orders", "orders")}${tile("Active customers", "customers")}${tile("New customers", "new_customers")}${tile("Repeat rate", "repeat_rate", true)}${tile("Average meals per pool", "avg_meals")}${tile("Pools that filled", "filled")}${tile("Cancelled orders", "cancelled")}</div>
-    ${isSuper && M ? `<section class="stack" style="gap:10px"><h3>Money <span class="small muted">(owner only)</span></h3><div class="dash-grid">${[["Food value", M.food], ["ChopPool vendor fee", M.commission], ...(M.trip_estimate != null ? [["Trips priced to customers", M.trip_estimate], ["Paid to riders", M.trip_paid]] : []), ["Service fees", M.service_fees], ["Cashback paid", M.cashback], ["Wallet refunds", M.refunds], ["Wallet balances owed", M.wallets_owed]].map(([l, v]) => `<div class="dtile"><b class="num" style="font-size:18px;white-space:nowrap">${money(v || 0)}</b><span>${esc(l)}</span></div>`).join("")}<div class="dtile"><b class="num">${M.momo_refunds || 0}</b><span>MoMo refunds to send</span></div></div></section>` : ""}
+    <div class="dash-grid rep-grid">${tile("Meals", "meals")}${tile("Orders", "orders")}${tile("Active customers", "customers")}${tile("New customers", "new_customers")}${tile("Repeat rate", "repeat_rate", true)}${tile("Average meals per pool", "avg_meals")}${tile("Pools that filled", "filled")}${tile("Cancelled orders", "cancelled")}</div>
+    ${isSuper && M ? `<section class="stack" style="gap:10px"><h3>Money <span class="small muted">(owner only)</span></h3><div class="dash-grid">${[["Food value", M.food], ["ChopPool vendor fee", M.commission], ...(M.trip_estimate != null ? [["Trips priced to customers", M.trip_estimate], ["Paid to riders", M.trip_paid]] : []), ["Service fees", M.service_fees], ["Cashback in wallets", M.cashback], ...(M.cashback_pending != null ? [["Cashback pending", M.cashback_pending]] : []), ["Wallet refunds", M.refunds], ["Wallet balances owed", M.wallets_owed]].map(([l, v]) => `<div class="dtile"><b class="num" style="font-size:18px;white-space:nowrap">${money(v || 0)}</b><span>${esc(l)}</span></div>`).join("")}<div class="dtile"><b class="num">${M.momo_refunds || 0}</b><span>MoMo refunds to send</span></div></div></section>` : ""}
     ${table("Top buildings", [["Building", r => esc(r.name)], ["Meals", r => trend(r.meals, r.prev_meals)], ["Pools", r => r.pools], ["Avg pool", r => r.avg_pool ?? "—"]], R.buildings || [], "No orders this week.")}
     ${(R.quiet || []).length ? table("Went quiet", [["Building", r => esc(r.name)], ["Meals last week", r => r.prev_meals]], R.quiet, "") : ""}
     ${table("Top customers", [["Name", r => esc(r.name)], ["Building", r => esc(r.building || "")], ...(isSuper ? [["Phone", r => esc(r.phone || "")]] : []), ["Orders", r => r.orders], ["Meals", r => r.meals]], R.customers || [], "No customers this week.")}
@@ -4430,29 +4634,52 @@ async function viewKitchen(token) {
       picked = true;
     } catch (e) { $("#view").innerHTML = `<p class="card err">${esc(cleanErr(e))}</p>`; return; }
     const other = d === dToday ? dNext : dToday, otherWaiting = N && N.pools.some(p => p.status === "waiting");
-    const dayTabs = dNext !== dToday ? `<nav class="admintabs" aria-label="Day">${[[dToday, "Today's deliveries"], [dNext, "Orders for " + dayLabel(dNext)]].map(([x, l]) => `<button data-kday="${x}"${x === d ? ' aria-current="page"' : ""}>${esc(l)}${x !== d && otherWaiting ? " (waiting for you)" : ""}</button>`).join("")}</nav>` : "";
+    const dayTabs = dNext !== dToday ? `<div class="chips" role="group" aria-label="Day">${[dToday, dNext].map(x => `<button type="button" class="tog" data-kday="${x}" aria-pressed="${x === d}">${esc(dayLabel(x)[0].toUpperCase() + dayLabel(x).slice(1))}${x !== d && otherWaiting ? ` <span class="dot" aria-label="needs you"></span>` : ""}</button>`).join("")}</div>` : "";
     const k = K.kitchen, used = K.pools.reduce((t, p) => t + p.orders.reduce((a, o) => a + o.qty, 0), 0);
     const waiting = K.pools.filter(p => p.status === "waiting");
     const afterCut = new Date() >= at(d, S.settings.cutoff);
+    // Buildings in the order their first order came in; oldest order first inside each
+    const firstAt = p => p.orders.reduce((m, o) => (o.created_at && o.created_at < m ? o.created_at : m), "9999");
+    const pools = [...K.pools].sort((a, b) => firstAt(a) < firstAt(b) ? -1 : firstAt(a) > firstAt(b) ? 1 : a.seq - b.seq);
+    const specials = pools.flatMap(p => p.orders.filter(o => ["quote_requested", "quoted"].includes(o.status)).map(o => ({ ...o, site: p.site })));
+    const priceBy = minus(S.settings.cutoff, Number(S.settings.quote_pay_min || 15));
+    // One line that says what to do next, with one big button
+    const nextUp = (() => {
+      if (!k.open && !k.paused) return { t: waiting.length ? "Customers are waiting. Confirm you're cooking." : "Confirm you're cooking " + dayLabel(d) + ".", go: "#cookCard", b: "Confirm" };
+      const sp = specials.filter(o => o.status === "quote_requested").length;
+      if (sp) return { t: `Price ${sp} special request${sp > 1 ? "s" : ""} by ${fmtTime(priceBy)}.`, go: "#specials", b: "Price now" };
+      const st = s => pools.find(p => p.status === s);
+      if (afterCut && st("collecting")) return { t: "Orders are closed. Confirm the final batch.", go: "#pool-" + st("collecting").id, b: "Confirm batch" };
+      if (st("accepted")) return { t: "Cook and pack. Tap Food is ready when done.", go: "#pool-" + st("accepted").id, b: "Go to order" };
+      if ((k.delivery_mode === "runner") && (st("ready") || st("picked_up") || st("arriving"))) { const p = st("ready") || st("picked_up") || st("arriving"); return { t: p.status === "ready" ? "Send your runner off with the bag." : "Your runner is on the way.", go: "#pool-" + p.id, b: "Go to order" }; }
+      if (st("ready")) return { t: "Food is packed. The rider is on the way to you.", go: "", b: "" };
+      if (st("picked_up") || st("arriving")) return { t: "The rider has the food. Nothing to do.", go: "", b: "" };
+      if (pools.length && pools.every(p => p.status === "delivered")) return { t: "All delivered. Well done.", go: "", b: "" };
+      if (pools.some(p => p.status === "collecting")) return { t: `Taking orders until ${fmtTime(S.settings.cutoff)}. ${used} meal${used === 1 ? "" : "s"} so far.`, go: "", b: "" };
+      return { t: k.paused ? "You're not cooking " + dayLabel(d) + "." : `No orders yet. Orders close at ${fmtTime(S.settings.cutoff)}.`, go: "", b: "" };
+    })();
+    const quoteForm = o => `<form class="quote" data-quote="${esc(o.id)}"><p><strong>${esc(o.site)}, code ${esc(o.code)}</strong>${o.status === "quoted" ? ` <span class="chip warn">Priced ${money(o.quote_price)}, waiting for payment</span>` : ""}</p>
+            <div class="stack small" style="gap:2px"><span><strong>${o.qty} × ${esc(o.item_name)}</strong>${o.unit_price != null ? ` <span class="muted">(menu price ${money(o.unit_price)})</span>` : ""}</span>
+              ${o.addons?.length ? `<span>Add-ons: ${esc(addonText(o.addons))}${Number(o.addons_total) ? ` <span class="muted">(${money(o.addons_total)} a meal, charged separately)</span>` : ""}</span>` : ""}
+              <span>Request: <strong>${esc(o.special_request)}</strong></span>${o.note ? `<span class="muted">Note: ${esc(o.note)}</span>` : ""}</div>
+            <div><label for="qp-${o.id}">Full price per meal, including the extra (GHS)</label><input id="qp-${o.id}" inputmode="decimal" value="${esc(o.quote_price ?? o.unit_price ?? "")}">
+              <p class="small muted" style="margin-top:4px">Start from the menu price and add what the extra costs.${o.addons?.length ? " Don't include add-ons; they're added on top." : ""}</p></div>
+            <div class="qbtns"><button class="btn">${o.status === "quoted" ? "Update price" : "Send price"}</button><button class="ghost" type="button" data-decline="${esc(o.id)}">Can't do this</button></div></form>`;
+    const settingsHtml = `${termsNeed(k) && (k.open || k.paused) ? `<section class="card stack">${termsBox(k, K.menu)}<button class="btn wide" id="acceptTermsOnly">Accept the new terms</button></section>` : ""}${autoCard(k, d)}${freeCard(k)}`;
     $("#view").innerHTML = `
       <header class="topzone pagetop"><div class="pagehead"><div class="pagebrand">${LOGO(30)}<p class="brand" style="font-size:18px">ChopPool vendor</p></div>${themeBtn()}</div><h1>${esc(k.name)}</h1>
         <p class="muted">${fmtDate(d)} · ready by ${minus(S.settings.delivery_time, 30)} · ${used} of ${k.capacity} meals · ${k.delivery_mode === "runner" ? "you deliver with your own runner" : "a ChopPool rider collects"}</p></header>
-      ${k.added_by_customer ? (k.listing_status === "pending" ? `<p class="note">Your free listing request is with ChopPool. We'll let you know once it's approved.</p>`
-        : `<section class="card listcta"><div><strong>Want more customers? List as a ChopPool vendor for free.</strong><p class="small muted">${k.listing_status === "declined" ? "Your last request wasn't approved. You can update it and try again." : "Reach people in every nearby office, hostel and apartment, not just the building that added you."}</p></div><button class="btn" id="listMe">List my business</button></section>`)
-        : appTools("#kitchen-" + token, { kitchen_token: token }, "Vendor")}
       ${dayTabs}
-      ${k.open ? `<p><span class="chip ok">You're taking orders for ${dayLabel(d)}</span></p>`
-        : k.paused ? `<section class="card"><h2>You're not cooking ${dayLabel(d)}</h2><p class="small muted">Customers can't order from you for ${fmtDate(d)}.</p><button class="ghost wide" id="unpause">I'm cooking ${dayLabel(d)} after all</button></section>`
-        : `<section class="card" style="border-color:var(--accent)"><h2>${waiting.length ? "Customers are waiting for you" : "Are you cooking " + dayLabel(d) + "?"}</h2>
+      ${nextUp.go === "#cookCard" || (k.paused && !k.open) ? "" : `<section class="card nextup" aria-live="polite"><p>${esc(nextUp.t)}</p>${nextUp.b ? `<button class="btn wide" data-jump="${esc(nextUp.go)}">${esc(nextUp.b)}</button>` : ""}</section>`}
+      ${k.open ? "" : k.paused ? `<section class="card"><h2>You're not cooking ${dayLabel(d)}</h2><p class="small muted">Customers can't order from you for ${fmtDate(d)}.</p><button class="ghost wide" id="unpause">I'm cooking ${dayLabel(d)} after all</button></section>`
+        : `<section class="card" id="cookCard" style="border-color:var(--accent)"><h2>${waiting.length ? "Customers are waiting for you" : "Are you cooking " + dayLabel(d) + "?"}</h2>
           <p>${waiting.length ? waiting.map(p => esc(p.site)).join(", ") + " want" + (waiting.length > 1 ? "" : "s") + " to order. Confirm " + (d > today() ? "by " + fmtTime(confirmBy()) + " " + (dayLabel(d) === "tomorrow" ? "tomorrow" : fmtDate(d)) : "within " + S.settings.accept_timeout_min + " minutes") + " so the pool can open." : "Confirm so people can start ordering from you."}</p>
           ${termsNeed(k) ? termsBox(k, K.menu) : ""}
           ${termsNeed(k) ? `<button class="btn wide" id="acceptTerms">Accept terms and confirm I'm cooking ${dayLabel(d)}</button>` : `${Number(k.fee_rate) > 0 ? `<p class="small muted">${esc(termsLine(k))}</p>` : ""}<button class="btn wide" id="openDay">Yes, I'm cooking ${dayLabel(d)}</button>`}</section>`}
-      ${termsNeed(k) && (k.open || k.paused) ? `<section class="card stack">${termsBox(k, K.menu)}<button class="btn wide" id="acceptTermsOnly">Accept the new terms</button></section>` : ""}
-      ${autoCard(k, d)}
-      ${freeCard(k)}
-      ${K.pools.map(p => {
+      ${specials.length ? `<section class="card stack" id="specials"><div class="top"><h2>Special requests</h2><span class="chip warn">Price by ${fmtTime(priceBy)}</span></div><p class="small muted">The customer pays after you price it. Requests not priced in time are cancelled.</p>${specials.map(quoteForm).join("")}</section>` : ""}
+      ${pools.map(p => {
         const tally = {}; p.orders.filter(o => !o.special_request || o.status !== "quote_requested").forEach(o => { const key = o.item_name + (o.addons?.length ? " (" + addonText(o.addons) + ")" : "") + (o.special_request ? " · Special: " + o.special_request : ""); tally[key] = (tally[key] || 0) + o.qty; });
-        const n = p.orders.reduce((a, o) => a + o.qty, 0), quotes = p.orders.filter(o => ["quote_requested", "quoted"].includes(o.status));
+        const n = p.orders.reduce((a, o) => a + o.qty, 0);
         const btns = p.status === "waiting" ? "" : p.status === "collecting" ? (afterCut ? `<button class="btn wide" data-k="accepted" data-pool="${esc(p.id)}">Confirm final batch</button>` : `<p class="small muted">Orders close at ${fmtTime(S.settings.cutoff)}. Then confirm the final batch.</p>`)
           : p.status === "accepted" ? `<button class="btn wide" data-k="ready" data-pool="${esc(p.id)}">Food is ready</button>`
           : (k.delivery_mode === "runner" || p.free) && p.status === "ready" ? `<button class="btn wide" data-k="picked_up" data-pool="${esc(p.id)}">Runner has picked up</button>`
@@ -4462,25 +4689,27 @@ async function viewKitchen(token) {
         const runnerHand = (k.delivery_mode === "runner" || p.free) && ["arriving", "delivered"].includes(p.status)
           ? (p.handoff === "host" ? `<p>Hand the bag to <strong>${esc(p.host_label || p.drop_point)}</strong>.</p>` : `<p>At <strong>${esc(p.drop_point)}</strong>, hand each meal over against its code.</p>${codeBox("rc-" + p.id)}`) : "";
         const food = p.orders.filter(o => o.paid).reduce((t, o) => t + (Number(o.quote_price ?? o.unit_price) + Number(o.addons_total || 0)) * o.qty, 0);
-        return `<article class="card"><div class="top"><h2>${esc(p.site)} · Pool ${p.seq}</h2><span class="chip">${n} meals</span></div>${stepsHtml(p.status)}
+        return `<article class="card" id="pool-${esc(p.id)}"><div class="top"><h2>${esc(p.site)} · Pool ${p.seq}</h2><span class="chip">${n} meals</span></div>${stepsHtml(p.status)}
           <p class="small muted">One sealed bag for ${esc(p.drop_point)}${p.free ? ` · <strong style="color:var(--ok)">free delivery: your runner takes it</strong>` : ""}</p>
           ${food > 0 ? `<div class="sumgrid small"><span>Food paid for</span><b class="num">${money(food)}</b>${Number(p.fee) > 0 ? `<span>ChopPool fee (${Math.round(Number(p.fee_rate) * 1000) / 10}% after ${p.fee_free} meals)</span><b class="num">−${money(p.fee)}</b>` : ""}<span>Due to you</span><b class="num">${money(food - Number(p.fee || 0))}</b></div>` : ""}
           ${Object.keys(tally).length ? `<ul style="margin:0;padding-left:20px">${Object.entries(tally).map(([nm, q]) => `<li class="num"><strong>${q} ×</strong> ${esc(nm)}</li>`).join("")}</ul>` : ""}
-          ${quotes.map(o => `<form class="quote" data-quote="${esc(o.id)}"><p><strong>Special request, code ${esc(o.code)}</strong>${o.status === "quoted" ? ` <span class="chip warn">Priced ${money(o.quote_price)}, waiting for payment</span>` : ""}</p>
-            <div class="stack small" style="gap:2px"><span><strong>${o.qty} × ${esc(o.item_name)}</strong>${o.unit_price != null ? ` <span class="muted">(menu price ${money(o.unit_price)})</span>` : ""}</span>
-              ${o.addons?.length ? `<span>Add-ons: ${esc(addonText(o.addons))}${Number(o.addons_total) ? ` <span class="muted">(${money(o.addons_total)} a meal, charged separately)</span>` : ""}</span>` : ""}
-              <span>Request: <strong>${esc(o.special_request)}</strong></span>${o.note ? `<span class="muted">Note: ${esc(o.note)}</span>` : ""}</div>
-            <div><label for="qp-${o.id}">Full price per meal, including the extra (GHS)</label><input id="qp-${o.id}" inputmode="decimal" value="${esc(o.quote_price ?? o.unit_price ?? "")}">
-              <p class="small muted" style="margin-top:4px">Start from the menu price and add what the extra costs.${o.addons?.length ? " Don't include add-ons; they're added on top." : ""}</p></div>
-            <div class="row" style="justify-content:flex-start;gap:8px"><button class="btn">${o.status === "quoted" ? "Update price" : "Send price"}</button><button class="ghost" type="button" data-decline="${esc(o.id)}">Can't do this</button></div></form>`).join("")}
           <p class="small muted">Label each pack with its code:</p>
-          <div class="labels">${byCode(p.orders.filter(o => !["quote_requested", "quoted"].includes(o.status))).map(([c, g]) => `<div><span class="lc num">${esc(c)}</span><span class="items">${g.map(o => `<span>${o.qty} × ${esc(o.item_name)}${o.addons?.length ? " · " + esc(addonText(o.addons)) : ""}${o.special_request ? `<br><strong>Special: ${esc(o.special_request)}</strong>` : ""}${o.note ? `<br><span class="small muted">Note: ${esc(o.note)}</span>` : ""}</span>`).join("")}${g.length > 1 ? `<span class="small muted">One bag · ${g.reduce((t, o) => t + o.qty, 0)} meals</span>` : ""}</span>${g.every(o => o.collected) ? `<span class="tick">Collected</span>` : g.every(o => o.paid) ? "" : `<span class="chip warn">Payment pending</span>`}</div>`).join("") || `<p class="small muted">No paid orders yet.</p>`}</div>
+          <div class="labels">${byCode(p.orders.filter(o => !["quote_requested", "quoted"].includes(o.status))).sort((x, y) => (x[1][0].created_at || "") < (y[1][0].created_at || "") ? -1 : 1).map(([c, g]) => `<div><span class="lc num">${esc(c)}</span><span class="items">${g.map(o => `<span>${o.qty} × ${esc(o.item_name)}${o.addons?.length ? " · " + esc(addonText(o.addons)) : ""}${o.special_request ? `<br><strong>Special: ${esc(o.special_request)}</strong>` : ""}${o.note ? `<br><span class="small muted">Note: ${esc(o.note)}</span>` : ""}</span>`).join("")}${g.length > 1 ? `<span class="small muted">One bag · ${g.reduce((t, o) => t + o.qty, 0)} meals</span>` : ""}</span>${g.every(o => o.collected) ? `<span class="tick">Collected</span>` : g.every(o => o.paid) ? "" : `<span class="chip warn">Payment pending</span>`}</div>`).join("") || `<p class="small muted">No paid orders yet.</p>`}</div>
           ${runnerHand}${btns}</article>`;
-      }).join("") || `<p class="card muted">No orders yet for ${fmtDate(d)}. Orders close at ${fmtTime(S.settings.cutoff)}.</p>`}
-      ${k.added_by_customer ? `<section class="card stack"><h2>Your menu</h2><p class="small muted">Check the dishes, prices and extras the customer added for you. Add as many dishes as you like, then save once.</p>
+      }).join("")}
+      <details class="card settingsfold"${S.kset ? " open" : ""}><summary><h2>Your settings</h2><span class="small muted">Cooking days, free delivery, menu, photos, alerts</span></summary>
+      ${settingsHtml}
+      ${k.added_by_customer ? `<section class="stack"><h2>Your menu</h2><p class="small muted">Check the dishes, prices and extras the customer added for you. Add as many dishes as you like, then save once.</p>
         ${menuEditor(K.menu, "vendor:" + token, false)}</section>`
-        : K.menu.length ? `<section class="card stack"><h2>Dish photos</h2><p class="small muted">A good photo helps customers choose you. Tap a dish to add or change its photo. ChopPool manages your dishes and prices.</p>
-        <div class="photogrid">${K.menu.map(i => `<div class="mdish" data-item="${esc(i.id)}"><button type="button" class="mphoto" data-photo aria-label="Photo for ${esc(i.name)}">${i.photo_url ? `<img src="${esc(i.photo_url)}" alt="" loading="lazy">` : `<span class="dishpic">${art(dishKind(i))}</span>`}<span class="cam">${CAM}</span></button><span class="small">${esc(i.name)}</span></div>`).join("")}</div></section>` : ""}`;
+        : K.menu.length ? `<section class="stack"><h2>Dish photos</h2><p class="small muted">Dishes with photos get chosen more often. Tap a dish to add or change its photo. ChopPool checks each photo before customers see it.</p>
+        <p class="small"><strong>Tips:</strong> shoot from above, plate on a plain surface, in daylight. No text or logos.</p>
+        <div class="photogrid">${K.menu.map(i => `<div class="mdish" data-item="${esc(i.id)}"><button type="button" class="mphoto" data-photo aria-label="Photo for ${esc(i.name)}">${i.photo_url ? `<img src="${esc(i.photo_url)}" alt="" loading="lazy">` : `<span class="dishpic">${art(dishKind(i))}</span>`}<span class="cam">${CAM}</span></button><span class="small">${esc(i.name)}</span></div>`).join("")}</div></section>` : ""}
+      ${k.added_by_customer ? "" : appTools("#kitchen-" + token, { kitchen_token: token }, "Vendor")}
+      </details>
+      ${k.added_by_customer ? (k.listing_status === "pending" ? `<p class="note">Your free listing request is with ChopPool. We'll let you know once it's approved.</p>`
+        : `<section class="card listcta"><div><strong>Want more customers? List as a ChopPool vendor for free.</strong><p class="small muted">${k.listing_status === "declined" ? "Your last request wasn't approved. You can update it and try again." : "Reach people in every nearby office, hostel and apartment, not just the building that added you."}</p></div><button class="btn" id="listMe">List my business</button></section>`)
+        : ""}`;
+    $("#view").querySelector(".settingsfold")?.addEventListener("toggle", e => { S.kset = e.target.open; });
     $("#listMe")?.addEventListener("click", () => openListingForm(token, k));
     // Always cooking: weekdays that open automatically; one-tap pause for a single day
     const saveAuto = async list => { try { await api.kitchenSetAuto(token, list); notifyServer({ kitchen_token: token, date: d }); toast(list.length ? "You cook " + daysText(list) + ". Pools open straight away on those days." : "No days ticked. Confirm each day instead."); draw(); } catch (e) { toast(cleanErr(e)); } };
@@ -4504,6 +4733,8 @@ async function viewKitchen(token) {
       return;
     }
     const day = e.target.closest("[data-kday]"); if (day) { d = day.dataset.kday; return draw(); }
+    const jump = e.target.closest("[data-jump]");
+    if (jump) { const t = jump.dataset.jump && $(jump.dataset.jump); if (t) { t.scrollIntoView({ behavior: "smooth", block: "start" }); const f = t.querySelector("input, button.btn"); setTimeout(() => f?.focus({ preventScroll: true }), 450); } return; }
     const dec = e.target.closest("[data-decline]");
     if (dec) {
       openSheet(`${sheetHead("Can't do this request?", "The customer is told and can order the standard meal instead. Nothing is charged.")}
@@ -4653,7 +4884,7 @@ async function viewHost(token) {
     let H; try { H = await api.hostView(token, d); } catch (e) { $("#view").innerHTML = `<p class="card err">${esc(cleanErr(e))}</p>`; return; }
     const left = H.pools.flatMap(p => p.orders).filter(o => !o.collected).length;
     $("#view").innerHTML = `<header class="topzone pagetop"><div class="pagehead"><div class="pagebrand">${LOGO(30)}<p class="brand" style="font-size:18px">ChopPool drop point</p></div>${themeBtn()}</div><h1>${esc(H.site.name)}</h1><p class="muted">${fmtDate(d)} · ${esc(H.site.drop_point)} · ${left} meals waiting</p></header>
-      <section class="card"><h2>Hand over a meal</h2><p class="small muted">Ask for the customer's 4-digit code.</p>${codeBox("hostcode")}</section>` +
+      <section class="card"><h2>Hand over a meal</h2><p class="small muted">Ask for their code, like K-27, and check the first name.</p>${codeBox("hostcode")}</section>` +
       (H.pools.map(p => `<article class="card"><div class="top"><h3>${esc(p.menu)} · Pool ${p.seq}</h3><span class="chip ${p.status === "delivered" ? "ok" : "dim"}">${p.status === "delivered" ? "Bag arrived" : STEP_LABEL[p.status]}</span></div>${handList(p.orders)}</article>`).join("")
         || `<p class="card muted">No deliveries for today yet.</p>`);
   };
@@ -4719,6 +4950,7 @@ function viewRiderSignup() {
       <div class="grid2"><div><label for="rsPhone">Phone / WhatsApp</label><input id="rsPhone" inputmode="tel" autocomplete="tel" placeholder="024 123 4567"></div><div><label for="rsMomo">MoMo number for payouts</label><input id="rsMomo" inputmode="tel" placeholder="024 123 4567"></div></div>
       <div class="grid2"><div><label for="rsBike">Motorbike and plate</label><input id="rsBike" placeholder="Honda, GW 1234-22"></div><div><label for="rsArea">Area you ride in</label><input id="rsArea" placeholder="Osu, Airport, East Legon"></div></div>
       <p class="small muted">The ChopPool team checks every application and will call you. Delivery pricing is the same for every rider.</p>
+      <p class="small muted">We use these details to check and pay you. See our <a href="#privacy" target="_blank" rel="noopener">privacy notice</a>.</p>
       <p class="err" id="rsErr"></p><button class="btn wide">Send application</button></form>`;
   $("#rsForm").addEventListener("submit", async e => {
     e.preventDefault();
@@ -4769,7 +5001,7 @@ function splash() {
   const pk = (cls, x, y, c) => `<i class="sp-p ${cls}" style="left:${x}%;top:${y}%;background:${c}"></i>`;
   const el = document.createElement("div"); el.className = "splash wait" + (still ? " still" : ""); el.setAttribute("aria-hidden", "true");
   el.innerHTML = `<div class="sp-in"><div class="sp-logo">${pk("sp-p1", 20, 61, "#FFF7EE")}${pk("sp-p3", 21, 27, "#FFF7EE")}${pk("sp-p2", 25, 44, "#F5B04A")}</div>
-    <div class="sp-word">chop<span>pool</span></div><p class="sp-tag"><span>Split delivery.</span><span>One order.</span><span>One building.</span></p></div>`;
+    <div class="sp-word">chop<span>pool</span></div><p class="sp-tag"><span>Order together,</span><span>pay less.</span></p></div>`;
   document.body.appendChild(el); S.splashing = true;
   // Start the animation once the heading font is ready and the first screen has been built behind it (at most 1.2 s),
   // so no heavy work runs while the packs are moving. If the app's data is slow, the first screen waits until they've landed.
@@ -4784,7 +5016,7 @@ function splash() {
   let gone = false, minDone = false; const done = () => { if (gone) return; gone = true; el.classList.add("out"); setTimeout(() => { el.remove(); S.splashing = false; revealScan(); }, 380); };
   const tryDone = () => { if (minDone && S.appReady) done(); };
   el.addEventListener("click", () => { if (S.appReady) done(); });
-  function startMin() { setTimeout(() => { minDone = true; tryDone(); if (!gone && !matchMedia("(prefers-reduced-motion: reduce)").matches) el.classList.add("hold"); }, still ? 500 : 1900); }
+  function startMin() { setTimeout(() => { minDone = true; tryDone(); if (!gone && !matchMedia("(prefers-reduced-motion: reduce)").matches) el.classList.add("hold"); }, still ? 500 : 2100); }
   S.onReady = tryDone;
   setTimeout(done, 15000);   // never stay stuck
 }
@@ -4833,6 +5065,7 @@ async function route() {
   document.title = h === "rider-signup" ? "Rider sign-up · ChopPool" : h.startsWith("kitchen-") ? "Vendor · ChopPool" : h.startsWith("rider-") ? "Rider · ChopPool"
     : h.startsWith("host-") ? "Drop point · ChopPool" : h === "admin" ? "Admin · ChopPool" : "ChopPool · " + TAGLINE;
   if (h === "rider-signup") return viewRiderSignup();
+  if (h === "privacy" || h === "terms") return viewLegal(h);
   const view = h.startsWith("kitchen-") ? "kitchen" : h.startsWith("rider-") ? "rider" : h.startsWith("host-") ? "host" : h === "admin" ? "admin" : "order";
   document.querySelectorAll("#demoBar a").forEach(a => { if (a.getAttribute("href") === "#" + h || (view === "order" && a.dataset.view === "order")) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
   if (view === "kitchen") return viewKitchen(h.slice(8));
@@ -4922,6 +5155,7 @@ async function start() {
   if (/[?&]app=1/.test(location.search) && (!location.hash || location.hash === "#") && local.get("cp_home")) history.replaceState(null, "", location.pathname + location.search + local.get("cp_home"));
   document.addEventListener("click", async e => {
     const ins = e.target.closest("[data-install]"); if (ins) return installApp(ins.dataset.install);
+    const lg = e.target.closest("[data-legal]"); if (lg) { e.preventDefault(); return openLegal(lg.dataset.legal); }
     if (e.target.closest("[data-theme-cycle]")) return cycleTheme();
     const al = e.target.closest("[data-alerts]"); if (al) { if (await pushSubscribe(JSON.parse(al.dataset.alerts || "{}"))) { toast("Alerts are on for this phone."); al.textContent = "Alerts are on"; } }
   });

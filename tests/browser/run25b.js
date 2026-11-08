@@ -1,0 +1,11 @@
+const { chromium, devices } = require('playwright');
+(async () => { const b = await chromium.launch(); const ctx = await b.newContext({ ...devices['iPhone 14'] });
+  const p = await ctx.newPage(); p.on('pageerror', e => console.log('ERR', e.message));
+  await p.route(/tile\.openstreetmap|cdnjs|nominatim/, r => r.abort());
+  await p.addInitScript(() => { localStorage.setItem('cp_splash_v','1'); localStorage.setItem('cp_site', JSON.stringify('s1')); });
+  await p.goto('file:///home/claude/choppool/index.html'); await p.waitForTimeout(1800);
+  console.log(await p.evaluate(() => { const r = heroDelivery([], siteOf(S.siteId)); return JSON.stringify(r); }));
+  await p.evaluate(() => { S.board.pools = []; renderHero(); });
+  console.log((await p.locator('.hero-stat').last().innerText()).replace(/\n/g,' | '));
+  await p.locator('#hero').screenshot({ path: '/tmp/b17_hero.png' });
+  await b.close(); })();
