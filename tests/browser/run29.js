@@ -25,18 +25,21 @@ const { chromium, devices } = require('playwright');
   console.log('  pools', res);
   await p.evaluate(() => { location.hash = '#kitchen-demok1'; }); await p.waitForTimeout(1200);
   if (info.date !== info.today && await p.locator('[data-kday]').count()) { await p.locator(`[data-kday="${info.date}"]`).click(); await p.waitForTimeout(600); }
-  ok(/handed over|still to be collected/.test(await p.locator('#view').innerText()), 'seller shows handover count after Arrived');
+  ok(/received · \d+ waiting|meals received/.test(await p.locator('#view').innerText()), 'seller shows handover count after Arrived');
   // collect all codes for that date
   await p.evaluate(async (date) => { const K = await api.kitchenView('demok1', date); for (const pl of K.pools) for (const o of pl.orders) { if (!o.collected) { try { await api.collectCode('demoh1', o.code, date, null, 'cash'); } catch (e) {} try { await api.collectCode('demok1', o.code, date, null, 'cash'); } catch (e) {} } } }, info.date);
   await p.evaluate(() => { location.hash = '#order'; }); await p.waitForTimeout(300);
   await p.evaluate(() => { location.hash = '#kitchen-demok1'; }); await p.waitForTimeout(1200);
   if (info.date !== info.today && await p.locator('[data-kday]').count()) { await p.locator(`[data-kday="${info.date}"]`).click(); await p.waitForTimeout(600); }
   const t = await p.locator('#view').innerText();
-  ok(/Handed over/.test(t), 'seller step reaches Handed over');
-  ok(/All .* handed over\. This delivery is done/.test(t), 'seller sees delivery done');
+  ok(/\bDone\b/.test(t), 'seller step reaches Done');
+  ok(/All .* received\. This delivery is done/.test(t), 'seller sees delivery done');
   console.log('  next:', await p.locator('.nextup').innerText().catch(() => '-'));
   // customer
   await p.evaluate(() => { location.hash = '#order'; }); await p.waitForTimeout(1200); await p.click('.tabbar [data-tab=orders]'); await p.waitForTimeout(800);
-  const ot = await p.locator('#tabOrders').innerText(); ok(/Collected/.test(ot) && /Got my food/.test(ot), 'customer sees Collected + Got my food');
+  const ot = await p.locator('#tabOrders').innerText(); ok(/Delivered/.test(ot) && /Got my food/.test(ot), 'customer sees Delivered + Got my food');
+  await p.locator('[data-gotit]').first().click(); await p.waitForTimeout(1000);
+  ok(/How was lunch/.test(await p.locator('#sheet').innerText()), 'review opens after Got my food');
+  await p.evaluate(() => closeSheet()); await p.waitForTimeout(400); await p.click('[data-oseg=past]').catch(() => {}); await p.waitForTimeout(300);
   await p.screenshot({ path: '/tmp/shots/final-customer.png' });
   console.log('errors', errs); await b.close(); })();

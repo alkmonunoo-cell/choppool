@@ -16,8 +16,8 @@ const { chromium, devices } = require('playwright');
   await p.click('.tabbar [data-tab=orders]'); await p.waitForTimeout(300); ok(await p.evaluate(() => S.oseg) === 'up', 're-tap Orders goes to Upcoming');
   // place an order, then hide name and rate
   const id = await p.evaluate(async () => { await api.kitchenOpenDay('demok1', S.date).catch(()=>{}); const r = await api.placeOrder({ site: 's1', item: 'i1', qty: 1, name: 'Ama Owusu', phone: '0240000001', ref: '51234567890' }); const m = local.get('cp_orders') || []; m.push({ id: r.id, order_date: r.order_date }); local.set('cp_orders', m); return r.id; });
-  await p.click('.tabbar [data-tab=wallet]'); await p.waitForTimeout(400); await p.click('[data-acc=privacy]'); await p.waitForTimeout(300);
-  await p.check('input[name=np][value=hide]'); await p.waitForTimeout(300);
+  await p.click('.tabbar [data-tab=wallet]'); await p.waitForTimeout(400); await p.click('#profBtn'); await p.waitForTimeout(300);
+  await p.fill('#pfName', 'Ama Owusu'); await p.uncheck('#pfShow', { force: true }); await p.click('#pfForm button.btn'); await p.waitForTimeout(400); console.log('  hide flag', await p.evaluate(() => localStorage.getItem('cp_hide_name')));
   const hidden = await p.evaluate(async id => { await api.updateOrder(id, { status: 'paid' }); return (await api.myOrders([id])).length && true; }, id);
   const rv = await p.evaluate(async id => { await api.collectCode('demoh1', (await api.myOrders([id]))[0].code, S.date, null, 'cash').catch(() => {}); await api.confirmReceived?.(id).catch?.(() => {}); try { await api.submitReview(id, '0240000001', 5, 'Lovely'); } catch (e) { return 'rate err ' + e.message; } const rs = await api.kitchenReviews('k1'); return rs.find(r => r.comment === 'Lovely'); }, id);
   ok(rv && typeof rv === 'object' && !rv.name, 'review name hidden (' + JSON.stringify(rv && rv.name) + ')');

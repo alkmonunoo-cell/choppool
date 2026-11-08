@@ -1095,7 +1095,12 @@ function makeDemoApi() {
     orders.filter(o => ["quote_requested", "quoted"].includes(o.status) && pastCutoff(o.order_date)).forEach(o => { o.status = "cancelled"; o.cancel_reason = "Special request not paid before cut-off"; });
     // "Got my food" confirms itself a while after handover; then cashback is posted once
     const rcv = Number(settings.auto_receive_min || 120) * 6e4;
-    orders.filter(o => !o.parent_id && o.status === "collected" && !o.received_at && !o.problem && o.collected_at && Date.now() >= Date.parse(o.collected_at) + rcv).forEach(o => { o.received_at = nowIso(); });
+    const recv = (o, by) => { o.received_at = o.received_at || nowIso(); o.status = "collected"; o.collected_at = o.collected_at || nowIso(); o.collected_by = o.collected_by || by;
+      orders.filter(c => c.parent_id === o.id && c.status === "paid").forEach(c => { c.status = "collected"; c.collected_at = c.collected_at || nowIso(); c.collected_by = c.collected_by || "with main order"; }); };
+    S.demoRecv = recv;
+    orders.filter(o => !o.parent_id && ["paid", "collected"].includes(o.status) && !o.received_at && !o.problem).forEach(o => {
+      const p = pools.find(x => x.id === o.pool_id);
+      if ((p && p.status === "delivered" && p.delivered_at && Date.now() >= Date.parse(p.delivered_at) + rcv) || (o.collected_at && Date.now() >= Date.parse(o.collected_at) + rcv)) recv(o, "auto"); });
     orders.filter(o => !o.parent_id && o.user_id && !o.cashback_posted && ["paid", "collected"].includes(o.status) && (!o.problem || o.problem_resolved_at)).forEach(o => {
       const p = pools.find(x => x.id === o.pool_id); if (!p || p.status === "cancelled") return;
       if (!(o.received_at || (p.status === "delivered" && p.delivered_at && Date.now() >= Date.parse(p.delivered_at) + rcv))) return;
@@ -1188,6 +1193,7 @@ function makeDemoApi() {
     async payQuote(id, ref, useWallet) { housekeeping(); const o = orders.find(x => x.id === id); if (!o || o.status !== "quoted") throw new Error("This request is not waiting for payment.");
       if (o.quote_pay_by && Date.now() > Date.parse(o.quote_pay_by) + 30e3) throw new Error("The time to pay for this special order has run out."); return settle(o, ref, useWallet); },
     async myOrders(ids) {
+      housekeeping();
       return orders.filter(o => ids.includes(o.id) || ids.includes(o.parent_id) || (me && o.user_id === me.id)).filter(o => o.order_date >= today()).sort((a, b) => a.created_at < b.created_at ? 1 : -1).map(o => {
         const p = pools.find(x => x.id === o.pool_id);
         return { id: o.id, order_date: o.order_date, code: o.code, status: o.status, qty: o.qty, item_name: o.item_name, site_id: o.site_id, kitchen_id: o.kitchen_id, pool_seq: p.seq, pool_status: p.status,
@@ -1200,7 +1206,9 @@ function makeDemoApi() {
           collected_at: o.collected_at || null, cashback_posted: !!o.cashback_posted, solo_choice: o.solo_choice || null };
       });
     },
-    async confirmReceived(id) { const o = orders.find(x => x.id === id); if (o && o.status === "collected" && !o.parent_id) o.received_at = o.received_at || nowIso(); housekeeping(); },
+    async confirmReceived(id) { const o = orders.find(x => x.id === id && !x.parent_id); if (!o || !["paid", "collected"].includes(o.status)) throw new Error("This order can't be confirmed.");
+      const p = pools.find(x => x.id === o.pool_id); if (o.status === "paid" && !(p && p.status === "delivered")) throw new Error("Your lunch hasn't been delivered yet.");
+      housekeeping(); S.demoRecv(o, "customer"); housekeeping(); },
     async reportProblem(id, text) { const o = orders.find(x => x.id === id); if (String(text || "").trim().length < 3) throw new Error("Say what went wrong.");
       if (!o || o.cashback_posted || !["paid", "collected"].includes(o.status)) throw new Error("This order can't take a report any more."); o.problem = String(text).trim(); o.problem_at = nowIso(); o.problem_resolved_at = null; },
     async resolveProblem(id, note, credit) { const o = orders.find(x => x.id === id); o.problem_resolved_at = nowIso(); o.problem_note = note || "";
@@ -1699,7 +1707,7 @@ async function copy(text, okMsg) {
   catch (e) { openSheet(`<h2 id="sheetTitle">Copy this</h2><textarea rows="8" aria-label="Text to copy">${esc(text)}</textarea><button class="ghost" data-close>Close</button>`); }
 }
 const STEPS = ["collecting", "accepted", "ready", "picked_up", "arriving", "delivered"];
-const STEP_LABEL = { waiting: "Waiting for vendor", collecting: "Taking orders", accepted: "Cooking", ready: "Food ready", picked_up: "On the way", arriving: "Nearly there", delivered: "Arrived", handed: "Handed over" };
+const STEP_LABEL = { waiting: "Waiting for vendor", collecting: "Taking orders", accepted: "Cooking", ready: "Food ready", picked_up: "On the way", arriving: "Nearly there", delivered: "Delivered", handed: "Done" };
 // The last step, "Handed over", is reached when every meal in the pool has been collected against its code
 const handedOver = os => (os || []).length > 0 && os.every(o => o.collected || o.status === "collected");
 const stepsHtml = (st, orders) => {
@@ -1708,7 +1716,7 @@ const stepsHtml = (st, orders) => {
   return `<div class="steps">${list.map((x, i) => `<span class="${x === cur ? (x === "handed" ? "now fin" : "now") : i < list.indexOf(cur) ? "done" : ""}">${STEP_LABEL[x]}</span>`).join("")}</div>`;
 };
 const handInfo = (st, os) => { if (st !== "delivered") return ""; const c = handCount(os); if (!c.all) return "";
-  return c.got >= c.all ? `<p class="handline fin">${ICON.check} All ${c.all} meal${c.all === 1 ? "" : "s"} handed over. This delivery is done.</p>` : `<p class="handline">${c.got} of ${c.all} meals handed over · ${c.all - c.got} still to collect</p>`; };
+  return c.got >= c.all ? `<p class="handline fin">${ICON.check} All ${c.all} meal${c.all === 1 ? "" : "s"} received. This delivery is done.</p>` : `<p class="handline">${c.got} of ${c.all} meals received · ${c.all - c.got} waiting</p>`; };
 const handCount = os => { const all = (os || []).filter(o => !["quote_requested", "quoted", "cancelled"].includes(o.status)); return { got: all.filter(o => o.collected || o.status === "collected").reduce((t, o) => t + (o.qty || 1), 0), all: all.reduce((t, o) => t + (o.qty || 1), 0) }; };
 const siteOf = id => S.sites.find(x => x.id === id) || {};
 const menuOf = id => S.menus.find(x => x.id === id) || {};
@@ -2134,7 +2142,7 @@ async function viewOrder() {
     const fx = e.target.closest("[data-fixpay]"); if (fx) return openFixPayment((S.mine || []).find(o => o.id === fx.dataset.fixpay), fx.dataset.mode);
     if (soloClick(e)) return;
     const gi = e.target.closest("[data-gotit]"); if (gi) return run0(async () => { await api.confirmReceived(gi.dataset.gotit); await refreshMine(); refreshUser();
-      const o = (S.mine || []).find(x => x.id === gi.dataset.gotit); if (o && !o.my_rating) openReview(o, 0); else toast("Enjoy your lunch. Your cashback is on its way."); });
+      const o = (S.mine || []).find(x => x.id === gi.dataset.gotit); markReviewAsked(gi.dataset.gotit); if (o && !o.my_rating) openReview(o, 0); else toast("Enjoy your lunch. Your cashback is on its way."); });
     const pr = e.target.closest("[data-problem]"); if (pr) return openProblem(pr.dataset.problem);
     const b = e.target.closest("button[data-pay]"); if (b) openPayQuote(b.dataset.pay); const ro = e.target.closest("[data-reorder]"); if (ro) openOrder(ro.dataset.reorder);
     const ap = e.target.closest("[data-addplate]"); if (ap) { const o = (S.mine || []).find(x => x.id === ap.dataset.addplate); if (o) openOrder(o.kitchen_id, { join: o }); }
@@ -2384,7 +2392,7 @@ function renderHero() {
   const mineToday = (S.mine || []).filter(o => !o.parent_id && o.order_date === today() && ["pending", "paid", "collected"].includes(o.status) && new Date() >= at(o.order_date, s.cutoff));
   const lvl = o => o.status === "collected" ? 6 : stepRank(o.pool_status);
   const best = mineToday.sort((a, b) => lvl(b) - lvl(a))[0];
-  const myLive = best ? { label: best.status === "collected" ? "Collected" : ({ accepted: "Cooking", collecting: "Cooking", ready: "Ready", picked_up: "On the way", arriving: "On the way", delivered: "Arrived" }[best.pool_status] || "Cooking"), more: mineToday.length - 1 } : null;
+  const myLive = best ? { label: best.received_at ? "Received" : best.status === "collected" || best.pool_status === "delivered" ? "Delivered" : ({ accepted: "Cooking", collecting: "Cooking", ready: "Ready", picked_up: "On the way", arriving: "On the way", delivered: "Arrived" }[best.pool_status] || "Cooking"), more: mineToday.length - 1 } : null;
   const name = firstName();
   const dl = dayLabel(S.date);
   el.innerHTML = `<div class="hero-text"><p class="small">${greeting()}${name ? ", " + esc(name) : ""}</p>
@@ -2815,7 +2823,7 @@ function vendorClick(e) {
 }
 
 /* ---------- Orders: Upcoming / Past ---------- */
-const STEP_LABELS = ["Paid", "Cooking", "On the way", "Arrived", "Collected"];
+const STEP_LABELS = ["Paid", "Cooking", "On the way", "Delivered", "Received"];
 // Priced special order: time left to pay
 async function run0(fn) { try { await fn(); } catch (e) { toast(cleanErr(e)); } }
 function soloClick(e) {
@@ -2889,6 +2897,8 @@ function pickSwitchDish(o, t) {
       closeSheet(); toast("Moved. Your new code is " + r.code + "."); notifyServer({ order_id: r.id }); if (local.get("cp_push")) pushSubscribe({ order_ids: (local.get("cp_orders") || []).map(x => x.id) }, true); await refreshBoard(); await refreshMine();
     } catch (e) { $("#swErr").textContent = cleanErr(e); } });
 }
+// "Got my food" shows once the rider has marked the delivery Delivered (or the code was checked), until received or a problem is reported
+const canConfirm = o => !o.parent_id && !o.received_at && !o.problem && (o.status === "collected" || (o.status === "paid" && o.pool_status === "delivered"));
 function orderCard(o, all, next) {
   const step = progressOf(o), k = menuOf(o.kitchen_id), kids = all.filter(c => c.parent_id === o.id).sort((a, b) => a.created_at < b.created_at ? -1 : 1), liveKids = kids.filter(c => c.status !== "cancelled");
   const s4 = Math.min(5, step);
@@ -2899,7 +2909,7 @@ function orderCard(o, all, next) {
       <p class="status-text">${esc(statusLine(o))}</p>
       ${o.status === "quoted" ? quoteBreakdown(o) + (o.quote_pay_by ? `<p class="small" style="font-weight:700;color:var(--warn-ink, var(--accent-2))" data-paywin="${esc(o.quote_pay_by)}">${payWindowText(o.quote_pay_by)}</p>` : "") + `<button class="btn wide" data-pay="${esc(o.id)}">Pay ${money(o.amount_due)}</button>` : ""}
       ${soloBanner(o)}
-      ${o.status === "collected" && !o.parent_id && !o.received_at && !o.problem ? `<div class="recv"><span>Got everything?</span><div class="row" style="gap:8px"><button class="btn" data-gotit="${esc(o.id)}">Got my food</button><button class="ghost" data-problem="${esc(o.id)}">Report a problem</button></div></div>` : ""}
+      ${canConfirm(o) ? `<div class="recv"><span>Got everything?</span><div class="row" style="gap:8px"><button class="btn" data-gotit="${esc(o.id)}">Got my food</button><button class="ghost" data-problem="${esc(o.id)}">Report a problem</button></div></div>` : ""}
       ${o.problem ? `<div class="vbanner w"><span><b>${o.problem_resolved ? "Problem sorted" : "Problem reported"}</b> · ${esc(o.problem)}${o.problem_resolved ? "" : ". We're on it; your cashback waits until it's sorted."}</span></div>` : ""}
       ${o.status === "pending" && o.pay_issue ? `<div class="vbanner w" style="display:grid;gap:10px"><span><b>${o.pay_issue === "short" ? "Your payment was short" : "Payment not found"}</b></span>
         <div class="row" style="gap:8px;flex-wrap:wrap">${o.pay_issue === "short" ? `<button class="btn" data-fixpay="${esc(o.id)}" data-mode="rest">Pay the rest</button>` : `<button class="btn" data-fixpay="${esc(o.id)}" data-mode="ref">Fix the reference</button><button class="ghost" data-fixpay="${esc(o.id)}" data-mode="again">Pay again</button>`}</div></div>` : ""}
@@ -2948,7 +2958,7 @@ function renderOrders() {
   const el = $("#tabOrders"); if (!el) return;
   const all = S.mine || [], ids = new Set(all.map(o => o.id)), rows = all.filter(o => !o.parent_id || !ids.has(o.parent_id));
   // A collected order stays in Upcoming until it's received (or a problem is reported), so "Got my food" is easy to find
-  const awaiting = o => o.status === "collected" && !o.parent_id && !o.received_at && !o.cashback_posted && (!o.collected_at || Date.now() - Date.parse(o.collected_at) < Number(S.settings.auto_receive_min || 120) * 6e4);
+  const awaiting = o => canConfirm(o) && !o.cashback_posted;
   const isPast = o => (o.status === "cancelled" || (o.status === "collected" && !awaiting(o) && !(o.problem && !o.problem_resolved)) || o.order_date < today()) && !awaiting(o);
   const up = rows.filter(o => !isPast(o)).sort((a, b) => a.order_date < b.order_date ? -1 : a.order_date > b.order_date ? 1 : 0), past = rows.filter(isPast).sort((a, b) => a.order_date < b.order_date ? 1 : -1);
   if (!S.osegPicked) S.oseg = up.length || !past.length ? "up" : "past";
@@ -2994,7 +3004,6 @@ async function renderWallet() {
     <div class="glist">
       <button class="grow" data-acc="notif"><span class="gic">${ICON.bell}</span><span class="gtx">Notifications<small>${esc(alertsSummary())}</small></span><span class="ch">›</span></button>
       <button class="grow" data-acc="payments"><span class="gic">${ICON.phone}</span><span class="gtx">Payments<small>${esc(me.phone ? "MoMo " + fmtPhone(me.phone) + (me.network ? " · " + me.network : "") : "Add the number you pay with")}</small></span><span class="ch">›</span></button>
-      <button class="grow" data-acc="privacy"><span class="gic">${ICON.user || ICON.help}</span><span class="gtx">Name privacy<small>${local.get("cp_hide_name") ? "Hidden from other customers" : "First name shown"}</small></span><span class="ch">›</span></button>
       <button class="grow" data-acc="building"><span class="gic">${ICON.pin.replace('width="13" height="13"', 'width="18" height="18"')}</span><span class="gtx">My buildings<small>${esc(recent.slice(0, 2).join(", ") || site.name || "Choose your building")}</small></span><span class="ch">›</span></button>
       <button class="grow" data-acc="theme"><span class="gic">${ICON.dark}</span><span class="gtx">Appearance<small>${esc(themeLabel())}</small></span><span class="ch">›</span></button>
       ${isStandalone() ? "" : `<button class="grow" data-install="#order"><span class="gic">${ICON.download}</span><span class="gtx">Get the app<small>One tap from your home screen${pushReady() ? ", with alerts" : ""}</small></span><span class="ch">›</span></button>`}
@@ -3014,7 +3023,6 @@ async function accountClick(e) {
   if (t === "notif") return openNotifSettings();
   if (t === "profile") return openProfile(true);
   if (t === "payments") return openPayments();
-  if (t === "privacy") return openNamePrivacy();
   if (t === "building") return openSitePicker();
   if (t === "theme") return openAppearance();
   if (t === "help") return openHelp();
@@ -3038,14 +3046,6 @@ function openPayments() {
     if (S.user) { try { await api.saveProfile({ phone: ph || null }); } catch (e) {} }
     closeSheet(); toast("Saved"); renderWallet(); });
 }
-// Name privacy: show my first name to other customers, or keep it hidden (riders and hosts always see it for the handover)
-function openNamePrivacy() {
-  const hidden = !!local.get("cp_hide_name");
-  openSheet(`${sheetHead("Name privacy", "Riders and drop-point hosts always see your name so they hand over the right meal.")}
-    <div class="stack" style="gap:8px"><label class="grow"><input type="radio" name="np" value="show"${hidden ? "" : " checked"}> <span class="gtx">Show my first name<small>Shown next to ratings you leave for vendors</small></span></label>
-    <label class="grow"><input type="radio" name="np" value="hide"${hidden ? " checked" : ""}> <span class="gtx">Hide my name<small>Your ratings show as "Someone"</small></span></label></div>`);
-  $("#sheet").addEventListener("change", e => { if (e.target.name !== "np") return; local.set("cp_hide_name", e.target.value === "hide"); syncNamePrivacy(); renderWallet(); toast(e.target.value === "hide" ? "Your name is hidden from other customers" : "Your first name shows in pools"); });
-}
 /* ---------- Privacy notice and terms of use (plain language; have a lawyer check before launch) ---------- */
 const LEGAL_UPDATED = "8 November 2026";
 function legalHtml(which) {
@@ -3060,7 +3060,7 @@ function legalHtml(which) {
     <h3>Who sees it</h3>
     <ul><li>The vendor sees your order and code. For special requests, they see what you asked for.</li>
       <li>The rider or drop-point host sees your first name, code and phone number to hand over your meal.</li>
-      <li>Other customers never see your phone number. Your first name shows next to ratings you leave, unless you hide it under Account › Name privacy.</li>
+      <li>Other customers never see your phone number. Your first name shows next to ratings you leave, unless you turn it off in Account › Edit profile.</li>
       <li>The ChopPool team sees orders and payments to run deliveries, refunds and support.</li>
       <li>We don't sell your data or share it for advertising.</li></ul>
     <h3>How long we keep it</h3>
@@ -3081,7 +3081,7 @@ function legalHtml(which) {
       <li>Special requests are priced by the vendor first. You then have ${esc(s.quote_pay_min || 15)} minutes to pay, or the request is released and nothing is charged.</li>
       <li>If something is wrong with your meal, tap <strong>Report a problem</strong> on the order the same day. We'll look into it and credit you where it's fair.</li></ul>
     <h3>Collecting your meal</h3>
-    <p>Bring your code to the drop point. Meals not collected within ${esc(s.auto_receive_min || 120)} minutes of delivery are treated as received. Please check allergies and ingredients with the vendor before ordering; ChopPool doesn't prepare food.</p>
+    <p>Bring your code to the drop point. Tap <strong>Got my food</strong> once you have it. If you don't, your order is treated as received ${esc(s.auto_receive_min || 120)} minutes after delivery. Please check allergies and ingredients with the vendor before ordering; ChopPool doesn't prepare food.</p>
     <h3>Fair use</h3>
     <p>Don't place orders you don't intend to pay for, reuse someone else's payment ID, or misuse codes. We may block numbers or accounts that do.</p>
     <h3>Vendors and riders</h3>
@@ -3115,6 +3115,7 @@ function openProfile(focusPhone) {
     <form id="pfForm" class="stack" novalidate>
       <div><label for="pfName">Your name</label><input id="pfName" autocomplete="name" maxlength="60" value="${esc(name)}" placeholder="e.g. Ama Mensah"></div>
       <div><label for="pfPhone">MoMo number</label><input id="pfPhone" inputmode="tel" value="${esc(me.phone || "")}" placeholder="024 123 4567"></div>
+      <label class="switch"><span>Show my first name on ratings<small class="muted" style="display:block;font-weight:400">Off: your ratings show as "Someone". Riders still see your name to hand over your meal.</small></span><input type="checkbox" id="pfShow"${local.get("cp_hide_name") ? "" : " checked"}></label>
       <p class="small muted">Your photo stays on this phone.</p><p class="err" id="pfErr"></p><button class="btn wide">Save</button></form>`);
   const redraw = () => { $("#pfAv").innerHTML = avatarHtml($("#pfName").value, true, pic); $("#pfRm").classList.toggle("hidden", !pic); $("#pfPick").textContent = pic ? "Change photo" : "Add a photo"; };
   if (focusPhone) setTimeout(() => $("#pfPhone")?.focus(), 350);
@@ -3133,6 +3134,7 @@ function openProfile(focusPhone) {
       if (S.user) { if (nm !== S.user.name) S.user = await api.updateName(nm); try { await api.saveProfile({ name: nm, phone: ph || null }); } catch (e2) {} }
       local.set("cp_me", { ...meNow(), name: nm, phone: ph || meNow().phone || "" });
       try { local.set("cp_avatar", pic); } catch (e3) { toast("That photo is too large to keep on this phone."); }
+      const hide = !$("#pfShow").checked; if (hide !== !!local.get("cp_hide_name")) { local.set("cp_hide_name", hide); syncNamePrivacy(); }
       closeSheet(); toast("Profile saved"); renderHero(); renderWallet();
     } catch (err) { $("#pfErr").textContent = cleanErr(err); }
   });
@@ -3192,7 +3194,7 @@ function updatesList() {
     let t = null, title = "";
     if (o.status === "quoted") { t = "priced"; title = "Your request is priced"; }
     else if (o.status === "cancelled") { t = /did not confirm/.test(o.cancel_reason || "") ? "cashback" : "confirm"; title = /did not confirm/.test(o.cancel_reason || "") ? name + " didn't confirm" : "Order cancelled"; }
-    else if (["arriving", "delivered"].includes(o.pool_status) && o.status !== "collected") { t = "arriving"; title = o.pool_status === "arriving" ? "Lunch is 5 minutes away" : "Lunch is here"; }
+    else if (["arriving", "delivered"].includes(o.pool_status) && !o.received_at) { t = "arriving"; title = o.pool_status === "arriving" ? "Lunch is 5 minutes away" : "Lunch is here"; }
     else if (o.pool_status === "waiting") { t = "confirm"; title = "Waiting for " + name; }
     else if (["collecting", "accepted", "ready", "picked_up"].includes(o.pool_status) && o.status !== "collected") { t = "confirm"; title = name + " is cooking"; }
     if (t) out.push({ id: o.id + o.status + o.pool_status, t, title, body: statusLine(o), at, act: o.status === "quoted" || (t === "arriving" && o.status !== "collected") });
@@ -3283,7 +3285,8 @@ function statusLine0(o) {
   if (o.status === "pending" && o.pay_issue === "short") return "We received " + money(o.amount_received || 0) + ", so " + money(Math.max(0, Number(o.amount_due) - Number(o.amount_received || 0))) + " is still owed. Pay the rest before " + fmtTime(S.settings.cutoff) + " so your lunch counts.";
   if (o.status === "pending" && o.pay_issue) return "We couldn't find a MoMo payment with reference " + (o.momo_ref || "") + ". Fix the reference or pay again before " + fmtTime(S.settings.cutoff) + ".";
   if (o.status === "cancelled") return (o.cancel_reason || "Cancelled") + ". " + (S.user ? "Any wallet payment is back in your wallet; MoMo payments are refunded by ChopPool." : "ChopPool will refund your MoMo payment.");
-  if (o.status === "collected") return "Collected. Enjoy your lunch.";
+  if (o.received_at) return "Received. Enjoy your lunch.";
+  if (o.status === "collected") return "Handed over. Tap Got my food to confirm.";
   if (o.status === "cancelled" && o.cancel_reason === "Moved to another pool") return "Moved to another pool." + (o.refund_needed && Number(o.refund_due) > 0 ? " ChopPool will refund the difference, " + money(o.refund_due) + ", to your MoMo." : "");
   if (o.status === "quote_requested") return "Waiting for " + seller + " to price your special request. You'll then have " + (S.settings.quote_pay_min || 15) + " minutes to pay.";
   if (o.status === "quoted") return seller + " priced your request at " + money(o.quote_price) + " a meal. Check the total and pay to confirm.";
@@ -3294,13 +3297,25 @@ function statusLine0(o) {
   if (st === "ready") return "Packed and waiting for delivery.";
   if (st === "picked_up") return "On the way to " + site.drop_point + ".";
   if (st === "arriving") return site.handoff === "host" ? "Arriving at " + site.drop_point + " in about 5 minutes." : "Arriving at " + site.drop_point + " in about 5 minutes. Bring code " + o.code + ".";
+  if (st === "delivered" && o.status === "paid") return (site.handoff === "host" ? "Your lunch is here. Collect from " + (site.host_label || site.drop_point) + " with code " + o.code + "." : "Your lunch is here at " + site.drop_point + ". Show code " + o.code + " to the rider.") + " Then tap Got my food.";
   if (st === "delivered") return site.handoff === "host" ? "Ready to collect from " + (site.host_label || site.drop_point) + ". Show code " + o.code + "." : "Delivery is at " + site.drop_point + " for " + S.settings.arrival_window_min + " minutes. Show code " + o.code + ".";
   return "";
 }
 function progressOf(o) {
-  if (o.status === "collected") return 5;
+  if (o.received_at) return 5;
+  if (o.status === "collected") return 4;
   if (["cancelled", "quote_requested", "quoted"].includes(o.status) || o.pool_status === "waiting") return 0;
   return { collecting: o.status === "paid" ? 1 : 0, accepted: 2, ready: 2, picked_up: 3, arriving: 3, delivered: 4 }[o.pool_status] || 0;
+}
+// An order confirmed automatically (the customer never tapped Got my food) asks for a rating once, the next time the app is opened
+function markReviewAsked(id) { const a = local.get("cp_review_asked") || []; if (!a.includes(id)) local.set("cp_review_asked", a.concat(id).slice(-60)); }
+function askReviewLater() {
+  if (S.reviewAskedThisVisit || S.splashing || $("#sheetBg")?.classList.contains("open") || !$("#tabOrders")) return;
+  const asked = local.get("cp_review_asked") || [];
+  const o = (S.mine || []).find(x => !x.parent_id && x.received_at && !x.my_rating && !x.problem && !asked.includes(x.id) && Date.now() - Date.parse(x.received_at) < 3 * 864e5);
+  if (!o) return;
+  S.reviewAskedThisVisit = true; markReviewAsked(o.id);
+  setTimeout(() => { if (!$("#sheetBg")?.classList.contains("open")) openReview(o, 0); }, 900);
 }
 async function refreshMine() {
   if (!$("#tabOrders")) return;
@@ -3317,6 +3332,7 @@ async function refreshMine() {
       const msg = statusLine(o); toast(msg); sysNotify("Your ChopPool lunch", msg);
     }
   });
+  askReviewLater();
   const active = rows.filter(o => !["collected", "cancelled"].includes(o.status)).length;
   $("#ordBadge").textContent = active; $("#ordBadge").classList.toggle("hidden", !active);
   if (S.tab === "orders") renderOrders();
@@ -3324,7 +3340,7 @@ async function refreshMine() {
   const sig = rows.map(o => o.id + o.status + o.pool_status).join(); if (sig !== S.mineSig) { S.mineSig = sig; if ($("#pools") && !S.noSite) renderPools(); if ($("#tabHome")) renderWhen(); }
 }
 // Customers can cancel until the cut-off; after that the kitchen is cooking
-const canCancel = o => ["pending", "paid", "quote_requested", "quoted"].includes(o.status) && new Date() < at(o.order_date, S.settings.cutoff);
+const canCancel = o => ["pending", "paid", "quote_requested", "quoted"].includes(o.status) && !["accepted", "ready", "picked_up", "arriving", "delivered"].includes(o.pool_status) && new Date() < at(o.order_date, S.settings.cutoff);
 // What the pool has saved on this order's delivery: shown as cashback, and as a reason for guests to create an account
 function savingLine(o) {
   const v = Number(o.saving) || 0; if (!v || o.status === "cancelled") return "";
@@ -4203,7 +4219,7 @@ async function renderAdmin(cached) {
     const addForm = `
       <form class="card" data-form="site"><h2>Add a building</h2>
         <div class="grid2"><div><label for="nsName">Building name</label><input id="nsName" name="name" placeholder="Heritage Tower, Ridge"></div><div><label for="nsDrop">Drop point</label><input id="nsDrop" name="drop_point" placeholder="Lobby security desk"></div></div>
-        <div class="grid2"><div><label for="nsHand">Handoff</label><select id="nsHand" name="handoff"><option value="host">Drop-point host</option><option value="meet_rider">Meet the rider</option></select></div><div><label for="nsHost">Host</label><input id="nsHost" name="host_label" placeholder="the security desk in the lobby"></div></div>
+        <div class="grid2"><div><label for="nsHand">Handoff</label><select id="nsHand" name="handoff"><option value="meet_rider">Meet the rider</option><option value="host">Drop-point host</option></select></div><div><label for="nsHost">Host</label><input id="nsHost" name="host_label" placeholder="the security desk in the lobby"></div></div>
         ${searchRow("nsSearch", "Search the building or area")}<div id="nsResults" class="stack"></div>
         <div id="newSiteMap" class="map" style="height:260px"></div><p class="small muted" id="nsPin">Search above, or tap the map to place the building's pin.</p>
         <p class="err" data-err></p><button class="btn">Add building</button></form>`;
@@ -4665,7 +4681,7 @@ async function viewKitchen(token) {
       if ((k.delivery_mode === "runner") && (st("ready") || st("picked_up") || st("arriving"))) { const p = st("ready") || st("picked_up") || st("arriving"); return { t: p.status === "ready" ? "Send your runner off with the bag." : "Your runner is on the way.", go: "#pool-" + p.id, b: "Go to order" }; }
       if (st("ready")) return { t: "Food is packed. The rider is on the way to you.", go: "", b: "" };
       if (st("picked_up") || st("arriving")) return { t: "The rider has the food. Nothing to do.", go: "", b: "" };
-      if (pools.length && pools.every(p => p.status === "delivered")) { const c = handCount(pools.flatMap(p => p.orders)); return { t: c.got >= c.all ? "All delivered and handed over. You're done for " + dayLabel(d) + "." : `Delivered. ${c.all - c.got} meal${c.all - c.got === 1 ? "" : "s"} still to be collected.`, go: "", b: "" }; }
+      if (pools.length && pools.every(p => p.status === "delivered")) { const c = handCount(pools.flatMap(p => p.orders)); return { t: c.got >= c.all ? "All delivered and received. You're done for " + dayLabel(d) + "." : `Delivered. ${c.all - c.got} meal${c.all - c.got === 1 ? "" : "s"} not yet received.`, go: "", b: "" }; }
       if (pools.some(p => p.status === "collecting")) return { t: `Taking orders until ${fmtTime(S.settings.cutoff)}. ${used} meal${used === 1 ? "" : "s"} so far.`, go: "", b: "" };
       return { t: k.paused ? "You're not cooking " + dayLabel(d) + "." : `No orders yet. Orders close at ${fmtTime(S.settings.cutoff)}.`, go: "", b: "" };
     })();
@@ -4694,8 +4710,8 @@ async function viewKitchen(token) {
         const btns = p.status === "waiting" ? "" : p.status === "collecting" ? (afterCut ? `<button class="btn wide" data-k="accepted" data-pool="${esc(p.id)}">Confirm final batch</button>` : `<p class="small muted">Orders close at ${fmtTime(S.settings.cutoff)}. Then confirm the final batch.</p>`)
           : p.status === "accepted" ? `<button class="btn wide" data-k="ready" data-pool="${esc(p.id)}">Food is ready</button>`
           : (k.delivery_mode === "runner" || p.free) && p.status === "ready" ? `<button class="btn wide" data-k="picked_up" data-pool="${esc(p.id)}">Runner has picked up</button>`
-          : (k.delivery_mode === "runner" || p.free) && p.status === "picked_up" ? `<button class="btn wide" data-k="delivered" data-pool="${esc(p.id)}">Arrived</button>`
-          : (k.delivery_mode === "runner" || p.free) && p.status === "arriving" ? `<button class="btn wide" data-k="delivered" data-pool="${esc(p.id)}">Arrived</button>`
+          : (k.delivery_mode === "runner" || p.free) && p.status === "picked_up" ? `<button class="btn wide" data-k="delivered" data-pool="${esc(p.id)}">Delivered</button>`
+          : (k.delivery_mode === "runner" || p.free) && p.status === "arriving" ? `<button class="btn wide" data-k="delivered" data-pool="${esc(p.id)}">Delivered</button>`
           : p.status === "delivered" ? "" : `<p><span class="chip ok">${p.status === "ready" ? "Waiting for the rider" : p.status === "picked_up" || p.status === "arriving" ? "Rider has the food" : STEP_LABEL[p.status]}</span></p>`;
         const runnerHand = (k.delivery_mode === "runner" || p.free) && ["arriving", "delivered"].includes(p.status) && !handedOver(p.orders.filter(o => !["quote_requested", "quoted"].includes(o.status)))
           ? (p.handoff === "host" ? `<p>Hand the bag to <strong>${esc(p.host_label || p.drop_point)}</strong>.</p>` : `<p>At <strong>${esc(p.drop_point)}</strong>, hand each meal over against its code.</p>${codeBox("rc-" + p.id)}`) : "";
@@ -4756,7 +4772,7 @@ async function viewKitchen(token) {
     }
     const b = e.target.closest("button[data-k]"); if (!b) return;
     b.disabled = true;
-    try { await api.kitchenUpdate(token, b.dataset.pool, b.dataset.k); notifyServer({ pool_id: b.dataset.pool }); toast({ accepted: "Batch confirmed. Thank you.", ready: "Marked packed.", picked_up: "On the way.", arriving: "Customers have been told you're 5 minutes away.", delivered: "Arrived. Hand over meals against codes." }[b.dataset.k]); draw(); }
+    try { await api.kitchenUpdate(token, b.dataset.pool, b.dataset.k); notifyServer({ pool_id: b.dataset.pool }); toast({ accepted: "Batch confirmed. Thank you.", ready: "Marked packed.", picked_up: "On the way.", arriving: "Customers have been told you're 5 minutes away.", delivered: "Delivered. Customers have been told their lunch is here." }[b.dataset.k]); draw(); }
     catch (err) { b.disabled = false; toast(cleanErr(err)); }
   });
   $("#view").addEventListener("submit", async e => {
@@ -4852,8 +4868,8 @@ const byCode = os => { const m = new Map(); os.forEach(o => { if (!m.has(o.code)
 const handList = os => `<div class="labels">${byCode(os).map(([c, g]) => `<div><span class="lc num">${esc(c)}</span><span>${esc(g[0].name)} · ${g.map(o => o.qty + " × " + esc(o.item_name)).join(" + ")}</span>${g.every(o => o.collected) ? `<span class="tick">Collected</span>` : `<span class="muted small">Waiting</span>`}</div>`).join("")}</div>`;
 async function viewRider(token) {
   const d = opsDate();
-  // Picked up -> (customers get "about 5 minutes away" automatically) -> Arrived
-  const NEXT = { ready: ["picked_up", "Picked up"], picked_up: ["delivered", "Arrived"], arriving: ["delivered", "Arrived"] };
+  // Picked up -> (customers get "about 5 minutes away" automatically) -> Delivered
+  const NEXT = { ready: ["picked_up", "Picked up"], picked_up: ["delivered", "Delivered"], arriving: ["delivered", "Delivered"] };
   const draw = async () => {
     let R; try { R = await api.riderView(token, d); } catch (e) { $("#view").innerHTML = `<p class="card err">${esc(cleanErr(e))}</p>`; return; }
     $("#view").innerHTML = `<header class="topzone pagetop"><div class="pagehead"><div class="pagebrand">${LOGO(30)}<p class="brand" style="font-size:18px">ChopPool rider</p></div>${themeBtn()}</div><h1>${esc(R.rider.name)}</h1><p class="muted">${fmtDate(d)} · deliver by ${fmtTime(S.settings.delivery_time)}</p></header>` +
@@ -4862,7 +4878,7 @@ async function viewRider(token) {
         const nx = NEXT[p.status];
         const btn = nx ? `<button class="btn wide" data-r="${nx[0]}" data-pool="${esc(p.id)}">${nx[1]}</button>` : p.status === "delivered" ? "" : `<p class="chip warn">${p.status === "accepted" ? "Cooking. Wait for \"Food is ready\"" : "Wait for the kitchen"}</p>`;
         const hand = p.handoff === "host"
-          ? `<p>Hand the sealed bag to <strong>${esc(p.host_label || p.drop_point)}</strong>, then tap Arrived.</p>`
+          ? `<p>Hand the sealed bag to <strong>${esc(p.host_label || p.drop_point)}</strong>, then tap Delivered.</p>`
           : `<p>Wait at <strong>${esc(p.drop_point)}</strong> for ${S.settings.arrival_window_min} minutes. Hand each meal over against its code.</p>${["arriving", "delivered"].includes(p.status) && !handedOver(p.orders) ? codeBox("c-" + p.id) : ""}${handList(p.orders)}`;
         return `<article class="card"><div class="top"><h2>${esc(p.kitchen)} → ${esc(p.site)}</h2><span class="chip">${p.meals} meals</span></div>${stepsHtml(p.status, p.orders)}${handInfo(p.status, p.orders)}
           <p class="small"><strong>Pick up:</strong> ${esc(p.kitchen)}${p.kitchen_address ? ", " + esc(p.kitchen_address) : ""}${p.kitchen_phone ? ` · <a href="tel:${esc(p.kitchen_phone)}">${esc(fmtPhone(p.kitchen_phone))}</a>` : ""}</p>
@@ -4897,7 +4913,7 @@ async function viewHost(token) {
     const left = H.pools.flatMap(p => p.orders).filter(o => !o.collected).length;
     $("#view").innerHTML = `<header class="topzone pagetop"><div class="pagehead"><div class="pagebrand">${LOGO(30)}<p class="brand" style="font-size:18px">ChopPool drop point</p></div>${themeBtn()}</div><h1>${esc(H.site.name)}</h1><p class="muted">${fmtDate(d)} · ${esc(H.site.drop_point)} · ${left} meals waiting</p></header>
       <section class="card"><h2>Hand over a meal</h2><p class="small muted">Ask for their code, like K-27, and check the first name.</p>${codeBox("hostcode")}</section>` +
-      (H.pools.map(p => `<article class="card"><div class="top"><h3>${esc(p.menu)} · Pool ${p.seq}</h3><span class="chip ${p.status === "delivered" ? "ok" : "dim"}">${p.status === "delivered" ? (handedOver(p.orders) ? "All handed over" : "Bag arrived") : STEP_LABEL[p.status]}</span></div>${handInfo(p.status, p.orders)}${handList(p.orders)}</article>`).join("")
+      (H.pools.map(p => `<article class="card"><div class="top"><h3>${esc(p.menu)} · Pool ${p.seq}</h3><span class="chip ${p.status === "delivered" ? "ok" : "dim"}">${p.status === "delivered" ? (handedOver(p.orders) ? "All received" : "Bag arrived") : STEP_LABEL[p.status]}</span></div>${handInfo(p.status, p.orders)}${handList(p.orders)}</article>`).join("")
         || `<p class="card muted">No deliveries for today yet.</p>`);
   };
   wireCodes(token, d, draw);
