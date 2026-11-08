@@ -1,14 +1,14 @@
 const { chromium, devices } = require('playwright');
 const ok = (c, m) => { if (!c) { console.log('FAIL', m); process.exitCode = 1; } else console.log('ok', m); };
 (async () => { const b = await chromium.launch(); const ctx = await b.newContext({ ...devices['iPhone 14'] });
-  await ctx.addInitScript(() => { localStorage.setItem('cp_splash_v','1'); localStorage.setItem('cp_site', JSON.stringify('s1')); });
+  await ctx.addInitScript(() => { localStorage.setItem('cp_splash_v','1'); ['cp_intro_done','cp_intro_kitchen','cp_intro_rider','cp_intro_host'].forEach(k => localStorage.setItem(k, 'true')); localStorage.setItem('cp_site', JSON.stringify('s1')); });
   const p = await ctx.newPage(); const errs = []; p.on('pageerror', e => errs.push(e.message)); p.on('dialog', d => d.dismiss());
   await p.route(/tile\.openstreetmap|nominatim/, r => r.abort());
   await p.goto('http://localhost:8765/index.html#order'); await p.waitForSelector('#tabHome'); await p.waitForTimeout(1200);
   // 1. Checkout: full trip
   await p.locator('.tabbar button', { hasText: 'Vendors' }).click(); await p.waitForTimeout(500);
   await p.locator('#kitchensList [data-vendor]').first().click(); await p.waitForTimeout(700);
-  await p.locator('#vfoot [data-vgo], #vfoot button').first().click(); await p.waitForTimeout(700);
+  await p.locator('#vpage [data-dish]:not([disabled])').first().click(); await p.waitForTimeout(400); await p.click('#dAdd'); await p.waitForTimeout(300); await p.locator('#vfoot [data-vcheckout]').click(); await p.waitForTimeout(700);
   const sum = await p.locator('#sum').innerText(); ok(/Delivery, full trip/.test(sum) && /Shared by the pool/.test(sum), 'checkout shows the full trip');
   await p.fill('#fName', 'Ama Mensah').catch(()=>{}); await p.fill('#fPhone', '0241234567').catch(()=>{});
   await p.locator('#fRef').focus(); await p.waitForTimeout(400); await p.fill('#fRef', '51234567890');
@@ -45,7 +45,7 @@ const ok = (c, m) => { if (!c) { console.log('FAIL', m); process.exitCode = 1; }
   // 5. Admin pages
   await p.goto('http://localhost:8765/index.html#admin'); await p.waitForTimeout(1800);
   for (const [tab, sub] of [['today', 'wallets'], ['today', 'owed'], ['team', 'activity'], ['dash', null]]) {
-    await p.locator(`[data-atab="${tab}"]`).first().click(); await p.waitForTimeout(600);
+    await p.evaluate(t => document.querySelector(`[data-atab="${t}"]`).click(), tab); await p.waitForTimeout(600);
     if (sub) { await p.locator(`#aSub [data-asub="${sub}"]`).click(); await p.waitForTimeout(800); }
     const t = await p.locator('#view').innerText(); ok(t.length > 50, 'admin ' + tab + (sub ? '/' + sub : '') + ' renders');
     if (sub === 'wallets') ok(/Problems reported/.test(t) && /Payments with no order/.test(t), 'refunds page has problems + unmatched');

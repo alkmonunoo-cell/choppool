@@ -43,7 +43,7 @@ async function poolEvents(poolId: string, opened = false) {
   const cust = () => customerSubs(live), url = APP + "/#order";
   if (p.status === "waiting" && await once("new_pool:" + p.id))
     await send(await kitchenSubs(k.id), "New pool at " + site.name, laterDay(p) ? "Customers want lunch from you on " + dayName(p.order_date) + ". Confirm you're cooking by " + String(s.next_day_confirm_by || "08:30").slice(0, 5) + " that morning."
-      : "Customers want to order from you. Confirm you're cooking within " + s.accept_timeout_min + " minutes.", APP + "/#kitchen-" + k.token, "pool-" + p.id);
+      : "Customers want lunch from you today. Confirm you're cooking by " + hhmm(waitUntil(p, s)) + ".", APP + "/#kitchen-" + k.token, "pool-" + p.id);
   // "Always cooking" vendors: the pool opened by itself, so tell them it started
   if (p.status === "collecting" && (k.auto_days || []).length && meals && await once("auto_start:" + p.id))
     await send(await kitchenSubs(k.id), "New pool at " + site.name, meals + " meal" + (meals > 1 ? "s" : "") + " so far. Orders close at " + String(s.cutoff).slice(0, 5) + "; you'll get the final count then.", APP + "/#kitchen-" + k.token, "pool-" + p.id);
@@ -66,11 +66,16 @@ const distKm = (a: any, b: any) => { const r = Math.PI / 180, x = (b.lng - a.lng
 // Pools for a later day give the vendor until the "confirm by" time that morning
 const laterDay = (p: any) => p.order_date > String(p.created_at).slice(0, 10);
 const dayName = (d: string) => new Date(d + "T00:00:00Z").toLocaleDateString("en-GB", { weekday: "long", timeZone: "UTC" });
+// Same rule as the database: later day -> confirm-by time that morning; same day -> until the confirm-by time if earlier,
+// otherwise the usual minutes; never past the cut-off
 function waitUntil(p: any, s: any) {
-  if (!laterDay(p)) return new Date(Date.parse(p.created_at) + s.accept_timeout_min * 6e4);
   const by = String(s.next_day_confirm_by || "08:30").slice(0, 5), cut = String(s.cutoff).slice(0, 5);
-  return new Date(p.order_date + "T" + (by < cut ? by : cut) + ":00Z");
+  const confirmAt = new Date(p.order_date + "T" + (by < cut ? by : cut) + ":00Z");
+  if (laterDay(p)) return confirmAt;
+  const cutAt = new Date(p.order_date + "T" + cut + ":00Z");
+  return new Date(Math.min(cutAt.getTime(), Math.max(Date.parse(p.created_at) + s.accept_timeout_min * 6e4, confirmAt.getTime())));
 }
+const hhmm = (d: Date) => d.toISOString().slice(11, 16);
 async function orderEvents(orderId: string) {
   const { data: o } = await db.from("orders").select("*").eq("id", orderId).single(); if (!o) return;
   const { data: k } = await db.from("kitchens").select("*").eq("id", o.kitchen_id).single();
@@ -81,7 +86,7 @@ async function orderEvents(orderId: string) {
   // Payment we couldn't find, or short: the customer can fix it from Orders before cut-off (always sent; not a type you can switch off)
   if (o.status === "pending" && o.pay_issue && await once("payissue:" + o.id + ":" + o.pay_issue + ":" + (o.momo_ref || "")))
     await send(await customerSubs([o]), o.pay_issue === "short" ? "Your payment was short" : "We couldn't find your payment",
-      (o.pay_issue === "short" ? "We received " + money(o.amount_received || 0) + ". Pay the rest" : "Check the MoMo reference or pay again") + " before orders close so your lunch counts.", APP + "/#order", "order-" + o.id);
+      (o.pay_issue === "short" ? "We received " + money(o.amount_received || 0) + ". Pay the rest" : "Check the mobile money transaction ID or pay again") + " before orders close so your lunch counts.", APP + "/#order", "order-" + o.id);
   if (o.status === "cancelled" && o.cancel_reason === "Payment not received" && await once("unpaid:" + o.id))
     await send(await customerSubs([o]), "Order cancelled", "We didn't receive your payment before orders closed, so code " + o.code + " was cancelled.", APP + "/#order", "order-" + o.id);
   if (o.status === "cancelled" && ["Special request not paid in time", "The seller didn't price your request in time"].includes(o.cancel_reason || "") && await once("quoteclosed:" + o.id))
@@ -159,8 +164,10 @@ async function tick() {
       }
     }
     if (p.status === "waiting" && !laterDay(p)) {
-      const mins = (now.getTime() - Date.parse(p.created_at)) / 6e4, left = Math.max(0, Math.round(s.accept_timeout_min - mins));
-      for (const t of [5, 10, 15]) if (mins >= t && t < s.accept_timeout_min && await once("remind" + t + ":" + p.id)) {
+      // Reminders counted back from the deadline: 15, 10 and 5 minutes left
+      const until = waitUntil(p, s), left = Math.max(0, Math.round((until.getTime() - now.getTime()) / 6e4));
+      const bucket = left <= 0 ? 0 : left <= 5 ? 5 : left <= 10 ? 10 : left <= 15 ? 15 : 0;
+      for (const t of bucket ? [bucket] : []) if (await once("remind" + t + ":" + p.id)) {
         const [{ data: k }, { data: site }, { data: os }] = await Promise.all([db.from("kitchens").select("*").eq("id", p.kitchen_id).single(), db.from("sites").select("*").eq("id", p.site_id).single(),
           db.from("orders").select("qty").eq("pool_id", p.id).neq("status", "cancelled")]);
         const n = (os || []).reduce((a: number, o: any) => a + o.qty, 0);

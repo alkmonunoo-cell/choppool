@@ -2,7 +2,7 @@ const { chromium } = require('playwright');
 (async () => { const b = await chromium.launch(); const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, hasTouch: true, isMobile: true });
   const p = await ctx.newPage(); const errs = []; p.on('pageerror', e => errs.push(e.message));
   await p.route(/tile\.openstreetmap|cdnjs|nominatim/, r => r.abort());
-  await p.addInitScript(() => { localStorage.setItem('cp_splash_v','1'); localStorage.setItem('cp_site', JSON.stringify('s1')); localStorage.setItem('cp_me', JSON.stringify({ name: 'Ama', phone: '0241234567' })); });
+  await p.addInitScript(() => { localStorage.setItem('cp_splash_v','1'); ['cp_intro_done','cp_intro_kitchen','cp_intro_rider','cp_intro_host'].forEach(k => localStorage.setItem(k, 'true')); localStorage.setItem('cp_site', JSON.stringify('s1')); localStorage.setItem('cp_me', JSON.stringify({ name: 'Ama', phone: '0241234567' })); });
   await p.clock.install({ time: new Date('2026-11-05T09:30:00Z') });
   const step = async (n, f) => { try { await f(); console.log('ok', n); } catch (e) { console.log('FAIL', n, e.message.split('\n')[0]); } };
   await p.goto('file:///home/claude/choppool/index.html'); await p.waitForTimeout(1500);

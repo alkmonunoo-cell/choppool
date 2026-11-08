@@ -3,7 +3,7 @@ const { chromium, devices } = require('playwright');
 (async () => { const b = await chromium.launch(); const ctx = await b.newContext({ ...devices['iPhone 14'] });
   const p = await ctx.newPage(); const errs = []; p.on('pageerror', e => errs.push(e.message));
   await p.route(/tile\.openstreetmap|cdnjs|nominatim/, r => r.abort());
-  await p.addInitScript(() => { localStorage.setItem('cp_splash_v','1'); localStorage.setItem('cp_site', JSON.stringify('s1')); });
+  await p.addInitScript(() => { localStorage.setItem('cp_splash_v','1'); ['cp_intro_done','cp_intro_kitchen','cp_intro_rider','cp_intro_host'].forEach(k => localStorage.setItem(k, 'true')); localStorage.setItem('cp_site', JSON.stringify('s1')); });
   const ok = (c, m) => console.log(c ? 'ok' : 'FAIL', m);
   await p.goto('http://localhost:8765/index.html'); await p.waitForTimeout(1500);
   const info = await p.evaluate(async () => {

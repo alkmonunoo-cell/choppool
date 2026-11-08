@@ -122,6 +122,7 @@ button.hero-stat { padding-right: 22px !important; font: inherit; color: inherit
 button.hero-stat::after { content: "›"; position: absolute; right: 9px; top: 6px; font-weight: 700; font-size: 17px; opacity: .85; }
 .hero-stat b { font-family: var(--font-display); font-size: 18px; font-weight: 800; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .hero-stat { min-width: 0; }
+.hero-stat .of { display: block; opacity: .8; }
 .mylunch { position: relative; z-index: 1; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; column-gap: 12px; row-gap: 9px; width: 100%; min-height: 0; text-align: left; color: inherit; font: inherit; line-height: 1.25; background: rgba(0,0,0,.16); border: 1px solid rgba(255,255,255,.2); border-radius: 16px; padding: 11px 14px 12px; cursor: pointer; box-shadow: none; }
 .mylunch .ml-code { display: grid; justify-items: end; line-height: 1.1; }
 .mylunch .ml-code small { opacity: .75; font-size: 12px; }
@@ -134,6 +135,8 @@ button.hero-stat::after { content: "›"; position: absolute; right: 9px; top: 6
 .ml-dot.go { animation: mlPulse 1.6s ease-in-out infinite; }
 @keyframes mlPulse { 50% { box-shadow: 0 0 0 7px rgba(255,255,255,0); } }
 @media (prefers-reduced-motion: reduce) { .ml-dot.go { animation: none; } }
+.mylunch.bad { background: #7F1D1D; border-color: rgba(255,255,255,.35); }
+.mylunch.bad .ml-dot { background: #FCA5A5; }
 .ml-bar { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
 .ml-bar i { height: 4px; border-radius: 2px; background: rgba(255,255,255,.28); }
 .ml-bar i.on { background: #fff; }
@@ -276,7 +279,7 @@ input::placeholder, textarea::placeholder { color: color-mix(in srgb, var(--mute
 .sheet.searching .searchrow { position: sticky; top: -10px; z-index: 3; background: var(--surface); padding: 8px 0; margin: -8px 0; }
 .sheet-bg.open { opacity: 1; visibility: visible; transition: opacity .32s ease, visibility 0s; }
 .sheet { background: var(--surface); color: var(--ink); width: 100%; max-width: 560px; max-height: 94%; overflow-y: auto; border-radius: 28px 28px 0 0; padding: 10px 20px 0; display: grid; gap: 16px; align-content: start; }
-.sheet { transform: translateY(105%); transition: transform .4s cubic-bezier(.2,.9,.25,1); overscroll-behavior: contain; touch-action: pan-y; -webkit-overflow-scrolling: touch; padding-bottom: env(safe-area-inset-bottom); }
+.sheet { transform: translateY(105%); transition: transform .46s cubic-bezier(.22,1,.36,1); overscroll-behavior: contain; touch-action: pan-y; -webkit-overflow-scrolling: touch; padding-bottom: env(safe-area-inset-bottom); }
 .sheet-bg.open .sheet { transform: translateY(0); }
 .sheet { overflow-x: hidden; } .sheet > * { min-width: 0; }
 .sheet.dragging { transition: none; }
@@ -363,6 +366,9 @@ body.locked { position: fixed; left: 0; right: 0; overflow: hidden; }
 .kcard .tile svg { width: 46px; height: 46px; }
 .tabbar button { background: none; border: none; color: var(--muted); display: grid; justify-items: center; gap: 2px; padding: 8px 4px; font-size: 12px; font-weight: 700; border-radius: 16px; position: relative; }
 .tabbar button[aria-current="page"] { color: var(--accent); background: var(--accent-soft); }
+.tabbar:has(.tabpill) button[aria-current="page"] { background: none; }
+.tabpill { position: absolute; left: 0; top: 0; border-radius: 16px; background: var(--accent-soft); transition: transform .42s cubic-bezier(.22,1,.36,1), width .42s cubic-bezier(.22,1,.36,1); pointer-events: none; }
+.tabbar button { z-index: 1; }
 .badge { position: absolute; top: 4px; left: calc(50% + 8px); min-width: 18px; height: 18px; border-radius: 99px; background: var(--accent); color: var(--on-accent); font-size: 12px; display: grid; place-items: center; padding: 0 5px; }
 
 /* Toast */
@@ -561,12 +567,30 @@ button.dtile:not([disabled]):hover { outline: 2px solid var(--accent-soft); }
 .pagehead .iconbtn { width: 38px; height: 38px; border-radius: 12px; flex: none; }
 .admintop { gap: 10px; }
 .poolhead { display: grid; gap: 2px; }
+#aRefresh.spin svg { animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.intro { position: fixed; inset: 0; z-index: 70; background: rgba(10,6,4,.55); display: flex; align-items: flex-end; justify-content: center; opacity: 0; transition: opacity .3s ease; }
+.intro.on { opacity: 1; }
+.intro-card { position: relative; width: min(560px, 100%); min-width: 0; overflow: hidden; background: var(--surface); border-radius: 28px 28px 0 0; padding: 18px 0 calc(18px + env(safe-area-inset-bottom)); transform: translateY(40px); transition: transform .5s cubic-bezier(.22,1,.36,1); }
+.intro.on .intro-card { transform: none; }
+.intro-skip { position: absolute; top: 14px; right: 18px; z-index: 2; }
+.intro-track { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; }
+.intro-track::-webkit-scrollbar { display: none; }
+.intro-slide { flex: 0 0 100%; scroll-snap-align: center; padding: 18px 24px 6px; display: grid; gap: 8px; justify-items: center; text-align: center; }
+.intro-art svg { width: 220px; height: 154px; }
+.intro-slide h2 { margin: 6px 0 0; font-size: 24px; }
+.intro-slide p { margin: 0; color: var(--muted); max-width: 34ch; line-height: 1.45; }
+.intro-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 24px 0; }
+.intro-dots { display: flex; gap: 6px; } .intro-dots i { width: 8px; height: 8px; border-radius: 99px; background: var(--line); transition: width .3s, background .3s; } .intro-dots i.on { width: 22px; background: var(--accent); }
+.intro-foot .btn { min-width: 140px; }
+.intro-list { padding-left: 20px; margin: 0; gap: 8px; }
+@media (prefers-reduced-motion: reduce) { .intro, .intro-card { transition: none; } }
 .legal h3 { font-size: 15px; margin: 10px 0 0; }
 .legal ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
 .legal p { margin: 0; }
 .installhint { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--surface-2); border-radius: 16px; padding: 10px 12px; }
 .installhint > span { display: flex; align-items: center; gap: 10px; }
-.installhint .ghost { padding: 8px 14px; flex: none; }
+.installhint .ghost, .installhint .btn { padding: 8px 14px; flex: none; white-space: nowrap; }
 .setform { gap: 12px; }
 .setform .grid2 { align-items: end; }
 .savebar { position: sticky; bottom: calc(10px + env(safe-area-inset-bottom)); z-index: 5; display: grid; gap: 6px; }
@@ -625,6 +649,9 @@ input, select, textarea { font-size: 16px; min-width: 0; max-width: 100%; }
 .tabbar { background: color-mix(in srgb, var(--surface) 82%, transparent) !important; -webkit-backdrop-filter: blur(20px) saturate(160%); backdrop-filter: blur(20px) saturate(160%); border: 1px solid color-mix(in srgb, var(--line) 70%, transparent); bottom: max(10px, calc(env(safe-area-inset-bottom) - 12px)) !important; }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { .tabbar, .topzone.scrolled, .sheet-foot, .statusglass { background: var(--surface) !important; } }
 .toast { bottom: calc(82px + max(10px, calc(env(safe-area-inset-bottom) - 12px))); }
+body:has(#vfoot.on) .toast { bottom: calc(96px + env(safe-area-inset-bottom)); }
+body:has(#vpage.open) .toast { bottom: calc(24px + env(safe-area-inset-bottom)); }
+body:has(#vfoot.on):has(#vpage.open) .toast { bottom: calc(96px + env(safe-area-inset-bottom)); }
 /* Installed on iPhone, pages shorter than the screen put the tab bar too high (an iOS bug); pages that scroll are fine.
    So every page is at least a touch taller than the screen. */
 html.standalone body { min-height: calc(100vh + 1px); min-height: calc(100lvh + 1px); }
@@ -659,9 +686,12 @@ html.standalone, html.standalone body { overscroll-behavior: none; }
 .splash.hold .sp-tag { animation: spFade 3.2s ease-in-out infinite; }
 @keyframes spFade { 50% { opacity: .55; } }
 /* Premium motion: installed app only. One soft curve, short and small, never bouncy */
-.is-app .pane-in { animation: paneIn .32s cubic-bezier(.2,.8,.2,1) both; will-change: transform, opacity; }
-.is-app .pane-in.from-left { --dx: -24px; }
-@keyframes paneIn { from { opacity: 0; transform: translateX(var(--dx, 24px)); } to { opacity: 1; transform: none; } }
+/* Tab changes: the old screen slides away, the new one slides in from the side you're heading to */
+.is-app .pane-in { animation: paneIn .42s cubic-bezier(.22,1,.36,1) both; will-change: transform, opacity; }
+.is-app .pane-in.from-left { --dx: -22%; }
+@keyframes paneIn { from { opacity: 0; transform: translateX(var(--dx, 22%)); } to { opacity: 1; transform: none; } }
+.pane-ghost { position: fixed; z-index: 1; margin: 0 !important; pointer-events: none; animation: paneOut .3s cubic-bezier(.4,0,.2,1) both; }
+@keyframes paneOut { to { opacity: 0; transform: translateX(var(--dx, -22%)); } }
 .is-app .tabbar button[aria-current="page"] svg { animation: tabPop .22s ease-out; }
 @keyframes tabPop { 50% { transform: scale(1.12); } }
 .is-app .rv { opacity: 0; transform: translateY(18px) scale(.985); transition: opacity .5s cubic-bezier(.16,1,.3,1), transform .6s cubic-bezier(.16,1,.3,1); will-change: transform, opacity; }
@@ -703,6 +733,16 @@ body:not(.on-home) #bell, body:not(.on-home) #theme { display: none; }
 .prow .pbar { height: 4px; border-radius: 9px; background: var(--surface-2); overflow: hidden; margin-top: 6px; }
 .prow .pbar i { display: block; height: 100%; border-radius: 9px; background: var(--ok); }
 .prow .acts { display: flex; gap: 6px; align-items: center; flex: none; }
+/* Narrow phones (360 px and below): nothing squeezed or cut off */
+@media (max-width: 360px) {
+  .hero-stats { grid-template-columns: 1fr 1fr; }
+  .hero-stats > :nth-child(3) { grid-column: 1 / -1; }
+  .prow { gap: 10px; padding: 10px; }
+  .prow .ptile { width: 46px; height: 46px; } .prow .ptile svg { width: 38px; height: 38px; }
+  .prow .acts .iconround { display: none; }
+  .prow .acts .btn { padding: 9px 14px; }
+}
+@media (max-width: 340px) { .appbar .place strong { font-size: 18px; } }
 .prow .acts .btn { padding: 9px 15px; font-size: 13.5px; border-radius: 99px; }
 .ytag { font-size: 12px; vertical-align: 2px; white-space: nowrap; font-weight: 800; color: var(--on-accent); background: var(--accent); border-radius: 99px; padding: 2px 7px; }
 .iconround { width: 38px; height: 38px; border-radius: 99px; display: grid; place-items: center; background: var(--surface-2); border: 1px solid var(--line); color: var(--ink); padding: 0; flex: none; }
@@ -774,6 +814,11 @@ body:not(.on-home) #bell, body:not(.on-home) #theme { display: none; }
 /* Vendor page */
 .vpage { position: fixed; inset: 0; z-index: 26; background: var(--bg); overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; transform: translateX(100%); transition: transform .38s cubic-bezier(.2,.85,.25,1); }
 .vpage.open { transform: none; }
+.is-app .vpage { transform: none; opacity: 0; visibility: hidden; transition: opacity .32s ease, visibility 0s .32s; }
+.is-app .vpage.open { opacity: 1; visibility: visible; transition: opacity .28s ease; }
+.is-app .vpage .vbody { transition: transform .5s cubic-bezier(.22,1,.36,1); }
+.is-app .vpage:not(.open) .vbody { transform: translateY(40px); }
+.vpage.grow .vplate { animation: none; }
 .vpage .vhero { position: relative; height: calc(250px + env(safe-area-inset-top)); display: grid; place-items: center; overflow: hidden; padding-top: env(safe-area-inset-top); }
 .vpage .vhero::after { content: ""; position: absolute; inset: 0; background: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22120%22%20height%3D%22120%22%20fill%3D%22none%22%20stroke%3D%22%23B85A2A%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M10%2030h34a17%2017%200%200%201-34%200z%22/%3E%3Cpath%20d%3D%22M18%2024c0-4%204-4%204-8M27%2024c0-4%204-4%204-8%22/%3E%3Cpath%20d%3D%22M78%2012l14%2030M86%2010v14a4%204%200%200%200%208%200V10M90%2024v22%22/%3E%3Cpath%20d%3D%22M70%2080c6-10%2020-10%2026%200-6%2010-20%2010-26%200z%22/%3E%3Cpath%20d%3D%22M70%2080h26%22/%3E%3Cpath%20d%3D%22M14%2084c8-6%2014%202%2022-4%204%2010-8%2022-22%2014z%22/%3E%3Cpath%20d%3D%22M14%2094c6-4%2012-6%2022-14%22/%3E%3Ccircle%20cx%3D%2256%22%20cy%3D%2256%22%20r%3D%223%22/%3E%3Ccircle%20cx%3D%22104%22%20cy%3D%22104%22%20r%3D%222%22/%3E%3Ccircle%20cx%3D%2250%22%20cy%3D%22108%22%20r%3D%222%22/%3E%3C/svg%3E") 0 0 / 120px repeat; opacity: .16; pointer-events: none; }
 .vpage .vplate { position: relative; z-index: 1; width: 190px; height: 190px; filter: drop-shadow(0 18px 20px rgba(60,30,10,.25)); animation: vrise .5s cubic-bezier(.2,.8,.2,1); }
@@ -789,6 +834,30 @@ body:not(.on-home) #bell, body:not(.on-home) #theme { display: none; }
 .vfacts b { font: 800 16px var(--font-display); display: block; white-space: nowrap; }
 .vfacts span { font-size: 12px; color: var(--muted); line-height: 1.3; display: block; }
 .vfacts b .rs { color: #C77700; font-size: inherit; display: inline; }
+.vfoot:not(.on) { display: none; }
+.vfoot .btn.traybar { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; text-align: left; }
+.traybar .tc { min-width: 30px; height: 30px; border-radius: 10px; background: rgba(255,255,255,.22); display: grid; place-items: center; font-weight: 800; }
+.traybar .tl { display: grid; line-height: 1.2; font-weight: 750; }
+.traybar .tl small { opacity: .85; font-weight: 600; font-size: 12px; }
+.traybar .tp { font-weight: 800; }
+.vbrow { display: flex; align-items: center; gap: 12px; } .vbrow .btn { flex: none; padding: 10px 16px; }
+.vitem[disabled] { opacity: .5; }
+.logo.net { width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; font-weight: 800; font-size: 12px; flex: none; }
+.logo.net.gen { background: var(--surface-2); color: var(--ink); border: 1px solid var(--line); }
+.pfrom { display: grid; gap: 6px; }
+.pfm, .pmrow { display: flex; align-items: center; gap: 12px; }
+.pfm > span:nth-child(2), .pmrow > span:nth-child(2) { flex: 1; min-width: 0; }
+.pmrow { width: 100%; text-align: left; background: var(--surface-2); border: 1px solid transparent; border-radius: 16px; padding: 10px 12px; color: inherit; font: inherit; }
+.pmrow.on { border-color: var(--accent); }
+.pmrow .pmact { display: flex; gap: 10px; flex: none; }
+.pmpick { display: grid; gap: 8px; }
+.dishhead { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; gap: 12px; align-items: center; }
+.dishhead .tile { width: 64px; height: 64px; border-radius: 18px; display: grid; place-items: center; overflow: hidden; }
+.dishhead h2 { margin: 0; font-size: 20px; }
+.tlines { display: grid; gap: 8px; }
+.tline { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; background: var(--surface-2); border-radius: 14px; padding: 10px 12px; }
+.tline .tx { display: grid; min-width: 0; } .tline .tx small { color: var(--muted); }
+.tline .qty { transform: scale(.9); transform-origin: right center; }
 .vfoot .btn > span:first-child { display: grid; text-align: left; }
 .vfoot .btn > span:last-child { display: grid; text-align: right; }
 .vbanner { display: flex; gap: 12px; align-items: center; background: var(--ok-soft); color: var(--ok); border-radius: 18px; padding: 12px 14px; font-size: 13px; line-height: 1.4; }
@@ -1059,7 +1128,9 @@ function makeDemoApi() {
   const pfree = pid => { const pl = pools.find(p => p.id === pid) || {}, k = kitchens.find(x => x.id === pl.kitchen_id) || {}, st = sites.find(x => x.id === pl.site_id) || {};
     return Number(k.free_m) > 0 && hasPin(k) && hasPin(st) && distM(k, st) * ROAD_FACTOR <= Math.min(Number(k.free_m), Number(settings.free_max_m)) && meals(pid) >= Number(k.free_min || 0); };
   // How long a vendor has to confirm: same day = minutes; a later day = the "confirm by" time that morning
-  const waitUntil = p => p.order_date > String(p.created_at).slice(0, 10) ? at(p.order_date, hm(settings.next_day_confirm_by) < hm(settings.cutoff) ? settings.next_day_confirm_by : settings.cutoff) : new Date(Date.parse(p.created_at) + settings.accept_timeout_min * 6e4);
+  const confirmAt = d => at(d, hm(settings.next_day_confirm_by) < hm(settings.cutoff) ? settings.next_day_confirm_by : settings.cutoff);
+  const waitUntil = p => p.order_date > String(p.created_at).slice(0, 10) ? confirmAt(p.order_date)
+    : new Date(Math.min(+at(p.order_date, settings.cutoff), Math.max(Date.parse(p.created_at) + settings.accept_timeout_min * 6e4, +confirmAt(p.order_date))));
   const poolFee = p => { const os = orders.filter(o => o.pool_id === p.id && ["paid", "collected"].includes(o.status)), food = os.reduce((t, o) => t + (Number(o.quote_price ?? o.unit_price) + Number(o.addons_total || 0)) * o.qty, 0), n = os.reduce((t, o) => t + o.qty, 0);
     return n ? Math.round(Number(p.fee_rate || 0) * food * Math.max(0, n - Number(p.fee_free ?? 5)) / n * 100) / 100 : 0; };
   const isOpen = (kid, d) => days.some(x => x.kitchen_id === kid && x.order_date === d) || (k => !!k && (k.auto_days || []).includes(isoDow(d)) && !(k.paused_dates || []).includes(d))(kitchens.find(x => x.id === kid));
@@ -1084,7 +1155,7 @@ function makeDemoApi() {
   function settle(o, ref, useWallet) {
     const total = dueOf(o); let use = 0;
     if (useWallet && me && o.user_id === me.id) { use = Math.max(0, Math.min(balance(me.id), total)); if (use > 0) ledger.push({ user_id: me.id, amount: -use, reason: "Paid for order " + o.code, order_id: o.id, created_at: nowIso() }); }
-    if (use < total && (!ref || ref.trim().length < 4)) throw new Error("Enter the MoMo transaction ID for the remaining " + (total - use).toFixed(2) + ".");
+    if (use < total && (!ref || ref.trim().length < 4)) throw new Error("Enter the mobile money transaction ID for the remaining " + (total - use).toFixed(2) + ".");
     o.wallet_used += use; if (use < total) o.momo_ref = ref.trim(); o.status = use >= total ? "paid" : "pending";
     return { total, wallet_used: use, momo_due: total - use };
   }
@@ -1093,7 +1164,9 @@ function makeDemoApi() {
     orders.filter(o => o.status === "pending" && o.pay_issue && pastCutoff(o.order_date)).forEach(o => {
       o.status = "cancelled"; o.cancel_reason = "Payment not received"; o.refund_due = Number(o.amount_received || 0); o.refund_needed = o.refund_due > 0 && !o.user_id;
       if (o.refund_due > 0 && o.user_id) ledger.push({ user_id: o.user_id, amount: o.refund_due, reason: "Money back: payment was short, code " + o.code, order_id: o.id, created_at: nowIso() });
-      if (o.wallet_used > 0 && o.user_id) ledger.push({ user_id: o.user_id, amount: o.wallet_used, reason: "Refund: payment not received", order_id: o.id, created_at: nowIso() }); });
+      if (o.wallet_used > 0 && o.user_id) ledger.push({ user_id: o.user_id, amount: o.wallet_used, reason: "Refund: payment not received", order_id: o.id, created_at: nowIso() });
+      orders.filter(c => c.parent_id === o.id && c.basket && c.status === "pending").forEach(c => { c.status = "cancelled"; c.cancel_reason = "Payment not received";
+        if (c.wallet_used > 0 && c.user_id) ledger.push({ user_id: c.user_id, amount: c.wallet_used, reason: "Refund: payment not received", order_id: c.id, created_at: nowIso() }); }); });
     pools.filter(p => p.status === "waiting" && new Date() >= waitUntil(p)).forEach(p => {
       p.status = "cancelled";
       orders.filter(o => o.pool_id === p.id && o.status !== "cancelled").forEach(o => {
@@ -1205,6 +1278,29 @@ function makeDemoApi() {
         activity: orders.filter(o => !["cancelled", "quote_requested", "quoted"].includes(o.status) && minsAgo(o.created_at) < 360).map(o => ({ id: o.id, site_id: o.site_id, kitchen_id: o.kitchen_id, pool_id: o.pool_id, item_name: o.item_name, qty: o.qty, created_at: o.created_at })) };
     },
     async placeOrder(r) { return place(r, false); },
+    // Several dishes, one payment, one code (mirrors place_basket)
+    async placeBasket(r) {
+      const lines = r.lines || []; if (!lines.length) throw new Error("Your tray is empty.");
+      if (lines.length > 8) throw new Error("Up to 8 different dishes in one order.");
+      const mealsN = lines.reduce((t, l) => t + (l.qty || 1), 0); if (mealsN > Math.min(10, settings.max_meals)) throw new Error("Up to " + Math.min(10, settings.max_meals) + " meals in one order.");
+      if (new Set(lines.map(l => (items.find(i => i.id === l.item) || {}).kitchen_id)).size > 1) throw new Error("Order from one vendor at a time.");
+      const pp = String(r.payerPhone || "").replace(/\D/g, ""); if (pp && !/^0\d{9}$/.test(pp)) throw new Error("Enter the 10-digit mobile money number you paid from.");
+      const made = [], snapshot = ledger.length;
+      try {
+        for (const l of lines) { const x = place({ site: r.site, item: l.item, qty: l.qty || 1, name: r.name, phone: r.phone, ref: "BASKET", addons: l.addons || [], note: l.note, join: made[0] ? made[0].id : null }, false); made.push(orders.find(o => o.id === x.id)); }
+        made.forEach((o, n) => { o.momo_ref = null; o.status = "pending"; o.basket = n > 0; o.payer_phone = pp || null; o.payer_network = r.payerNetwork || null; });
+        const total = made.reduce((t, o) => t + dueOf(o), 0); let use = 0;
+        if (r.useWallet && me && made[0].user_id === me.id) { use = Math.max(0, Math.min(balance(me.id), total)); if (use > 0) ledger.push({ user_id: me.id, amount: -use, reason: "Paid for order " + made[0].code, order_id: made[0].id, created_at: nowIso() }); }
+        if (use < total && (!r.ref || r.ref.trim().length < 4)) throw new Error("Enter the mobile money transaction ID for the remaining " + (total - use).toFixed(2) + ".");
+        let left = use; made.forEach((o, n) => { const t = dueOf(o), part = Math.min(left, t); left -= part; o.wallet_used = part; o.status = part >= t ? "paid" : "pending"; o.momo_ref = n === 0 && use < total ? r.ref.trim() : null; });
+        const pl = pools.find(p => p.id === made[0].pool_id);
+        return { id: made[0].id, code: made[0].code, ids: made.map(o => o.id), total, wallet_used: use, momo_due: total - use, status: made[0].status, order_date: made[0].order_date, pool_id: pl.id, pool_seq: pl.seq, pool_status: pl.status, meals: meals(pl.id) };
+      } catch (e) {
+        made.forEach(o => { const i = orders.indexOf(o); if (i >= 0) orders.splice(i, 1); }); ledger.length = snapshot;
+        pools.filter(p => p.status === "waiting" && !meals(p.id)).forEach(p => pools.splice(pools.indexOf(p), 1));
+        throw e;
+      }
+    },
     async payQuote(id, ref, useWallet) { housekeeping(); const o = orders.find(x => x.id === id); if (!o || o.status !== "quoted") throw new Error("This request is not waiting for payment.");
       if (o.quote_pay_by && Date.now() > Date.parse(o.quote_pay_by) + 30e3) throw new Error("The time to pay for this special order has run out."); return settle(o, ref, useWallet); },
     async myOrders(ids) {
@@ -1266,7 +1362,8 @@ function makeDemoApi() {
     async updateSettings(patch) { Object.assign(settings, patch); },
     async savePayMethod(p) { if (p.is_main) payMethods.forEach(x => { x.is_main = false; }); if (p.id) Object.assign(payMethods.find(x => x.id === p.id), p); else payMethods.push({ id: "pm" + uid(), sort: payMethods.length + 1, created_at: nowIso(), ...p }); },
     async removePayMethod(id) { payMethods.splice(payMethods.findIndex(x => x.id === id), 1); return "deleted"; },
-    async saveProfile(p) { const ex = profiles.find(x => x.user_id === me.id); if (ex) Object.assign(ex, p); else profiles.push({ user_id: me.id, email: me.email, ...p }); },
+    async saveProfile(p) { if (!me) return; const ex = profiles.find(x => x.user_id === me.id); if (ex) Object.assign(ex, p); else profiles.push({ user_id: me.id, email: me.email, ...p }); },
+    async getProfile() { return me ? profiles.find(x => x.user_id === me.id) || null : null; },
     async claimOrders(ids) { let n = 0; orders.forEach(o => { if (me && ids.includes(o.id) && !o.user_id) { o.user_id = me.id; n++;
         if (o.status === "cancelled" && o.refund_due > 0 && o.refund_needed) { o.refund_needed = false; ledger.push({ user_id: me.id, amount: o.refund_due, reason: "Money back: the vendor didn't confirm, code " + o.code, order_id: o.id, created_at: nowIso() }); } } }); return n; },
     async wallet() {
@@ -1422,6 +1519,7 @@ function makeDemoApi() {
         wallets: profiles.map(p => ({ ...p, balance: balance(p.user_id) })), items, team, payment_methods: payMethods, waiters,
         unmatched: unmatched.slice(), problems: orders.filter(o => o.problem && !o.problem_resolved_at) };
     },
+    async alertReach(ids) { return localStorage.getItem("cp_alerts") === "true" ? orders.filter(o => ids.includes(o.id) && (local.get("cp_orders") || []).some(x => x.id === o.id)).map(o => o.id) : []; },
     async refsSeen(refs) { const n = {}; orders.filter(o => o.status !== "cancelled" && o.momo_ref).forEach(o => { n[o.momo_ref] = (n[o.momo_ref] || 0) + 1; }); return Object.fromEntries(refs.filter(r => n[r] > 1).map(r => [r, n[r]])); },
     async adminDues() {
       const paidTo = (t, id) => payouts.filter(x => x.payee_type === t && (x.kitchen_id === id || x.rider_id === id)).reduce((a, x) => a + x.amount, 0);
@@ -1443,12 +1541,13 @@ function makeDemoApi() {
     async fixPayment(id, phone, ref) { const o = orders.find(x => x.id === id); if (!o) throw new Error("Order not found.");
       if (!(me && o.user_id === me.id) && String(phone).replace(/\D/g, "") !== String(o.phone).replace(/\D/g, "")) throw new Error("This order isn't yours.");
       if (o.status !== "pending" || !o.pay_issue) throw new Error("This payment doesn't need fixing."); const r = String(ref).replace(/\s/g, "").toUpperCase();
-      if (!/^[A-Z0-9.]{6,30}$/.test(r)) throw new Error("Enter the MoMo transaction ID from your payment message.");
+      if (!/^[A-Z0-9.]{6,30}$/.test(r)) throw new Error("Enter the mobile money transaction ID from your payment message.");
       o.momo_ref = o.pay_issue === "short" && o.momo_ref ? o.momo_ref + " + " + r : r; o.pay_issue = null; return { ok: true }; },
     async mergeSites(from, into) { const a = sites.find(x => x.id === from), b = sites.find(x => x.id === into); if (!a || !b || a === b) throw new Error("Pick two different buildings.");
       pools.filter(p => p.site_id === a.id).forEach(p => { p.site_id = b.id; p.seq += 100; }); orders.filter(o => o.site_id === a.id).forEach(o => { o.site_id = b.id; }); kitchens.filter(k => k.site_id === a.id).forEach(k => { k.site_id = b.id; });
       waiters.filter(w => w.site_id === a.id).forEach(w => { w.site_id = b.id; }); a.archived = true; if (a.status === "pending") a.status = "declined"; a.request_note = (a.request_note ? a.request_note + " · " : "") + "Merged into " + b.name; return a.name + " merged into " + b.name + "."; },
-    async updateOrder(id, patch) { Object.assign(orders.find(o => o.id === id), patch); },
+    async updateOrder(id, patch) { const o = orders.find(x => x.id === id), was = o.status; Object.assign(o, patch);
+      if (!o.parent_id && was === "pending" && o.status === "paid") orders.filter(c => c.parent_id === o.id && c.basket && c.status === "pending").forEach(c => { c.status = "paid"; }); },
     async updatePool(id, patch) { const p = pools.find(x => x.id === id); Object.assign(p, patch); if (patch.status && stamp[patch.status]) p[stamp[patch.status]] = nowIso(); },
     async updateKitchen(id, patch) { Object.assign(kitchens.find(k => k.id === id), patch); },
     async creditWallet(user_id, amount, reason) { ledger.push({ user_id, amount: Number(amount), reason, created_at: nowIso(), created_by: "coordinator" }); },
@@ -1485,14 +1584,20 @@ function makeDemoApi() {
    LIVE DATA LAYER: Supabase
    ===================================================================================== */
 function makeSupabaseApi() {
-  const sb = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+  // Two separate sign-ins on one phone: customers stay signed in until they sign out; the team screens have their own
+  // session, so the admin safety time-out never signs the customer side out.
+  const teamLink = /(^|[?&])reset=admin\b/.test(location.search), teamPage = location.hash === "#admin" || teamLink;
+  const mk = (key, detect) => window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: detect, ...(key ? { storageKey: key } : {}) } });
+  const sbCustomer = mk(null, !teamLink), sbTeam = mk("cp-team-auth", teamLink);
+  let sb = teamPage ? sbTeam : sbCustomer;
   // A password-reset email link signs the person in for one step: choose a new password
-  sb.auth.onAuthStateChange(ev => { if (ev === "PASSWORD_RECOVERY") { S.recovery = true; if (S.appReady) showRecovery(); } });
+  [sbCustomer, sbTeam].forEach(c => c.auth.onAuthStateChange(ev => { if (ev === "PASSWORD_RECOVERY") { S.recovery = true; if (S.appReady) showRecovery(); } }));
   const must = r => { if (r.error) throw new Error(r.error.message); return r.data; };
   const rpc = async (fn, args) => must(await sb.rpc(fn, args || {}));
   const stamp = { accepted: "accepted_at", ready: "ready_at", picked_up: "picked_up_at", arriving: "arriving_at", delivered: "delivered_at" };
   return {
     demo: false,
+    useTeam(on) { const next = on ? sbTeam : sbCustomer; if (next === sb) return false; sb = next; return true; },
     async load() {
       const soft = q => q.then(r => r.error ? null : r.data, () => null);   // optional tables: the app still works before the database update
       const [payMethods, popRows, scoreRows, scRows] = await Promise.all([soft(sb.from("payment_methods").select("*").eq("active", true).order("sort")), soft(sb.from("dish_popularity").select("*")), soft(sb.from("kitchen_scores").select("*")), soft(sb.from("site_kitchen_counts").select("*"))]);
@@ -1518,6 +1623,8 @@ function makeSupabaseApi() {
       const l = {}; load.forEach(r => { l[r.kitchen_id] = r.meals; });
       return { pools, load: l, activity, open: days.map(x => x.kitchen_id) };
     },
+    placeBasket: r => rpc("place_basket", { p_site: r.site, p_lines: (r.lines || []).map(l => ({ item: l.item, qty: l.qty, addons: l.addons || [], note: l.note || null })), p_name: r.name, p_phone: r.phone,
+      p_ref: r.ref || null, p_use_wallet: !!r.useWallet, p_payer_phone: r.payerPhone || null, p_payer_network: r.payerNetwork || null }),
     placeOrder: r => rpc("place_order", { p_site: r.site, p_item: r.item, p_qty: r.qty, p_name: r.name, p_phone: r.phone, p_ref: r.ref || null,
       p_addons: r.addons || [], p_note: r.note || null, p_special: r.special || null, p_use_wallet: !!r.useWallet, ...(r.join ? { p_join: r.join } : {}) }),
     payQuote: (id, ref, useWallet) => rpc("pay_quote", { p_order: id, p_ref: ref || null, p_use_wallet: !!useWallet }),
@@ -1551,6 +1658,7 @@ function makeSupabaseApi() {
       if (r.error && /base_fare|per_km|column|schema cache/i.test(r.error.message)) throw new Error("Run update-7.sql in the Supabase SQL Editor once, then try again.");
       if (!must(r).length) throw new Error("Not saved. Your account may not have permission to change settings."); },
     async saveProfile(p) { const u = await this.user(); if (u) must(await sb.from("profiles").upsert({ user_id: u.id, email: u.email, ...p })); },
+    async getProfile() { const u = await this.user(); if (!u) return null; const r = await sb.from("profiles").select("*").eq("user_id", u.id).maybeSingle(); return r.error ? null : r.data; },
     claimOrders: ids => rpc("claim_orders", { p_ids: ids }),
     wallet: () => rpc("my_wallet"),
     kitchenView: (t, d) => rpc("kitchen_view", { p_token: t, p_date: d }),
@@ -1600,8 +1708,9 @@ function makeSupabaseApi() {
     },
     isAdmin: () => rpc("is_admin"),
     async adminData(date) {
-      await sb.rpc("housekeeping");
-      const [orders, pools, riders, sites, kitchens, wallets, items, team, payment_methods, waiters] = await Promise.all([
+      sb.rpc("housekeeping").then(() => {}, () => {});   // also runs on the schedule; don't make the screen wait for it
+      const since14 = new Date(Date.now() - 14 * 864e5).toISOString().slice(0, 10);
+      const [orders, pools, riders, sites, kitchens, wallets, items, team, payment_methods, waiters, unmatched, problems] = await Promise.all([
         sb.from("orders").select("*").eq("order_date", date).order("created_at").then(must),
         sb.from("pools").select("*").eq("order_date", date).order("seq").then(must),
         sb.from("riders").select("*").order("name").then(must),
@@ -1611,14 +1720,14 @@ function makeSupabaseApi() {
         sb.from("menu_items").select("*").order("name").then(must),
         sb.from("admins").select("*").order("role", { ascending: false }).then(must),
         sb.from("payment_methods").select("*").order("sort").then(r => r.error ? [] : r.data, () => []),
-        sb.from("site_waiters").select("site_id,created_at").then(r => r.error ? [] : r.data, () => [])
+        sb.from("site_waiters").select("site_id,created_at").then(r => r.error ? [] : r.data, () => []),
+        sb.from("unmatched_payments").select("*").is("refunded_at", null).order("created_at", { ascending: false }).then(r => r.error ? [] : r.data, () => []),
+        sb.from("orders").select("*").not("problem", "is", null).is("problem_resolved_at", null).gte("order_date", since14).then(r => r.error ? [] : r.data, () => [])
       ]);
       const m = {}; orders.forEach(o => { if (o.status !== "cancelled") m[o.pool_id] = (m[o.pool_id] || 0) + o.qty; });
-      const [unmatched, problems] = await Promise.all([
-        sb.from("unmatched_payments").select("*").is("refunded_at", null).order("created_at", { ascending: false }).then(r => r.error ? [] : r.data, () => []),
-        sb.from("orders").select("*").not("problem", "is", null).is("problem_resolved_at", null).gte("order_date", new Date(Date.now() - 14 * 864e5).toISOString().slice(0, 10)).then(r => r.error ? [] : r.data, () => [])]);
       return { orders, pools: pools.map(p => ({ ...p, meals: m[p.id] || 0 })), riders, sites, kitchens, wallets, items, team, payment_methods, waiters, unmatched, problems };
     },
+    alertReach: ids => rpc("admin_alert_reach", { p_ids: ids }),
     async refsSeen(refs, date) { return refs.length ? rpc("admin_refs_seen", { p_refs: refs, p_date: date }) : {}; },
     async adminDues(from, to) { return rpc("admin_dues", { p_from: from, p_to: to }); },
     async payouts() { return must(await sb.from("payouts").select("*").order("created_at", { ascending: false }).limit(100)); },
@@ -1936,7 +2045,9 @@ async function refreshUser() {
   try { S.user = await api.user(); } catch (e) { S.user = null; }
   S.balance = 0;
   S.walletEntries = null;
-  if (S.user) { try { const w = await api.wallet(); S.balance = Number(w.balance) || 0; S.walletEntries = w.entries || []; } catch (e) {} }
+  if (S.user) { try { const w = await api.wallet(); S.balance = Number(w.balance) || 0; S.walletEntries = w.entries || []; } catch (e) {}
+    // Saved payment methods follow the account to any phone
+    try { const pr = api.getProfile && await api.getProfile(); if (pr && Array.isArray(pr.pay_methods) && pr.pay_methods.length) local.set("cp_paymethods", pr.pay_methods); else if (payMethods().length) api.saveProfile({ pay_methods: payMethods() }).catch(() => {}); } catch (e) {} }
   renderHero(); updateBellDot();
   if (S.tab === "wallet") renderWallet();
 }
@@ -2082,6 +2193,14 @@ function setTab(t) {
   const ORDER = ["home", "kitchens", "orders", "wallet"], prev = S.tab;
   S.tab = t;
   const pane = $("#tab" + t[0].toUpperCase() + t.slice(1));
+  const calm = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const oldPane = prev && prev !== t ? $("#tab" + prev[0].toUpperCase() + prev.slice(1)) : null;
+  if (oldPane && !oldPane.classList.contains("hidden") && !calm && document.body.classList.contains("is-app")) {
+    const r = oldPane.getBoundingClientRect(), g = oldPane.cloneNode(true), back = ORDER.indexOf(t) < ORDER.indexOf(prev);
+    g.removeAttribute("id"); g.querySelectorAll("[id]").forEach(x => x.removeAttribute("id")); g.classList.add("pane-ghost"); g.setAttribute("aria-hidden", "true");
+    Object.assign(g.style, { top: r.top + "px", left: r.left + "px", width: r.width + "px" }); g.style.setProperty("--dx", back ? "22%" : "-22%");
+    document.body.appendChild(g); const kill = () => g.remove(); g.addEventListener("animationend", kill); setTimeout(kill, 600);
+  }
   if (pane && prev && prev !== t && document.body.classList.contains("is-app")) { pane.classList.remove("pane-in", "from-left"); void pane.offsetWidth; pane.classList.add("pane-in"); if (ORDER.indexOf(t) < ORDER.indexOf(prev)) pane.classList.add("from-left"); }
   ["home", "kitchens", "orders", "wallet"].forEach(x => {
     $("#tab" + x[0].toUpperCase() + x.slice(1))?.classList.toggle("hidden", x !== t);
@@ -2098,8 +2217,16 @@ function setTab(t) {
   if (t === "wallet") renderWallet();
   if (t === "kitchens") { syncVChips(); renderKitchens(); }
   window.scrollTo(0, 0);
-  requestAnimationFrame(() => { setKTop(); if (t === "home") watchHero(); });
+  movePill();
+  requestAnimationFrame(() => { setKTop(); if (t === "home") { watchHero(); fitStats(); } });
 }
+// The highlight on the tab bar glides to the tab you picked
+function movePill() {
+  const bar = $(".tabbar"), b = bar && bar.querySelector('button[aria-current="page"]'); if (!bar || !b) return;
+  let pill = bar.querySelector(".tabpill"); if (!pill) { pill = document.createElement("span"); pill.className = "tabpill"; pill.setAttribute("aria-hidden", "true"); bar.prepend(pill); }
+  pill.style.width = b.offsetWidth + "px"; pill.style.height = b.offsetHeight + "px"; pill.style.transform = `translate(${b.offsetLeft}px, ${b.offsetTop}px)`;
+}
+window.addEventListener("resize", () => movePill());
 async function viewOrder() {
   S.tab = S.tab || "home";
   const theme = local.get("cp_theme") || "auto";
@@ -2194,9 +2321,10 @@ function loadLeaflet() {
 const ACCRA = { lat: 5.6037, lng: -0.1870 };
 async function makeMap(el, center, zoom) {
   const L = await loadLeaflet();
+  if (!el || !el.isConnected) return null;   // the page was redrawn while the map library loaded
   const m = L.map(el).setView([(center || ACCRA).lat, (center || ACCRA).lng], zoom || 12);
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "&copy; OpenStreetMap contributors" }).addTo(m);
-  setTimeout(() => m.invalidateSize(), 200);
+  setTimeout(() => { if (el.isConnected) m.invalidateSize(); }, 200);
   return m;
 }
 const pinIcon = (L, kind) => L.divIcon({ className: "", html: `<span class="mpin ${kind || ""}"></span>`, iconSize: [24, 24], iconAnchor: [12, 24] });
@@ -2315,7 +2443,7 @@ function openSitePicker(opt) {
     $("#mapToggle").textContent = el.classList.contains("hidden") ? "Show on map" : "Hide map";
     if (map || el.classList.contains("hidden")) return;
     try {
-      map = await makeMap(el, here || (hasPin(siteOf(S.siteId)) ? siteOf(S.siteId) : ACCRA), 12);
+      map = await makeMap(el, here || (hasPin(siteOf(S.siteId)) ? siteOf(S.siteId) : ACCRA), 12); if (!map) return;
       const L = window.L, pts = [];
       S.sites.filter(hasPin).forEach(x => { pts.push([x.lat, x.lng]); L.marker([x.lat, x.lng], { icon: pinIcon(L, x.id === S.siteId ? "on" : "") }).addTo(map).bindPopup(`<strong>${esc(x.name)}</strong><br>${esc(x.drop_point)}<br><button class="btn" style="margin-top:6px;padding:6px 12px" data-pick="${esc(x.id)}">Deliver here</button>`); });
       if (here) L.marker([here.lat, here.lng], { icon: pinIcon(L, "me") }).addTo(map);
@@ -2355,7 +2483,7 @@ function openRequestSite(here, opt = {}) {
     if (zoom) map.setView([p.lat, p.lng], zoom);
     near();
   };
-  makeMap($("#bMap"), pin || ACCRA, pin ? (opt.name ? 17 : 16) : 12).then(m => { map = m; if (pin) setPin(pin); map.on("click", e => setPin({ lat: e.latlng.lat, lng: e.latlng.lng })); })
+  makeMap($("#bMap"), pin || ACCRA, pin ? (opt.name ? 17 : 16) : 12).then(m => { if (!m) return; map = m; if (pin) setPin(pin); map.on("click", e => setPin({ lat: e.latlng.lat, lng: e.latlng.lng })); })
     .catch(e => { $("#bMap").innerHTML = `<p class="err" style="padding:12px">${esc(cleanErr(e))}</p>`; });
   placeSearch($("#bSearch"), $("#bResults"), r => { if (!map) return; setPin(r, 17); $("#bResults").innerHTML = ""; $("#bSearch").value = ""; if (!$("#bName").value) $("#bName").value = r.short; });
   $("#bMe").addEventListener("click", async () => { try { const me = S.here = await myPosition(); if (map) setPin(me, 17); } catch (e) { toast(cleanErr(e)); } });
@@ -2403,13 +2531,16 @@ function renderHero() {
   const here = S.board.pools.filter(p => S.noSite || p.site_id === S.siteId);
   const meals = here.reduce((t, p) => t + p.meals, 0);
   const dlv = heroDelivery(here, site);
+  // My own meals for this order day (all my orders and extra plates, not cancelled)
+  const myMeals = (S.mine || []).filter(o => o.order_date === S.date && ["pending", "paid", "collected", "quote_requested", "quoted"].includes(o.status) && (S.noSite || o.site_id === S.siteId)).reduce((t, o) => t + (o.qty || 0), 0);
   // Orders closed and I have lunch coming today: show where it is instead of the meal count
   // My lunch today, from payment until I've got it: a slim strip under the figures (the figures stay as they are)
+  const payProb = (S.mine || []).find(o => !o.parent_id && o.order_date >= today() && o.status === "pending" && o.pay_issue);
   const mineAll = (S.mine || []).filter(o => !o.parent_id && o.order_date >= today() && ["paid", "collected"].includes(o.status) && !o.received_at);
   const firstDay = mineAll.map(o => o.order_date).sort()[0];
   const mineToday = mineAll.filter(o => o.order_date === firstDay);
   const best = mineToday.sort((a, b) => progressOf(b) - progressOf(a))[0];
-  const live = best ? (() => { const st = progressOf(best), dl2 = dayLabel(best.order_date), lab = canConfirm(best) ? "Your lunch is here" : st <= 1 ? "Confirmed for " + (dl2 === "today" || dl2 === "tomorrow" ? dl2 : fmtDate(best.order_date)) : ["", "", "Being cooked", "On the way", "Delivered"][Math.min(st, 4)];
+  const live = payProb ? `<button class="mylunch bad" data-gomine aria-label="Payment problem on code ${esc(payProb.code)}. Open your order to fix it"><span class="ml-dot"></span><span class="ml-t"><b>${payProb.pay_issue === "short" ? "Your payment was short" : "We couldn't find your payment"}</b><small>Code ${esc(payProb.code)} · fix it before ${fmtTime(S.settings.cutoff)} so your lunch counts</small></span><span class="ml-code"><small>tap</small><b>Fix</b></span></button>` : best ? (() => { const st = progressOf(best), dl2 = dayLabel(best.order_date), lab = canConfirm(best) ? "Your lunch is here" : st <= 1 ? "Confirmed for " + (dl2 === "today" || dl2 === "tomorrow" ? dl2 : fmtDate(best.order_date)) : ["", "", "Being cooked", "On the way", "Delivered"][Math.min(st, 4)];
     return `<button class="mylunch" data-gomine aria-label="Your lunch: ${esc(lab)}. Open your order"><span class="ml-dot${st >= 3 ? " go" : ""}"></span><span class="ml-t"><b>${esc(lab)}</b><small>${esc(best.qty + " × " + best.item_name)}${mineToday.length > 1 ? " · +" + (mineToday.length - 1) + " more" : ""}</small></span><span class="ml-code"><small>code</small><b>${esc(best.code)}</b></span><span class="ml-bar" aria-hidden="true">${[1, 2, 3, 4, 5].map(i => `<i class="${i <= st ? "on" : ""}"></i>`).join("")}</span></button>`; })() : "";
   const name = firstName();
   const dl = dayLabel(S.date);
@@ -2418,13 +2549,24 @@ function renderHero() {
       <p class="small">Order by ${fmtTime(s.cutoff)}${dl === "today" ? "" : " " + (dl === "tomorrow" ? "tomorrow" : fmtDate(S.date))} · lunch at ${fmtTime(s.delivery_time)}</p>
 </div>
     <div class="hero-stats"><div class="hero-stat" id="cdBox"><b class="num" id="countdown">--</b><span id="cdLabel">until orders close</span></div>
-      ${hasMineToday() ? `<button class="hero-stat hlink" data-gomine aria-label="${meals} meals ordered. Open your orders"><b class="num">${meals}</b><span>meals ordered</span></button>` : `<div class="hero-stat"><b class="num">${meals}</b><span>meals ordered</span></div>`}
+      ${myMeals ? `<button class="hero-stat hlink" data-gomine aria-label="${myMeals} of your meals, ${meals} in your building. Open your orders"><b class="num">${myMeals}</b><span>your meal${myMeals === 1 ? "" : "s"}${meals > myMeals ? ` <span class="of">of ${meals} here</span>` : ""}</span></button>` : `<div class="hero-stat"><b class="num">${meals}</b><span>ordered in your building</span></div>`}
       ${S.noSite ? `<div class="hero-stat"><b class="num">${here.filter(p => p.status === "collecting" && p.meals > 0).length}</b><span>pools open</span></div>` : (dlv ? `<button class="hero-stat hlink" data-vendor="${esc(dlv.kid)}">${(v => `<b class="num${v.length > 7 ? " long" : ""}">${v}</b>`)(dlv.fee === 0 ? "Free" : Number.isInteger(dlv.fee) ? "GHS " + dlv.fee : money(dlv.fee))}<span>${esc(dlv.label)}</span></button>` : `<div class="hero-stat"><b class="num">${menusHere().length}</b><span>vendors cooking</span></div>`)}</div>`;
   if (live) el.insertAdjacentHTML("beforeend", live);
-  tickCountdown(); fitStats();
+  tickCountdown(); fitStats(); countUp(el);
+}
+// Figures count up to their value the first time they show (or when they change)
+const shownNums = {};
+function countUp(root) {
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches || !document.body.classList.contains("is-app")) return;
+  root.querySelectorAll(".hero-stat b.num, .vfacts b").forEach((b, i) => {
+    if (b.id === "countdown") return; const m = /^(\D*)(\d+)(\D*)$/.exec(b.textContent.trim()); if (!m) return;
+    const to = +m[2], key = (b.closest("[data-vendor]") ? "v" : "h") + i, from = shownNums[key] ?? 0; shownNums[key] = to; if (from === to || to > 9999) return;
+    const t0 = performance.now(), dur = 650, step = now => { const k = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - k, 3); b.textContent = m[1] + Math.round(from + (to - from) * e) + m[3]; if (k < 1) requestAnimationFrame(step); };
+    requestAnimationFrame(step);
+  });
 }
 // Small phones: a figure that doesn't fit its box steps down a size instead of being cut off
-function fitStats() { requestAnimationFrame(() => document.querySelectorAll(".hero-stat b").forEach(b => { if (b.id === "countdown" && !b.querySelector(".ampm")) return; b.classList.remove("long", "tiny"); if (b.scrollWidth > b.clientWidth + 1) b.classList.add("long"); if (b.scrollWidth > b.clientWidth + 1) b.classList.add("tiny"); })); }
+function fitStats() { requestAnimationFrame(() => document.querySelectorAll(".hero-stat b").forEach(b => { if (b.id === "countdown" && !b.querySelector(".ampm")) return; if (!b.clientWidth) return; b.classList.remove("long", "tiny"); if (b.scrollWidth > b.clientWidth + 1) b.classList.add("long"); if (b.scrollWidth > b.clientWidth + 1) b.classList.add("tiny"); })); }
 function tickCountdown() {
   document.querySelectorAll("[data-paywin]").forEach(el => { el.textContent = payWindowText(el.dataset.paywin); });
   if (!$("#countdown")) return;
@@ -2500,10 +2642,13 @@ const SHARE = SV('<path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="
 const mineBtns = (o, k) => `<div class="minebtns"><button class="btn wide" data-addplate="${esc(o.id)}">${SV('<path d="M12 5v14M5 12h14"/>', 18)} Add to my order</button><button class="ghost sharebtn" data-share="${esc(o.site_id)},${esc(k.id)}" aria-label="Share this pool">${SHARE}</button></div>`;
 // When a waiting pool's vendor must confirm by: same-day pools get minutes; pools for a later day get until the "confirm by" time that morning
 const confirmBy = () => { const s = S.settings, by = s.next_day_confirm_by || "08:30"; return hm(by) < hm(s.cutoff) ? by : s.cutoff; };
-const waitUntilOf = p => p && p.wait_until ? new Date(p.wait_until) : p ? (p.order_date > String(p.created_at).slice(0, 10) ? at(p.order_date, confirmBy()) : new Date(Date.parse(p.created_at) + S.settings.accept_timeout_min * 6e4)) : null;
+const waitUntilOf = p => p && p.wait_until ? new Date(p.wait_until) : p && p.created_at ? (p.order_date > String(p.created_at).slice(0, 10) ? at(p.order_date, confirmBy())
+  : new Date(Math.min(+at(p.order_date, S.settings.cutoff), Math.max(Date.parse(p.created_at) + S.settings.accept_timeout_min * 6e4, +at(p.order_date, confirmBy()))))) : null;
 const waitLeftMin = p => p ? Math.max(0, Math.round((waitUntilOf(p) - Date.now()) / 6e4)) : S.settings.accept_timeout_min;
 // "within 20 minutes" today, "by 08:30 tomorrow" for a later day
-const confirmText = d => d > today() ? "by " + fmtTime(confirmBy()) + " " + (dayLabel(d) === "tomorrow" ? "tomorrow" : "on " + fmtDate(d)) : "within " + S.settings.accept_timeout_min + " minutes";
+// Same rule as the server: today before the confirm-by time -> "by 8:30"; later today -> "within 20 minutes"
+const confirmText = d => d > today() ? "by " + fmtTime(confirmBy()) + " " + (dayLabel(d) === "tomorrow" ? "tomorrow" : "on " + fmtDate(d))
+  : new Date() < at(d, confirmBy()) ? "by " + fmtTime(confirmBy()) : "within " + S.settings.accept_timeout_min + " minutes";
 const leftText = p => { const m = waitLeftMin(p); return m > 90 ? "confirms by " + fmtTime(confirmBy()) + (dayLabel((p || {}).order_date || S.date) === "tomorrow" ? " tomorrow" : "") : m + " min left"; };
 // Waiting for the vendor: status, time left and the button together in one box
 function waitBox(k) {
@@ -2745,8 +2890,10 @@ function wireVendors() {
 }
 
 /* ---------- Vendor page: the full menu, reviews and photos, then the order sheet ---------- */
-function openVendor(kid) {
+function openVendor(kid, from) {
   const k = menuOf(kid); if (!k.id) return;
+  const srcEl = from || document.querySelector(`[data-vendor="${CSS.escape(kid)}"] .plate, [data-vendor="${CSS.escape(kid)}"] svg, [data-vendor="${CSS.escape(kid)}"] img`);
+  const src = srcEl && srcEl.getBoundingClientRect();
   S.vp = { id: kid, tab: "menu" };
   let el = $("#vpage");
   if (!el) {
@@ -2757,6 +2904,14 @@ function openVendor(kid) {
     history.pushState({ vp: 1 }, "");
   }
   el.scrollTop = 0; drawVendor();
+  // Grow the dish picture from the tile that was tapped into the page header
+  const vp = el.querySelector(".vplate");
+  if (vp && src && src.width && !matchMedia("(prefers-reduced-motion: reduce)").matches && document.body.classList.contains("is-app")) {
+    el.classList.add("grow");
+    requestAnimationFrame(() => { const d = vp.getBoundingClientRect(); const sx = src.width / d.width, dx = src.left + src.width / 2 - (d.left + d.width / 2), dy = src.top + src.height / 2 - (d.top + d.height / 2);
+      vp.style.transition = "none"; vp.style.transform = `translate(${dx}px, ${dy}px) scale(${sx})`;
+      requestAnimationFrame(() => { vp.style.transition = "transform .5s cubic-bezier(.22,1,.36,1)"; vp.style.transform = ""; setTimeout(() => { el.classList.remove("grow"); vp.style.transition = ""; }, 560); }); });
+  }
   requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add("open")));
 }
 function closeVendor(fromPop) {
@@ -2768,24 +2923,89 @@ function closeVendor(fromPop) {
 window.addEventListener("popstate", () => { if ($("#vpage")) closeVendor(true); });
 function vendorBanner(k) {
   const s = S.settings, v = vInfo(k), mo = S.noSite ? null : myOrderIn(k), site = siteOf(S.siteId), day = dayLabel(S.date);
-  if (S.noSite) return `<div class="vbanner o"><span>Choose your building to order from <b>${esc(k.public_name)}</b> and see delivery prices.</span></div>`;
-  if (mo) return `<div class="vbanner"><span><b>You're in this pool</b> · code <b class="num">${esc(mo.code)}</b>. ${v.active ? "Your share now " + money(feeFor(Math.max(v.p.meals, 1), s, poolTrip(v.p))) + " a meal." : ""} Add a plate or share it so delivery drops.</span></div>`;
+  if (S.noSite) return `<div class="vbanner o vbrow"><span>Choose your building to order from <b>${esc(k.public_name)}</b> and see delivery prices.</span><button class="btn" data-vgo>Choose</button></div>`;
+  if (mo) return `<div class="vbanner"><span><b>You're in this pool</b> · code <b class="num">${esc(mo.code)}</b>. ${v.active ? "Your share now " + money(feeFor(Math.max(v.p.meals, 1), s, poolTrip(v.p))) + " a meal. " : ""}Tap + to add a dish to your order: same code, packed together.</span></div>`;
   if (v.st.full) return `<div class="vbanner bad"><span><b>Fully booked ${esc(day)}.</b> Try another vendor near you.</span></div>`;
-  if (v.st.waiting) return `<div class="vbanner w"><span><b>Waiting for ${esc(k.public_name)} to confirm</b> · ${v.p ? v.p.meals : 0} meals so far. Join anyway: if they don't confirm in time, everyone gets their money back.</span></div>`;
+  if (v.st.waiting) return `<div class="vbanner w"><span><b>Waiting for ${esc(k.public_name)} to confirm</b> ${esc(confirmText(S.date))} · ${v.p ? v.p.meals : 0} meal${v.p && v.p.meals === 1 ? "" : "s"} so far. You can still order: if they don't confirm, everyone gets their money back.</span></div>`;
   if (v.active) { const j = feeFor(v.p.meals + 1, s, poolTrip(v.p, v.p.meals + 1)); return `<div class="vbanner"><span><b>${v.p.meals} meal${v.p.meals > 1 ? "s" : ""} from ${esc(site.name || "your building")}</b> in a pool. Join now and your share is ${money(j)} a meal.</span></div>`; }
   if (v.st.open) return `<div class="vbanner o"><span><b>Cooking ${esc(day)}.</b> Start a pool and share it: delivery gets cheaper for everyone who joins.</span></div>`;
   return `<div class="vbanner o"><span><b>No pool yet ${esc(day)}.</b> Start one and we'll ask ${esc(k.public_name)} to confirm. Others in your building can join.</span></div>`;
 }
+// The bottom bar only appears once there's something in the tray
 function vendorFoot(k) {
-  const v = vInfo(k), mo = S.noSite ? null : myOrderIn(k);
-  const label = S.noSite ? "Choose your building" : mo ? "Add to my order" : v.st.full ? "Fully booked" : v.st.waiting ? "Join anyway" : v.active ? "Join the pool" : v.st.open ? "Start a pool" : "Order and ask them to cook";
-  const sub = S.noSite ? "Then pick your meal" : mo ? "Same bag, code " + mo.code : v.st.full ? "Try another vendor" : "Pick your meal next";
-  return `<button class="btn" data-vgo${v.st.full && !mo ? " disabled" : ""}><span><span>${esc(label)}</span><small>${esc(sub)}</small></span></button>`;
+  const t = trayFor(k.id); if (!t.lines.length) return "";
+  const n = t.lines.reduce((a, l) => a + l.qty, 0);
+  return `<button class="btn traybar" data-vcheckout><span class="tc num">${n}</span><span class="tl">View order<small>${t.lines.length} dish${t.lines.length === 1 ? "" : "es"} · ${n} meal${n === 1 ? "" : "s"}</small></span><span class="tp num">${money(trayFood(t))}</span></button>`;
+}
+/* ---------- Payment methods: up to 3 mobile money numbers, one default ---------- */
+const NET_STYLE = { MTN: ["#FFCC00", "#1E1B24", "MTN"], Telecel: ["#E30613", "#fff", "Telecel"], AirtelTigo: ["#0A3D91", "#fff", "AT"] };
+const netBadge = n => { const x = NET_STYLE[n]; return x ? `<span class="logo net" style="background:${x[0]};color:${x[1]}">${esc(x[2])}</span>` : `<span class="logo net gen">${ICON.phone}</span>`; };
+// Same dish, same extras and note: one line ("3 × TZ") instead of a list
+function groupDishes(list) {
+  const out = [];
+  list.forEach(o => { const ex = [addonText(o.addons), o.note].filter(Boolean).join(" · "), key = o.item_name + "|" + ex; const g = out.find(x => x.key === key); if (g) g.qty += Number(o.qty || 1); else out.push({ key, name: o.item_name, extra: ex, qty: Number(o.qty || 1) }); });
+  return out;
+}
+// Dishes added in the same checkout are paid with the first one (no separate payment of their own)
+const isTrayKid = c => !!c.parent_id && (c.basket || (c.status === "pending" && !c.momo_ref && !Number(c.wallet_used)));
+const dueWithTray = o => Number(o.amount_due || 0) + (S.mine || []).filter(c => c.parent_id === o.id && c.status === "pending" && isTrayKid(c)).reduce((t, c) => t + Number(c.amount_due || 0), 0);
+const firstOf = n => String(n || "").trim().split(/\s+/)[0] || "";
+// Network from the number's prefix (people can still change it)
+const guessNet = n => { const p = String(n || "").replace(/\D/g, "").slice(0, 3); return ["024", "054", "055", "059", "025", "053"].includes(p) ? "MTN" : ["020", "050"].includes(p) ? "Telecel" : ["027", "057", "026", "056"].includes(p) ? "AirtelTigo" : ""; };
+const maskNum = n => "•••• " + String(n || "").replace(/\D/g, "").slice(-4);
+function payMethods() {
+  let L = local.get("cp_paymethods");
+  if (!Array.isArray(L)) { const me = meNow(); L = me.phone && me.network ? [{ id: "pm1", number: me.phone, network: me.network, nick: "", def: true }] : []; local.set("cp_paymethods", L); }
+  return L;
+}
+function savePayMethods(L) { if (L.length && !L.some(m => m.def)) L[0].def = true; local.set("cp_paymethods", L); if (S.user) api.saveProfile({ pay_methods: L }).catch(() => {}); }
+const defaultPM = () => { const L = payMethods(); return L.find(m => m.def) || L[0] || null; };
+const payToFor = net => payList().find(p => net && p.network === net) || payList()[0];
+function pickPayFrom(cur, done) {
+  const L = payMethods(); const back = $("#sheet").innerHTML;
+  const host = document.createElement("div"); host.className = "pmpick"; host.innerHTML = `<p class="group-title">Pay from</p>${L.map(m => `<button type="button" class="pmrow${cur && cur.id === m.id ? " on" : ""}" data-pm="${esc(m.id)}">${netBadge(m.network)}<span><b>${esc(m.nick || m.network)}</b> <span class="num muted">${esc(maskNum(m.number))}</span></span>${m.def ? `<span class="chip">Default</span>` : ""}</button>`).join("")}
+    <button type="button" class="pmrow" data-pm="new"><span class="logo net gen">+</span><span><b>Another number</b></span></button>`;
+  const box = $("#payFrom"); box.innerHTML = ""; box.appendChild(host);
+  host.addEventListener("click", e => { const b = e.target.closest("[data-pm]"); if (!b) return; done(b.dataset.pm === "new" ? null : L.find(m => m.id === b.dataset.pm)); });
+}
+/* ---------- Tray: several dishes from one vendor, one checkout, one payment, one code ---------- */
+function trayFor(kid) { const t = local.get("cp_tray"); return t && t.kid === kid && t.site === S.siteId && t.date === S.date ? t : { kid, site: S.siteId, date: S.date, lines: [] }; }
+function traySave(t) { local.set("cp_tray", t.lines.length ? t : null); if ($("#vfoot") && S.vp) { $("#vfoot").innerHTML = vendorFoot(menuOf(S.vp.id)); $("#vfoot").classList.toggle("on", !!t.lines.length); } }
+const lineItem = l => S.items.find(i => i.id === l.item) || {};
+const lineAdd = l => (lineItem(l).addons || []).filter(a => (l.addons || []).includes(a.name)).reduce((t, a) => t + Number(a.price), 0);
+const trayFood = t => t.lines.reduce((a, l) => a + (Number(lineItem(l).price || 0) + lineAdd(l)) * l.qty, 0);
+const sameLine = (a, b) => a.item === b.item && (a.note || "") === (b.note || "") && [...(a.addons || [])].sort().join("|") === [...(b.addons || [])].sort().join("|");
+// One dish: how many, extras, a note, then into the tray
+function openDish(k, dishId) {
+  const d = S.items.find(i => i.id === dishId); if (!d) return;
+  if (S.noSite) return openSitePicker({ then: () => openDish(k, dishId) });
+  const st = menuState(k); if (st.full) return toast(k.public_name + " is fully booked " + dayLabel(S.date) + ".");
+  let qty = 1; const extras = new Set(), i0 = menuIndex(k.id);
+  const specialOpen = !(S.date === today() && new Date() >= at(S.date, S.settings.special_cutoff));
+  openSheet(`<div class="dishhead"><span class="tile" style="background:${tint(i0)}">${plate(d, k.id)}</span><div><h2>${esc(d.name)}</h2><p class="small muted">${esc(k.public_name)} · <span class="num">${money(d.price)}</span></p></div><button class="closex" data-close aria-label="Close">${ICON.close}</button></div>
+    <div class="row"><p class="group-title">How many</p><div class="qty"><button type="button" id="dMinus" aria-label="One less">−</button><output id="dQ">1</output><button type="button" id="dPlus" aria-label="One more">+</button></div></div>
+    ${(d.addons || []).length ? `<div class="group"><p class="group-title">Extras <span class="muted" style="font-weight:500">(optional, added to each plate)</span></p><div class="chips" id="dExtras">${d.addons.map(a => `<button type="button" class="tog" data-addon="${esc(a.name)}" aria-pressed="false">${esc(a.name)}${a.price ? " +" + money(a.price) : ""}</button>`).join("")}</div></div>` : ""}
+    <div class="group"><label for="dNote">Note for the kitchen <span class="muted" style="font-weight:500">(optional)</span></label><input id="dNote" maxlength="140" placeholder="Less oil, extra napkins"></div>
+    ${specialOpen ? `<button type="button" class="linkbtn" id="dSpecial" style="justify-self:start">Want something not on the menu? Send a special request</button>` : ""}
+    <div class="sheet-foot"><button class="btn wide" id="dAdd">Add to order · <span class="num" id="dTot"></span></button></div>`);
+  const draw = () => { $("#dQ").textContent = qty; const a = (d.addons || []).filter(x => extras.has(x.name)).reduce((t, x) => t + Number(x.price), 0); $("#dTot").textContent = money((Number(d.price) + a) * qty); };
+  draw();
+  $("#dMinus").addEventListener("click", () => { qty = Math.max(1, qty - 1); draw(); });
+  $("#dPlus").addEventListener("click", () => { qty = Math.min(5, qty + 1); draw(); });
+  $("#dExtras")?.addEventListener("click", e => { const b = e.target.closest("[data-addon]"); if (!b) return; const n = b.dataset.addon; extras.has(n) ? extras.delete(n) : extras.add(n); b.setAttribute("aria-pressed", String(extras.has(n))); draw(); });
+  $("#dSpecial")?.addEventListener("click", () => openOrder(k.id, { preset: { item_id: d.id, qty: 1 }, fromPage: true, special: true }));
+  $("#dAdd").addEventListener("click", () => {
+    const t = trayFor(k.id), line = { item: d.id, qty, addons: [...extras], note: $("#dNote").value.trim() || null };
+    const meals = t.lines.reduce((a, l) => a + l.qty, 0) + qty, cap = Math.min(10, Number(S.settings.max_meals) || 10);
+    if (meals > cap) return toast("Up to " + cap + " meals in one order.");
+    const same = t.lines.find(l => sameLine(l, line)); if (same) same.qty = Math.min(5, same.qty + qty); else t.lines.push(line);
+    traySave(t); closeSheet(); toast("Added " + qty + " × " + d.name);
+  });
 }
 function drawVendorLive() {
   const k = menuOf(S.vp && S.vp.id); if (!k.id) return;
   if ($("#vpBanner")) $("#vpBanner").innerHTML = vendorBanner(k);
-  if ($("#vfoot")) $("#vfoot").innerHTML = vendorFoot(k);
+  if ($("#vfoot")) { $("#vfoot").innerHTML = vendorFoot(k); $("#vfoot").classList.toggle("on", !!$("#vfoot").innerHTML); }
 }
 function drawVendor() {
   const el = $("#vpage"), k = menuOf(S.vp.id); if (!el || !k.id) return;
@@ -2795,7 +3015,7 @@ function drawVendor() {
   const facts = [
     sc.ratings >= 1 ? [`<span class="rs">★ ${Number(sc.rating).toFixed(1)}</span>`, sc.ratings + " rating" + (sc.ratings > 1 ? "s" : "")] : ["New", "on ChopPool"],
     v.km != null ? [kmText(v.km).replace(/^u/, "U"), "by road"] : [String(dishes.length), "dish" + (dishes.length === 1 ? "" : "es") + " on the menu"],
-    S.noSite ? ["Choose", "your building for prices"] : [moneyShort(v.trip), "trip, shared by the pool"]];
+    S.noSite ? ["Choose", "your building for prices"] : [moneyShort(v.trip), "shared trip"]];
   el.innerHTML = `<div class="vhero" style="background:${tint(i0)}">
       <button class="vfab" data-vback style="left:14px" aria-label="Back">${ICON.back}</button>
       <button class="vfab${fav ? " fav" : ""}" data-vfav style="right:${S.noSite ? 14 : 64}px" aria-label="${fav ? "Remove from favourites" : "Add to favourites"}" aria-pressed="${fav}">${ICON.heart}</button>
@@ -2807,11 +3027,11 @@ function drawVendor() {
       <div class="vfacts">${facts.map(([b, t]) => `<div><b>${b}</b><span>${esc(t)}</span></div>`).join("")}</div>
       <div id="vpBanner">${vendorBanner(k)}</div>
       <div class="vtabs" role="tablist"><button data-vtab="menu" aria-pressed="${S.vp.tab === "menu"}">Menu</button><button data-vtab="rev" aria-pressed="${S.vp.tab === "rev"}">Reviews${sc.ratings ? " · " + sc.ratings : ""}</button></div>
-      <div id="vpBody" class="stack" style="gap:8px">${S.vp.tab === "menu" ? groups.map(([t, ds]) => `<h3 class="vcat">${esc(t)}</h3>` + ds.map(d => `<button class="vitem" data-dish="${esc(d.id)}">
+      <div id="vpBody" class="stack" style="gap:8px">${S.vp.tab === "menu" ? groups.map(([t, ds]) => `<h3 class="vcat">${esc(t)}</h3>` + ds.map(d => `<button class="vitem" data-dish="${esc(d.id)}"${v.st.full && !(S.noSite ? null : myOrderIn(k)) ? " disabled" : ""}>
           <span class="vph" style="background:${tint(i0)}">${plate(d, k.id)}</span><span class="vtx"><strong>${esc(d.name)}</strong>${(d.addons || []).length ? `<span class="ds">Extras: ${esc(d.addons.map(a => a.name).join(", "))}</span>` : ""}<span class="pr num">${money(d.price)}</span></span><span class="plus" aria-hidden="true">+</span></button>`).join("")).join("")
         || `<p class="small muted">No dishes on the menu yet.</p>` : `<p class="small muted">Loading reviews…</p>`}</div>
     </div>`;
-  if ($("#vfoot")) $("#vfoot").innerHTML = vendorFoot(k);
+  if ($("#vfoot")) { $("#vfoot").innerHTML = vendorFoot(k); $("#vfoot").classList.toggle("on", !!$("#vfoot").innerHTML); }
   if (S.vp.tab === "rev") loadVendorReviews(k);
 }
 async function loadVendorReviews(k) {
@@ -2836,7 +3056,8 @@ function vendorClick(e) {
   const sh = e.target.closest("[data-share]"); if (sh) { const [a, c] = sh.dataset.share.split(","); return sharePool(a, c); }
   const tb = e.target.closest("[data-vtab]"); if (tb) { S.vp.tab = tb.dataset.vtab; const y = $("#vpage").scrollTop; drawVendor(); $("#vpage").scrollTop = Math.min(y, $(".vtabs").offsetTop - 8); return; }
   const d = e.target.closest("[data-dish]");
-  if (d) return mo ? openOrder(k.id, { join: mo, preset: { item_id: d.dataset.dish, qty: 1 }, fromPage: true }) : openOrder(k.id, { preset: { item_id: d.dataset.dish, qty: 1 }, fromPage: true });
+  if (d) return mo ? openOrder(k.id, { join: mo, preset: { item_id: d.dataset.dish, qty: 1 }, fromPage: true }) : openDish(k, d.dataset.dish);
+  if (e.target.closest("[data-vcheckout]")) return openOrder(k.id, { tray: true, fromPage: true });
   if (e.target.closest("[data-vgo]")) return S.noSite ? openSitePicker() : mo ? openOrder(k.id, { join: mo, fromPage: true }) : openOrder(k.id, { fromPage: true });
 }
 
@@ -2901,7 +3122,7 @@ function pickSwitchDish(o, t) {
   openSheet(`${sheetHead("Choose your dish", esc(t.k.public_name) + (t.d ? " · collect at " + esc(t.si.name) : ""))}
     <form id="swForm" class="stack" novalidate>
       <div class="stack" style="gap:6px">${dishes.map((d, n) => `<label class="grow"><input type="radio" name="swd" value="${n}"${n ? "" : " checked"}> <span class="gtx"><b>${esc(d.name)}</b><small>${money(d.price)}</small></span></label>`).join("")}</div>
-      <p class="small" id="swSum"></p><div id="swPay" class="hidden"><div class="vbanner o" style="display:grid;gap:4px"><span>Send the difference by MoMo to</span><b class="num" style="font-size:18px">${esc(pm.number || "")}</b><span class="small">${esc([pm.network, pm.name].filter(Boolean).join(" · "))}</span></div>
+      <p class="small" id="swSum"></p><div id="swPay" class="hidden"><div class="vbanner o" style="display:grid;gap:4px"><span>Send the difference by mobile money to</span><b class="num" style="font-size:18px">${esc(pm.number || "")}</b><span class="small">${esc([pm.network, pm.name].filter(Boolean).join(" · "))}</span></div>
         <label for="swRef">Transaction ID of that payment</label><input id="swRef" autocomplete="off" placeholder="e.g. 5123456789"></div>
       <p class="err" id="swErr"></p><button class="btn wide" id="swGo">Move my order</button></form>`);
   const upd = () => { const d = dishes[+($("input[name=swd]:checked") || {}).value || 0], tot = totalFor(d, o.qty), diff = tot - paid;
@@ -2921,7 +3142,7 @@ function orderCard(o, all, next) {
   const step = progressOf(o), k = menuOf(o.kitchen_id), kids = all.filter(c => c.parent_id === o.id).sort((a, b) => a.created_at < b.created_at ? -1 : 1), liveKids = kids.filter(c => c.status !== "cancelled");
   const s4 = Math.min(5, step);
   return `<article class="order-card${next ? " next" : ""}"><div class="head"><span class="tile" style="background:${tint(menuIndex(o.kitchen_id))}">${art(dishKind(S.items.find(i => i.kitchen_id === o.kitchen_id && i.name === o.item_name) || o.item_name))}</span>
-      <div><strong>${esc(k.public_name || "")}</strong><p class="small" style="font-weight:600">${o.qty} × ${esc(o.item_name)}</p>${liveKids.map(c => `<p class="small" style="font-weight:600">+ ${c.qty} × ${esc(c.item_name)}</p>`).join("")}${liveKids.length ? `<p class="small muted">One bag</p>` : ""}</div>
+      <div><strong>${esc(k.public_name || "")}</strong>${groupDishes([o, ...liveKids]).map(g => `<p class="small" style="font-weight:600">${g.qty} × ${esc(g.name)}${g.extra ? ` <span class="muted" style="font-weight:500">· ${esc(g.extra)}</span>` : ""}</p>`).join("")}${liveKids.length ? `<p class="small muted">Same code, packed together</p>` : ""}</div>
       <div class="c"><span>Code</span><b class="num">${esc(o.code)}</b></div></div>
       ${["quote_requested", "quoted"].includes(o.status) ? "" : `<div class="steps4" aria-label="Progress ${s4} of 5">${[1, 2, 3, 4, 5].map(n => `<i class="${n <= s4 ? "on" : ""}"></i>`).join("")}</div><div class="steps4l">${STEP_LABELS.map((l, n) => `<span class="${n < s4 ? "on" : ""}">${l}</span>`).join("")}</div>`}
       <p class="status-text">${esc(statusLine(o))}</p>
@@ -2929,9 +3150,9 @@ function orderCard(o, all, next) {
       ${soloBanner(o)}
       ${canConfirm(o) ? `<div class="recv"><span>Got everything?</span><div class="row" style="gap:8px"><button class="btn" data-gotit="${esc(o.id)}">Got my food</button><button class="ghost" data-problem="${esc(o.id)}">Report a problem</button></div></div>` : ""}
       ${o.problem ? `<div class="vbanner w"><span><b>${o.problem_resolved ? "Problem sorted" : "Problem reported"}</b> · ${esc(o.problem)}${o.problem_resolved ? "" : ". We're on it; your cashback waits until it's sorted."}</span></div>` : ""}
-      ${o.status === "pending" && o.pay_issue ? `<div class="vbanner w" style="display:grid;gap:10px"><span><b>${o.pay_issue === "short" ? "Your payment was short" : "Payment not found"}</b></span>
+      ${o.status === "pending" && o.pay_issue ? `<div class="vbanner bad" style="display:grid;gap:10px"><span><b>${o.pay_issue === "short" ? "Your payment was short" : "We couldn't find your payment"}</b> · ${money(dueWithTray(o))} for code ${esc(o.code)}. Fix it before ${fmtTime(S.settings.cutoff)} so your lunch counts.</span>
         <div class="row" style="gap:8px;flex-wrap:wrap">${o.pay_issue === "short" ? `<button class="btn" data-fixpay="${esc(o.id)}" data-mode="rest">Pay the rest</button>` : `<button class="btn" data-fixpay="${esc(o.id)}" data-mode="ref">Fix the reference</button><button class="ghost" data-fixpay="${esc(o.id)}" data-mode="again">Pay again</button>`}</div></div>` : ""}
-      ${liveKids.filter(c => c.status === "pending").length ? `<p class="small muted">Added plate: payment being checked.</p>` : ""}
+      ${liveKids.filter(c => c.status === "pending" && !isTrayKid(c)).length ? `<p class="small muted">Added plate: payment being checked.</p>` : ""}
       ${savingLine(o)}
       ${canAddPlate(o) || shareablePool(o) ? `<div class="minebtns">${canAddPlate(o) ? `<button class="btn wide" data-addplate="${esc(o.id)}">${SV('<path d="M12 5v14M5 12h14"/>', 18)} Add a plate</button>` : ""}${shareablePool(o) ? `<button class="ghost sharebtn" data-share="${esc(o.site_id)},${esc(o.kitchen_id)}" aria-label="Share this pool">${SHARE}</button>` : ""}</div>` : ""}
       ${canCancel(o) || liveKids.some(canCancel) ? `<div class="row" style="justify-content:flex-start;gap:14px;flex-wrap:wrap">${canCancel(o) ? `<button class="linkbtn" data-cancel="${esc(o.id)}" style="color:var(--danger)">Cancel order</button>` : ""}${liveKids.filter(canCancel).map(c => `<button class="linkbtn" data-cancel="${esc(c.id)}" style="color:var(--danger)">Remove ${esc(c.item_name.split(" with ")[0])}</button>`).join("")}</div>` : ""}</article>`;
@@ -2953,12 +3174,12 @@ function pastRow(o) {
 // Payment we couldn't find, or short: fix the reference, or pay (again / the rest) and send the new reference
 function openFixPayment(o, mode) {
   if (!o) return;
-  const owed = mode === "rest" ? Math.max(0, Number(o.amount_due) - Number(o.amount_received || 0)) : Number(o.amount_due);
+  const owed = mode === "rest" ? Math.max(0, dueWithTray(o) - Number(o.amount_received || 0)) : dueWithTray(o);
   const pm = (S.payMethods || []).find(x => x.is_main) || (S.payMethods || [])[0] || { network: S.settings.momo_network, number: S.settings.momo_number, name: S.settings.momo_name };
   const me = meNow();
   openSheet(`${sheetHead(mode === "ref" ? "Fix the payment reference" : mode === "rest" ? "Pay the rest" : "Pay again", "Code " + o.code + " · " + (menuOf(o.kitchen_id).public_name || ""))}
-    ${mode === "ref" ? `<p class="small">We couldn't find <strong class="num">${esc(o.momo_ref || "")}</strong> on our MoMo statement. Copy the transaction ID from your MoMo payment message and enter it below.</p>`
-      : `<div class="vbanner o" style="display:grid;gap:4px"><span>Send <b class="num">${money(owed)}</b> by MoMo to</span><b class="num" style="font-size:18px">${esc(pm.number || "")}</b><span class="small">${esc([pm.network, pm.name].filter(Boolean).join(" · "))}</span></div>`}
+    ${mode === "ref" ? `<p class="small">We couldn't find <strong class="num">${esc(o.momo_ref || "")}</strong> on our mobile money statement. Copy the transaction ID from your mobile money payment message and enter it below.</p>`
+      : `<div class="vbanner o" style="display:grid;gap:4px"><span>Send <b class="num">${money(owed)}</b> by mobile money to</span><b class="num" style="font-size:18px">${esc(pm.number || "")}</b><span class="small">${esc([pm.network, pm.name].filter(Boolean).join(" · "))}</span></div>`}
     <form id="fxForm" class="stack" novalidate>
       <div><label for="fxRef">${mode === "ref" ? "Correct transaction ID" : "Transaction ID of this payment"}</label><input id="fxRef" inputmode="text" autocomplete="off" placeholder="e.g. 5123456789"></div>
       ${S.user ? "" : `<div><label for="fxPhone">Phone number on the order</label><input id="fxPhone" inputmode="tel" value="${esc(me.phone || "")}" placeholder="024 123 4567"></div>`}
@@ -2966,7 +3187,7 @@ function openFixPayment(o, mode) {
       <p class="err" id="fxErr"></p><button class="btn wide">Send for checking</button></form>`);
   $("#fxForm").addEventListener("submit", async ev => {
     ev.preventDefault(); const ref = $("#fxRef").value.trim(), ph = (S.user ? me.phone : $("#fxPhone").value) || "";
-    if (ref.replace(/\s/g, "").length < 6) return ($("#fxErr").textContent = "Enter the transaction ID from your MoMo payment message.");
+    if (ref.replace(/\s/g, "").length < 6) return ($("#fxErr").textContent = "Enter the transaction ID from your mobile money payment message.");
     try { await api.fixPayment(o.id, ph, ref); closeSheet(); toast("Thanks. We'll check the payment again."); refreshMine(); }
     catch (e) { $("#fxErr").textContent = cleanErr(e); }
   });
@@ -3021,7 +3242,7 @@ async function renderWallet() {
     <p class="gtitle">Settings</p>
     <div class="glist">
       <button class="grow" data-acc="notif"><span class="gic">${ICON.bell}</span><span class="gtx">Notifications<small>${esc(alertsSummary())}</small></span><span class="ch">›</span></button>
-      <button class="grow" data-acc="payments"><span class="gic">${ICON.phone}</span><span class="gtx">Payments<small>${esc(me.phone ? "MoMo " + fmtPhone(me.phone) + (me.network ? " · " + me.network : "") : "Add the number you pay with")}</small></span><span class="ch">›</span></button>
+      <button class="grow" data-acc="payments"><span class="gic">${ICON.phone}</span><span class="gtx">Payment methods<small>${esc((d => d ? (d.nick || d.network) + " " + maskNum(d.number) + " · default" : "Add the mobile money number you pay with")(defaultPM()))}</small></span><span class="ch">›</span></button>
       <button class="grow" data-acc="building"><span class="gic">${ICON.pin.replace('width="13" height="13"', 'width="18" height="18"')}</span><span class="gtx">My buildings<small>${esc(recent.slice(0, 2).join(", ") || site.name || "Choose your building")}</small></span><span class="ch">›</span></button>
       <button class="grow" data-acc="theme"><span class="gic">${ICON.dark}</span><span class="gtx">Appearance<small>${esc(themeLabel())}</small></span><span class="ch">›</span></button>
       ${isStandalone() ? "" : `<button class="grow" data-install="#order"><span class="gic">${ICON.download}</span><span class="gtx">Get the app<small>One tap from your home screen${pushReady() ? ", with alerts" : ""}</small></span><span class="ch">›</span></button>`}
@@ -3048,21 +3269,34 @@ async function accountClick(e) {
   if (t === "signin") return openAccount();
   if (t === "signout") { await api.signOut(); S.user = null; await refreshUser(); refreshMine(); renderWallet(); toast("Signed out"); }
 }
-// Payments: the MoMo number you pay with and its network; built to hold more methods later
-function openPayments() {
-  const me = meNow();
-  openSheet(`${sheetHead("Payments", "How you pay for lunch.")}
-    <form id="payForm" class="stack" novalidate>
-      <p class="gtitle" style="margin:0">MoMo</p>
-      <div class="grid2"><div><label for="payPhone">Number you pay with</label><input id="payPhone" inputmode="tel" value="${esc(fmtPhone(me.phone || ""))}" placeholder="024 123 4567"></div>
-        <div><label for="payNet">Network</label><select id="payNet">${["", ...NETWORKS].map(n => `<option value="${esc(n)}"${(me.network || "") === n ? " selected" : ""}>${n || "Choose"}</option>`).join("")}</select></div></div>
-      <p class="small muted">We fill this in at checkout and use it for MoMo refunds. Card payments and a second number are coming later.</p>
-      <p class="err" id="payErr"></p><button class="btn wide">Save</button></form>`);
-  $("#payForm").addEventListener("submit", async ev => { ev.preventDefault(); const ph = $("#payPhone").value.replace(/\D/g, ""), net = $("#payNet").value;
-    if (ph && !/^0\d{9}$/.test(ph)) return ($("#payErr").textContent = "Enter a 10-digit MoMo number starting with 0, like 024 123 4567.");
-    local.set("cp_me", { ...meNow(), phone: ph, network: net });
-    if (S.user) { try { await api.saveProfile({ phone: ph || null }); } catch (e) {} }
-    closeSheet(); toast("Saved"); renderWallet(); });
+// Payments: the mobile money number you pay with and its network; built to hold more methods later
+// Payment methods: wallet first, then up to 3 mobile money numbers with one default
+function openPayments(editId) {
+  const L = payMethods(), ed = editId === "new" ? { id: "pm" + Date.now(), number: "", network: "MTN", nick: "" } : L.find(m => m.id === editId);
+  openSheet(`${sheetHead("Payment methods", "Your default is picked at checkout. You can choose another there.")}
+    ${S.user ? `<div class="pmrow static"><span class="logo net gen">${ICON.wallet || ICON.phone}</span><span><b>ChopPool wallet</b> <span class="num muted">${money(S.balance || 0)}</span><small class="muted" style="display:block">Always used first</small></span></div>` : ""}
+    <div class="stack" style="gap:8px" id="pmList">${L.map(m => `<div class="pmrow">${netBadge(m.network)}<span><b>${esc(m.nick || m.network)}</b> <span class="num muted">${esc(maskNum(m.number))}</span>${m.def ? ` <span class="chip ok">Default</span>` : ""}</span>
+      <span class="pmact">${m.def ? "" : `<button type="button" class="linkbtn small" data-pmdef="${esc(m.id)}">Make default</button>`}<button type="button" class="linkbtn small" data-pmedit="${esc(m.id)}">Edit</button></span></div>`).join("") || `<p class="small muted">No numbers saved yet.</p>`}</div>
+    ${ed ? `<form id="pmForm" class="stack card" novalidate style="box-shadow:none;background:var(--surface-2)"><div class="grid2"><div><label for="pmN">Mobile money number</label><input id="pmN" inputmode="tel" value="${esc(fmtPhone(ed.number))}" placeholder="024 123 4567"></div>
+        <div><label for="pmNet">Network</label><select id="pmNet">${NETWORKS.map(n => `<option${ed.network === n ? " selected" : ""}>${n}</option>`).join("")}</select></div></div>
+        <div><label for="pmNick">Nickname <span class="muted" style="font-weight:500">(optional)</span></label><input id="pmNick" maxlength="20" value="${esc(ed.nick || "")}" placeholder="Work, Personal"></div>
+        <p class="err" id="pmErr"></p><div class="row" style="gap:8px;justify-content:flex-start"><button class="btn">Save</button>${editId !== "new" ? `<button type="button" class="ghost" data-pmdel="${esc(ed.id)}">Remove</button>` : ""}<button type="button" class="ghost" data-pmcancel>Cancel</button></div></form>`
+      : L.length < 3 ? `<button type="button" class="ghost wide" data-pmedit="new">+ Add a mobile money number</button>` : `<p class="small muted">You can save up to 3 numbers.</p>`}
+    <p class="small muted">Refunds go back to the number an order was paid from. Card payments will appear here when we add them.</p>`);
+  const sheet = $("#sheet");
+  sheet.onclick = e => {
+    const b = e.target.closest("[data-pmdef],[data-pmedit],[data-pmdel],[data-pmcancel]"); if (!b) return;
+    if (b.dataset.pmdef) { L.forEach(m => { m.def = m.id === b.dataset.pmdef; }); savePayMethods(L); renderWallet(); return openPayments(); }
+    if (b.dataset.pmedit) return openPayments(b.dataset.pmedit);
+    if (b.dataset.pmdel) { const n = L.findIndex(m => m.id === b.dataset.pmdel); if (n >= 0) L.splice(n, 1); savePayMethods(L); renderWallet(); toast("Removed"); return openPayments(); }
+    if (b.hasAttribute("data-pmcancel")) return openPayments();
+  };
+  $("#pmForm")?.addEventListener("submit", ev => { ev.preventDefault(); const num = $("#pmN").value.replace(/\D/g, "");
+    if (!/^0\d{9}$/.test(num)) return ($("#pmErr").textContent = "Enter a 10-digit mobile money number starting with 0, like 024 123 4567.");
+    if (L.some(m => m.number === num && m.id !== ed.id)) return ($("#pmErr").textContent = "That number is already saved.");
+    const rec = { ...ed, number: num, network: $("#pmNet").value, nick: $("#pmNick").value.trim() };
+    const n = L.findIndex(m => m.id === ed.id); if (n >= 0) L[n] = rec; else { rec.def = !L.length; L.push(rec); }
+    savePayMethods(L); renderWallet(); toast("Saved"); openPayments(); });
 }
 /* ---------- Privacy notice and terms of use (plain language; have a lawyer check before launch) ---------- */
 const LEGAL_UPDATED = "8 November 2026";
@@ -3071,7 +3305,7 @@ function legalHtml(which) {
   const P = `<h3>What we collect</h3>
     <ul><li><strong>Your name and phone number</strong>, so the rider can hand over the right meal and we can reach you about your order.</li>
       <li><strong>Your building and drop point</strong>, to group orders into pools.</li>
-      <li><strong>Your MoMo transaction ID</strong>, to match your payment. We never ask for your MoMo PIN.</li>
+      <li><strong>Your mobile money transaction ID</strong>, to match your payment. We never ask for your mobile money PIN.</li>
       <li><strong>Your email</strong>, only if you create an account, to sign you in and keep your wallet.</li>
       <li><strong>Your location</strong>, only when you tap "Use my location" (customers) or while a rider's page is open, to find nearby buildings and tell customers lunch is close. We don't track you in the background.</li>
       <li><strong>Ratings and photos</strong> you choose to add.</li></ul>
@@ -3090,11 +3324,11 @@ function legalHtml(which) {
   const T = `<h3>How ChopPool works</h3>
     <p>ChopPool groups lunch orders from the same building so one delivery trip is shared. Vendors cook and pack your food; riders or your vendor's runner deliver it to your building's drop point.</p>
     <h3>Paying</h3>
-    <ul><li>You pay for your meal, the full delivery trip and the service fee when you order, by MoMo to the number shown.</li>
+    <ul><li>You pay for your meal, the full delivery trip and the service fee when you order, by mobile money to the number shown.</li>
       <li>Your order is confirmed once we find your payment. If we can't find it, or it's short, we'll tell you how to fix it before orders close.</li>
       <li>Once you've got your lunch, your fair share of the trip is worked out. What you paid above it comes back to your ChopPool wallet as cashback. Wallet credit is used first on your next order and can't be withdrawn as cash, except as a refund we agree.</li></ul>
     <h3>Cancellations and refunds</h3>
-    <ul><li>You can cancel before orders close. Paid orders go back to your wallet, or to MoMo if you ask.</li>
+    <ul><li>You can cancel before orders close. Paid orders go back to your wallet, or to mobile money if you ask.</li>
       <li>If a vendor doesn't confirm, can't cook, or your pool is cancelled, you get your money back in full.</li>
       <li>Special requests are priced by the vendor first. You then have ${esc(s.quote_pay_min || 15)} minutes to pay, or the request is released and nothing is charged.</li>
       <li>If something is wrong with your meal, tap <strong>Report a problem</strong> on the order the same day. We'll look into it and credit you where it's fair.</li></ul>
@@ -3132,7 +3366,7 @@ function openProfile(focusPhone) {
       <div class="row" style="gap:16px;justify-content:center"><button type="button" class="linkbtn" id="pfPick">${pic ? "Change photo" : "Add a photo"}</button><button type="button" class="linkbtn${pic ? "" : " hidden"}" id="pfRm" style="color:var(--muted)">Use initials</button></div></div>
     <form id="pfForm" class="stack" novalidate>
       <div><label for="pfName">Your name</label><input id="pfName" autocomplete="name" maxlength="60" value="${esc(name)}" placeholder="e.g. Ama Mensah"></div>
-      <div><label for="pfPhone">MoMo number</label><input id="pfPhone" inputmode="tel" value="${esc(me.phone || "")}" placeholder="024 123 4567"></div>
+      <div><label for="pfPhone">Phone number <span class="muted" style="font-weight:500">(the rider calls this)</span></label><input id="pfPhone" inputmode="tel" value="${esc(me.phone || "")}" placeholder="024 123 4567"></div>
       <label class="switch"><span>Show my first name on ratings<small class="muted" style="display:block;font-weight:400">Off: your ratings show as "Someone". Riders still see your name to hand over your meal.</small></span><input type="checkbox" id="pfShow"${local.get("cp_hide_name") ? "" : " checked"}></label>
       <p class="small muted">Your photo stays on this phone.</p><p class="err" id="pfErr"></p><button class="btn wide">Save</button></form>`);
   const redraw = () => { $("#pfAv").innerHTML = avatarHtml($("#pfName").value, true, pic); $("#pfRm").classList.toggle("hidden", !pic); $("#pfPick").textContent = pic ? "Change photo" : "Add a photo"; };
@@ -3147,7 +3381,7 @@ function openProfile(focusPhone) {
     ev.preventDefault();
     const nm = $("#pfName").value.trim().replace(/\s+/g, " "), ph = $("#pfPhone").value.replace(/\D/g, "");
     if (nm.length < 2) return ($("#pfErr").textContent = "Enter your name.");
-    if (ph && !/^0\d{9}$/.test(ph)) return ($("#pfErr").textContent = "Enter a 10-digit MoMo number starting with 0, like 024 123 4567.");
+    if (ph && !/^0\d{9}$/.test(ph)) return ($("#pfErr").textContent = "Enter a 10-digit mobile money number starting with 0, like 024 123 4567.");
     try {
       if (S.user) { if (nm !== S.user.name) S.user = await api.updateName(nm); try { await api.saveProfile({ name: nm, phone: ph || null }); } catch (e2) {} }
       local.set("cp_me", { ...meNow(), name: nm, phone: ph || meNow().phone || "" });
@@ -3175,16 +3409,64 @@ function openAppearance() {
   openSheet(`${sheetHead("Appearance", "")}<div class="glist">${[["auto", "Match my phone", "auto"], ["light", "Light", "light"], ["dark", "Dark", "dark"]].map(([v, l, ic]) => `<button class="grow" data-th="${v}"><span class="gic">${ICON[ic]}</span><span class="gtx">${l}</span>${v === cur ? `<span style="color:var(--accent)">${SV('<path d="m5 12.5 4.5 4.5L19 7.5"/>', 20)}</span>` : ""}</button>`).join("")}</div>`);
   $("#sheet").onclick = e => { const b = e.target.closest("[data-th]"); if (!b) return; $("#sheet").onclick = null; local.set("cp_theme", b.dataset.th); applyTheme(b.dataset.th); syncThemeBtns(); closeSheet(); renderWallet(); };
 }
+/* ---------- First time: three cards on how ChopPool works (once per phone; replay from Account) ---------- */
+const INTRO_ART = [
+  `<svg viewBox="0 0 200 140" aria-hidden="true"><rect x="62" y="18" width="76" height="104" rx="10" fill="var(--surface-2)" stroke="var(--line)"/>${[0, 1, 2, 3].map(r => [0, 1, 2].map(c => `<rect x="${74 + c * 20}" y="${30 + r * 20}" width="12" height="12" rx="3" fill="var(--accent-soft)"/>`).join("")).join("")}
+    ${[30, 170].map(x => `<circle cx="${x}" cy="78" r="9" fill="var(--accent)"/><rect x="${x - 14}" y="91" width="28" height="26" rx="13" fill="var(--accent)"/>`).join("")}<rect x="86" y="112" width="28" height="22" rx="5" fill="var(--accent-2)"/><path d="M93 112 v-5 a7 7 0 0 1 14 0 v5" stroke="var(--accent-2)" stroke-width="3" fill="none"/>
+    <path d="M48 104 H62 M138 104 H152" stroke="var(--accent)" stroke-width="3" stroke-dasharray="4 5" stroke-linecap="round"/></svg>`,
+  `<svg viewBox="0 0 200 140" aria-hidden="true"><rect x="40" y="40" width="120" height="76" rx="14" fill="var(--surface-2)" stroke="var(--line)"/><rect x="40" y="56" width="120" height="14" fill="var(--accent-soft)"/><circle cx="138" cy="96" r="9" fill="var(--accent)"/>
+    <circle cx="70" cy="26" r="14" fill="#F5B83D"/><text x="70" y="31" text-anchor="middle" font-size="14" font-weight="800" fill="#5A3A00">₵</text><path d="M86 26 C110 20 128 26 134 40" stroke="var(--accent)" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M128 36 l6 5 l2 -8" stroke="var(--accent)" stroke-width="3" fill="none" stroke-linecap="round"/></svg>`,
+  `<svg viewBox="0 0 200 140" aria-hidden="true"><rect x="36" y="44" width="72" height="62" rx="10" fill="var(--accent)"/><rect x="48" y="34" width="48" height="16" rx="6" fill="var(--accent-2)"/><rect x="118" y="38" width="56" height="34" rx="9" fill="var(--surface-2)" stroke="var(--line)"/>
+    <text x="146" y="61" text-anchor="middle" font-size="15" font-weight="800" fill="var(--ink)">K-27</text><circle cx="146" cy="100" r="16" fill="var(--ok)"/><path d="M139 100 l5 5 l9 -10" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`];
+function maybeIntro() {
+  const h = location.hash.slice(1);
+  if (h && h !== "order" && !h.startsWith("join=")) return introFor(h);
+  if (local.get("cp_intro_done") || S.recovery || (local.get("cp_orders") || []).length) return;
+  openIntro();
+}
+function openIntro() {
+  const s = S.settings, cards = [
+    ["Order together", "Pick lunch from vendors near you. Everyone in your building shares one delivery trip, so it costs less."],
+    ["Pay less", "You pay the full delivery when you order. Once you've got your lunch, what the pool saved comes back to your ChopPool wallet."],
+    ["Collect with your code", `Order by ${fmtTime(s.cutoff)} and lunch arrives around ${fmtTime(s.delivery_time)}. Show your code, like K-27, then tap Got my food.`]];
+  const el = document.createElement("div"); el.className = "intro"; el.setAttribute("role", "dialog"); el.setAttribute("aria-modal", "true"); el.setAttribute("aria-label", "How ChopPool works");
+  el.innerHTML = `<div class="intro-card"><button class="linkbtn intro-skip" data-iskip>Skip</button>
+    <div class="intro-track">${cards.map(([t, b], n) => `<section class="intro-slide"><div class="intro-art">${INTRO_ART[n]}</div><h2>${esc(t)}</h2><p>${esc(b)}</p></section>`).join("")}</div>
+    <div class="intro-foot"><div class="intro-dots">${cards.map((_, n) => `<i${n === 0 ? ' class="on"' : ""}></i>`).join("")}</div><button class="btn" data-inext>Next</button></div></div>`;
+  document.body.appendChild(el); requestAnimationFrame(() => el.classList.add("on"));
+  const track = el.querySelector(".intro-track"), at_ = () => Math.round(track.scrollLeft / track.clientWidth);
+  const sync = () => { const n = at_(); el.querySelectorAll(".intro-dots i").forEach((d, i) => d.classList.toggle("on", i === n)); el.querySelector("[data-inext]").textContent = n === cards.length - 1 ? (S.noSite ? "Choose your building" : "Start ordering") : "Next"; };
+  track.addEventListener("scroll", () => requestAnimationFrame(sync), { passive: true });
+  const finish = () => { local.set("cp_intro_done", true); el.classList.remove("on"); setTimeout(() => el.remove(), 300); };
+  el.addEventListener("click", e => {
+    if (e.target.closest("[data-iskip]")) return finish();
+    if (e.target.closest("[data-inext]")) { const n = at_(); if (n < cards.length - 1) track.scrollTo({ left: (n + 1) * track.clientWidth, behavior: "smooth" }); else { finish(); if (S.noSite) setTimeout(() => openSitePicker(), 320); } }
+  });
+}
+// Seller, rider and drop-point links: one card the first time each is opened
+function introFor(h) {
+  const kind = h.startsWith("kitchen-") ? "kitchen" : h.startsWith("rider-") && h !== "rider-signup" ? "rider" : h.startsWith("host-") ? "host" : null; if (!kind || local.get("cp_intro_" + kind)) return;
+  const s = S.settings, txt = {
+    kitchen: ["Your ChopPool page", [`When customers ask, tap <b>Confirm</b> (by ${fmtTime(confirmBy())} for the day's orders).`, "Price any special requests before the time shown.", `At ${fmtTime(s.cutoff)} you get the final count. Cook, pack and write each code on its pack.`, "Tap <b>Food is ready</b>. The line at the top always says what to do next."]],
+    rider: ["Your rider page", ["Each pickup shows the vendor, the building and how many meals.", "Tap <b>Picked up</b> at the vendor, then <b>Delivered</b> at the building.", "Hand each meal over against the customer's code, like K-27."]],
+    host: ["Your drop-point page", ["When the bag arrives, keep it safe.", "Hand each meal over when the customer shows their code, like K-27.", "Type the code here so they know it's been collected."]] }[kind];
+  setTimeout(() => {
+    openSheet(`${sheetHead(txt[0], "How this page works")}<ol class="stack small intro-list">${txt[1].map(x => `<li>${x}</li>`).join("")}</ol><button class="btn wide" data-close>Got it</button>`);
+    local.set("cp_intro_" + kind, true);
+  }, 400);
+}
 function openHelp() {
   const s = S.settings;
   openSheet(`${sheetHead("How ChopPool works", "")}
+    <button class="ghost wide" id="replayIntro">See the quick tour again</button>
     <div class="stack small" style="gap:12px">
       <p><strong>Pools.</strong> People in the same building order from the same vendor, and one rider brings everything. The delivery cost is shared, so it drops as more people join.</p>
       <p><strong>Paying.</strong> You pay the full trip at checkout. Once you've got your lunch, everyone's share is worked out and the rest comes back to your wallet as cashback.</p>
       <p><strong>Special requests.</strong> The vendor prices it first. You then have ${s.quote_pay_min || 15} minutes to pay, or it's released and nothing is charged.</p>
-      <p><strong>If the vendor doesn't confirm.</strong> Your money comes back: to your wallet if you have an account, or ChopPool refunds your MoMo.</p>
+      <p><strong>If the vendor doesn't confirm.</strong> Your money comes back: to your wallet if you have an account, or ChopPool refunds your mobile money.</p>
       <p><strong>Collecting.</strong> Lunch arrives around ${fmtTime(s.delivery_time)}. Show your code at the drop point. Then tap "Got my food", or "Report a problem" if something's wrong.</p>
       <p><strong>Cancelling.</strong> You can cancel from Orders until ${fmtTime(s.cutoff)}.</p></div>`);
+  $("#replayIntro")?.addEventListener("click", () => { closeSheet(); setTimeout(openIntro, 300); });
 }
 function openNotifSettings() {
   const draw = () => {
@@ -3287,28 +3569,29 @@ const vendorWord = t => String(t || "").replace(/\bseller\b/g, "vendor").replace
 function statusLine(o) { return vendorWord(statusLine0(o)); }
 function statusLine0(o) {
   const site = siteOf(o.site_id), st = o.pool_status, seller = menuOf(o.kitchen_id).public_name || "The vendor";
-  if (o.status === "cancelled" && /^You cancelled/.test(o.cancel_reason || "")) return o.cancel_reason + "." + (o.refund_needed ? " ChopPool will refund your MoMo payment." : o.has_account && Number(o.max_fee) ? " Your money is back in your wallet." : "");
+  if (o.status === "cancelled" && /^You cancelled/.test(o.cancel_reason || "")) return o.cancel_reason + "." + (o.refund_needed ? " ChopPool will refund your mobile money payment." : o.has_account && Number(o.max_fee) ? " Your money is back in your wallet." : "");
   if (o.status === "cancelled" && /^The seller can't/.test(o.cancel_reason || "")) return o.cancel_reason + ". Nothing was charged. You can still order the standard meal.";
   if (o.status === "cancelled" && /did not confirm/.test(o.cancel_reason || "")) {
     const back = Number(o.refund_due || 0) + Number(o.wallet_used || 0);
     if (o.has_account && !o.refund_needed && back > 0) return "The vendor didn't confirm in time. " + money(back) + " is back in your wallet, ready for your next order.";
-    if (o.refund_needed && Number(o.refund_due) > 0) return "The vendor didn't confirm in time. ChopPool will refund " + money(o.refund_due) + " to your MoMo, or create an account to get it in your wallet straight away.";
-    if (o.refund_needed) return "The vendor didn't confirm in time. ChopPool will check your MoMo payment and refund it.";
+    if (o.refund_needed && Number(o.refund_due) > 0) return "The vendor didn't confirm in time. ChopPool will refund " + money(o.refund_due) + " to your mobile money, or create an account to get it in your wallet straight away.";
+    if (o.refund_needed) return "The vendor didn't confirm in time. ChopPool will check your mobile money payment and refund it.";
     return "The vendor didn't confirm in time. Nothing was charged.";
   }
   if (o.status === "cancelled" && o.cancel_reason === "Payment not received") {
-    if (Number(o.refund_due) > 0) return "We didn't receive the full payment before orders closed, so this order was cancelled. " + (o.has_account && !o.refund_needed ? money(o.refund_due) + " is back in your wallet." : "ChopPool will refund the " + money(o.refund_due) + " you sent to your MoMo.");
+    if (Number(o.refund_due) > 0) return "We didn't receive the full payment before orders closed, so this order was cancelled. " + (o.has_account && !o.refund_needed ? money(o.refund_due) + " is back in your wallet." : "ChopPool will refund the " + money(o.refund_due) + " you sent to your mobile money.");
     return "We didn't receive your payment before orders closed, so this order was cancelled.";
   }
-  if (o.status === "pending" && o.pay_issue === "short") return "We received " + money(o.amount_received || 0) + ", so " + money(Math.max(0, Number(o.amount_due) - Number(o.amount_received || 0))) + " is still owed. Pay the rest before " + fmtTime(S.settings.cutoff) + " so your lunch counts.";
-  if (o.status === "pending" && o.pay_issue) return "We couldn't find a MoMo payment with reference " + (o.momo_ref || "") + ". Fix the reference or pay again before " + fmtTime(S.settings.cutoff) + ".";
-  if (o.status === "cancelled") return (o.cancel_reason || "Cancelled") + ". " + (S.user ? "Any wallet payment is back in your wallet; MoMo payments are refunded by ChopPool." : "ChopPool will refund your MoMo payment.");
+  if (o.status === "pending" && o.pay_issue === "short") return "We received " + money(o.amount_received || 0) + ", so " + money(Math.max(0, dueWithTray(o) - Number(o.amount_received || 0))) + " is still owed. Pay the rest before " + fmtTime(S.settings.cutoff) + " so your lunch counts.";
+  if (o.status === "pending" && o.pay_issue) return "We couldn't find a mobile money payment with reference " + (o.momo_ref || "") + ". Fix the reference or pay again before " + fmtTime(S.settings.cutoff) + ".";
+  if (o.status === "cancelled") return (o.cancel_reason || "Cancelled") + ". " + (S.user ? "Any wallet payment is back in your wallet; mobile money payments are refunded by ChopPool." : "ChopPool will refund your mobile money payment.");
   if (o.received_at) return "Received. Enjoy your lunch.";
   if (o.status === "collected") return "Handed over. Tap Got my food to confirm.";
-  if (o.status === "cancelled" && o.cancel_reason === "Moved to another pool") return "Moved to another pool." + (o.refund_needed && Number(o.refund_due) > 0 ? " ChopPool will refund the difference, " + money(o.refund_due) + ", to your MoMo." : "");
+  if (o.status === "cancelled" && o.cancel_reason === "Moved to another pool") return "Moved to another pool." + (o.refund_needed && Number(o.refund_due) > 0 ? " ChopPool will refund the difference, " + money(o.refund_due) + ", to your mobile money." : "");
   if (o.status === "quote_requested") return "Waiting for " + seller + " to price your special request. You'll then have " + (S.settings.quote_pay_min || 15) + " minutes to pay.";
   if (o.status === "quoted") return seller + " priced your request at " + money(o.quote_price) + " a meal. Check the total and pay to confirm.";
-  if (st === "waiting") return "Waiting for " + seller + " to confirm. If they don't " + confirmText(o.order_date) + ", you get your money back.";
+  if (st === "waiting") { const w = o.wait_until && new Date(o.wait_until), by = w && isFinite(w) ? "by " + w.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "UTC" }) + (w.toISOString().slice(0, 10) > today() ? " " + (dayLabel(w.toISOString().slice(0, 10)) === "tomorrow" ? "tomorrow" : fmtDate(w.toISOString().slice(0, 10))) : "") : confirmText(o.order_date);
+    return "Waiting for " + seller + " to confirm " + by + ". If they don't, you get your money back."; }
   if (o.status === "pending" && st === "collecting") return "Payment being checked.";
   if (st === "collecting") return "Confirmed. Pool " + o.pool_seq + " closes at " + fmtTime(S.settings.cutoff) + ".";
   if (st === "accepted") return "The kitchen is cooking.";
@@ -3380,20 +3663,24 @@ function openCancel(id) {
   openSheet(`${sheetHead("Cancel order " + esc(o.code) + "?", "You can cancel until " + fmtTime(S.settings.cutoff) + ". After that the kitchen is cooking.")}
     <form id="cancelForm" class="stack" novalidate><p class="group-title">Why are you cancelling?</p>
       <div class="stack" style="gap:6px">${R.map((r, n) => `<label class="choice"><input type="radio" name="why" value="${esc(r)}"${n === 0 ? " checked" : ""}><span>${esc(r)}</span></label>`).join("")}</div>
+      <div id="whyOtherBox" class="hidden"><textarea id="whyOther" aria-label="Tell us why" rows="2" maxlength="200" placeholder="Tell us why (helps us improve)"></textarea></div>
       ${special ? `<p class="note">You haven't paid for this request, so nothing is charged.</p>`
         : paidMomo && o.has_account ? `<p class="group-title">Your refund (${money(o.amount_due)})</p><div class="stack" style="gap:6px">
           <label class="choice"><input type="radio" name="to" value="wallet" checked><span>To my ChopPool wallet, straight away</span></label>
-          <label class="choice"><input type="radio" name="to" value="momo"><span>Back to my MoMo (ChopPool sends it, usually the same day)</span></label></div>`
-        : paidMomo ? `<p class="note">ChopPool will refund ${money(o.amount_due)} to your MoMo, usually the same day.</p>`
-        : o.status === "pending" && Number(o.amount_due) > 0 ? `<p class="note">Your MoMo payment is still being checked. Once it's confirmed, ChopPool refunds it to your MoMo.</p>`
+          <label class="choice"><input type="radio" name="to" value="momo"><span>Back to my mobile money (ChopPool sends it, usually the same day)</span></label></div>`
+        : paidMomo ? `<p class="note">ChopPool will refund ${money(o.amount_due)} to your mobile money, usually the same day.</p>`
+        : o.status === "pending" && Number(o.amount_due) > 0 ? `<p class="note">Your mobile money payment is still being checked. Once it's confirmed, ChopPool refunds it to your mobile money.</p>`
         : `<p class="note">Your wallet payment goes straight back to your wallet.</p>`}
       <p class="err" id="cancelErr"></p>
       <div class="row" style="justify-content:flex-start;gap:8px"><button class="btn" style="background:var(--danger);box-shadow:none">Cancel order</button><button class="ghost" type="button" data-close>Keep it</button></div></form>`);
+  $("#cancelForm").addEventListener("change", e => { if (e.target.name === "why") { const o2 = e.target.value === "Other"; $("#whyOtherBox").classList.toggle("hidden", !o2); if (o2) $("#whyOther").focus(); } });
   $("#cancelForm").addEventListener("submit", async e => {
-    e.preventDefault(); const f = e.target, why = f.querySelector("[name=why]:checked")?.value, to = f.querySelector("[name=to]:checked")?.value || "wallet";
+    e.preventDefault(); const f = e.target, to = f.querySelector("[name=to]:checked")?.value || "wallet";
+    let why = f.querySelector("[name=why]:checked")?.value;
+    if (why === "Other") { const t = $("#whyOther").value.trim(); if (t.length < 3) { $("#cancelErr").textContent = "Tell us briefly why you're cancelling."; $("#whyOther").focus(); return; } why = "Other: " + t.slice(0, 200); }
     try {
       const r = await api.cancelOrder(id, why, to); closeSheet();
-      toast(r.refund === "nothing" ? "Request cancelled. Nothing was charged." : r.refund === "momo" ? "Cancelled. ChopPool will refund " + money(r.momo) + " to your MoMo." : r.wallet_credit ? "Cancelled. " + money(r.wallet_credit) + " is back in your wallet." : "Order cancelled.");
+      toast(r.refund === "nothing" ? "Request cancelled. Nothing was charged." : r.refund === "momo" ? "Cancelled. ChopPool will refund " + money(r.momo) + " to your mobile money." : r.wallet_credit ? "Cancelled. " + money(r.wallet_credit) + " is back in your wallet." : "Order cancelled.");
       await refreshMine(); refreshBoard(); if (S.user) renderWallet();
     } catch (err) { $("#cancelErr").textContent = cleanErr(err); }
   });
@@ -3465,24 +3752,28 @@ function openOrder(menuId, opt = {}) {
   const dishes = S.items.filter(i => i.kitchen_id === k.id), i0 = menuIndex(k.id);
   const me = local.get("cp_me") || {};
   let qty = preset ? Math.min(5, preset.qty || 1) : 1, item = (preset && dishes.find(d => d.id === preset.item_id)) || dishes[0], special = false;
+  const trayMode = !!opt.tray && !join, tray = trayMode ? trayFor(k.id) : null;
+  if (trayMode && !tray.lines.length) return toast("Your order is empty. Tap + on a dish to add it.");
+  let payFrom = defaultPM();
   let extras = new Set(preset ? (preset.addons || []).filter(n => (item.addons || []).some(a => a.name === n)) : []);
   const specialOpen = !join && !(S.date === today() && new Date() >= at(S.date, s.special_cutoff));
   const known = me.name && me.phone;
   const waitingHere = S.board.pools.some(p => p.site_id === site.id && p.kitchen_id === k.id && p.status === "waiting" && p.meals > 0);
   openSheet(`
-    ${join ? sheetHead("Add another plate", esc(k.public_name) + " · code " + esc(join.code) + ", same bag") : sheetHead(esc(k.public_name), esc(site.name) + " · " + fmtDate(S.date) + ", " + fmtTime(s.delivery_time))}
+    ${join ? sheetHead("Add to my order", esc(k.public_name) + " · same code " + esc(join.code) + ", packed together") : sheetHead(esc(k.public_name), esc(site.name) + " · " + fmtDate(S.date) + ", " + fmtTime(s.delivery_time))}
     ${join || opt.fromPage ? "" : `<div id="revStrip" class="revstrip"></div>`}
     ${join ? `<p class="note">Your plate joins code <strong>${esc(join.code)}</strong>. You pay only for the plate and its service fee: delivery is already paid, and the final split counts every meal under your code.</p>` : ""}
     ${!join && k.added_by_customer ? `<p class="note">A local vendor added by a customer. ChopPool doesn't inspect their kitchen.</p>` : ""}
     ${join || st.open ? "" : waitingHere ? `<p class="note"><strong>${esc(k.public_name)} hasn't confirmed yet.</strong> Join anyway: if they don't confirm ${confirmText(S.date)}, everyone gets their money back.</p>`
       : `<p class="note">You're first today. We'll ask ${esc(k.public_name)} to confirm ${confirmText(S.date)}. Others here can join while you wait. If they don't confirm, you get your money back.</p>`}
     <form id="orderForm" class="stack" novalidate>
-      <div class="group"><p class="group-title">Choose your meal</p><div class="dishes">
+      ${trayMode ? `<div class="group"><div class="top"><p class="group-title">Your order</p><button type="button" class="linkbtn" id="moreDishes">+ Add more dishes</button></div><div class="tlines" id="tLines"></div></div>` : ""}
+      <div class="group${trayMode ? " hidden" : ""}"><p class="group-title">Choose your meal</p><div class="dishes">
         ${dishes.map((d, n) => `<label class="dish"><input type="radio" name="dish" value="${esc(d.id)}"${d === item ? " checked" : ""}><span class="tile" style="background:${tint(i0)}">${plate(d, k.id)}</span><span>${esc(d.name)}</span><span class="price num">${money(d.price)}</span></label>`).join("")}
       </div></div>
-      <div class="group" id="extrasGroup"></div>
-      <div class="row"><p class="group-title">How many</p><div class="qty"><button type="button" id="minus" aria-label="One less">−</button><output id="q">${qty}</output><button type="button" id="plus" aria-label="One more">+</button></div></div>
-      <div class="group"><button type="button" class="linkbtn" id="noteToggle" style="justify-self:start">+ Add a note for the kitchen</button>
+      <div class="row${trayMode ? " hidden" : ""}"><p class="group-title">How many</p><div class="qty"><button type="button" id="minus" aria-label="One less">−</button><output id="q">${qty}</output><button type="button" id="plus" aria-label="One more">+</button></div></div>
+      <div class="group${trayMode ? " hidden" : ""}" id="extrasGroup"></div>
+      <div class="group${trayMode ? " hidden" : ""}"><button type="button" class="linkbtn" id="noteToggle" style="justify-self:start">+ Add a note for the kitchen</button>
         <div id="noteBox" class="hidden"><input id="fNote" maxlength="140" placeholder="Less oil, extra napkins" aria-label="Note for the kitchen"></div>
         ${specialOpen ? `<button type="button" class="linkbtn" id="specialToggle" style="justify-self:start">+ Ask for something not on the menu</button>
         <div id="specialBox" class="hidden stack"><textarea id="fSpecial" rows="3" maxlength="300" placeholder="Jollof with fried fish instead of chicken" aria-label="Special request"></textarea>
@@ -3491,13 +3782,12 @@ function openOrder(menuId, opt = {}) {
       <div class="group"><p class="group-title">Your details</p>
         ${known ? `<div class="me-row" id="meRow"><span class="avatar">${esc(me.name.slice(0, 1).toUpperCase())}</span><span style="flex:1;display:grid"><strong>${esc(me.name)}</strong><span class="small muted num">${esc(me.phone)}</span></span><button type="button" class="linkbtn" id="meEdit">Change</button></div>` : ""}
         <div class="grid2${known ? " hidden" : ""}" id="meFields"><div><label for="fName">Your name</label><input id="fName" autocomplete="name" value="${esc(me.name || "")}" placeholder="e.g. Ama Mensah"></div>
-          <div><label for="fPhone">MoMo number</label><input id="fPhone" inputmode="tel" placeholder="024 123 4567" value="${esc(me.phone || "")}"></div></div>
+          <div><label for="fPhone">Phone number</label><input id="fPhone" inputmode="tel" placeholder="024 123 4567" value="${esc(me.phone || "")}"></div></div>
         ${S.user && S.balance > 0 ? `<label class="switch"><span>Use wallet <span class="muted num">(${money(S.balance)})</span></span><input type="checkbox" id="fWallet" checked></label>` : ""}
       </div>
       <div class="group" id="payGroup"><p class="group-title">Payment</p><div class="sum" id="sum"></div>
-        <div class="pay" id="payPart"><div class="momo"><span class="logo">MoMo</span><span style="flex:1;display:grid"><span class="small muted">Send <strong id="dueTxt"></strong> to</span><strong class="num">${esc(payList()[0].number)}</strong><span class="small muted">${esc(payList()[0].name)}${payList()[0].network ? " · " + esc(payList()[0].network) : ""}</span></span>
-          <button type="button" class="ghost" data-copynum="${esc(payList()[0].number)}" style="padding:8px 10px" aria-label="Copy MoMo number">${ICON.copy}</button></div>${payAlts()}
-          <div><label for="fRef">Transaction ID from your MoMo SMS</label><input id="fRef" placeholder="e.g. 51234567890"></div></div>
+        <div class="pay" id="payPart"><div id="payFrom"></div><div id="payTo"></div>${payAlts()}
+          <div><label for="fRef">Transaction ID from your mobile money SMS</label><input id="fRef" placeholder="e.g. 51234567890"></div></div>
         <p class="small muted" id="saveTxt">What the pool saves on delivery comes back to your ChopPool wallet once you've got your lunch.</p>
         <p class="small muted">By paying you agree to our <a href="#terms" target="_blank" rel="noopener">terms</a> and <a href="#privacy" target="_blank" rel="noopener">privacy notice</a>.</p>
       </div>
@@ -3505,11 +3795,40 @@ function openOrder(menuId, opt = {}) {
       <div class="sheet-foot"><div class="tot"><b class="num" id="totTxt"></b><span id="totSub"></span></div><button class="btn" type="submit" id="submitBtn">Join the pool</button></div>
     </form>`);
   const drawExtras = () => {
-    $("#extrasGroup").innerHTML = (item.addons || []).length ? `<p class="group-title">Make it yours</p><div class="chips">${item.addons.map(a =>
+    $("#extrasGroup").innerHTML = (item.addons || []).length ? `<p class="group-title">Extras <span class="muted" style="font-weight:500">(optional, added to each plate)</span></p><div class="chips">${item.addons.map(a =>
       `<button type="button" class="tog" data-addon="${esc(a.name)}" aria-pressed="${extras.has(a.name)}">${esc(a.name)}${a.price ? " +" + money(a.price) : ""}</button>`).join("")}</div>` : "";
+  };
+  // Pay from (your saved numbers) and pay to (ChopPool's number on the same network where we have one)
+  const drawPay = due => {
+    const pt = payToFor(payFrom && payFrom.network);
+    $("#payFrom").innerHTML = payFrom ? `<div class="pfrom"><span class="small muted">Paying from</span><span class="pfm">${netBadge(payFrom.network)}<span><b>${esc(payFrom.nick || payFrom.network || "Mobile money")}</b> <span class="num muted">${esc(maskNum(payFrom.number))}</span></span><button type="button" class="linkbtn" id="pfChange">Change</button></span></div>`
+      : `<div class="grid2"><div><label for="pfNum">Pay from</label><input id="pfNum" inputmode="tel" placeholder="024 123 4567" value="${esc(fmtPhone(me.phone || ""))}"></div><div><label for="pfNet">Network</label><select id="pfNet">${NETWORKS.map(n => `<option${guessNet(me.phone) === n ? " selected" : ""}>${n}</option>`).join("")}</select></div></div><label class="switch small"><span>Save for next time</span><input type="checkbox" id="pfSave" checked></label>`;
+    $("#pfNum")?.addEventListener("input", e => { const g = guessNet(e.target.value); if (g) $("#pfNet").value = g; });
+    $("#payTo").innerHTML = `<div class="momo">${netBadge(pt.network)}<span style="flex:1;display:grid"><span class="small muted">Send <strong id="dueTxt">${money(due)}</strong> to</span><strong class="num">${esc(pt.number)}</strong><span class="small muted">${esc(pt.name || "")}${pt.network ? " · " + esc(pt.network) : ""}</span></span>
+      <button type="button" class="ghost" data-copynum="${esc(pt.number)}" style="padding:8px 10px" aria-label="Copy mobile money number">${ICON.copy}</button></div>`;
+    $("#pfChange")?.addEventListener("click", () => pickPayFrom(payFrom, m => { payFrom = m; draw(); }));
+    $("#pfNet")?.addEventListener("change", () => { payFrom = null; drawPay(due); });
+  };
+  const drawTray = () => {
+    $("#tLines").innerHTML = tray.lines.map((l, n) => { const it = lineItem(l), ad = lineAdd(l); return `<div class="tline"><span class="tx"><b>${l.qty} × ${esc(it.name || "Dish")}</b><small>${[(l.addons || []).join(", "), l.note].filter(Boolean).map(esc).join(" · ")}${(l.addons || []).length || l.note ? " · " : ""}<span class="num">${money((Number(it.price || 0) + ad) * l.qty)}</span></small></span>
+      <div class="qty"><button type="button" data-tl="${n}" data-d="-1" aria-label="${l.qty === 1 ? "Remove" : "One less"}">${l.qty === 1 ? "×" : "−"}</button><output>${l.qty}</output><button type="button" data-tl="${n}" data-d="1" aria-label="One more">+</button></div></div>`; }).join("");
   };
   const draw = () => {
     $("#q").textContent = qty;
+    if (trayMode) {
+      drawTray();
+      const meals = tray.lines.reduce((a, l) => a + l.qty, 0), food = trayFood(tray), first = tray.lines[0].qty;
+      const tripN = tripNow(k, site), dTot = upfrontPerMeal(tripN, first, s) * first, sFee = Number(s.service_fee), total = food + dTot + sFee * meals;
+      const useW = $("#fWallet")?.checked ? Math.min(S.balance, total) : 0, due = total - useW;
+      $("#sum").innerHTML = `<div><span>Food (${meals} meal${meals === 1 ? "" : "s"})</span><span class="num">${money(food)}</span></div>` +
+        (tripN === 0 ? `<div><span>Delivery, by the vendor</span><span class="num">Free</span></div>` : `<div><span>Delivery, full trip<small class="sumhint">Shared by the pool. What others save you comes back as cashback.</small></span><span class="num">${money(dTot)}</span></div>`) +
+        `<div><span>Service fee (${money(sFee)} a meal)</span><span class="num">${money(sFee * meals)}</span></div>` + (useW ? `<div><span>From wallet</span><span class="num">−${money(useW)}</span></div>` : "");
+      $("#payPart").classList.toggle("hidden", due <= 0); drawPay(due);
+      $("#totTxt").textContent = due <= 0 ? money(useW) : money(due);
+      $("#totSub").textContent = due <= 0 ? money(useW) + " from your wallet" : useW ? "Pay by mobile money, after " + money(useW) + " from your wallet" : "Pay by mobile money";
+      const startsPool = !S.board.pools.some(p => p.site_id === S.siteId && p.kitchen_id === k.id && ["waiting", "collecting"].includes(p.status) && p.meals > 0);
+      $("#submitBtn").textContent = startsPool ? "Create pool" : "Join pool"; return;
+    }
     if (special) {
       $("#sum").innerHTML = `<div><span>${qty} × special request</span><span>Priced by the vendor</span></div>`;
       $("#payPart").classList.add("hidden"); $("#saveTxt").classList.add("hidden");
@@ -3526,14 +3845,18 @@ function openOrder(menuId, opt = {}) {
       (join ? `<div><span>Delivery</span><span class="num">Already paid</span></div>` : tripN === 0 ? `<div><span>Delivery, by the vendor</span><span class="num">Free</span></div>` : `<div><span>Delivery, full trip<small class="sumhint">Shared by the pool. Your share comes back as cashback.</small></span><span class="num">${money(dFee * qty)}</span></div>`) +
       `<div><span>Service fee${qty > 1 ? " (" + money(sFee) + " a meal)" : ""}</span><span class="num">${money(sFee * qty)}</span></div>` +
       (useW ? `<div><span>From wallet</span><span class="num">−${money(useW)}</span></div>` : "");
-    $("#payPart").classList.toggle("hidden", due <= 0);
-    $("#dueTxt").textContent = money(due);
+    $("#payPart").classList.toggle("hidden", due <= 0); drawPay(due);
     $("#totTxt").textContent = due <= 0 ? money(useW) : money(due);
-    $("#totSub").textContent = due <= 0 ? money(useW) + " from your wallet" : useW ? "Pay by MoMo, after " + money(useW) + " from your wallet" : "Pay by MoMo";
+    $("#totSub").textContent = due <= 0 ? money(useW) + " from your wallet" : useW ? "Pay by mobile money, after " + money(useW) + " from your wallet" : "Pay by mobile money";
     const startsPool = !join && !S.board.pools.some(p => p.site_id === S.siteId && p.kitchen_id === k.id && ["waiting", "collecting"].includes(p.status) && p.meals > 0);
     $("#submitBtn").textContent = join ? "Add to pool" : startsPool ? "Create pool" : "Join pool";
   };
   drawExtras(); draw(); if (!join && !opt.fromPage) loadReviews(k);
+  if (opt.special && $("#specialToggle")) $("#specialToggle").click();
+  $("#moreDishes")?.addEventListener("click", () => closeSheet());
+  $("#tLines")?.addEventListener("click", e => { const b = e.target.closest("[data-tl]"); if (!b) return; const l = tray.lines[+b.dataset.tl];
+    l.qty += +b.dataset.d; if (l.qty < 1) tray.lines.splice(+b.dataset.tl, 1); else l.qty = Math.min(5, l.qty);
+    traySave(tray); if (!tray.lines.length) { closeSheet(); return toast("Your order is empty."); } draw(); });
   $("#orderForm").addEventListener("change", e => { if (e.target.name === "dish") { item = dishes.find(d => d.id === e.target.value); extras = new Set(); drawExtras(); } draw(); });
   $("#extrasGroup").addEventListener("click", e => { const b = e.target.closest("[data-addon]"); if (!b) return; const n = b.dataset.addon; extras.has(n) ? extras.delete(n) : extras.add(n); b.setAttribute("aria-pressed", String(extras.has(n))); draw(); });
   $("#minus").addEventListener("click", () => { qty = Math.max(1, qty - 1); draw(); });
@@ -3561,18 +3884,28 @@ function openOrder(menuId, opt = {}) {
     const showMe = () => { $("#meRow")?.classList.add("hidden"); $("#meFields").classList.remove("hidden"); };
     if (special && sp.length < 4) return (err.textContent = "Describe what you'd like the vendor to make.");
     if (name.length < 2) { showMe(); return (err.textContent = "Add your name."); }
-    if (!/^0\d{9}$/.test(phone)) { showMe(); return (err.textContent = "Enter a 10-digit MoMo number starting with 0, like 024 123 4567."); }
-    if (!special && !$("#payPart").classList.contains("hidden") && ref.length < 4) { $("#fRef").focus(); return (err.textContent = "Enter the transaction ID from your MoMo SMS."); }
+    if (!/^0\d{9}$/.test(phone)) { showMe(); return (err.textContent = "Enter a 10-digit mobile money number starting with 0, like 024 123 4567."); }
+    const payVisible = !special && !$("#payPart").classList.contains("hidden");
+    let from = payFrom;
+    if (payVisible && !from) { const num = ($("#pfNum")?.value || "").replace(/\D/g, "") || phone; if (!/^0\d{9}$/.test(num)) { $("#pfNum")?.focus(); return (err.textContent = "Enter the 10-digit mobile money number you'll pay from."); }
+      from = { id: "pm" + Date.now(), number: num, network: ($("#pfNum")?.value ? $("#pfNet").value : guessNet(num) || $("#pfNet").value), nick: "" }; if ($("#pfSave")?.checked) { const L = payMethods(); L.push({ ...from, def: !L.length }); savePayMethods(L); } }
+    if (payVisible && ref.length < 4) { $("#fRef").focus(); return (err.textContent = "Enter the transaction ID from your mobile money SMS."); }
     $("#submitBtn").disabled = true; err.textContent = "";
     try {
-      const r = await api.placeOrder({ site: site.id, item: item.id, qty, name, phone, ref, addons: [...extras], note: $("#fNote").value, special: sp || null, useWallet: !!$("#fWallet")?.checked, join: join ? join.id : null });
+      const trayMeals = trayMode ? tray.lines.reduce((a, l) => a + l.qty, 0) : 0;
+      const r = trayMode
+        ? await api.placeBasket({ site: site.id, lines: tray.lines, name, phone, ref, useWallet: !!$("#fWallet")?.checked, payerPhone: from && from.number, payerNetwork: from && from.network })
+        : (!special && !join && api.placeBasket)
+          ? await api.placeBasket({ site: site.id, lines: [{ item: item.id, qty, addons: [...extras], note: $("#fNote").value }], name, phone, ref, useWallet: !!$("#fWallet")?.checked, payerPhone: from && from.number, payerNetwork: from && from.network })
+          : await api.placeOrder({ site: site.id, item: item.id, qty, name, phone, ref, addons: [...extras], note: $("#fNote").value, special: sp || null, useWallet: !!$("#fWallet")?.checked, join: join ? join.id : null });
+      if (trayMode) { tray.lines = []; traySave(tray); }
       local.set("cp_me", { name, phone });
       const mine = (local.get("cp_orders") || []).filter(o => o.order_date >= today()); mine.push({ id: r.id, order_date: r.order_date }); local.set("cp_orders", mine); if (local.get("cp_hide_name")) syncNamePrivacy();
       if (S.user) { try { await api.saveProfile({ name, phone }); } catch (e) {} }
       await refreshBoard(); refreshMine(); refreshUser();
       notifyServer({ order_id: r.id }); if (local.get("cp_push")) pushSubscribe({ order_ids: [r.id] }, true);
       if (join) { closeSheet(); closeVendor(); toast("Added to code " + r.code + ". " + (r.status === "paid" ? "Paid." : "Payment being checked.")); setTab("orders"); return; }
-      r.myQty = qty; showConfirmation(r, k, site, sp);
+      r.myQty = trayMeals || qty; showConfirmation(r, k, site, sp);
     } catch (e) {
       $("#submitBtn").disabled = false; const msg = cleanErr(e);
       // The money may already have been sent: keep the payment on record for a refund and say so plainly
@@ -3639,12 +3972,14 @@ function showConfirmation(r, k, site, special) {
     ${!special && r.meals < s.max_meals ? `<button class="btn wide" id="sharePool">Share this pool</button>` : ""}
     ${!S.user && !special ? `<button class="ghost wide" id="toAccount">Create an account to keep your cashback</button>` : ""}
     <button class="linkbtn" id="toOrders" style="justify-self:center">Track this order</button>
-    ${askInstall ? `<div class="installhint"><span>${LOGO(28)}<span class="small">Get ChopPool on your home screen for one-tap lunch${pushReady() ? " and alerts" : ""}.</span></span><button class="ghost" data-install="#order">Install</button></div>` : ""}`);
+    ${!special && !local.get("cp_alerts") && (pushReady() || DEMO) ? `<div class="installhint alertask"><span>${ICON.bell || ""}<span class="small"><b>Get told if there's a problem with your payment</b>, when your vendor confirms and when lunch arrives.</span></span><button class="btn" id="confAlerts">Turn on</button></div>` : ""}
+    ${askInstall ? `<div class="installhint"><span>${LOGO(28)}<span class="small">Get ChopPool on your home screen for one-tap lunch${pushReady() ? " and alerts" : ""}${/iPhone|iPad/.test(navigator.userAgent) ? ". It also keeps you signed in" : ""}.</span></span><button class="ghost" data-install="#order">Install</button></div>` : ""}`);
   $("#toAccount")?.addEventListener("click", () => openAccount("Your order is saved. Create an account to keep your delivery cashback."));
   $("#toOrders").addEventListener("click", () => { closeSheet(); setTab("orders"); });
+  $("#confAlerts")?.addEventListener("click", async () => { local.set("cp_alerts_explained", true); await toggleAlerts(); $(".alertask")?.remove(); });
   $("#sharePool")?.addEventListener("click", async () => { await refreshBoard(); sharePool(site.id, k.id); });
 }
-/* ---------- Payment options: main MoMo account first, others one tap away ---------- */
+/* ---------- Payment options: main mobile money account first, others one tap away ---------- */
 const payList = () => { const pm = (S.payMethods || []).slice().sort((a, b) => (b.is_main - a.is_main) || (a.sort || 0) - (b.sort || 0)); const s = S.settings; return pm.length ? pm : [{ network: s.momo_network || "", number: s.momo_number, name: s.momo_name }]; };
 const payAlts = () => { const o = payList().slice(1); return o.length ? `<details class="payalts"><summary class="small">Other ways to pay (${o.length})</summary>${o.map(p => `<div class="payalt"><span><strong class="num">${esc(p.number)}</strong> <span class="small muted">${esc(p.network)} · ${esc(p.name)}</span></span><button type="button" class="linkbtn" data-copynum="${esc(p.number)}">Copy</button></div>`).join("")}</details>` : ""; };
 function openPayQuote(id) {
@@ -3654,8 +3989,8 @@ function openPayQuote(id) {
     ${sheetHead("Confirm your special request", esc(menuOf(o.kitchen_id).public_name) + " priced it at " + money(o.quote_price) + " a meal.")}
     <div class="sum"><div><span>Total with delivery and service</span><span class="num">${money(o.amount_due)}</span></div></div>
     ${S.user && S.balance > 0 ? `<label class="switch"><span>Use wallet <span class="muted num">(${money(S.balance)})</span></span><input type="checkbox" id="qWallet" checked></label>` : ""}
-    <div class="pay"><div class="momo"><span class="logo">MoMo</span><span style="flex:1;display:grid"><span class="small muted">Send the rest to</span><strong class="num">${esc(payList()[0].number)}</strong><span class="small muted">${esc(payList()[0].name)}${payList()[0].network ? " · " + esc(payList()[0].network) : ""} · before ${fmtTime(s.cutoff)}</span></span><button type="button" class="ghost" data-copynum="${esc(payList()[0].number)}" style="padding:8px 10px" aria-label="Copy MoMo number">${ICON.copy}</button></div>${payAlts()}
-      <div><label for="qRef">Transaction ID from your MoMo SMS</label><input id="qRef" placeholder="e.g. 51234567890"></div></div>
+    <div class="pay"><div class="momo"><span class="logo">Mobile money</span><span style="flex:1;display:grid"><span class="small muted">Send the rest to</span><strong class="num">${esc(payList()[0].number)}</strong><span class="small muted">${esc(payList()[0].name)}${payList()[0].network ? " · " + esc(payList()[0].network) : ""} · before ${fmtTime(s.cutoff)}</span></span><button type="button" class="ghost" data-copynum="${esc(payList()[0].number)}" style="padding:8px 10px" aria-label="Copy mobile money number">${ICON.copy}</button></div>${payAlts()}
+      <div><label for="qRef">Transaction ID from your mobile money SMS</label><input id="qRef" placeholder="e.g. 51234567890"></div></div>
     <p class="err" id="qErr"></p><button class="btn wide" id="qPay">Confirm payment</button>`);
   $("#qPay").addEventListener("click", async () => {
     try { await api.payQuote(id, $("#qRef").value.trim(), !!$("#qWallet")?.checked); closeSheet(); toast("Paid. Your special request is confirmed."); refreshMine(); refreshUser(); }
@@ -3698,7 +4033,7 @@ function openAddVendor() {
     if (z) vMap.setView([p.lat, p.lng], z); $("#vPinTxt").textContent = "Pin set. Drag it or tap the map to adjust."; est(); };
   const mode = here => { $("#vHere").setAttribute("aria-pressed", String(here)); $("#vElse").setAttribute("aria-pressed", String(!here)); $("#vPinBox").classList.toggle("hidden", here);
     if (here) { vPin = null; est(); return; }
-    if (!vMap) makeMap($("#vMap"), hasPin(site) ? site : ACCRA, 13).then(m => { vMap = m; if (hasPin(site)) window.L.marker([site.lat, site.lng], { icon: pinIcon(window.L, "me") }).addTo(m); m.on("click", e => putPin(e.latlng)); })
+    if (!vMap) makeMap($("#vMap"), hasPin(site) ? site : ACCRA, 13).then(m => { if (!m) return; vMap = m; if (hasPin(site)) window.L.marker([site.lat, site.lng], { icon: pinIcon(window.L, "me") }).addTo(m); m.on("click", e => putPin(e.latlng)); })
       .catch(e => { $("#vMap").innerHTML = `<p class="err" style="padding:12px">${esc(cleanErr(e))}</p>`; });
     else setTimeout(() => vMap.invalidateSize(), 50); };
   $("#vHere").addEventListener("click", () => mode(true)); $("#vElse").addEventListener("click", () => mode(false));
@@ -3734,6 +4069,20 @@ const ADMIN_SUBS = {
 };
 const NETWORKS = ["MTN", "Telecel", "AirtelTigo"];
 // Team screens lock themselves: signed out after a quiet spell (owner sets 5-60 min, default 15) and after 12 hours in total
+// Refresh: spinning icon while it fetches; quiet auto-refresh every minute while nobody is typing or has a sheet open
+async function adminRefresh(manual) {
+  const b = $("#aRefresh"); if (S.adminBusy) return; S.adminBusy = true; b?.classList.add("spin");
+  try { await renderAdmin(); if (manual) toast("Up to date"); } finally { S.adminBusy = false; b?.classList.remove("spin"); }
+}
+function adminAuto() {
+  if (S.adminAuto) return;
+  S.adminAuto = setInterval(() => {
+    if (location.hash !== "#admin" || document.visibilityState !== "visible" || !S.user) return;
+    const a = document.activeElement; if (a && /INPUT|SELECT|TEXTAREA/.test(a.tagName)) return;
+    if ($("#sheetBg")?.classList.contains("open") || $("#aBody details[open] form")) return;
+    adminRefresh(false);
+  }, 60000);
+}
 function adminTimeout() {
   if (DEMO || S.adminTimer) return;
   const idleMs = () => Math.min(60, Math.max(5, Number(S.settings.admin_idle_min || 15))) * 6e4, MAX = 12 * 3600e3;
@@ -3791,13 +4140,13 @@ async function viewAdmin() {
     return;
   }
   S.role = role; S.adminTab = S.adminTab || "dash";
-  adminTimeout();
+  adminTimeout(); adminAuto();
   const day = S.adminDate || opsDate();
   document.body.classList.add("is-admin");
   S.adminTab = ADMIN_TABS.some(t => t[0] === S.adminTab) ? S.adminTab : "dash";
   $("#view").innerHTML = `
     <div class="topzone admintop">
-    <header class="ahead"><div class="ahead-id">${LOGO(36)}<div><h1>Operations</h1><p class="small muted">${esc(S.user?.email || "")} · ${role === "super" ? "Owner" : "Coordinator"}${isStandalone() ? "" : ` · <button class="linkbtn small" data-install="#admin" style="padding:0">Install app</button>`}</p></div></div>
+    <header class="ahead"><div class="ahead-id">${LOGO(36)}<div><h1>Operations</h1><p class="small muted">${esc(S.user?.email || "")} · ${role === "super" ? "Owner" : "Coordinator"} · <span id="aUpdated"></span>${isStandalone() ? "" : ` · <button class="linkbtn small" data-install="#admin" style="padding:0">Install app</button>`}</p></div></div>
       <div class="ahead-act"><button class="iconbtn" id="aRefresh" aria-label="Refresh">${SV('<path d="M21 12a9 9 0 1 1-2.6-6.4L21 8"/><path d="M21 3v5h-5"/>')}</button>${themeBtn()}<button class="iconbtn" id="aSignOut" aria-label="Sign out" title="Sign out">${ICON.out}</button></div></header>
     <div class="adaybar"><span id="aDays"></span><input id="aDate" type="date" value="${day}" aria-label="Delivery date"></div>
     <nav class="admintabs" aria-label="Team sections">${ADMIN_TABS.map(([k, l]) => `<button data-atab="${k}">${l}</button>`).join("")}</nav></div>
@@ -3805,13 +4154,19 @@ async function viewAdmin() {
   $("#aDays").addEventListener("click", e => { const b = e.target.closest("[data-aday]"); if (!b) return; S.adminDate = b.dataset.aday; $("#aDate").value = S.adminDate; renderAdmin(); });
   document.querySelectorAll("[data-atab]").forEach(b => b.addEventListener("click", () => { S.adminTab = b.dataset.atab; renderAdmin(); }));
   $("#aDate").addEventListener("change", e => { S.adminDate = e.target.value; renderAdmin(); });
-  $("#aRefresh").addEventListener("click", renderAdmin);
+  $("#aRefresh").addEventListener("click", () => adminRefresh(true));
   $("#aSignOut").addEventListener("click", async () => { await api.signOut(); S.user = null; S.role = null; S.admin = null; try { await refreshUser(); } catch (e) {} toast("Signed out"); viewAdmin(); });
   $("#aBody").addEventListener("click", adminClick);
   $("#aSub").addEventListener("click", e => { const b = e.target.closest("[data-asub]"); if (!b) return; S.adminSub[S.adminTab] = b.dataset.asub; renderAdmin(true); });
   // Search and sort redraw from what's loaded; open items stay open
   $("#aBody").addEventListener("input", e => { const q = e.target.closest("[data-lq]"); if (!q) return; (S.lq = S.lq || {})[q.dataset.lq] = q.value; const pos = q.selectionStart; renderAdmin(true); const n = document.querySelector(`[data-lq="${q.dataset.lq}"]`); if (n) { n.focus(); try { n.setSelectionRange(pos, pos); } catch (x) {} } });
-  $("#aBody").addEventListener("toggle", e => { const d = e.target; if (!d.matches || !d.matches("details[data-key]")) return; S.openItems = S.openItems || new Set(); if (d.open) S.openItems.add(d.dataset.key); else S.openItems.delete(d.dataset.key); }, true);
+  // One card open at a time in each admin list: opening one closes the others and brings it into view
+  $("#aBody").addEventListener("toggle", e => { const d = e.target; if (!d.matches || !d.matches("details[data-key]")) return; S.openItems = S.openItems || new Set();
+    if (d.open) {
+      d.parentElement.querySelectorAll(":scope > details[data-key][open]").forEach(o => { if (o !== d) { o.open = false; S.openItems.delete(o.dataset.key); } });
+      S.openItems.add(d.dataset.key);
+      if (!S.restoring) requestAnimationFrame(() => { const top = d.getBoundingClientRect().top; if (top < 70 || top > innerHeight * .6) d.scrollIntoView({ behavior: "smooth", block: "start" }); });
+    } else S.openItems.delete(d.dataset.key); }, true);
   $("#aBody").addEventListener("change", adminChange);
   $("#aBody").addEventListener("submit", adminSubmit);
   await renderAdmin();
@@ -3937,21 +4292,29 @@ async function renderAdmin(cached) {
   // Two days can be live at once: today's deliveries and (after the cut-off) tomorrow's orders
   let otherWait = S.adminOtherWait || [];
   if (!cached) {
-    otherWait = [];
-    if (dNext !== dToday) {
-      try {
-        if (!S.adminDate && !S.adminDayPicked) { S.adminDayPicked = true; const [wt, wn] = await Promise.all([api.waitingPools(dToday), api.waitingPools(dNext)]); if (wn.length && !wt.length) S.adminDate = dNext; }
-        const cur = S.adminDate || dToday; otherWait = [dToday, dNext].includes(cur) ? await api.waitingPools(cur === dToday ? dNext : dToday) : [];
-      } catch (e) {}
-    }
+    // Show what we already have straight away, then fetch everything in one parallel batch
+    const guess = S.adminDate || dToday;
+    if (S.admin && S.admin.date === guess && !S.adminPainting) { S.adminPainting = true; try { await renderAdmin(true); } finally { S.adminPainting = false; } }
+    const two = dNext !== dToday, seq = (S.adminSeq = (S.adminSeq || 0) + 1);
+    let wt = [], wn = [], data = null;
+    try {
+      [wt, wn, data] = await Promise.all([two ? api.waitingPools(dToday).catch(() => []) : [], two ? api.waitingPools(dNext).catch(() => []) : [], api.adminData(guess)]);
+    } catch (e) { toast("Couldn't load: " + cleanErr(e)); return; }
+    if (seq !== S.adminSeq) return;   // a newer refresh has started
+    if (two && !S.adminDate && !S.adminDayPicked) { S.adminDayPicked = true; if (wn.length && !wt.length) { S.adminDate = dNext; try { data = await api.adminData(dNext); } catch (e) {} } }
+    const cur = S.adminDate || dToday;
+    otherWait = two && [dToday, dNext].includes(cur) ? (cur === dToday ? wn : wt) : [];
     S.adminOtherWait = otherWait;
+    data.date = cur; data.kitchens = data.kitchens.filter(k => !k.archived); data.sites = data.sites.filter(x => !x.archived);
+    S.admin = data; S.adminAt = new Date();
   }
   const d = S.adminDate || dToday, isSuper = S.role === "super";
   if ($("#aDate") && $("#aDate").value !== d) $("#aDate").value = d;
   if ($("#aDays")) $("#aDays").innerHTML = dNext !== dToday ? `<span class="chips" role="group" aria-label="Day">${[[dToday, "Today"], [dNext, dayLabel(dNext)[0].toUpperCase() + dayLabel(dNext).slice(1)]].map(([x, l]) => `<button type="button" class="tog" data-aday="${x}" aria-pressed="${x === d}">${esc(l)}${x !== d && otherWait.length ? ` <span class="dot" aria-label="${otherWait.length} waiting"></span>` : ""}</button>`).join("")}</span>` : "";
   document.querySelectorAll("[data-atab]").forEach(b => { if (b.dataset.atab === S.adminTab) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
   let A = S.admin;
-  if (!cached || !A) { try { A = await api.adminData(d); } catch (e) { toast("Couldn't load: " + cleanErr(e)); return; } S.admin = A; A.kitchens = A.kitchens.filter(k => !k.archived); A.sites = A.sites.filter(x => !x.archived); }
+  if (!A) return;
+  $("#aUpdated") && ($("#aUpdated").textContent = S.adminAt ? "Updated " + S.adminAt.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : "");
   adminMaps.forEach(m => { try { m.remove(); } catch (e) {} }); adminMaps = [];
   const K = id => A.kitchens.find(k => k.id === id) || {}, sName = id => (A.sites.find(x => x.id === id) || {}).name || "";
   const aTrip = p => { const k = K(p.kitchen_id), st = A.sites.find(x => x.id === p.site_id) || {}; return tripFor(hasPin(k) ? k : k.added_by_customer ? st : {}, st, s); };
@@ -4017,7 +4380,7 @@ async function renderAdmin(cached) {
       if (stepRank(p.status) < stepRank("delivered") && nowT > dlv + 15 * 6e4) return { p, what: kn + ": not arrived" };
       return null; }).filter(Boolean); void lateBy;
     const acts = [
-      ["Payments to check", live.filter(o => o.status === "pending").length, "today:orders", "warn", "MoMo references waiting"],
+      ["Payments to check", live.filter(o => o.status === "pending").length, "today:orders", "warn", "Mobile money references waiting"],
       ["Refunds due", A.orders.filter(o => o.refund_needed).length, "today:wallets", "bad", "Cancelled or vendor no-show"],
       ["Vendors not confirmed", waiting.length + otherWait.length, "today:pools", "bad", waiting.length ? "Least time left: " + Math.min(...waiting.map(minsLeft)) + " min" : otherWait.length ? "For " + dayLabel(d === dToday ? dNext : dToday) : ""],
       ["Special requests to price", A.orders.filter(o => o.status === "quote_requested").length, "today:orders", "warn", "Vendors haven't priced yet"],
@@ -4092,18 +4455,27 @@ async function renderAdmin(cached) {
       rest.sort(cmp); toCheckL.sort((a, b) => a.created_at < b.created_at ? -1 : 1);
       const row = (o, flag) => { const p = A.pools.find(x => x.id === o.pool_id) || {}, k = K(o.kitchen_id);
         const extras = [addonText(o.addons), o.note ? "Note: " + o.note : "", o.special_request ? "Special: " + o.special_request + (o.quote_price ? " (" + money(o.quote_price) + ")" : " (not priced)") : ""].filter(Boolean).join(" · ");
-        const paid = [o.wallet_used > 0 ? "Wallet " + money(o.wallet_used) : "", o.momo_ref ? "MoMo " + o.momo_ref : ""].filter(Boolean).join(" + ");
-        const due = Math.max(0, orderTotal(o) - Number(o.wallet_used || 0) - Number(o.carried_amount || 0)), bad = unpaid[o.phone] || 0, reused = o.momo_ref && (S.refsSeen || {})[String(o.momo_ref).trim()];
-        const payCell = o.status === "pending" ? `<div class="stack" style="gap:6px;min-width:190px"><span class="num">${esc(paid || "—")}${reused ? ` <span class="chip bad">Ref used ${reused}×</span>` : ""}<br><span class="small muted">Expect ${money(due)}${Number(o.carried_amount) > 0 ? " (" + money(o.carried_amount) + " moved from another pool)" : ""}</span></span>
+        const paid = [o.wallet_used > 0 ? "Wallet " + money(o.wallet_used) : "", o.momo_ref ? "Ref " + o.momo_ref : ""].filter(Boolean).join(" + ");
+        // A tray order is paid once, on its first dish: expect the whole amount there
+        const own = o2 => Math.max(0, orderTotal(o2) - Number(o2.wallet_used || 0) - Number(o2.carried_amount || 0));
+        const kids = A.orders.filter(c => c.parent_id === o.id && c.basket && c.status === "pending");
+        const due = own(o) + kids.reduce((t, c) => t + own(c), 0), bad = unpaid[o.phone] || 0, reused = o.momo_ref && (S.refsSeen || {})[String(o.momo_ref).trim()];
+        const reach = S.reach && S.reach.has(o.id), from = o.payer_phone ? `<br><span class="small muted">From ${esc(o.payer_network || "")} ${esc(fmtPhone(o.payer_phone))}</span>` : "";
+        const tellMsg = `Hi ${firstOf(o.customer_name)}, this is ChopPool. We couldn't find your mobile money payment of ${money(due)} for code ${o.code}${o.momo_ref ? " (ID " + o.momo_ref + ")" : ""}. Please check the transaction ID or pay again before ${fmtTime(S.settings.cutoff)} so your lunch counts.`;
+        const tell = o.status === "pending" && !reach ? `<span class="small"><span class="chip">No alerts on</span> <a href="https://wa.me/233${esc(String(o.phone).replace(/^0/, ""))}?text=${encodeURIComponent(tellMsg)}" target="_blank" rel="noopener">WhatsApp</a> · <a href="sms:${esc(o.phone)}?&body=${encodeURIComponent(tellMsg)}">SMS</a></span>` : "";
+        const payCell = o.basket && o.status === "pending" ? `<span class="small muted">Paid together with the first dish on code ${esc(o.code)}</span>` : o.status === "pending" ? `<div class="stack" style="gap:6px;min-width:190px"><span class="num">${esc(paid || "—")}${reused ? ` <span class="chip bad">Ref used ${reused}×</span>` : ""}<br><span class="small muted">Expect ${money(due)}${kids.length ? " for " + (kids.length + 1) + " dishes" : ""}${Number(o.carried_amount) > 0 ? " (" + money(o.carried_amount) + " moved from another pool)" : ""}</span>${from}</span>${tell}
             ${o.pay_issue ? `<span class="chip warn">${o.pay_issue === "short" ? "Short: " + money(o.amount_received || 0) + " received" : "Not found"} · customer told</span>` : ""}
             <div class="row" style="gap:6px;flex-wrap:wrap;justify-content:flex-start"><button class="btn" data-act="pay-found" style="padding:7px 12px">Payment found</button><button class="ghost" data-act="pay-issue" style="padding:7px 12px">Not found / short</button></div></div>` : `<span class="num">${esc(paid || "—")}</span>`;
         return `<tr data-orow="${esc(o.id)}"><td class="num">${flag ? `<span class="pdotx" title="Payment to confirm"></span>` : ""}${clock(o.created_at)}</td><td>${esc(o.customer_name)}${bad ? `<br><span class="chip bad" title="Payments not received in the last 60 days">${bad} unpaid before</span>` : ""}</td><td class="num">${esc(o.phone)}</td><td>${esc(sName(o.site_id))}</td>
           <td>${o.qty} × ${esc(o.item_name)}<br><span class="small muted">${esc(k.public_name || "")} Pool ${p.seq || ""}</span></td><td style="white-space:normal;min-width:180px">${esc(extras)}</td><td>${payCell}</td><td class="num">${esc(o.code)}</td>
           <td><select data-order="${esc(o.id)}" aria-label="Order status">${ST.map(x => `<option${x === o.status ? " selected" : ""}>${x}</option>`).join("")}</select></td></tr>`; };
-      const head = `<tr><th>Time</th><th>Customer</th><th>MoMo no.</th><th>Building</th><th>Order</th><th>Extras and requests</th><th>Paid by</th><th>Code</th><th>Status</th></tr>`;
+      // Which customers can get a phone alert about their payment (fetched quietly, then the cards update)
+      const pend = A.orders.filter(o => o.status === "pending" && !o.basket).map(o => o.id);
+      if (pend.length && api.alertReach && S.reachFor !== pend.join()) { S.reachFor = pend.join(); api.alertReach(pend).then(ids => { S.reach = new Set(ids || []); if (S.adminTab === "today") renderAdmin(true); }).catch(() => {}); }
+      const head = `<tr><th>Time</th><th>Customer</th><th>Phone</th><th>Building</th><th>Order</th><th>Extras and requests</th><th>Paid by</th><th>Code</th><th>Status</th></tr>`;
       body.innerHTML = `
       <div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:8px"><h2>Orders for ${fmtDate(d)}</h2><div class="row" style="gap:8px"><label class="small muted" for="oSort" style="margin:0">Sort</label><select id="oSort" data-ls="osort" style="width:auto">${[["new", "Newest first"], ["old", "Oldest first"], ["status", "Status"], ["building", "Building"], ["vendor", "Vendor"]].map(([v2, l]) => `<option value="${v2}"${v2 === sortBy ? " selected" : ""}>${l}</option>`).join("")}</select><button class="ghost" data-act="csv">Copy as CSV</button></div></div>
-      ${toCheckL.length ? `<h3 class="row" style="gap:8px;justify-content:flex-start"><span class="pdotx"></span>Payments to confirm · ${toCheckL.length}</h3><p class="small muted">Find each reference on the MoMo statement. Found it: <strong>Payment found</strong>. Not there, or too little: <strong>Not found / short</strong>, and the customer is told how to fix it.</p>
+      ${toCheckL.length ? `<h3 class="row" style="gap:8px;justify-content:flex-start"><span class="pdotx"></span>Payments to confirm · ${toCheckL.length}</h3><p class="small muted">Find each reference on the mobile money statement. Found it: <strong>Payment found</strong>. Not there, or too little: <strong>Not found / short</strong>, and the customer is told how to fix it.</p>
         <div class="table-wrap"><table>${head}${toCheckL.map(o => row(o, true)).join("")}</table></div>` : ""}
       ${issueL.length ? `<h3>Waiting for the customer to fix · ${issueL.length}</h3><p class="small muted">Cancelled automatically at ${fmtTime(s.cutoff)} if nothing changes.</p><div class="table-wrap"><table>${head}${issueL.map(o => row(o, false)).join("")}</table></div>` : ""}
       <h3>${toCheckL.length || issueL.length ? "All other orders" : "Orders"}</h3>
@@ -4120,12 +4492,12 @@ async function renderAdmin(cached) {
       <h2>Refunds due</h2>
       ${refunds.length ? `<div class="stack" style="gap:10px">${refunds.map(o => `<div class="card stack" style="gap:6px" data-refund="${esc(o.id)}"><div class="top"><strong>${esc(o.customer_name)} · <span class="num">${esc(o.code)}</span></strong><b class="num">${money(amt(o))}</b></div>
           <p class="small">${esc(o.cancel_reason || "Cancelled")} · send to <a class="num" href="tel:${esc(o.phone)}">${esc(fmtPhone(o.phone))}</a>${o.momo_ref ? ` · paid with <span class="num">${esc(o.momo_ref)}</span>` : ""}</p>
-          <form class="inline" data-form="refund" data-id="${esc(o.id)}" data-amt="${amt(o)}" style="grid-template-columns:1fr auto"><div><label>MoMo reference of your refund</label><input name="ref" autocomplete="off" placeholder="e.g. 5123456789"></div><button class="btn">Mark refunded</button></form></div>`).join("")}</div>`
+          <form class="inline" data-form="refund" data-id="${esc(o.id)}" data-amt="${amt(o)}" style="grid-template-columns:1fr auto"><div><label>Mobile money reference of your refund</label><input name="ref" autocomplete="off" placeholder="e.g. 5123456789"></div><button class="btn">Mark refunded</button></form></div>`).join("")}</div>`
         : `<p class="muted small">No refunds due for ${fmtDate(d)}.</p>`}
       <h2>Payments with no order</h2>
       ${(A.unmatched || []).length ? `<div class="stack" style="gap:10px">${A.unmatched.map(u => `<div class="card stack" style="gap:6px"><div class="top"><strong>${esc(u.name || "Customer")}</strong><b class="num">${money(u.amount)}</b></div>
           <p class="small">${esc(u.reason || "")} · ref <span class="num">${esc(u.momo_ref || "")}</span> · refund to <a class="num" href="tel:${esc(u.phone)}">${esc(fmtPhone(u.phone))}</a> · ${fmtDate(String(u.created_at).slice(0, 10))}</p>
-          <form class="inline" data-form="unmatched" data-id="${esc(u.id)}" style="grid-template-columns:1fr auto"><div><label>MoMo reference of your refund</label><input name="ref" autocomplete="off"></div><button class="btn">Mark refunded</button></form></div>`).join("")}</div>`
+          <form class="inline" data-form="unmatched" data-id="${esc(u.id)}" style="grid-template-columns:1fr auto"><div><label>Mobile money reference of your refund</label><input name="ref" autocomplete="off"></div><button class="btn">Mark refunded</button></form></div>`).join("")}</div>`
         : `<p class="muted small">None. When someone pays but their order can't go through (sold out, closed), it shows here for a refund.</p>`}
       <h2>Problems reported</h2>
       ${(A.problems || []).length ? `<div class="stack" style="gap:10px">${A.problems.map(o => `<div class="card stack" style="gap:6px"><div class="top"><strong>${esc(o.customer_name)} · <span class="num">${esc(o.code)}</span></strong><span class="small muted">${fmtDate(o.order_date)}</span></div>
@@ -4145,7 +4517,7 @@ async function renderAdmin(cached) {
       Promise.all([api.adminDues(from, d), api.payouts()]).then(([du, pays]) => { const el = $("#owedBox"); if (!el) return; const isOwner = S.role === "super";
         const row = (t, x) => `<div class="card stack" style="gap:6px"><div class="top"><strong>${esc(x.name)}</strong><b class="num">${money(x.due)}</b></div>
           <p class="small muted">${t === "seller" ? "Food " + money(x.food) + " · fee " + money(x.fee) + " (this week)" : "Trips " + money(x.trips) + " (this week)"} · paid so far ${money(x.paid)}</p>
-          ${isOwner && Number(x.due) > 0 ? `<form class="inline" data-form="payout" data-type="${t}" data-id="${esc(x.id)}" style="grid-template-columns:.7fr 1.2fr auto"><div><label>Amount</label><input name="amount" inputmode="decimal" value="${Number(x.due).toFixed(2)}"></div><div><label>MoMo reference</label><input name="ref" autocomplete="off"></div><button class="btn">Record payout</button></form>` : ""}</div>`;
+          ${isOwner && Number(x.due) > 0 ? `<form class="inline" data-form="payout" data-type="${t}" data-id="${esc(x.id)}" style="grid-template-columns:.7fr 1.2fr auto"><div><label>Amount</label><input name="amount" inputmode="decimal" value="${Number(x.due).toFixed(2)}"></div><div><label>Mobile money reference</label><input name="ref" autocomplete="off"></div><button class="btn">Record payout</button></form>` : ""}</div>`;
         el.innerHTML = `<h3>Sellers</h3>${(du.sellers || []).map(x => row("seller", x)).join("") || `<p class="small muted">Nothing owed to sellers yet.</p>`}
           <h3>Riders</h3>${(du.riders || []).map(x => row("rider", x)).join("") || `<p class="small muted">Nothing owed to riders yet. Add the trip cost on each pool.</p>`}
           <h3>Recent payouts</h3>${(pays || []).length ? `<div class="table-wrap"><table><tr><th>Date</th><th>To</th><th>Amount</th><th>Ref</th><th>By</th></tr>${pays.slice(0, 30).map(x => `<tr><td>${fmtDate(String(x.created_at).slice(0, 10))}</td><td>${esc(x.payee_type === "seller" ? (A.kitchens.find(k => k.id === x.kitchen_id) || {}).name || "Seller" : (A.riders.find(r => r.id === x.rider_id) || {}).name || "Rider")}</td><td class="num">${money(x.amount)}</td><td class="num">${esc(x.momo_ref || "")}</td><td class="small">${esc(x.paid_by || "")}</td></tr>`).join("")}</table></div>` : `<p class="small muted">No payouts recorded yet.</p>`}`;
@@ -4172,7 +4544,7 @@ async function renderAdmin(cached) {
     const items = A.items || [];
     if (sub === "requests") body.innerHTML = listReq.length ? `<div class="stack" style="gap:10px">${listReq.map(k => { const L = k.listing || {}, dishes = items.filter(i => i.kitchen_id === k.id && i.active !== false);
         return `<article class="card" data-kitchen="${esc(k.id)}" style="border:2px solid var(--hint)"><div class="top" style="align-items:flex-start"><div><h3>${esc(L.name || k.name)}</h3><p class="small muted">${esc(L.tagline || "")}${k.listing_requested_at ? " · asked " + fmtDate(String(k.listing_requested_at).slice(0, 10)) : ""} · first added by a customer at ${esc(sName(k.site_id))}</p></div>${pill("Wants to be listed", "warn")}</div>
-          <div class="grid2 small"><p><strong>Cooks:</strong> ${esc(L.hours || "—")}</p><p><strong>Meals a day:</strong> ${esc(L.capacity || k.capacity)}</p><p><strong>MoMo:</strong> <span class="num">${esc(L.momo || "—")}</span></p><p><strong>WhatsApp:</strong> <span class="num">${esc(k.whatsapp || "—")}</span></p></div>
+          <div class="grid2 small"><p><strong>Cooks:</strong> ${esc(L.hours || "—")}</p><p><strong>Meals a day:</strong> ${esc(L.capacity || k.capacity)}</p><p><strong>Mobile money:</strong> <span class="num">${esc(L.momo || "—")}</span></p><p><strong>WhatsApp:</strong> <span class="num">${esc(k.whatsapp || "—")}</span></p></div>
           ${L.lat != null ? `<a class="linkbtn" href="${osmLink(L)}" target="_blank" rel="noopener">See where they cook</a>` : ""}
           <p class="group-title">Menu</p><div class="dishline">${dishes.map(x => `<span>${esc(x.name)} · ${money(x.price)}</span>`).join("") || `<span>No dishes yet</span>`}</div>
           <p class="small muted">Approving lists them for every nearby building. Call them first and, if you can, visit or order a test meal.</p>
@@ -4193,7 +4565,7 @@ async function renderAdmin(cached) {
     S.addInit = () => {
       S.newKitPin = null; let put = null;
       $("#sheet").onclick = e => { menuEditorClick(e); };
-      makeMap($("#newKitMap"), ACCRA, 12).then(m => { adminMaps.push(m); let mk;
+      makeMap($("#newKitMap"), ACCRA, 12).then(m => { if (!m) return; adminMaps.push(m); let mk;
         put = (p, z) => { S.newKitPin = { lat: p.lat, lng: p.lng }; if (!mk) { mk = window.L.marker([p.lat, p.lng], { draggable: true, icon: pinIcon(window.L, "on") }).addTo(m); mk.on("dragend", () => { const ll = mk.getLatLng(); S.newKitPin = { lat: ll.lat, lng: ll.lng }; }); } else mk.setLatLng([p.lat, p.lng]); if (z) m.setView([p.lat, p.lng], z); $("#nkPin").textContent = "Pin placed. Drag it or tap the map to adjust."; };
         m.on("click", e => put(e.latlng)); }).catch(() => {});
       placeSearch($("#nkSearch"), $("#nkResults"), r => { if (put) put(r, 16); else S.newKitPin = { lat: r.lat, lng: r.lng }; $("#nkResults").innerHTML = ""; $("#nkSearch").value = ""; $("#nkPin").textContent = "Pin placed at " + r.short + "."; if (!$("#nkAddr").value) $("#nkAddr").value = r.short; });
@@ -4253,7 +4625,7 @@ async function renderAdmin(cached) {
         <div class="row" style="justify-content:flex-start;gap:8px;flex-wrap:wrap"><label class="choice" style="padding:8px 10px"><input type="checkbox" data-f="active"${x.active ? " checked" : ""}><span>Live</span></label><button class="ghost" data-act="site-save">Save</button>
           ${x.handoff === "host" ? `<button class="ghost" data-act="host-copy">Copy host link</button><button class="ghost" data-act="host-reset">Send a new link</button>` : ""}<button class="ghost" data-act="site-merge">Merge into…</button><button class="ghost" data-act="site-remove" style="color:var(--danger)">Remove</button>${hasPin(x) ? `<a class="linkbtn" href="${osmLink(x)}" target="_blank" rel="noopener">Map</a>` : ""}</div>
         </div></details>`; }).join("") || `<p class="muted">No buildings match.</p>`}</div>`;
-      makeMap($("#adminMap"), ACCRA, 11).then(m => {
+      makeMap($("#adminMap"), ACCRA, 11).then(m => { if (!m) return;
         adminMaps.push(m); const L = window.L, pts = [];
         A.sites.filter(x => hasPin(x) && x.status !== "declined").forEach(x => { pts.push([x.lat, x.lng]); L.marker([x.lat, x.lng], { icon: pinIcon(L, x.status === "pending" ? "" : "on") }).addTo(m).bindPopup(`<strong>${esc(x.name)}</strong><br>${esc(x.drop_point)}${x.status === "pending" ? "<br>Waiting for approval" : ""}`); });
         if (pts.length > 1) m.fitBounds(pts, { padding: [30, 30] });
@@ -4262,7 +4634,7 @@ async function renderAdmin(cached) {
     S.addForm = addForm; S.addTitle = "Add a building";
     S.addInit = () => {
       S.newSitePin = null;
-      makeMap($("#newSiteMap"), ACCRA, 12).then(m => {
+      makeMap($("#newSiteMap"), ACCRA, 12).then(m => { if (!m) return;
         adminMaps.push(m); let mk;
         const put = S.nsPut = (p, z) => { S.newSitePin = { lat: p.lat, lng: p.lng }; if (!mk) { mk = window.L.marker([p.lat, p.lng], { draggable: true, icon: pinIcon(window.L, "on") }).addTo(m); mk.on("dragend", () => { const ll = mk.getLatLng(); S.newSitePin = { lat: ll.lat, lng: ll.lng }; }); } else mk.setLatLng([p.lat, p.lng]); if (z) m.setView([p.lat, p.lng], z); $("#nsPin").textContent = "Pin placed. Drag it or tap the map to adjust."; };
         m.on("click", e => put(e.latlng));
@@ -4305,7 +4677,7 @@ async function renderAdmin(cached) {
   if (tab === "riders") {
 
     if (sub === "apply") body.innerHTML = riderApps.length ? `<div class="stack" style="gap:10px">${riderApps.map(r => `<article class="card" data-rider="${esc(r.id)}"><div class="top" style="align-items:flex-start"><div><h3>${esc(r.name)}</h3><p class="small muted">${esc(added(r))}</p></div>${pill("Applied", "warn")}</div>
-        <div class="grid2 small"><p><strong>Phone:</strong> <span class="num">${esc(r.phone || "")}</span></p><p><strong>MoMo:</strong> <span class="num">${esc(r.momo || "—")}</span></p><p><strong>Motorbike:</strong> ${esc(r.bike || "—")}</p><p><strong>Area:</strong> ${esc(r.area || "—")}</p></div>
+        <div class="grid2 small"><p><strong>Phone:</strong> <span class="num">${esc(r.phone || "")}</span></p><p><strong>Mobile money:</strong> <span class="num">${esc(r.momo || "—")}</span></p><p><strong>Motorbike:</strong> ${esc(r.bike || "—")}</p><p><strong>Area:</strong> ${esc(r.area || "—")}</p></div>
         <p class="small muted">Call them, check their licence and bike papers, then approve.</p>
         <div class="row" style="justify-content:flex-start;gap:8px;flex-wrap:wrap"><button class="btn" data-act="rider-approve">Approve</button><button class="ghost" data-act="rider-decline">Decline</button>${r.phone ? `<a class="linkbtn" href="tel:${esc(r.phone)}">Call</a>` : ""}</div></article>`).join("")}</div>`
       : `<div class="note">No rider applications waiting. Share the sign-up link from the Riders list.</div>`;
@@ -4352,13 +4724,13 @@ async function renderAdmin(cached) {
       <div class="stack" style="gap:8px">${pm.map(p => `<details class="item" data-paym="${esc(p.id)}" data-key="p:${esc(p.id)}"${isOpen("p:" + p.id)}>
         <summary><span class="ititle"><strong class="num">${esc(p.number)}</strong><span class="small muted">${esc(p.network)} · ${esc(p.name)}</span></span>
           <span class="imeta">${p.is_main ? pill("Main", "ok") : ""}${p.active ? "" : pill("Off", "dim")}</span></summary>
-        <div class="ibody"><div class="grid2"><div><label>MoMo number</label><input data-f="number" inputmode="tel" value="${esc(p.number)}"></div><div><label>Account name</label><input data-f="name" value="${esc(p.name)}"></div>
+        <div class="ibody"><div class="grid2"><div><label>Mobile money number</label><input data-f="number" inputmode="tel" value="${esc(p.number)}"></div><div><label>Account name</label><input data-f="name" value="${esc(p.name)}"></div>
           <div><label>Network</label><select data-f="network">${NETWORKS.map(n => `<option${p.network === n ? " selected" : ""}>${n}</option>`).join("")}</select></div></div>
           <div class="row" style="justify-content:flex-start;gap:8px;flex-wrap:wrap"><label class="choice" style="padding:8px 10px"><input type="checkbox" data-f="active"${p.active ? " checked" : ""}><span>Active</span></label>
             <label class="choice" style="padding:8px 10px"><input type="checkbox" data-f="is_main"${p.is_main ? " checked" : ""}><span>Main option</span></label>
             <button class="ghost" data-act="pay-save">Save</button><button class="ghost" data-act="pay-remove" style="color:var(--danger)">Remove</button></div></div></details>`).join("") || `<p class="muted">No payment options yet. Add your first one below.</p>`}</div>
       <form class="card" data-form="paymethod"><h2>Add a payment option</h2>
-        <div class="grid2"><div><label for="pmNum">MoMo number</label><input id="pmNum" name="number" inputmode="tel" placeholder="024 123 4567"></div><div><label for="pmName">Account name</label><input id="pmName" name="name" placeholder="ChopPool Ventures"></div>
+        <div class="grid2"><div><label for="pmNum">Mobile money number</label><input id="pmNum" name="number" inputmode="tel" placeholder="024 123 4567"></div><div><label for="pmName">Account name</label><input id="pmName" name="name" placeholder="ChopPool Ventures"></div>
           <div><label for="pmNet">Network</label><select id="pmNet" name="network">${NETWORKS.map(n => `<option>${n}</option>`).join("")}</select></div></div>
         <p class="err" data-err></p><button class="btn">Add payment option</button></form>`;
     }
@@ -4383,7 +4755,7 @@ function openPinSheet(title, start, onSave) {
     <div id="pResults" class="stack"></div><div id="pMap" class="map" style="height:240px"></div>
     <div class="sheet-foot"><p class="small muted" id="pTxt" style="flex:1">${pin ? "Current pin shown. Tap to move it." : "Tap the map to drop the pin."}</p><button class="btn" id="pSave">Save location</button></div>`);
   const set = (p, z) => { pin = p; const L = window.L; if (!mk) mk = L.marker([p.lat, p.lng], { icon: pinIcon(L, "on") }).addTo(map); else mk.setLatLng([p.lat, p.lng]); if (z) map.setView([p.lat, p.lng], z); $("#pTxt").textContent = "Pin placed. Tap Save location."; };
-  makeMap($("#pMap"), pin || ACCRA, pin ? 16 : 12).then(m => { map = m; if (pin) set(pin); m.on("click", e => set({ lat: e.latlng.lat, lng: e.latlng.lng })); }).catch(e => { $("#pMap").innerHTML = `<p class="err" style="padding:12px">${esc(cleanErr(e))}</p>`; });
+  makeMap($("#pMap"), pin || ACCRA, pin ? 16 : 12).then(m => { if (!m) return; map = m; if (pin) set(pin); m.on("click", e => set({ lat: e.latlng.lat, lng: e.latlng.lng })); }).catch(e => { $("#pMap").innerHTML = `<p class="err" style="padding:12px">${esc(cleanErr(e))}</p>`; });
   placeSearch($("#pSearch"), $("#pResults"), r => { if (map) { set(r, 17); $("#pResults").innerHTML = ""; $("#pSearch").value = ""; } });
   $("#pMe").addEventListener("click", async () => { try { const me = S.here = await myPosition(); if (map) set(me, 17); } catch (e) { toast(cleanErr(e)); } });
   $("#pSave").addEventListener("click", () => { if (!pin) return toast("Tap the map to drop the pin first."); closeSheet(); onSave(pin); });
@@ -4432,8 +4804,8 @@ async function adminClick(e) {
   const pm = t.closest("[data-paym]");
   if (pm && act === "pay-save") {
     const num = (fval(pm, "number") || "").replace(/[^\d ]/g, "").trim();
-    if (!/^0\d{9}$/.test(num.replace(/\s/g, ""))) return toast("Enter the 10-digit MoMo number, like 024 123 4567.");
-    if ((fval(pm, "name") || "").length < 2) return toast("Enter the name on the MoMo account.");
+    if (!/^0\d{9}$/.test(num.replace(/\s/g, ""))) return toast("Enter the 10-digit mobile money number, like 024 123 4567.");
+    if ((fval(pm, "name") || "").length < 2) return toast("Enter the name on the mobile money account.");
     return run(() => api.savePayMethod({ id: pm.dataset.paym, number: num, name: fval(pm, "name"), network: fval(pm, "network"), active: fval(pm, "active"), is_main: fval(pm, "is_main") }).then(async () => Object.assign(S, await api.load())), "Payment option saved");
   }
   if (pm && act === "pay-remove") return confirmRemove("Remove this payment option?", "Customers will stop seeing " + fval(pm, "number") + " at checkout.", () => api.removePayMethod(pm.dataset.paym));
@@ -4543,14 +4915,14 @@ async function adminSubmit(e) {
   try {
     if (f.dataset.form === "payment") {
       const num = v("momo_number").replace(/[^\d ]/g, "").trim(), name = v("momo_name"), net = f.querySelector("[name=momo_network]").value;
-      if (!/^0\d{9}$/.test(num.replace(/\s/g, ""))) return fail("Enter the 10-digit MoMo number, like 024 123 4567.");
-      if (name.length < 2) return fail("Enter the name on the MoMo account.");
+      if (!/^0\d{9}$/.test(num.replace(/\s/g, ""))) return fail("Enter the 10-digit mobile money number, like 024 123 4567.");
+      if (name.length < 2) return fail("Enter the name on the mobile money account.");
       await api.updateSettings({ momo_number: num, momo_name: name, momo_network: net }); Object.assign(S, await api.load()); toast("Payment details saved");
     }
     if (f.dataset.form === "paymethod") {
       const num = v("number").replace(/[^\d ]/g, "").trim(), name = v("name"), net = f.querySelector("[name=network]").value;
-      if (!/^0\d{9}$/.test(num.replace(/\s/g, ""))) return fail("Enter the 10-digit MoMo number, like 024 123 4567.");
-      if (name.length < 2) return fail("Enter the name on the MoMo account.");
+      if (!/^0\d{9}$/.test(num.replace(/\s/g, ""))) return fail("Enter the 10-digit mobile money number, like 024 123 4567.");
+      if (name.length < 2) return fail("Enter the name on the mobile money account.");
       await api.savePayMethod({ number: num, name, network: net, active: true, is_main: !(S.admin.payment_methods || []).some(p => p.is_main && p.active) });
       Object.assign(S, await api.load()); toast("Payment option added");
     }
@@ -4571,7 +4943,7 @@ async function adminSubmit(e) {
       await api.updateSettings(patch); Object.assign(S, await api.load()); toast("Settings saved");
     }
     if (f.dataset.form === "refund") {
-      const ref = v("ref"); if (ref.length < 4) return fail("Enter the MoMo reference of the refund you sent.");
+      const ref = v("ref"); if (ref.length < 4) return fail("Enter the mobile money reference of the refund you sent.");
       await api.updateOrder(f.dataset.id, { refund_needed: false, refund_due: 0, refund_amount: Number(f.dataset.amt) || 0, refund_ref: ref, refunded_at: new Date().toISOString(), refunded_by: (S.user && S.user.email) || "team" }); toast("Refund recorded");
     }
     if (f.dataset.form === "unmatched") { await api.markUnmatched(f.dataset.id, v("ref")); toast("Refund recorded"); }
@@ -4631,7 +5003,7 @@ function reportHtml(R, isSuper) {
   const flag = v => v.expired >= 2 || (v.on_time != null && v.on_time < 70) ? pill("Unreliable", "bad") : v.always_cooking ? pill("Set cooking days", "ok") : "";
   return `<div class="stack" style="gap:14px"><p class="small muted">${fmtDate(R.week_start)}–${fmtDate(R.week_end)}, compared with the week before.</p>
     <div class="dash-grid rep-grid">${tile("Meals", "meals")}${tile("Orders", "orders")}${tile("Active customers", "customers")}${tile("New customers", "new_customers")}${tile("Repeat rate", "repeat_rate", true)}${tile("Average meals per pool", "avg_meals")}${tile("Pools that filled", "filled")}${tile("Cancelled orders", "cancelled")}</div>
-    ${isSuper && M ? `<section class="stack" style="gap:10px"><h3>Money <span class="small muted">(owner only)</span></h3><div class="dash-grid">${[["Food value", M.food], ["ChopPool vendor fee", M.commission], ...(M.trip_estimate != null ? [["Trips priced to customers", M.trip_estimate], ["Paid to riders", M.trip_paid]] : []), ["Service fees", M.service_fees], ["Cashback in wallets", M.cashback], ...(M.cashback_pending != null ? [["Cashback pending", M.cashback_pending]] : []), ["Wallet refunds", M.refunds], ["Wallet balances owed", M.wallets_owed]].map(([l, v]) => `<div class="dtile"><b class="num" style="font-size:18px;white-space:nowrap">${money(v || 0)}</b><span>${esc(l)}</span></div>`).join("")}<div class="dtile"><b class="num">${M.momo_refunds || 0}</b><span>MoMo refunds to send</span></div></div></section>` : ""}
+    ${isSuper && M ? `<section class="stack" style="gap:10px"><h3>Money <span class="small muted">(owner only)</span></h3><div class="dash-grid">${[["Food value", M.food], ["ChopPool vendor fee", M.commission], ...(M.trip_estimate != null ? [["Trips priced to customers", M.trip_estimate], ["Paid to riders", M.trip_paid]] : []), ["Service fees", M.service_fees], ["Cashback in wallets", M.cashback], ...(M.cashback_pending != null ? [["Cashback pending", M.cashback_pending]] : []), ["Wallet refunds", M.refunds], ["Wallet balances owed", M.wallets_owed]].map(([l, v]) => `<div class="dtile"><b class="num" style="font-size:18px;white-space:nowrap">${money(v || 0)}</b><span>${esc(l)}</span></div>`).join("")}<div class="dtile"><b class="num">${M.momo_refunds || 0}</b><span>Mobile money refunds to send</span></div></div></section>` : ""}
     ${table("Top buildings", [["Building", r => esc(r.name)], ["Meals", r => trend(r.meals, r.prev_meals)], ["Pools", r => r.pools], ["Avg pool", r => r.avg_pool ?? "—"]], R.buildings || [], "No orders this week.")}
     ${(R.quiet || []).length ? table("Went quiet", [["Building", r => esc(r.name)], ["Meals last week", r => r.prev_meals]], R.quiet, "") : ""}
     ${table("Top customers", [["Name", r => esc(r.name)], ["Building", r => esc(r.building || "")], ...(isSuper ? [["Phone", r => esc(r.phone || "")]] : []), ["Orders", r => r.orders], ["Meals", r => r.meals]], R.customers || [], "No customers this week.")}
@@ -4673,13 +5045,16 @@ async function viewKitchen(token) {
       K = await api.kitchenView(token, d);
       if (dNext !== dToday) {
         N = await api.kitchenView(token, d === dNext ? dToday : dNext);
-        // First load: jump to the day where customers are waiting for the seller to confirm
-        if (!picked && d === dToday && N.pools.some(p => p.status === "waiting") && !K.pools.some(p => p.status === "waiting")) { picked = true; d = dNext; [K, N] = [N, K]; }
+        // First load: open the day that needs the vendor. Tomorrow when customers there are waiting, or when
+        // today's orders have closed and nothing is still being cooked or delivered today.
+        const running = K.pools.some(p => ["collecting", "accepted", "ready", "picked_up", "arriving"].includes(p.status));
+        const todayDone = new Date() >= at(dToday, S.settings.cutoff) && !running;
+        if (!picked && d === dToday && ((N.pools.some(p => p.status === "waiting") && !K.pools.some(p => p.status === "waiting")) || todayDone)) { picked = true; d = dNext; [K, N] = [N, K]; }
       }
       picked = true;
     } catch (e) { $("#view").innerHTML = `<p class="card err">${esc(cleanErr(e))}</p>`; return; }
-    const other = d === dToday ? dNext : dToday, otherWaiting = N && N.pools.some(p => p.status === "waiting");
-    const dayTabs = dNext !== dToday ? `<div class="chips" role="group" aria-label="Day">${[dToday, dNext].map(x => `<button type="button" class="tog" data-kday="${x}" aria-pressed="${x === d}">${esc(dayLabel(x)[0].toUpperCase() + dayLabel(x).slice(1))}${x !== d && otherWaiting ? ` <span class="dot" aria-label="needs you"></span>` : ""}</button>`).join("")}</div>` : "";
+    const other = d === dToday ? dNext : dToday, otherWaiting = N ? N.pools.filter(p => p.status === "waiting").length : 0;
+    const dayTabs = dNext !== dToday ? `<div class="chips" role="group" aria-label="Day">${[dToday, dNext].map(x => `<button type="button" class="tog" data-kday="${x}" aria-pressed="${x === d}">${esc(dayLabel(x)[0].toUpperCase() + dayLabel(x).slice(1))}${x !== d && otherWaiting ? ` · ${otherWaiting} waiting` : ""}</button>`).join("")}</div>` : "";
     const k = K.kitchen, used = K.pools.reduce((t, p) => t + p.orders.reduce((a, o) => a + o.qty, 0), 0);
     const waiting = K.pools.filter(p => p.status === "waiting");
     const afterCut = new Date() >= at(d, S.settings.cutoff);
@@ -4689,8 +5064,14 @@ async function viewKitchen(token) {
     const specials = pools.filter(p => ["waiting", "collecting"].includes(p.status)).flatMap(p => p.orders.filter(o => ["quote_requested", "quoted"].includes(o.status)).map(o => ({ ...o, site: p.site })));
     const priceBy = minus(S.settings.cutoff, Number(S.settings.quote_pay_min || 15));
     // One line that says what to do next, with one big button
+    const closedToday = d === today() && afterCut;
+    // "Customers at Heritage Tower want lunch tomorrow (3 meals). Confirm by 8:30 tomorrow · 42 min left."
+    const waitLine = () => { const by = waiting.map(p => waitUntilOf({ ...p, order_date: p.order_date || d })).filter(x => x && isFinite(x)).sort((a, b) => a - b)[0], meals = waiting.reduce((t, p) => t + p.orders.reduce((a, o) => a + o.qty, 0), 0);
+      const left = by ? Math.max(0, Math.round((by - new Date()) / 6e4)) : null, dl = dayLabel(d);
+      return "Customers at " + waiting.map(p => p.site).join(", ") + " want lunch " + (dl === "today" || dl === "tomorrow" ? dl : "on " + fmtDate(d)) + " (" + meals + " meal" + (meals === 1 ? "" : "s") + "). Confirm by " + (by ? by.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "UTC" }) : fmtTime(confirmBy())) + (by && by.toISOString().slice(0, 10) !== today() ? " " + (dayLabel(by.toISOString().slice(0, 10)) === "tomorrow" ? "tomorrow" : fmtDate(by.toISOString().slice(0, 10))) : "") + (left != null && left < 180 ? " · " + left + " min left" : "") + "."; };
     const nextUp = (() => {
-      if (!k.open && !k.paused) return { t: waiting.length ? "Customers are waiting. Confirm you're cooking." : "Confirm you're cooking " + dayLabel(d) + ".", go: "#cookCard", b: "Confirm" };
+      if (!k.open && !k.paused && closedToday) return { t: "Orders for " + dayLabel(d) + " have closed." + (dNext !== d ? " Tap " + dayLabel(dNext)[0].toUpperCase() + dayLabel(dNext).slice(1) + " to see what's next." : ""), go: "", b: "" };
+      if (!k.open && !k.paused) return { t: waiting.length ? waitLine() : "Confirm you're cooking " + dayLabel(d) + ".", go: "#cookCard", b: "Confirm" };
       const sp = specials.filter(o => o.status === "quote_requested").length;
       if (sp) return { t: `Price ${sp} special request${sp > 1 ? "s" : ""} by ${fmtTime(priceBy)}.`, go: "#specials", b: "Price now" };
       const st = s => pools.find(p => p.status === s);
@@ -4716,9 +5097,9 @@ async function viewKitchen(token) {
         <p class="muted">${fmtDate(d)} · ready by ${minus(S.settings.delivery_time, 30)} · ${used} of ${k.capacity} meals · ${k.delivery_mode === "runner" ? "you deliver with your own runner" : "a ChopPool rider collects"}</p></header>
       ${dayTabs}
       ${nextUp.go === "#cookCard" || (k.paused && !k.open) ? "" : `<section class="card nextup" aria-live="polite"><p>${esc(nextUp.t)}</p>${nextUp.b ? `<button class="btn wide" data-jump="${esc(nextUp.go)}">${esc(nextUp.b)}</button>` : ""}</section>`}
-      ${k.open ? "" : k.paused ? `<section class="card"><h2>You're not cooking ${dayLabel(d)}</h2><p class="small muted">Customers can't order from you for ${fmtDate(d)}.</p><button class="ghost wide" id="unpause">I'm cooking ${dayLabel(d)} after all</button></section>`
+      ${k.open || (closedToday && !waiting.length) ? "" : k.paused ? `<section class="card"><h2>You're not cooking ${dayLabel(d)}</h2><p class="small muted">Customers can't order from you for ${fmtDate(d)}.</p><button class="ghost wide" id="unpause">I'm cooking ${dayLabel(d)} after all</button></section>`
         : `<section class="card" id="cookCard" style="border-color:var(--accent)"><h2>${waiting.length ? "Customers are waiting for you" : "Are you cooking " + dayLabel(d) + "?"}</h2>
-          <p>${waiting.length ? waiting.map(p => esc(p.site)).join(", ") + " want" + (waiting.length > 1 ? "" : "s") + " to order. Confirm " + (d > today() ? "by " + fmtTime(confirmBy()) + " " + (dayLabel(d) === "tomorrow" ? "tomorrow" : fmtDate(d)) : "within " + S.settings.accept_timeout_min + " minutes") + " so the pool can open." : "Confirm so people can start ordering from you."}</p>
+          <p>${waiting.length ? waitLine() : "Confirm so people can start ordering from you."}</p>
           ${termsNeed(k) ? termsBox(k, K.menu) : ""}
           ${termsNeed(k) ? `<button class="btn wide" id="acceptTerms">Accept terms and confirm I'm cooking ${dayLabel(d)}</button>` : `${Number(k.fee_rate) > 0 ? `<p class="small muted">${esc(termsLine(k))}</p>` : ""}<button class="btn wide" id="openDay">Yes, I'm cooking ${dayLabel(d)}</button>`}</section>`}
       ${specials.length ? `<section class="card stack" id="specials"><div class="top"><h2>Special requests</h2><span class="chip warn">Price by ${fmtTime(priceBy)}</span></div><p class="small muted">The customer pays after you price it. Requests not priced in time are cancelled.</p>${specials.map(quoteForm).join("")}</section>` : ""}
@@ -4739,7 +5120,7 @@ async function viewKitchen(token) {
           ${food > 0 ? `<div class="sumgrid small"><span>Food paid for</span><b class="num">${money(food)}</b>${Number(p.fee) > 0 ? `<span>ChopPool fee (${Math.round(Number(p.fee_rate) * 1000) / 10}% after ${p.fee_free} meals)</span><b class="num">−${money(p.fee)}</b>` : ""}<span>Due to you</span><b class="num">${money(food - Number(p.fee || 0))}</b></div>` : ""}
           ${Object.keys(tally).length ? `<ul style="margin:0;padding-left:20px">${Object.entries(tally).map(([nm, q]) => `<li class="num"><strong>${q} ×</strong> ${esc(nm)}</li>`).join("")}</ul>` : ""}
           <p class="small muted">Label each pack with its code:</p>
-          <div class="labels">${byCode(p.orders.filter(o => !["quote_requested", "quoted"].includes(o.status))).sort((x, y) => (x[1][0].created_at || "") < (y[1][0].created_at || "") ? -1 : 1).map(([c, g]) => `<div><span class="lc num">${esc(c)}</span><span class="items">${g.map(o => `<span>${o.qty} × ${esc(o.item_name)}${o.addons?.length ? " · " + esc(addonText(o.addons)) : ""}${o.special_request ? `<br><strong>Special: ${esc(o.special_request)}</strong>` : ""}${o.note ? `<br><span class="small muted">Note: ${esc(o.note)}</span>` : ""}</span>`).join("")}${g.length > 1 ? `<span class="small muted">One bag · ${g.reduce((t, o) => t + o.qty, 0)} meals</span>` : ""}</span>${g.every(o => o.collected) ? `<span class="tick">Collected</span>` : g.every(o => o.paid) ? "" : `<span class="chip warn">Payment pending</span>`}</div>`).join("") || `<p class="small muted">No paid orders yet.</p>`}</div>
+          <div class="labels">${byCode(p.orders.filter(o => !["quote_requested", "quoted"].includes(o.status))).sort((x, y) => (x[1][0].created_at || "") < (y[1][0].created_at || "") ? -1 : 1).map(([c, g]) => `<div><span class="lc num">${esc(c)}</span><span class="items">${groupDishes(g.filter(o => !o.special_request)).map(x => `<span>${x.qty} × ${esc(x.name)}${x.extra ? ` <span class="small muted">· ${esc(x.extra)}</span>` : ""}</span>`).join("")}${g.filter(o => o.special_request).map(o => `<span>${o.qty} × ${esc(o.item_name)}<br><strong>Special: ${esc(o.special_request)}</strong></span>`).join("")}${g.length > 1 ? `<span class="small muted">Pack together · ${g.reduce((t, o) => t + o.qty, 0)} meals</span>` : ""}</span>${g.every(o => o.collected) ? `<span class="tick">Collected</span>` : g.every(o => o.paid) ? "" : `<span class="chip warn">Payment pending</span>`}</div>`).join("") || `<p class="small muted">No paid orders yet.</p>`}</div>
           ${runnerHand}${btns}</article>`;
       }).join("")}
       <details class="card settingsfold"${S.kset ? " open" : ""}><summary><h2>Your settings</h2><span class="small muted">Cooking days, free delivery, menu, photos, alerts</span></summary>
@@ -4883,7 +5264,7 @@ function wireCodes(token, d, redraw) {
 }
 // Orders grouped by code (a code can hold added plates), sorted A→Z
 const byCode = os => { const m = new Map(); os.forEach(o => { if (!m.has(o.code)) m.set(o.code, []); m.get(o.code).push(o); }); return [...m.entries()].sort((a, b) => a[0] < b[0] ? -1 : 1); };
-const handList = os => `<div class="labels">${byCode(os).map(([c, g]) => `<div><span class="lc num">${esc(c)}</span><span>${esc(g[0].name)} · ${g.map(o => o.qty + " × " + esc(o.item_name)).join(" + ")}</span>${g.every(o => o.collected) ? `<span class="tick">Collected</span>` : `<span class="muted small">Waiting</span>`}</div>`).join("")}</div>`;
+const handList = os => `<div class="labels">${byCode(os).map(([c, g]) => `<div><span class="lc num">${esc(c)}</span><span>${esc(g[0].name)} · ${groupDishes(g).map(x => x.qty + " × " + esc(x.name)).join(" + ")}</span>${g.every(o => o.collected) ? `<span class="tick">Collected</span>` : `<span class="muted small">Waiting</span>`}</div>`).join("")}</div>`;
 async function viewRider(token) {
   const d = opsDate();
   // Picked up -> (customers get "about 5 minutes away" automatically) -> Delivered
@@ -4993,7 +5374,7 @@ function viewRiderSignup() {
       <p class="muted">Deliver lunch from nearby kitchens to offices, hostels and apartments. One pickup, one drop point, every weekday around midday.</p></header>
     <form class="card stack" id="rsForm" novalidate>
       <div><label for="rsName">Full name</label><input id="rsName" autocomplete="name" placeholder="Kwame Asare"></div>
-      <div class="grid2"><div><label for="rsPhone">Phone / WhatsApp</label><input id="rsPhone" inputmode="tel" autocomplete="tel" placeholder="024 123 4567"></div><div><label for="rsMomo">MoMo number for payouts</label><input id="rsMomo" inputmode="tel" placeholder="024 123 4567"></div></div>
+      <div class="grid2"><div><label for="rsPhone">Phone / WhatsApp</label><input id="rsPhone" inputmode="tel" autocomplete="tel" placeholder="024 123 4567"></div><div><label for="rsMomo">Mobile money number for payouts</label><input id="rsMomo" inputmode="tel" placeholder="024 123 4567"></div></div>
       <div class="grid2"><div><label for="rsBike">Motorbike and plate</label><input id="rsBike" placeholder="Honda, GW 1234-22"></div><div><label for="rsArea">Area you ride in</label><input id="rsArea" placeholder="Osu, Airport, East Legon"></div></div>
       <p class="small muted">The ChopPool team checks every application and will call you. Delivery pricing is the same for every rider.</p>
       <p class="small muted">We use these details to check and pay you. See our <a href="#privacy" target="_blank" rel="noopener">privacy notice</a>.</p>
@@ -5015,7 +5396,7 @@ function openListingForm(token, k) {
       <div><label for="lsTag">What you sell, in a few words</label><input id="lsTag" value="${esc(L.tagline || "")}" placeholder="Waakye and gob3, cooked every morning"></div>
       <div class="row" style="justify-content:flex-start;gap:10px"><span class="small" id="lsPinTxt">${pin ? "Location set" : "Where do you cook?"}</span><button type="button" class="ghost" id="lsPin">${pin ? "Move pin" : "Set on map"}</button></div>
       <div class="grid2"><div><label for="lsCap">Meals you can make a day</label><input id="lsCap" inputmode="numeric" value="${esc(L.capacity || k.capacity || 30)}"></div><div><label for="lsHours">Days and times you cook</label><input id="lsHours" value="${esc(L.hours || "")}" placeholder="Mon–Fri, 7am–1pm"></div></div>
-      <div><label for="lsMomo">MoMo number for payments</label><input id="lsMomo" inputmode="tel" value="${esc(L.momo || "")}" placeholder="024 123 4567"></div>
+      <div><label for="lsMomo">Mobile money number for payments</label><input id="lsMomo" inputmode="tel" value="${esc(L.momo || "")}" placeholder="024 123 4567"></div>
       <p class="small muted">Your menu and prices are the ones on this page. Check them before you send.</p>
       <p class="err" id="lsErr"></p><button class="btn wide">Send listing request</button></form>`);
   $("#lsPin").addEventListener("click", () => {
@@ -5027,7 +5408,7 @@ function openListingForm(token, k) {
     const listing = { name: $("#lsName").value.trim(), tagline: $("#lsTag").value.trim(), capacity: Number($("#lsCap").value) || 30, hours: $("#lsHours").value.trim(), momo: $("#lsMomo").value.replace(/[^\d ]/g, "").trim(), lat: pin && pin.lat, lng: pin && pin.lng };
     if (listing.name.length < 2) return ($("#lsErr").textContent = "Add your business name.");
     if (!pin) return ($("#lsErr").textContent = "Set where you cook on the map.");
-    if (!/^0\d{9}$/.test(listing.momo.replace(/\s/g, ""))) return ($("#lsErr").textContent = "Enter your 10-digit MoMo number.");
+    if (!/^0\d{9}$/.test(listing.momo.replace(/\s/g, ""))) return ($("#lsErr").textContent = "Enter your 10-digit mobile money number.");
     try { await api.vendorRequestListing(token, listing); closeSheet(); toast("Request sent. ChopPool will check it and let you know."); route(); } catch (err) { $("#lsErr").textContent = cleanErr(err); }
   });
 }
@@ -5090,7 +5471,8 @@ window.addEventListener("scroll", () => {
   });
 }, { passive: true });
 function initMotion() {
-  if (!(isStandalone() || /[?&]motion=1/.test(location.search))) return;
+  // Premium motion in the browser too (it was installed-app only); people who ask for reduced motion get the calm version
+  if (/[?&]motion=0/.test(location.search)) return;
   document.body.classList.add("is-app");
   let t; new MutationObserver(() => { clearTimeout(t); t = setTimeout(revealScan, 30); }).observe(document.getElementById("app"), { childList: true, subtree: true });
 }
@@ -5114,9 +5496,12 @@ async function route() {
   if (h === "privacy" || h === "terms") return viewLegal(h);
   const view = h.startsWith("kitchen-") ? "kitchen" : h.startsWith("rider-") ? "rider" : h.startsWith("host-") ? "host" : h === "admin" ? "admin" : "order";
   document.querySelectorAll("#demoBar a").forEach(a => { if (a.getAttribute("href") === "#" + h || (view === "order" && a.dataset.view === "order")) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
+  if (S.appReady && ["kitchen", "rider", "host"].includes(view)) introFor(h);
   if (view === "kitchen") return viewKitchen(h.slice(8));
   if (view === "rider") return viewRider(h.slice(6));
   if (view === "host") return viewHost(h.slice(5));
+  // Team screens and the customer app use different sign-ins; switching between them reloads who is signed in
+  if (api.useTeam && api.useTeam(view === "admin")) { S.user = null; S.role = null; S.admin = null; try { await refreshUser(); } catch (e) {} }
   if (view === "admin") return viewAdmin();
   return viewOrder();
 }
@@ -5166,6 +5551,8 @@ async function start() {
       history.replaceState(null, "", location.pathname + (S.resetTo === "admin" ? "#admin" : "#order"));
     }
   }
+  // Ask the browser to keep this app's data (sign-in, orders on this phone) instead of clearing it when space is short
+  try { navigator.storage && navigator.storage.persist && navigator.storage.persisted().then(p => p || navigator.storage.persist()); } catch (e) {}
   // Instant start: last-seen menus and board from this phone, refreshed quietly in the background
   const boot = !DEMO && local.get("cp_boot");
   if (boot && boot.v === 2 && boot.load && boot.load.settings) {
@@ -5183,7 +5570,7 @@ async function start() {
   $("#sheetBg").addEventListener("click", e => { if (e.target === $("#sheetBg")) closeSheet(); });
   initSheetDrag();
   document.addEventListener("keydown", e => { if (e.key === "Escape") closeSheet(); });
-  document.addEventListener("click", e => { const c = e.target.closest("[data-copy]"); if (c) return copy(c.dataset.copy, "Link copied"); const b = e.target.closest("[data-copynum]"); if (b) copy(b.dataset.copynum.replace(/\s/g, ""), "MoMo number copied"); });
+  document.addEventListener("click", e => { const c = e.target.closest("[data-copy]"); if (c) return copy(c.dataset.copy, "Link copied"); const b = e.target.closest("[data-copynum]"); if (b) copy(b.dataset.copynum.replace(/\s/g, ""), "Mobile money number copied"); });
   window.addEventListener("hashchange", route);
   // Background refresh pauses while the app is hidden; catch up at once when it's opened again
   document.addEventListener("visibilitychange", () => { if (document.hidden || !$("#tabHome")) return; refreshBoard(); refreshMine(); tickCountdown(); });
@@ -5211,6 +5598,7 @@ async function start() {
   S.splashPainted && S.splashPainted();
   S.appReady = true; if (S.onReady) S.onReady();
   showRecovery();
+  maybeIntro();
 }
 start();
 </script>

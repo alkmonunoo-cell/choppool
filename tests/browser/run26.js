@@ -2,7 +2,7 @@ const { chromium, devices } = require('playwright');
 (async () => { const b = await chromium.launch(); const ctx = await b.newContext({ ...devices['iPhone 14'] });
   const p = await ctx.newPage(); const errs = []; p.on('pageerror', e => errs.push(e.message));
   await p.route(/tile\.openstreetmap|cdnjs|nominatim/, r => r.abort());
-  await p.addInitScript(() => { localStorage.setItem('cp_splash_v','1'); localStorage.setItem('cp_site', JSON.stringify('s1')); localStorage.setItem('cp_me', JSON.stringify({ name: 'Ama Mensah', phone: '0241234567' })); });
+  await p.addInitScript(() => { localStorage.setItem('cp_splash_v','1'); ['cp_intro_done','cp_intro_kitchen','cp_intro_rider','cp_intro_host'].forEach(k => localStorage.setItem(k, 'true')); localStorage.setItem('cp_site', JSON.stringify('s1')); localStorage.setItem('cp_me', JSON.stringify({ name: 'Ama Mensah', phone: '0241234567' })); });
   const step = async (n, f) => { try { await f(); console.log('ok', n); } catch (e) { console.log('FAIL', n, e.message.split('\n')[0]); } };
   await p.goto('file:///home/claude/choppool/index.html'); await p.waitForTimeout(1500);
   await step('countdown before 6am', async () => { const r = await p.evaluate(() => { S.settings.countdown_start = "23:59"; tickCountdown(); const a = [$("#countdown").textContent, $("#cdLabel").textContent]; S.settings.countdown_start = "00:00"; tickCountdown(); return a.concat([$("#countdown").textContent, $("#cdLabel").textContent]); }); console.log('  ', r.join(' | ')); });
