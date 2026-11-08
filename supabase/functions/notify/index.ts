@@ -52,14 +52,17 @@ async function poolEvents(poolId: string, opened = false) {
   if (p.status === "collecting" && meals === s.max_meals - 1 && await once("seat1:" + p.id))
     await send(await cust(), "1 seat left", "Your pool at " + site.name + " is almost full. Delivery is at its lowest.", url, "pool-" + p.id, "almost");
   if (p.status === "arriving" && await once("arriving:" + p.id))
-    await send(await cust(), "Lunch is 5 minutes away", site.handoff === "host" ? "It's coming to " + site.drop_point + "." : "Meet the rider at " + site.drop_point + " with your code.", url, "pool-" + p.id, "arriving");
-  if (p.status === "delivered" && site.handoff === "host" && await once("delivered:" + p.id))
-    await send(await cust(), "Lunch is here", "Collect it from " + (site.host_label || site.drop_point) + " with your code.", url, "pool-" + p.id, "arriving");
+    await send(await cust(), "Lunch is about 5 minutes away", site.handoff === "host" ? "It's coming to " + site.drop_point + "." : "Meet the rider at " + site.drop_point + " with your code.", url, "pool-" + p.id, "arriving");
+  if (p.status === "delivered" && await once("delivered:" + p.id))
+    await send(await cust(), "Your lunch is here", site.handoff === "host" ? "Collect it from " + (site.host_label || site.drop_point) + " with your code, like K-27."
+      : "The rider is at " + site.drop_point + " and waits " + (s.arrival_window_min || 10) + " minutes. Bring your code.", url, "pool-" + p.id, "arriving");
   if (p.rider_id && !["delivered", "cancelled"].includes(p.status) && await once("rider:" + p.id + ":" + p.rider_id)) {
     const { data: r } = await db.from("riders").select("*").eq("id", p.rider_id).single();
     if (r) await send(await riderSubs(r.id), "New pickup", k.public_name + " → " + site.name + ", " + meals + " meals.", APP + "/#rider-" + r.token, "rider-" + p.id);
   }
 }
+const quoteMins = (o: any) => o.quote_pay_by ? Math.max(1, Math.round((Date.parse(o.quote_pay_by) - Date.now()) / 6e4)) : 15;
+const distKm = (a: any, b: any) => { const r = Math.PI / 180, x = (b.lng - a.lng) * r * Math.cos((a.lat + b.lat) * r / 2), y = (b.lat - a.lat) * r; return Math.sqrt(x * x + y * y) * 6371; };
 // Pools for a later day give the vendor until the "confirm by" time that morning
 const laterDay = (p: any) => p.order_date > String(p.created_at).slice(0, 10);
 const dayName = (d: string) => new Date(d + "T00:00:00Z").toLocaleDateString("en-GB", { weekday: "long", timeZone: "UTC" });
@@ -74,13 +77,15 @@ async function orderEvents(orderId: string) {
   if (o.status === "quote_requested" && await once("special:" + o.id))
     await send(await kitchenSubs(o.kitchen_id), "Special request to price", o.qty + " × " + o.item_name + ": " + o.special_request, APP + "/#kitchen-" + k.token, "special-" + o.id);
   if (o.status === "quoted" && await once("quoted:" + o.id + ":" + o.quote_price))
-    await send(await customerSubs([o]), "Your request is priced", k.public_name + " priced it at " + money(o.quote_price) + " a meal. Pay to confirm.", APP + "/#order", "order-" + o.id, "priced");
+    await send(await customerSubs([o]), "Your request is priced", k.public_name + " priced it at " + money(o.quote_price) + " a meal. Pay within " + quoteMins(o) + " minutes to keep it.", APP + "/#order", "order-" + o.id, "priced");
   // Payment we couldn't find, or short: the customer can fix it from Orders before cut-off (always sent; not a type you can switch off)
   if (o.status === "pending" && o.pay_issue && await once("payissue:" + o.id + ":" + o.pay_issue + ":" + (o.momo_ref || "")))
     await send(await customerSubs([o]), o.pay_issue === "short" ? "Your payment was short" : "We couldn't find your payment",
       (o.pay_issue === "short" ? "We received " + money(o.amount_received || 0) + ". Pay the rest" : "Check the MoMo reference or pay again") + " before orders close so your lunch counts.", APP + "/#order", "order-" + o.id);
   if (o.status === "cancelled" && o.cancel_reason === "Payment not received" && await once("unpaid:" + o.id))
     await send(await customerSubs([o]), "Order cancelled", "We didn't receive your payment before orders closed, so code " + o.code + " was cancelled.", APP + "/#order", "order-" + o.id);
+  if (o.status === "cancelled" && ["Special request not paid in time", "The seller didn't price your request in time"].includes(o.cancel_reason || "") && await once("quoteclosed:" + o.id))
+    await send(await customerSubs([o]), "Special request closed", (o.cancel_reason || "") + ", so code " + o.code + " was released. Nothing was charged.", APP + "/#order", "order-" + o.id);
   if (o.status === "cancelled" && o.cancel_reason === "Special request not paid before cut-off" && await once("unpaidquote:" + o.id))
     await send(await customerSubs([o]), "Special request closed", "Orders closed before your special request was paid, so code " + o.code + " was released. Nothing was charged.", APP + "/#order", "order-" + o.id);
   if (o.status === "cancelled" && /^The seller can't/.test(o.cancel_reason || "") && await once("declined:" + o.id))
@@ -98,6 +103,48 @@ async function tick() {
   const { data: autoCancelled } = await db.from("orders").select("id").eq("status", "cancelled")
     .in("cancel_reason", ["Payment not received", "Special request not paid before cut-off"]).gte("order_date", since);
   for (const o of autoCancelled || []) await orderEvents(o.id);
+  const { data: qClosed } = await db.from("orders").select("id").eq("status", "cancelled")
+    .in("cancel_reason", ["Special request not paid in time", "The seller didn't price your request in time"]).gte("order_date", since);
+  for (const o of qClosed || []) await orderEvents(o.id);
+
+  // Cashback posted to a wallet in the last 15 minutes: tell the customer
+  const { data: cb } = await db.from("wallet_entries").select("order_id,amount,user_id").like("reason", "Delivery cashback%").gte("created_at", new Date(now.getTime() - 15 * 6e4).toISOString());
+  for (const e of cb || []) if (await once("cashback:" + e.order_id))
+    await send(((await db.from("push_subs").select("*").eq("user_id", e.user_id)).data || []), money(e.amount) + " cashback added", "Your share of the delivery is back in your ChopPool wallet.", APP + "/#order", "cashback-" + e.order_id, "cashback");
+
+  const cutToday = new Date(today + "T" + String(s.cutoff).slice(0, 5) + ":00Z"), payMin = Number(s.quote_pay_min || 15);
+  // Sellers: reminder 15 minutes before pricing for special requests closes
+  const priceBy = new Date(cutToday.getTime() - payMin * 6e4);
+  if (now >= new Date(priceBy.getTime() - 15 * 6e4) && now < priceBy) {
+    const { data: qs } = await db.from("orders").select("*").eq("status", "quote_requested").eq("order_date", today);
+    for (const o of qs || []) if (await once("quoteremind:" + o.id)) {
+      const { data: k } = await db.from("kitchens").select("*").eq("id", o.kitchen_id).single();
+      if (k) await send(await kitchenSubs(k.id), "Price a special request", "Price code " + o.code + " before " + priceBy.toISOString().slice(11, 16) + " or it closes.", APP + "/#kitchen-" + k.token, "special-" + o.id);
+    }
+  }
+  // Solo pools: 10 minutes before cut-off, ask the only customer if they still want it
+  if (now >= new Date(cutToday.getTime() - 10 * 6e4) && now < cutToday) {
+    const { data: tp } = await db.from("pools").select("id,kitchen_id").eq("order_date", today).in("status", ["collecting", "waiting"]);
+    for (const p of tp || []) {
+      const { data: os } = await db.from("orders").select("*").eq("pool_id", p.id).is("parent_id", null).in("status", ["pending", "paid"]);
+      if (!os || os.length !== 1 || os[0].solo_choice) continue;
+      if (await once("solo:" + os[0].id))
+        await send(await customerSubs(os), "You're the only one in this pool", "Delivery is the full trip. Keep it, switch to another pool, or cancel before " + String(s.cutoff).slice(0, 5) + ".", APP + "/#order", "solo-" + os[0].id, "solo");
+    }
+  }
+  // On the way: if the rider's phone hasn't said they're close, estimate it from pickup time and road distance (20 km/h)
+  const { data: moving } = await db.from("pools").select("*").eq("status", "picked_up").gte("order_date", since);
+  for (const p of moving || []) {
+    if (!p.picked_up_at) continue;
+    const [{ data: k }, { data: si }] = await Promise.all([db.from("kitchens").select("lat,lng").eq("id", p.kitchen_id).single(), db.from("sites").select("lat,lng").eq("id", p.site_id).single()]);
+    const km = k && si && k.lat != null && si.lat != null ? distKm(k, si) * 1.3 : 3, mins = km / 20 * 60;
+    if (now.getTime() >= Date.parse(p.picked_up_at) + Math.max(0, mins - 5) * 6e4) {
+      await db.from("pools").update({ status: "arriving", arriving_at: now.toISOString() }).eq("id", p.id).eq("status", "picked_up");
+      await poolEvents(p.id);
+    }
+  }
+  // Once a day: forget alert order IDs older than two days
+  if (await once("prune:" + today)) await db.rpc("prune_push_subs");
   const { data: pools } = await db.from("pools").select("*").gte("order_date", since);
   for (const p of pools || []) {
     if (p.status === "waiting" && laterDay(p)) {

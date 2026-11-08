@@ -124,6 +124,9 @@ button.hero-stat::after { content: "›"; position: absolute; right: 9px; top: 6
 .hero-stat { min-width: 0; }
 .hero-stat b.long { font-size: 15px; line-height: 21px; }
 .hero-stat b.tiny { font-size: 13px; }
+.recv { display: grid; gap: 8px; padding: 12px; border-radius: 14px; background: var(--ok-soft); color: var(--ink); font-weight: 600; }
+.solo .row .btn, .solo .row .ghost { padding: 9px 12px; }
+.sumhint { display: block; font-size: 12px; font-weight: 500; color: var(--muted); margin-top: 1px; }
 .hero-stat b .ampm { font-size: .6em; font-weight: 700; margin-left: 2px; letter-spacing: -.02em; }
 .hero-stat span { font-size: 11.5px; opacity: .9; line-height: 1.3; }
 :root[data-theme="dark"] .hero-stat { background: rgba(0,0,0,.12); }
@@ -893,17 +896,24 @@ applyTheme(local.get("cp_theme") || "auto");
 const hasPin = x => x && x.lat != null && x.lng != null;
 const ROAD_FACTOR = 1.3;   // road distance is roughly 1.3 x the straight line
 // Estimated rider trip cost from the kitchen to the building: base fare + rate per km. Falls back to the flat trip cost when either has no pin.
+// Trip price for a vendor -> building; never above the safety ceiling on a whole trip
+const tripMax = s => Number(s.trip_max ?? 80);
 function tripFor(k, site, s) {
-  if (!hasPin(k) || !hasPin(site) || s.per_km == null || s.base_fare == null) return Number(s.trip_cost);
-  return Math.round(Number(s.base_fare) + Number(s.per_km) * distM(k, site) / 1000 * ROAD_FACTOR);
+  if (!hasPin(k) || !hasPin(site) || s.per_km == null || s.base_fare == null) return Math.min(Number(s.trip_cost), tripMax(s));
+  return Math.min(tripMax(s), Math.round(Number(s.base_fare) + Number(s.per_km) * distM(k, site) / 1000 * ROAD_FACTOR));
 }
 const roadKm = (k, site) => distM(k, site) / 1000 * ROAD_FACTOR;
-// The per-meal cap only applies up to cap_km by road; longer trips split the real trip cost
-const capTrip = s => s.cap_km == null || s.base_fare == null || s.per_km == null ? Infinity : Math.round(Number(s.base_fare) + Number(s.per_km) * Number(s.cap_km));
-const isLong = (s, trip) => Number(trip ?? s.trip_cost) > capTrip(s);
-const capOf = (s, trip) => isLong(s, trip) ? Infinity : Number(s.max_fee);
-const feeFor = (meals, s, trip) => { const t = Number(trip ?? s.trip_cost), cap = capOf(s, t);
-  return meals <= 0 ? (cap === Infinity ? Math.ceil(t * 2) / 2 : cap) : Math.min(cap, Math.ceil(t / meals * 2) / 2); };
+// Everyone pays the full trip at checkout; cashback returns the shared part. A meal's share = trip / meals (rounded up to 50 pesewas).
+const isLong = () => false;
+const feeFor = (meals, s, trip) => { const t = Math.min(Number(trip ?? s.trip_cost), tripMax(s));
+  return meals <= 0 ? Math.ceil(t * 2) / 2 : Math.ceil(t / meals * 2) / 2; };
+// What's charged per meal at checkout so the whole order pays the trip once
+// One order for the steps every screen shows (same as the database)
+// Phone numbers read the same everywhere: 024 123 4567
+const fmtPhone = n => { const d = String(n || "").replace(/\D/g, ""); return d.length === 10 ? d.slice(0, 3) + " " + d.slice(3, 6) + " " + d.slice(6) : String(n || ""); };
+const newToken = () => [...crypto.getRandomValues(new Uint8Array(18))].map(b => b.toString(36).padStart(2, "0")).join("").slice(0, 24);
+const stepRank = st => ["waiting", "collecting", "accepted", "ready", "picked_up", "arriving", "delivered"].indexOf(st);
+const upfrontPerMeal = (trip, qty, s) => Math.ceil(feeFor(0, s, trip) / Math.max(1, qty) * 2) / 2;
 function nextDrop(meals, s, trip) {
   const cur = feeFor(Math.max(meals, 1), s, trip);
   for (let m = meals + 1; m <= s.max_meals; m++) { const f = feeFor(m, s, trip); if (f < cur) return { more: m - meals, fee: f }; }
@@ -941,7 +951,7 @@ const isoDow = d => { const w = new Date(d + "T00:00:00Z").getUTCDay(); return w
    DEMO DATA LAYER: in-memory copy of the database logic, with simulated customers
    ===================================================================================== */
 function makeDemoApi() {
-  const settings = { cutoff: "10:30", special_cutoff: "10:00", delivery_time: "12:30", trip_cost: 60, base_fare: 20, per_km: 6, max_fee: 10, cap_km: 8, service_fee: 2, min_pool: 6, max_meals: 15,
+  const settings = { cutoff: "10:30", special_cutoff: "10:00", delivery_time: "12:30", trip_cost: 60, base_fare: 20, per_km: 6, max_fee: 10, cap_km: 8, trip_max: 80, quote_pay_min: 15, auto_receive_min: 120, admin_idle_min: 15, service_fee: 2, min_pool: 6, max_meals: 15,
     commission_rate: 0.15, vendor_fee_rate: 0, vendor_fee_free: 5, next_day_confirm_by: "08:30", countdown_start: "06:00", near_max_fee: 50, free_max_m: 1500, accept_timeout_min: 20, arrival_window_min: 10, notify_daily_cap: 5, momo_number: "024 000 0000", momo_name: "ChopPool Pilot", momo_network: "MTN" };
   const sites = [
     { id: "s1", name: "Heritage Tower, Ridge", drop_point: "Lobby security desk", handoff: "host", host_label: "the security desk in the lobby", host_token: "demoh1", lat: 5.5640, lng: -0.2010, status: "active", active: true },
@@ -983,6 +993,7 @@ function makeDemoApi() {
     return n ? Math.round(Number(p.fee_rate || 0) * food * Math.max(0, n - Number(p.fee_free ?? 5)) / n * 100) / 100 : 0; };
   const isOpen = (kid, d) => days.some(x => x.kitchen_id === kid && x.order_date === d) || (k => !!k && (k.auto_days || []).includes(isoDow(d)) && !(k.paused_dates || []).includes(d))(kitchens.find(x => x.id === kid));
   const nowIso = () => new Date().toISOString();
+  const unmatched = [], payouts = [], activity = [];
   const pastCutoff = d => new Date() >= at(d, settings.cutoff);
   const dueOf = orderTotal;
   // Cashback per code: delivery paid once; the final share counts every meal under the code (added plates too)
@@ -995,12 +1006,10 @@ function makeDemoApi() {
       if (!near) return c; } };
 
   const tripOf = pid => { if (pfree(pid)) return 0; const pl = pools.find(p => p.id === pid) || {}; const k = kitchens.find(x => x.id === pl.kitchen_id) || {}, st = sites.find(x => x.id === pl.site_id) || {}; return tripFor(hasPin(k) ? k : k.added_by_customer ? st : {}, st, settings); };
-  function balance(user) {
-    const led = ledger.filter(e => e.user_id === user).reduce((t, e) => t + e.amount, 0);
-    const cb = orders.filter(o => o.user_id === user && ["paid", "collected"].includes(o.status) && pastCutoff(o.order_date) && pools.find(p => p.id === o.pool_id).status !== "cancelled")
-      .reduce((t, o) => t + cashOf(o), 0);
-    return Math.round((led + cb) * 100) / 100;
-  }
+  // Wallet = fixed entries only; cashback is posted once, as its own line, when the order is received
+  function balance(user) { return Math.round(ledger.filter(e => e.user_id === user).reduce((t, e) => t + e.amount, 0) * 100) / 100; }
+  const pendingCash = user => Math.round(orders.filter(o => o.user_id === user && !o.parent_id && ["paid", "collected"].includes(o.status) && !o.cashback_posted && pastCutoff(o.order_date)
+    && pools.find(p => p.id === o.pool_id).status !== "cancelled").reduce((t, o) => t + cashOf(o), 0) * 100) / 100;
   function settle(o, ref, useWallet) {
     const total = dueOf(o); let use = 0;
     if (useWallet && me && o.user_id === me.id) { use = Math.max(0, Math.min(balance(me.id), total)); if (use > 0) ledger.push({ user_id: me.id, amount: -use, reason: "Paid for order " + o.code, order_id: o.id, created_at: nowIso() }); }
@@ -1024,7 +1033,18 @@ function makeDemoApi() {
         if (o.refund_due > 0 && o.user_id && !o.refund_needed) ledger.push({ user_id: o.user_id, amount: o.refund_due, reason: "Money back: the vendor didn't confirm, code " + o.code, order_id: o.id, created_at: nowIso() });
       });
     });
+    const payMin = Number(settings.quote_pay_min || 15);
+    orders.filter(o => o.status === "quote_requested" && new Date() >= new Date(at(o.order_date, settings.cutoff).getTime() - payMin * 6e4)).forEach(o => { o.status = "cancelled"; o.cancel_reason = "The seller didn't price your request in time"; });
+    orders.filter(o => o.status === "quoted" && o.quote_pay_by && Date.now() > Date.parse(o.quote_pay_by) + 30e3).forEach(o => { o.status = "cancelled"; o.cancel_reason = "Special request not paid in time"; });
     orders.filter(o => ["quote_requested", "quoted"].includes(o.status) && pastCutoff(o.order_date)).forEach(o => { o.status = "cancelled"; o.cancel_reason = "Special request not paid before cut-off"; });
+    // "Got my food" confirms itself a while after handover; then cashback is posted once
+    const rcv = Number(settings.auto_receive_min || 120) * 6e4;
+    orders.filter(o => !o.parent_id && o.status === "collected" && !o.received_at && !o.problem && o.collected_at && Date.now() >= Date.parse(o.collected_at) + rcv).forEach(o => { o.received_at = nowIso(); });
+    orders.filter(o => !o.parent_id && o.user_id && !o.cashback_posted && ["paid", "collected"].includes(o.status) && (!o.problem || o.problem_resolved_at)).forEach(o => {
+      const p = pools.find(x => x.id === o.pool_id); if (!p || p.status === "cancelled") return;
+      if (!(o.received_at || (p.status === "delivered" && p.delivered_at && Date.now() >= Date.parse(p.delivered_at) + rcv))) return;
+      const cb = cashOf(o); if (cb > 0) ledger.push({ user_id: o.user_id, amount: cb, reason: "Delivery cashback, code " + o.code, order_id: o.id, created_at: nowIso() });
+      o.cashback_posted = true; });
   }
   function place(r, sim) {
     housekeeping();
@@ -1046,7 +1066,7 @@ function makeDemoApi() {
     const code = newCode(si.id, d, pl.id);
     const o = { id: "o" + uid(), created_at: nowIso(), order_date: d, pool_id: pl.id, site_id: si.id, kitchen_id: k.id, item_id: m.id, user_id: sim ? null : (me ? me.id : null),
       item_name: m.name, unit_price: m.price, qty: r.qty, addons: add, addons_total: addT, note: (r.note || "").trim() || null, special_request: special, quote_price: null,
-      customer_name: r.name, phone: r.phone, momo_ref: null, wallet_used: 0, code, max_fee: feeFor(1, settings, tripOf(pl.id)), service_fee: settings.service_fee, fee_per_meal: true, parent_id: null,
+      customer_name: r.name, phone: r.phone, momo_ref: null, wallet_used: 0, code, max_fee: upfrontPerMeal(tripOf(pl.id), r.qty, settings), service_fee: settings.service_fee, fee_per_meal: true, parent_id: null,
       status: special ? "quote_requested" : "pending", cancel_reason: null, refund_needed: false, collected_at: null };
     orders.push(o);
     let payment = null;
@@ -1109,18 +1129,40 @@ function makeDemoApi() {
         activity: orders.filter(o => !["cancelled", "quote_requested", "quoted"].includes(o.status) && minsAgo(o.created_at) < 360).map(o => ({ id: o.id, site_id: o.site_id, kitchen_id: o.kitchen_id, pool_id: o.pool_id, item_name: o.item_name, qty: o.qty, created_at: o.created_at })) };
     },
     async placeOrder(r) { return place(r, false); },
-    async payQuote(id, ref, useWallet) { housekeeping(); const o = orders.find(x => x.id === id); if (!o || o.status !== "quoted") throw new Error("This request is not waiting for payment."); return settle(o, ref, useWallet); },
+    async payQuote(id, ref, useWallet) { housekeeping(); const o = orders.find(x => x.id === id); if (!o || o.status !== "quoted") throw new Error("This request is not waiting for payment.");
+      if (o.quote_pay_by && Date.now() > Date.parse(o.quote_pay_by) + 30e3) throw new Error("The time to pay for this special order has run out."); return settle(o, ref, useWallet); },
     async myOrders(ids) {
       return orders.filter(o => ids.includes(o.id) || ids.includes(o.parent_id) || (me && o.user_id === me.id)).filter(o => o.order_date >= today()).sort((a, b) => a.created_at < b.created_at ? 1 : -1).map(o => {
         const p = pools.find(x => x.id === o.pool_id);
         return { id: o.id, order_date: o.order_date, code: o.code, status: o.status, qty: o.qty, item_name: o.item_name, site_id: o.site_id, kitchen_id: o.kitchen_id, pool_seq: p.seq, pool_status: p.status,
-          special_request: o.special_request, quote_price: o.quote_price, amount_due: dueOf(o) - o.wallet_used, cancel_reason: o.cancel_reason,
+          special_request: o.special_request, quote_price: o.quote_price, amount_due: dueOf(o) - o.wallet_used - Number(o.carried_amount || 0), cancel_reason: o.cancel_reason,
           unit_price: o.unit_price, addons: o.addons, addons_total: o.addons_total, max_fee: o.max_fee, service_fee: o.service_fee, wallet_used: o.wallet_used,
           saving: ["pending", "paid", "collected"].includes(o.status) && p.status !== "cancelled" ? cashOf(o) : 0,
           has_account: !!o.user_id, refund_needed: !!o.refund_needed, refund_due: o.refund_due || 0, my_rating: (reviews.find(r => r.order_id === o.id) || {}).rating || null, my_photo: (reviews.find(r => r.order_id === o.id) || {}).photo_url || null, pay_issue: o.pay_issue || null, amount_received: o.amount_received ?? null, momo_ref: o.momo_ref || null,
-          wait_until: p.status === "waiting" ? waitUntil(p).toISOString() : null, vendor_delivers: pfree(p.id), parent_id: o.parent_id || null, fee_per_meal: !!o.fee_per_meal, item_id: o.item_id, pool_id: o.pool_id, created_at: o.created_at };
+          wait_until: p.status === "waiting" ? waitUntil(p).toISOString() : null, vendor_delivers: pfree(p.id), parent_id: o.parent_id || null, fee_per_meal: !!o.fee_per_meal, item_id: o.item_id, pool_id: o.pool_id, created_at: o.created_at,
+          received_at: o.received_at || null, problem: o.problem || null, problem_resolved: !!o.problem_resolved_at, quote_pay_by: o.quote_pay_by || null, carried_amount: Number(o.carried_amount || 0),
+          collected_at: o.collected_at || null, cashback_posted: !!o.cashback_posted, solo_choice: o.solo_choice || null };
       });
     },
+    async confirmReceived(id) { const o = orders.find(x => x.id === id); if (o && o.status === "collected" && !o.parent_id) o.received_at = o.received_at || nowIso(); housekeeping(); },
+    async reportProblem(id, text) { const o = orders.find(x => x.id === id); if (String(text || "").trim().length < 3) throw new Error("Say what went wrong.");
+      if (!o || o.cashback_posted || !["paid", "collected"].includes(o.status)) throw new Error("This order can't take a report any more."); o.problem = String(text).trim(); o.problem_at = nowIso(); o.problem_resolved_at = null; },
+    async resolveProblem(id, note, credit) { const o = orders.find(x => x.id === id); o.problem_resolved_at = nowIso(); o.problem_note = note || "";
+      if (Number(credit) > 0 && o.user_id) ledger.push({ user_id: o.user_id, amount: Number(credit), reason: "Sorted: " + (note || "problem with code " + o.code), order_id: o.id, created_at: nowIso() }); housekeeping(); },
+    async soloChoice(id, choice) { const o = orders.find(x => x.id === id); if (o) o.solo_choice = choice; },
+    async switchOrder(from, r) {
+      const o = orders.find(x => x.id === from); if (!o || !["pending", "paid"].includes(o.status)) throw new Error("This order can't be moved.");
+      if (pastCutoff(o.order_date)) throw new Error("Orders have closed, so this order can't move now.");
+      if (orders.some(c => c.parent_id === o.id && c.status !== "cancelled")) throw new Error("Cancel the extra plates on this order first.");
+      const paid = dueOf(o), wasPaid = o.status === "paid";
+      o.status = "cancelled"; o.cancel_reason = "Moved to another pool"; o.refund_needed = false; o.refund_due = 0; const wu = o.wallet_used; o.wallet_used = 0;
+      const res = place({ site: r.site, item: r.item, qty: r.qty, addons: r.addons || [], note: r.note, name: o.customer_name, phone: o.phone, ref: r.ref || o.momo_ref || "MOVED", useWallet: false }, false);
+      const n = orders.find(x => x.id === res.id); n.user_id = o.user_id; n.moved_from = o.id; n.carried_amount = Math.min(paid, dueOf(n)); n.wallet_used = 0;
+      const diff = paid - dueOf(n); if (wasPaid && diff >= 0) n.status = "paid";
+      if (diff > 0) { if (o.user_id && wasPaid) ledger.push({ user_id: o.user_id, amount: diff, reason: "Money back: moved to a cheaper order, code " + n.code, order_id: n.id, created_at: nowIso() }); else { o.refund_due = diff; o.refund_needed = true; } }
+      void wu; return { ...res, status: n.status, to_pay: Math.max(0, -diff), refund: Math.max(0, diff) };
+    },
+    async recordUnmatched(r) { unmatched.push({ id: "u" + uid(), created_at: nowIso(), name: r.name, phone: String(r.phone || "").replace(/\D/g, ""), amount: Number(r.amount) || 0, momo_ref: r.ref, reason: r.reason }); },
     async addVendor(r) {
       const wa_ = String(r.whatsapp || "").replace(/\D/g, "");
       if ((r.name || "").trim().length < 2) throw new Error("Add the vendor's name.");
@@ -1149,9 +1191,8 @@ function makeDemoApi() {
         if (o.status === "cancelled" && o.refund_due > 0 && o.refund_needed) { o.refund_needed = false; ledger.push({ user_id: me.id, amount: o.refund_due, reason: "Money back: the vendor didn't confirm, code " + o.code, order_id: o.id, created_at: nowIso() }); } } }); return n; },
     async wallet() {
       if (!me) throw new Error("Sign in to see your wallet.");
-      const cb = orders.filter(o => o.user_id === me.id && ["paid", "collected"].includes(o.status) && pastCutoff(o.order_date) && cashOf(o) > 0)
-        .map(o => ({ at: at(o.order_date, settings.cutoff).toISOString(), amount: cashOf(o), reason: "Delivery cashback, code " + o.code }));
-      return { balance: balance(me.id), entries: ledger.filter(e => e.user_id === me.id).map(e => ({ at: e.created_at, amount: e.amount, reason: e.reason })).concat(cb).sort((a, b) => a.at < b.at ? 1 : -1) };
+      housekeeping();
+      return { balance: balance(me.id), pending: pendingCash(me.id), entries: ledger.filter(e => e.user_id === me.id).map(e => ({ at: e.created_at, amount: e.amount, reason: e.reason })).sort((a, b) => a.at < b.at ? 1 : -1) };
     },
     async kitchenView(token, date) {
       housekeeping();
@@ -1226,13 +1267,16 @@ function makeDemoApi() {
     async kitchenUpdate(token, pid, status) {
       const k = byToken(kitchens, "token", token); const p = pools.find(x => x.id === pid && x.kitchen_id === k.id);
       if (["picked_up", "arriving", "delivered"].includes(status) && k.delivery_mode !== "runner" && !pfree(p.id)) throw new Error("A ChopPool rider delivers this pool.");
+      if (stepRank(p.status) >= stepRank(status)) return;   // steps only move forward
       p.status = status; p[stamp[status]] = nowIso();
     },
     async kitchenQuote(token, oid, price) {
       const k = byToken(kitchens, "token", token); const o = orders.find(x => x.id === oid && x.kitchen_id === k.id);
       if (!(Number(price) > 0)) throw new Error("Enter a price per meal in cedis.");
       if (!o || !["quote_requested", "quoted"].includes(o.status)) throw new Error("That request can no longer be priced.");
-      o.quote_price = Number(price); o.status = "quoted";
+      const payMin = Number(settings.quote_pay_min || 15), cut = at(o.order_date, settings.cutoff).getTime();
+      if (Date.now() >= cut - payMin * 6e4) throw new Error("Pricing for today has closed, so the customer would have no time to pay.");
+      o.quote_price = Number(price); o.status = "quoted"; o.quoted_at = nowIso(); o.quote_pay_by = new Date(Math.min(Date.now() + payMin * 6e4, cut)).toISOString();
     },
     async kitchenDecline(token, oid, reason) {
       const k = byToken(kitchens, "token", token); const o = orders.find(x => x.id === oid && x.kitchen_id === k.id);
@@ -1273,19 +1317,21 @@ function makeDemoApi() {
         return { id: p.id, seq: p.seq, status: p.status, meals: meals(p.id), kitchen: k.name, kitchen_address: k.address, kitchen_phone: k.whatsapp, site: si.name, drop_point: si.drop_point, handoff: si.handoff, host_label: si.host_label, orders: handOrders(p.id) };
       }) };
     },
-    async riderUpdate(token, pid, status) { const r = byToken(riders, "token", token); const p = pools.find(x => x.id === pid && x.rider_id === r.id); if (!p) throw new Error("That pool is not assigned to you."); p.status = status; p[stamp[status]] = nowIso(); },
+    async riderUpdate(token, pid, status) { const r = byToken(riders, "token", token); const p = pools.find(x => x.id === pid && x.rider_id === r.id); if (!p) throw new Error("That pool is not assigned to you."); if (stepRank(p.status) >= stepRank(status)) return; p.status = status; p[stamp[status]] = nowIso(); },
     async hostView(token, date) {
       const si = byToken(sites, "host_token", token);
       return { site: { name: si.name, drop_point: si.drop_point }, pools: pools.filter(p => p.site_id === si.id && p.order_date === date && !["cancelled", "waiting"].includes(p.status) && meals(p.id) > 0)
         .map(p => ({ id: p.id, seq: p.seq, status: p.status, menu: kitchens.find(k => k.id === p.kitchen_id).public_name, meals: meals(p.id), orders: handOrders(p.id) })) };
     },
-    async collectCode(token, code, date, pool) {
+    async collectCode(token, code, date, pool, unpaid) {
       const rid = (riders.find(r => r.token === token) || {}).id, kit = kitchens.find(k => k.token === token && k.delivery_mode === "runner"), c = normCode(code);
       const hit = orders.filter(x => x.order_date === date && x.code === c && ["pending", "paid", "collected"].includes(x.status) && (!pool || x.pool_id === pool) &&
         (sites.find(s => s.id === x.site_id).host_token === token || (rid && pools.find(p => p.id === x.pool_id).rider_id === rid) || (kit && x.kitchen_id === kit.id) || (kitchens.some(k => k.token === token && k.id === x.kitchen_id) && pfree(x.pool_id)))).sort((a, b) => a.created_at < b.created_at ? -1 : 1);
       if (!hit.length) throw new Error("No order with code " + (c || code) + " for you today.");
       const todo = hit.filter(o => o.status !== "collected"); if (!todo.length) throw new Error("Code " + c + " was already collected.");
-      const wasPaid = hit.every(o => ["paid", "collected"].includes(o.status)); todo.forEach(o => { o.status = "collected"; o.collected_at = nowIso(); });
+      const wasPaid = hit.every(o => ["paid", "collected"].includes(o.status));
+      if (!wasPaid && unpaid !== "cash") throw new Error("UNPAID:" + hit[0].customer_name + ":" + todo.filter(o => o.status === "pending").reduce((t, o) => t + dueOf(o) - o.wallet_used - Number(o.carried_amount || 0), 0));
+      todo.forEach(o => { o.status = "collected"; o.collected_at = nowIso(); });
       const items_ = todo.map(o => o.qty + " × " + o.item_name).join(" + ");
       return { name: hit[0].customer_name, items: items_, item_name: items_, qty: todo.reduce((t, o) => t + o.qty, 0), was_paid: wasPaid, code: c };
     },
@@ -1293,8 +1339,25 @@ function makeDemoApi() {
     async adminData(date) {
       housekeeping();
       return { orders: orders.filter(o => o.order_date === date), pools: pools.filter(p => p.order_date === date).map(p => ({ ...p, meals: meals(p.id) })), riders, sites, kitchens,
-        wallets: profiles.map(p => ({ ...p, balance: balance(p.user_id) })), items, team, payment_methods: payMethods, waiters };
+        wallets: profiles.map(p => ({ ...p, balance: balance(p.user_id) })), items, team, payment_methods: payMethods, waiters,
+        unmatched: unmatched.slice(), problems: orders.filter(o => o.problem && !o.problem_resolved_at) };
     },
+    async refsSeen(refs) { const n = {}; orders.filter(o => o.status !== "cancelled" && o.momo_ref).forEach(o => { n[o.momo_ref] = (n[o.momo_ref] || 0) + 1; }); return Object.fromEntries(refs.filter(r => n[r] > 1).map(r => [r, n[r]])); },
+    async adminDues() {
+      const paidTo = (t, id) => payouts.filter(x => x.payee_type === t && (x.kitchen_id === id || x.rider_id === id)).reduce((a, x) => a + x.amount, 0);
+      const sellers = kitchens.map(k => { const ps = pools.filter(p => p.kitchen_id === k.id && p.status === "delivered");
+        const food = ps.reduce((t, p) => t + orders.filter(o => o.pool_id === p.id && ["paid", "collected"].includes(o.status) && (o.received_at || o.cashback_posted)).reduce((a, o) => a + (Number(o.quote_price ?? o.unit_price) + Number(o.addons_total || 0)) * o.qty, 0), 0);
+        const fee = ps.reduce((t, p) => t + poolFee(p), 0), paid = paidTo("seller", k.id); return { id: k.id, name: k.name, whatsapp: k.whatsapp, food, fee, paid, due: Math.round((food - fee - paid) * 100) / 100 }; }).filter(x => x.food || x.due);
+      const rs = riders.map(r => { const trips = pools.filter(p => p.rider_id === r.id && p.status === "delivered").reduce((t, p) => t + Number(p.trip_cost || 0), 0), paid = paidTo("rider", r.id);
+        return { id: r.id, name: r.name, phone: r.phone, trips, paid, due: Math.round((trips - paid) * 100) / 100 }; }).filter(x => x.trips || x.due);
+      return { sellers, riders: rs };
+    },
+    async payouts() { return payouts.slice().reverse(); },
+    async savePayout(r) { if (!(Number(r.amount) > 0)) throw new Error("Enter the amount paid."); payouts.push({ id: "po" + uid(), created_at: nowIso(), paid_by: "you", ...r, amount: Number(r.amount) }); },
+    async markUnmatched(id, ref) { const u = unmatched.find(x => x.id === id); if (u) { u.refunded_at = nowIso(); u.refund_ref = ref || null; } },
+    async activityLog() { return activity.slice(-200).reverse(); },
+    async resetRiderLink(id) { const r = riders.find(x => x.id === id); r.token = "r" + uid(); return r.token; },
+    async resetHostLink(id) { const x = sites.find(y => y.id === id); x.host_token = "h" + uid(); return x.host_token; },
     async setPayIssue(id, issue, amount) { const o = orders.find(x => x.id === id); if (issue === "found") Object.assign(o, { status: "paid", pay_issue: null, amount_received: null }); else Object.assign(o, { pay_issue: issue, amount_received: issue === "short" ? Number(amount) || 0 : null }); },
     async unpaidPhones() { const m = {}; orders.filter(o => o.cancel_reason === "Payment not received").forEach(o => { m[o.phone] = (m[o.phone] || 0) + 1; }); return m; },
     async fixPayment(id, phone, ref) { const o = orders.find(x => x.id === id); if (!o) throw new Error("Order not found.");
@@ -1430,7 +1493,7 @@ function makeSupabaseApi() {
     notify: body => sb.functions.invoke("notify", { body }),
     riderUpdate: (t, p, s) => rpc("rider_update", { p_token: t, p_pool: p, p_status: s }),
     hostView: (t, d) => rpc("host_view", { p_token: t, p_date: d }),
-    collectCode: (t, c, d, pool) => rpc("collect_code", { p_token: t, p_code: c, p_date: d, ...(pool ? { p_pool: pool } : {}) }),
+    collectCode: (t, c, d, pool, unpaid) => rpc("collect_code", { p_token: t, p_code: c, p_date: d, ...(pool ? { p_pool: pool } : {}), ...(unpaid ? { p_unpaid: unpaid } : {}) }),
     kitchenSetAuto: (t, days) => rpc("kitchen_set_auto", { p_token: t, p_days: days }),
     kitchenPause: (t, d, on) => rpc("kitchen_pause", { p_token: t, p_date: d, p_paused: !!on }),
     vendorSetPhoto: (t, item, url) => rpc("vendor_set_photo", { p_token: t, p_item: item, p_url: url }),
@@ -1470,8 +1533,25 @@ function makeSupabaseApi() {
         sb.from("site_waiters").select("site_id,created_at").then(r => r.error ? [] : r.data, () => [])
       ]);
       const m = {}; orders.forEach(o => { if (o.status !== "cancelled") m[o.pool_id] = (m[o.pool_id] || 0) + o.qty; });
-      return { orders, pools: pools.map(p => ({ ...p, meals: m[p.id] || 0 })), riders, sites, kitchens, wallets, items, team, payment_methods, waiters };
+      const [unmatched, problems] = await Promise.all([
+        sb.from("unmatched_payments").select("*").is("refunded_at", null).order("created_at", { ascending: false }).then(r => r.error ? [] : r.data, () => []),
+        sb.from("orders").select("*").not("problem", "is", null).is("problem_resolved_at", null).gte("order_date", new Date(Date.now() - 14 * 864e5).toISOString().slice(0, 10)).then(r => r.error ? [] : r.data, () => [])]);
+      return { orders, pools: pools.map(p => ({ ...p, meals: m[p.id] || 0 })), riders, sites, kitchens, wallets, items, team, payment_methods, waiters, unmatched, problems };
     },
+    async refsSeen(refs, date) { return refs.length ? rpc("admin_refs_seen", { p_refs: refs, p_date: date }) : {}; },
+    async adminDues(from, to) { return rpc("admin_dues", { p_from: from, p_to: to }); },
+    async payouts() { return must(await sb.from("payouts").select("*").order("created_at", { ascending: false }).limit(100)); },
+    async savePayout(r) { if (!(Number(r.amount) > 0)) throw new Error("Enter the amount paid."); must(await sb.from("payouts").insert({ ...r, amount: Number(r.amount), paid_by: S.user && S.user.email })); },
+    async markUnmatched(id, ref) { must(await sb.from("unmatched_payments").update({ refunded_at: new Date().toISOString(), refund_ref: ref || null, refunded_by: S.user && S.user.email }).eq("id", id)); },
+    async activityLog() { return must(await sb.from("activity_log").select("*").order("at", { ascending: false }).limit(200)); },
+    async resetRiderLink(id) { const t = newToken(); must(await sb.from("riders").update({ token: t }).eq("id", id)); return t; },
+    async resetHostLink(id) { const t = newToken(); must(await sb.from("sites").update({ host_token: t }).eq("id", id)); return t; },
+    async confirmReceived(id) { await rpc("confirm_received", { p_order: id }); },
+    async reportProblem(id, text) { await rpc("report_problem", { p_order: id, p_text: text }); },
+    async resolveProblem(id, note, credit) { await rpc("resolve_problem", { p_order: id, p_note: note || "", p_credit: Number(credit) || 0 }); },
+    async soloChoice(id, choice) { await rpc("solo_choice", { p_order: id, p_choice: choice }); },
+    async switchOrder(from, r) { return rpc("switch_order", { p_from: from, p_site: r.site, p_item: r.item, p_qty: r.qty, p_addons: r.addons || [], p_note: r.note || null, p_ref: r.ref || null }); },
+    async recordUnmatched(r) { try { await rpc("record_unmatched", { p_name: r.name, p_phone: r.phone, p_amount: r.amount, p_ref: r.ref, p_reason: r.reason }); } catch (e) {} },
     async updateOrder(id, patch) { must(await sb.from("orders").update(patch).eq("id", id)); },
     async updatePool(id, patch) { if (patch.status && stamp[patch.status]) patch[stamp[patch.status]] = new Date().toISOString(); must(await sb.from("pools").update(patch).eq("id", id)); },
     async updateKitchen(id, patch) { const r = await sb.from("kitchens").update(patch).eq("id", id).select("id");
@@ -1561,7 +1641,7 @@ async function copy(text, okMsg) {
   catch (e) { openSheet(`<h2 id="sheetTitle">Copy this</h2><textarea rows="8" aria-label="Text to copy">${esc(text)}</textarea><button class="ghost" data-close>Close</button>`); }
 }
 const STEPS = ["collecting", "accepted", "ready", "picked_up", "arriving", "delivered"];
-const STEP_LABEL = { waiting: "Waiting for vendor", collecting: "Taking orders", accepted: "Confirmed", ready: "Packed", picked_up: "On the way", arriving: "Arriving", delivered: "Delivered" };
+const STEP_LABEL = { waiting: "Waiting for vendor", collecting: "Taking orders", accepted: "Cooking", ready: "Food ready", picked_up: "On the way", arriving: "Nearly there", delivered: "Arrived" };
 const stepsHtml = st => st === "waiting" ? `<div class="steps"><span class="now">Waiting for vendor to confirm</span></div>`
   : `<div class="steps">${STEPS.map((x, i) => `<span class="${x === st ? "now" : i < STEPS.indexOf(st) ? "done" : ""}">${STEP_LABEL[x]}</span>`).join("")}</div>`;
 const siteOf = id => S.sites.find(x => x.id === id) || {};
@@ -1750,6 +1830,7 @@ const tint = i => `var(--tint-${(i % 4) + 1})`;
 const menuIndex = id => Math.max(0, S.menus.findIndex(m => m.id === id));
 const greeting = () => { const h = new Date().getHours(); return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening"; };
 const ghanaNow = () => new Date().toISOString().slice(11, 16);
+const addDays = (iso, n) => new Date(Date.parse(iso + "T00:00:00Z") + n * 864e5).toISOString().slice(0, 10);
 const dayLabel = iso => { const t = today(), d = new Date(Date.now() + 864e5).toISOString().slice(0, 10); return iso === t ? "today" : iso === d ? "tomorrow" : fmtDate(iso); };
 const firstName = () => String((S.user && S.user.name) || (local.get("cp_me") || {}).name || "").trim().split(/\s+/)[0] || "";
 const sheetHead = (title, sub) => `<div class="top" style="align-items:flex-start"><div><h2 id="sheetTitle">${title}</h2>${sub ? `<p class="small muted">${sub}</p>` : ""}</div><button class="closex" data-close aria-label="Close">${ICON.close}</button></div>`;
@@ -1963,6 +2044,10 @@ async function viewOrder() {
   $("#tabOrders").addEventListener("click", e => { const sg = e.target.closest("[data-oseg]"); if (sg) { S.oseg = sg.dataset.oseg; S.osegPicked = true; renderOrders(); window.scrollTo(0, 0); return; }
     const vd = e.target.closest("[data-vendor]"); if (vd) return openVendor(vd.dataset.vendor);
     const fx = e.target.closest("[data-fixpay]"); if (fx) return openFixPayment((S.mine || []).find(o => o.id === fx.dataset.fixpay), fx.dataset.mode);
+    if (soloClick(e)) return;
+    const gi = e.target.closest("[data-gotit]"); if (gi) return run0(async () => { await api.confirmReceived(gi.dataset.gotit); await refreshMine(); refreshUser();
+      const o = (S.mine || []).find(x => x.id === gi.dataset.gotit); if (o && !o.my_rating) openReview(o, 0); else toast("Enjoy your lunch. Your cashback is on its way."); });
+    const pr = e.target.closest("[data-problem]"); if (pr) return openProblem(pr.dataset.problem);
     const b = e.target.closest("button[data-pay]"); if (b) openPayQuote(b.dataset.pay); const ro = e.target.closest("[data-reorder]"); if (ro) openOrder(ro.dataset.reorder);
     const ap = e.target.closest("[data-addplate]"); if (ap) { const o = (S.mine || []).find(x => x.id === ap.dataset.addplate); if (o) openOrder(o.kitchen_id, { join: o }); }
     const rt = e.target.closest("[data-rate]"); if (rt) { const o = (S.mine || []).find(x => x.id === rt.dataset.rate); if (o) openReview(o, +rt.dataset.n || 0); return; }
@@ -2174,7 +2259,11 @@ function openRequestSite(here, opt = {}) {
           <p class="muted">${r.joined ? esc(r.name) + " has already been requested" + (r.waiting > 1 ? ", and " + r.waiting + " people are waiting for it" : "") + ". We've added you to the waitlist." : "We'll check " + esc(r.name) + " and add it to ChopPool, usually the same day."}
           ${local.get("cp_alerts") ? " You'll get an alert when it's live." : ""} Until then, you can order to the nearest building.</p></div>
         ${local.get("cp_alerts") ? "" : `<button class="ghost wide" id="bAlerts">Alert me when it's live</button>`}
+        <button class="ghost wide" id="bShare">${ICON.share} Ask others in the building</button>
         <button class="btn wide" data-close>OK</button>`);
+      $("#bShare")?.addEventListener("click", async () => { const text = "I've asked ChopPool to deliver lunch to " + r.name + ". The more of us who ask, the sooner it opens. Add your name:", url = baseUrl() + "/#order";
+        if (navigator.share) { try { await navigator.share({ title: "ChopPool for " + r.name, text, url }); return; } catch (e) { if (e && e.name === "AbortError") return; } }
+        copy(text + " " + url, "Message copied. Paste it in your building's WhatsApp group."); });
       $("#bAlerts")?.addEventListener("click", async () => { await toggleAlerts(); if (local.get("cp_alerts")) { try { await api.requestSite({ name: r.name, drop_point: $("#bDrop")?.value || "Main gate", lat: pin.lat, lng: pin.lng }); } catch (e2) {} toast("We'll alert you when " + r.name + " is live."); closeSheet(); } });
     } catch (e) { $("#bErr").textContent = cleanErr(e); }
   });
@@ -2203,6 +2292,11 @@ function renderHero() {
   const here = S.board.pools.filter(p => S.noSite || p.site_id === S.siteId);
   const meals = here.reduce((t, p) => t + p.meals, 0);
   const dlv = heroDelivery(here, site);
+  // Orders closed and I have lunch coming today: show where it is instead of the meal count
+  const mineToday = (S.mine || []).filter(o => !o.parent_id && o.order_date === today() && ["pending", "paid", "collected"].includes(o.status) && new Date() >= at(o.order_date, s.cutoff));
+  const lvl = o => o.status === "collected" ? 6 : stepRank(o.pool_status);
+  const best = mineToday.sort((a, b) => lvl(b) - lvl(a))[0];
+  const myLive = best ? { label: best.status === "collected" ? "Collected" : ({ accepted: "Cooking", collecting: "Cooking", ready: "Ready", picked_up: "On the way", arriving: "On the way", delivered: "Arrived" }[best.pool_status] || "Cooking"), more: mineToday.length - 1 } : null;
   const name = firstName();
   const dl = dayLabel(S.date);
   el.innerHTML = `<div class="hero-text"><p class="small">${greeting()}${name ? ", " + esc(name) : ""}</p>
@@ -2210,13 +2304,15 @@ function renderHero() {
       <p class="small">Order by ${fmtTime(s.cutoff)}${dl === "today" ? "" : " " + (dl === "tomorrow" ? "tomorrow" : fmtDate(S.date))} · arrives ${fmtTime(s.delivery_time)}${site.drop_point ? " at " + esc(site.drop_point) : ""}</p>
       <p class="small" style="opacity:.8">Ghana time (GMT) now <span class="num" id="ghNow">${ghanaNow()}</span></p></div>
     <div class="hero-stats"><div class="hero-stat" id="cdBox"><b class="num" id="countdown">--</b><span id="cdLabel">until orders close</span></div>
-      ${hasMineToday() ? `<button class="hero-stat hlink" data-gomine aria-label="${meals} meals ordered. Open your orders"><b class="num">${meals}</b><span>meals ordered</span></button>` : `<div class="hero-stat"><b class="num">${meals}</b><span>meals ordered</span></div>`}
+      ${myLive ? `<button class="hero-stat hlink" data-gomine aria-label="Your lunch: ${esc(myLive.label)}. Open your order"><b class="${myLive.label.length > 7 ? "long" : ""}">${esc(myLive.label)}</b><span>your lunch${myLive.more ? " · +" + myLive.more + " more" : ""}</span></button>`
+      : hasMineToday() ? `<button class="hero-stat hlink" data-gomine aria-label="${meals} meals ordered. Open your orders"><b class="num">${meals}</b><span>meals ordered</span></button>` : `<div class="hero-stat"><b class="num">${meals}</b><span>meals ordered</span></div>`}
       ${S.noSite ? `<div class="hero-stat"><b class="num">${here.filter(p => p.status === "collecting" && p.meals > 0).length}</b><span>pools open</span></div>` : (dlv ? `<button class="hero-stat hlink" data-vendor="${esc(dlv.kid)}">${(v => `<b class="num${v.length > 7 ? " long" : ""}">${v}</b>`)(dlv.fee === 0 ? "Free" : Number.isInteger(dlv.fee) ? "GHS " + dlv.fee : money(dlv.fee))}<span>${esc(dlv.label)}</span></button>` : `<div class="hero-stat"><b class="num">${menusHere().length}</b><span>vendors cooking</span></div>`)}</div>`;
   tickCountdown(); fitStats();
 }
 // Small phones: a figure that doesn't fit its box steps down a size instead of being cut off
 function fitStats() { requestAnimationFrame(() => document.querySelectorAll(".hero-stat b").forEach(b => { if (b.id === "countdown" && !b.querySelector(".ampm")) return; if (!b.dataset.fit && b.classList.contains("long")) return; b.dataset.fit = "1"; b.classList.remove("long", "tiny"); if (b.scrollWidth > b.clientWidth + 1) b.classList.add("long"); if (b.scrollWidth > b.clientWidth + 1) b.classList.add("tiny"); })); }
 function tickCountdown() {
+  document.querySelectorAll("[data-paywin]").forEach(el => { el.textContent = payWindowText(el.dataset.paywin); });
   if (!$("#countdown")) return;
   const fresh = orderDate(S.settings);
   if (fresh !== S.date) { S.date = fresh; renderWhen(); refreshBoard(); }
@@ -2630,7 +2726,80 @@ function vendorClick(e) {
 }
 
 /* ---------- Orders: Upcoming / Past ---------- */
-const STEP_LABELS = ["Paid", "Confirmed", "On the way", "Ready"];
+const STEP_LABELS = ["Payment", "Cooking", "On the way", "Ready to collect"];
+// Priced special order: time left to pay
+async function run0(fn) { try { await fn(); } catch (e) { toast(cleanErr(e)); } }
+function soloClick(e) {
+  const b = e.target.closest("[data-solo]"); if (!b) return false; const o = (S.mine || []).find(x => x.id === b.dataset.o); if (!o) return true;
+  const c = b.dataset.solo; api.soloChoice(o.id, c).catch(() => {});
+  if (c === "keep") { o.solo_choice = "keep"; renderOrders(); renderPools && renderPools(); toast("Kept. Your order goes ahead."); }
+  else if (c === "switch") openSwitch(o);
+  else if (c === "share") sharePool(o.site_id, o.kitchen_id);
+  else if (c === "cancel") openCancel(o.id);
+  return true;
+}
+function openProblem(id) {
+  openSheet(`${sheetHead("Report a problem", "Tell us what went wrong. Your cashback waits until it's sorted.")}<form id="pbForm" class="stack" novalidate>
+    <div class="stack" style="gap:6px">${["Something was missing", "The food was cold or spilled", "Wrong order", "It never arrived"].map((t, n) => `<label class="grow"><input type="radio" name="pbt" value="${esc(t)}"${n ? "" : " checked"}> <span class="gtx">${esc(t)}</span></label>`).join("")}</div>
+    <div><label for="pbTxt">Anything to add? (optional)</label><input id="pbTxt" placeholder="e.g. no egg in my waakye"></div><p class="err" id="pbErr"></p><button class="btn wide">Send</button></form>`);
+  $("#pbForm").addEventListener("submit", async ev => { ev.preventDefault(); const t = $("input[name=pbt]:checked").value + ((($("#pbTxt").value || "").trim()) ? ": " + $("#pbTxt").value.trim() : "");
+    try { await api.reportProblem(id, t); closeSheet(); toast("Thanks. The ChopPool team will sort it out."); await refreshMine(); } catch (e) { $("#pbErr").textContent = cleanErr(e); } });
+}
+function payWindowText(by) { const ms = Date.parse(by) - Date.now(); if (ms <= 0) return "Time to pay has run out.";
+  const m = Math.floor(ms / 6e4), sec = Math.floor(ms / 1000) % 60; return "Pay within " + m + ":" + String(sec).padStart(2, "0") + " to keep it"; }
+// Alone in a pool close to cut-off: keep, switch, share or cancel (shown from 10 minutes before)
+function isSolo(o) {
+  if (o.parent_id || !["pending", "paid"].includes(o.status) || !["collecting", "waiting"].includes(o.pool_status) || o.order_date !== S.date) return false;
+  const p = (S.board.pools || []).find(x => x.id === o.pool_id); if (!p) return false;
+  const kids = (S.mine || []).filter(c => c.parent_id === o.id && c.status !== "cancelled").reduce((t, c) => t + c.qty, 0);
+  return p.meals <= o.qty + kids;
+}
+function soloBanner(o) {
+  if (!isSolo(o) || o.solo_choice === "keep") return "";
+  const cut = at(o.order_date, S.settings.cutoff).getTime(), now = Date.now();
+  if (now < cut - 10 * 6e4 || now >= cut) return "";
+  const trip = Number(o.max_fee) * o.qty;
+  return `<div class="vbanner o solo" style="display:grid;gap:10px"><span><b>You're the only one in this pool.</b> Delivery is ${money(trip)} (the full trip). Still want it?</span>
+    <div class="row" style="gap:8px;flex-wrap:wrap"><button class="btn" data-solo="keep" data-o="${esc(o.id)}">Keep my order</button>${switchTargets(o).length ? `<button class="ghost" data-solo="switch" data-o="${esc(o.id)}">Switch to another pool</button>` : ""}
+      <button class="ghost" data-solo="share" data-o="${esc(o.id)}">Share the pool</button><button class="linkbtn" data-solo="cancel" data-o="${esc(o.id)}" style="color:var(--danger)">Cancel and refund</button></div></div>`;
+}
+// Pools still open that a solo order could move to: other vendors at the same building first, then buildings within a short walk (~300 m)
+function switchTargets(o) {
+  const home = siteOf(o.site_id), out = [];
+  (S.board.pools || []).filter(p => ["collecting", "waiting"].includes(p.status) && p.meals > 0 && p.id !== o.pool_id && p.kitchen_id !== o.kitchen_id && p.meals + o.qty <= Number(S.settings.max_meals)).forEach(p => {
+    const si = siteOf(p.site_id), d = p.site_id === o.site_id ? 0 : hasPin(home) && hasPin(si) ? distM(home, si) : Infinity;
+    if (d > 300) return; const k = menuOf(p.kitchen_id); if (!k.id) return;
+    out.push({ p, k, si, d, share: feeFor(p.meals + o.qty, S.settings, poolTrip(p, p.meals + o.qty)) });
+  });
+  return out.sort((a, b) => a.d - b.d || b.p.meals - a.p.meals);
+}
+function openSwitch(o) {
+  const ts = switchTargets(o);
+  openSheet(`${sheetHead("Switch to another pool", "Your payment moves across. Pick a pool, then a dish.")}
+    <div class="stack" style="gap:8px">${ts.map((t, n) => `<button class="grow swt" data-swt="${n}"><span class="gtx"><b>${esc(t.k.public_name)}</b><small>${t.d ? "Collect at " + esc(t.si.name) + ", about " + Math.max(1, Math.round(t.d / 80)) + " min walk · " : ""}${t.p.meals} meals so far · your delivery share ${money(t.share)} a meal</small></span><span class="ch">›</span></button>`).join("")}</div>`);
+  $("#sheet").addEventListener("click", e => { const b = e.target.closest("[data-swt]"); if (!b) return; pickSwitchDish(o, ts[+b.dataset.swt]); });
+}
+function pickSwitchDish(o, t) {
+  const dishes = S.items.filter(i => i.kitchen_id === t.k.id && i.active !== false), paid = Number(o.amount_due) + Number(o.wallet_used || 0) + Number(o.carried_amount || 0);
+  const totalFor = (d, q) => (Number(d.price)) * q + upfrontPerMeal(poolTrip(t.p, t.p.meals + q), q, S.settings) * q + Number(S.settings.service_fee) * q;
+  const pm = (S.payMethods || []).find(x => x.is_main) || (S.payMethods || [])[0] || { network: S.settings.momo_network, number: S.settings.momo_number, name: S.settings.momo_name };
+  openSheet(`${sheetHead("Choose your dish", esc(t.k.public_name) + (t.d ? " · collect at " + esc(t.si.name) : ""))}
+    <form id="swForm" class="stack" novalidate>
+      <div class="stack" style="gap:6px">${dishes.map((d, n) => `<label class="grow"><input type="radio" name="swd" value="${n}"${n ? "" : " checked"}> <span class="gtx"><b>${esc(d.name)}</b><small>${money(d.price)}</small></span></label>`).join("")}</div>
+      <p class="small" id="swSum"></p><div id="swPay" class="hidden"><div class="vbanner o" style="display:grid;gap:4px"><span>Send the difference by MoMo to</span><b class="num" style="font-size:18px">${esc(pm.number || "")}</b><span class="small">${esc([pm.network, pm.name].filter(Boolean).join(" · "))}</span></div>
+        <label for="swRef">Transaction ID of that payment</label><input id="swRef" autocomplete="off" placeholder="e.g. 5123456789"></div>
+      <p class="err" id="swErr"></p><button class="btn wide" id="swGo">Move my order</button></form>`);
+  const upd = () => { const d = dishes[+($("input[name=swd]:checked") || {}).value || 0], tot = totalFor(d, o.qty), diff = tot - paid;
+    $("#swSum").innerHTML = "New order: " + money(tot) + ". Already paid: " + money(paid) + ". " + (diff > 0.004 ? "<b>Pay " + money(diff) + " more.</b>" : diff < -0.004 ? "<b>" + money(-diff) + " comes back to you.</b>" : "Nothing more to pay.");
+    $("#swPay").classList.toggle("hidden", !(diff > 0.004)); return { d, diff }; };
+  $("#swForm").addEventListener("change", upd); upd();
+  $("#swForm").addEventListener("submit", async ev => { ev.preventDefault(); const { d, diff } = upd(), ref = ($("#swRef")?.value || "").trim();
+    if (diff > 0.004 && ref.length < 6) return ($("#swErr").textContent = "Enter the transaction ID of the extra payment.");
+    try { const r = await api.switchOrder(o.id, { site: t.p.site_id, item: d.id, qty: o.qty, ref: diff > 0.004 ? ref : null });
+      const saved = local.get("cp_orders") || []; saved.push({ id: r.id, order_date: r.order_date || S.date }); local.set("cp_orders", saved);
+      closeSheet(); toast("Moved. Your new code is " + r.code + "."); notifyServer({ order_id: r.id }); if (local.get("cp_push")) pushSubscribe({ order_ids: (local.get("cp_orders") || []).map(x => x.id) }, true); await refreshBoard(); await refreshMine();
+    } catch (e) { $("#swErr").textContent = cleanErr(e); } });
+}
 function orderCard(o, all, next) {
   const step = progressOf(o), k = menuOf(o.kitchen_id), kids = all.filter(c => c.parent_id === o.id).sort((a, b) => a.created_at < b.created_at ? -1 : 1), liveKids = kids.filter(c => c.status !== "cancelled");
   const s4 = Math.min(4, step);
@@ -2639,7 +2808,10 @@ function orderCard(o, all, next) {
       <div class="c"><span>Code</span><b class="num">${esc(o.code)}</b></div></div>
       ${["quote_requested", "quoted"].includes(o.status) ? "" : `<div class="steps4" aria-label="Progress ${s4} of 4">${[1, 2, 3, 4].map(n => `<i class="${n <= s4 ? "on" : ""}"></i>`).join("")}</div><div class="steps4l">${STEP_LABELS.map((l, n) => `<span class="${n < s4 ? "on" : ""}">${l}</span>`).join("")}</div>`}
       <p class="status-text">${esc(statusLine(o))}</p>
-      ${o.status === "quoted" ? quoteBreakdown(o) + `<button class="btn wide" data-pay="${esc(o.id)}">Pay ${money(o.amount_due)}</button>` : ""}
+      ${o.status === "quoted" ? quoteBreakdown(o) + (o.quote_pay_by ? `<p class="small" style="font-weight:700;color:var(--warn-ink, var(--accent-2))" data-paywin="${esc(o.quote_pay_by)}">${payWindowText(o.quote_pay_by)}</p>` : "") + `<button class="btn wide" data-pay="${esc(o.id)}">Pay ${money(o.amount_due)}</button>` : ""}
+      ${soloBanner(o)}
+      ${o.status === "collected" && !o.parent_id && !o.received_at && !o.problem ? `<div class="recv"><span>Got everything?</span><div class="row" style="gap:8px"><button class="btn" data-gotit="${esc(o.id)}">Got my food</button><button class="ghost" data-problem="${esc(o.id)}">Report a problem</button></div></div>` : ""}
+      ${o.problem ? `<div class="vbanner w"><span><b>${o.problem_resolved ? "Problem sorted" : "Problem reported"}</b> · ${esc(o.problem)}${o.problem_resolved ? "" : ". We're on it; your cashback waits until it's sorted."}</span></div>` : ""}
       ${o.status === "pending" && o.pay_issue ? `<div class="vbanner w" style="display:grid;gap:10px"><span><b>${o.pay_issue === "short" ? "Your payment was short" : "Payment not found"}</b></span>
         <div class="row" style="gap:8px;flex-wrap:wrap">${o.pay_issue === "short" ? `<button class="btn" data-fixpay="${esc(o.id)}" data-mode="rest">Pay the rest</button>` : `<button class="btn" data-fixpay="${esc(o.id)}" data-mode="ref">Fix the reference</button><button class="ghost" data-fixpay="${esc(o.id)}" data-mode="again">Pay again</button>`}</div></div>` : ""}
       ${liveKids.filter(c => c.status === "pending").length ? `<p class="small muted">Added plate: payment being checked.</p>` : ""}
@@ -2686,7 +2858,9 @@ function dateHead(d) { const t = today(), tm = new Date(Date.parse(t + "T00:00:0
 function renderOrders() {
   const el = $("#tabOrders"); if (!el) return;
   const all = S.mine || [], ids = new Set(all.map(o => o.id)), rows = all.filter(o => !o.parent_id || !ids.has(o.parent_id));
-  const isPast = o => ["collected", "cancelled"].includes(o.status) || o.order_date < today();
+  // A collected order stays in Upcoming until it's received (or a problem is reported), so "Got my food" is easy to find
+  const awaiting = o => o.status === "collected" && !o.parent_id && !o.received_at && !o.cashback_posted && (!o.collected_at || Date.now() - Date.parse(o.collected_at) < Number(S.settings.auto_receive_min || 120) * 6e4);
+  const isPast = o => (o.status === "cancelled" || (o.status === "collected" && !awaiting(o) && !(o.problem && !o.problem_resolved)) || o.order_date < today()) && !awaiting(o);
   const up = rows.filter(o => !isPast(o)).sort((a, b) => a.order_date < b.order_date ? -1 : a.order_date > b.order_date ? 1 : 0), past = rows.filter(isPast).sort((a, b) => a.order_date < b.order_date ? 1 : -1);
   if (!S.osegPicked) S.oseg = up.length || !past.length ? "up" : "past";
   let body = "";
@@ -2708,7 +2882,7 @@ const meNow = () => local.get("cp_me") || {};
 const avatarHtml = (name, big, pic = local.get("cp_avatar")) => { const ini = String(name || "").trim().split(/\s+/).map(w => w[0] || "").slice(0, 2).join("").toUpperCase();
   return `<span class="pavatar${big ? " big" : ""}">${pic ? `<img src="${esc(pic)}" alt="">` : ini ? esc(ini) : ICON.user}</span>`; };
 const txRow = e => `<div class="grow"><span class="gic">${ICON.wallet}</span><span class="gtx">${esc(e.reason)}<small>${esc(e.at ? fmtDate(String(e.at).slice(0, 10)) : "")}</small></span><span class="amt num${e.amount > 0 ? " pos" : ""}">${e.amount < 0 ? "−" : "+"}${money(Math.abs(e.amount))}</span></div>`;
-const MUTE_TYPES = [["Your orders", [["confirm", "The vendor confirms or cancels your pool"], ["priced", "Your special request is priced"], ["arriving", "Lunch is 5 minutes away or ready to collect"], ["almost", "Your pool is almost full"], ["cashback", "Cashback and refunds"]]],
+const MUTE_TYPES = [["Your orders", [["confirm", "The vendor confirms or cancels your pool"], ["priced", "Your special request is priced"], ["arriving", "Lunch is about 5 minutes away or here"], ["almost", "Your pool is almost full"], ["cashback", "Cashback and refunds"], ["solo", "You're alone in a pool before orders close"]]],
   ["Your building", [["building", "Someone orders at your building"]]]];
 const muted = () => new Set(local.get("cp_mute") || []);
 const notifOn = type => !muted().has(type);
@@ -2723,7 +2897,7 @@ async function renderWallet() {
   const recent = recentSites().map(id => siteOf(id).name).filter(Boolean);
   el.innerHTML = `
     <button class="prof" id="profBtn">${avatarHtml(name)}<span class="ptx"><b>${esc(name || "Add your name")}</b><small>${esc([me.phone, site.name].filter(Boolean).join(" · ") || (S.user ? S.user.email : "Guest on this phone"))}</small></span><span class="ed">Edit</span></button>
-    <div class="wcard"><small>ChopPool wallet</small><b class="num">${money(S.user ? S.balance : 0)}</b><p>${S.user ? "Used first at checkout. Credit can't be withdrawn as cash." : "When pools fill up, the delivery you saved comes back here as cashback."}</p>
+    <div class="wcard"><small>ChopPool wallet</small><b class="num">${money(S.user ? S.balance : 0)}</b><p>${S.user ? (w && Number(w.pending) > 0 ? "Coming back: " + money(w.pending) + " once you've got your lunch. " : "") + "Used first at checkout. Credit can't be withdrawn as cash." : "When others join your pool, your share of the trip comes back here."}</p>
       ${S.user ? "" : `<button class="btn" id="wSign">Create an account to collect cashback</button>`}</div>
     ${S.user ? `<p class="gtitle">Activity</p><div class="glist">${entries.length ? entries.slice(0, 3).map(txRow).join("") + `<button class="grow seeall" id="txAll">See all transactions</button>` : `<div class="grow"><span class="gtx"><small>No activity yet. Order from a pool to start earning cashback.</small></span></div>`}</div>`
       : `<button class="linkbtn" id="wIn" style="justify-self:center">I already have an account</button>`}
@@ -2808,9 +2982,10 @@ function openHelp() {
   openSheet(`${sheetHead("How ChopPool works", "")}
     <div class="stack small" style="gap:12px">
       <p><strong>Pools.</strong> People in the same building order from the same vendor, and one rider brings everything. The delivery cost is shared, so it drops as more people join.</p>
-      <p><strong>Paying.</strong> You pay delivery up front. When orders close at ${fmtTime(s.cutoff)}, whatever the pool saved comes back to your wallet as cashback.</p>
+      <p><strong>Paying.</strong> You pay the full trip at checkout. Once you've got your lunch, everyone's share is worked out and the rest comes back to your wallet as cashback.</p>
+      <p><strong>Special requests.</strong> The vendor prices it first. You then have ${s.quote_pay_min || 15} minutes to pay, or it's released and nothing is charged.</p>
       <p><strong>If the vendor doesn't confirm.</strong> Your money comes back: to your wallet if you have an account, or ChopPool refunds your MoMo.</p>
-      <p><strong>Collecting.</strong> Lunch arrives around ${fmtTime(s.delivery_time)}. Show your code at the drop point.</p>
+      <p><strong>Collecting.</strong> Lunch arrives around ${fmtTime(s.delivery_time)}. Show your code at the drop point. Then tap "Got my food", or "Report a problem" if something's wrong.</p>
       <p><strong>Cancelling.</strong> You can cancel from Orders until ${fmtTime(s.cutoff)}.</p></div>`);
 }
 function openNotifSettings() {
@@ -2928,8 +3103,9 @@ function statusLine0(o) {
   if (o.status === "pending" && o.pay_issue) return "We couldn't find a MoMo payment with reference " + (o.momo_ref || "") + ". Fix the reference or pay again before " + fmtTime(S.settings.cutoff) + ".";
   if (o.status === "cancelled") return (o.cancel_reason || "Cancelled") + ". " + (S.user ? "Any wallet payment is back in your wallet; MoMo payments are refunded by ChopPool." : "ChopPool will refund your MoMo payment.");
   if (o.status === "collected") return "Collected. Enjoy your lunch.";
-  if (o.status === "quote_requested") return "Waiting for " + seller + " to price your special request.";
-  if (o.status === "quoted") return seller + " priced your request at " + money(o.quote_price) + " a meal. Check the total and pay before " + fmtTime(S.settings.cutoff) + " to confirm.";
+  if (o.status === "cancelled" && o.cancel_reason === "Moved to another pool") return "Moved to another pool." + (o.refund_needed && Number(o.refund_due) > 0 ? " ChopPool will refund the difference, " + money(o.refund_due) + ", to your MoMo." : "");
+  if (o.status === "quote_requested") return "Waiting for " + seller + " to price your special request. You'll then have " + (S.settings.quote_pay_min || 15) + " minutes to pay.";
+  if (o.status === "quoted") return seller + " priced your request at " + money(o.quote_price) + " a meal. Check the total and pay to confirm.";
   if (st === "waiting") return "Waiting for " + seller + " to confirm. If they don't " + confirmText(o.order_date) + ", you get your money back.";
   if (o.status === "pending" && st === "collecting") return "Payment being checked.";
   if (st === "collecting") return "Confirmed. Pool " + o.pool_seq + " closes at " + fmtTime(S.settings.cutoff) + ".";
@@ -2964,7 +3140,7 @@ async function refreshMine() {
   $("#ordBadge").textContent = active; $("#ordBadge").classList.toggle("hidden", !active);
   if (S.tab === "orders") renderOrders();
   updateBellDot(); if (S.tab === "home") renderHero();
-  const sig = rows.map(o => o.id + o.status + o.pool_status).join(); if (sig !== S.mineSig) { S.mineSig = sig; if ($("#pools") && !S.noSite) renderPools(); }
+  const sig = rows.map(o => o.id + o.status + o.pool_status).join(); if (sig !== S.mineSig) { S.mineSig = sig; if ($("#pools") && !S.noSite) renderPools(); if ($("#tabHome")) renderWhen(); }
 }
 // Customers can cancel until the cut-off; after that the kitchen is cooking
 const canCancel = o => ["pending", "paid", "quote_requested", "quoted"].includes(o.status) && new Date() < at(o.order_date, S.settings.cutoff);
@@ -2974,9 +3150,12 @@ function savingLine(o) {
   const closed = new Date() >= at(o.order_date, S.settings.cutoff);
   const n = (Number(o.qty) || 1) + (S.mine || []).filter(c => c.parent_id === o.id && c.status !== "cancelled").reduce((t, c) => t + c.qty, 0);
   const now = Math.max(0, (Number(o.max_fee) * (Number(o.qty) || 1) - v) / n);
-  const fare = `Delivery: <s>${money(o.max_fee)}</s> <strong>${money(now)} a meal</strong>`;
-  if (!closed) return `<p class="small" style="color:var(--ok)">${fare} · ${money(v)} back to your wallet</p>`;
-  if (o.has_account) return `<p class="small" style="color:var(--ok)">${fare} · ${o.status === "pending" ? money(v) + " to your wallet once your payment is confirmed" : money(v) + " added to your wallet"}</p>`;
+  const fare = `Delivery: paid ${money(Number(o.max_fee) * (Number(o.qty) || 1))} (full trip) · your share <strong>${money(now)} a meal</strong>`;
+  if (o.cashback_posted) return `<p class="small" style="color:var(--ok)">${fare} · ${money(v)} added to your wallet</p>`;
+  if (!o.has_account) return closed ? `<div class="note" style="display:grid;gap:8px"><span><strong>${money(v)} cashback is waiting for you.</strong> Create a free account on this phone to keep it in your wallet for your next lunch.</span><button class="btn" data-keepcb>Keep my cashback</button></div>`
+    : `<p class="small" style="color:var(--ok)">${fare} · ${money(v)} cashback if you create an account</p>`;
+  if (!closed) return `<p class="small" style="color:var(--ok)">${fare} · about ${money(v)} back to your wallet</p>`;
+  if (o.has_account) return `<p class="small" style="color:var(--ok)">${fare} · ${o.status === "pending" ? money(v) + " to your wallet once your payment is confirmed and lunch is received" : money(v) + " to your wallet once you've got your lunch"}</p>`;
   return `<div class="note" style="display:grid;gap:8px"><span><strong>${money(v)} cashback is waiting for you.</strong> Create a free account on this phone to keep it in your wallet for your next lunch.</span><button class="btn" data-keepcb>Create an account and keep ${money(v)}</button></div>`;
 }
 function openCancel(id) {
@@ -3008,7 +3187,7 @@ function openCancel(id) {
 function quoteBreakdown(o) {
   const q = Number(o.qty) || 1, rows = [[q + " × " + o.item_name + " with your request (vendor's price " + money(o.quote_price) + ")", Number(o.quote_price) * q]];
   if (Number(o.addons_total)) rows.push(["Add-ons: " + addonText(o.addons), Number(o.addons_total) * q]);
-  if (o.max_fee != null) rows.push(["Delivery, full price", Number(o.max_fee) * q]);
+  if (o.max_fee != null) rows.push(["Delivery, full trip", Number(o.max_fee) * q]);
   if (o.service_fee != null) rows.push([o.fee_per_meal && q > 1 ? "Service fee (" + money(o.service_fee) + " a meal)" : "Service fee", Number(o.service_fee) * (o.fee_per_meal ? q : 1)]);
   if (Number(o.wallet_used)) rows.push(["Wallet credit used", -Number(o.wallet_used)]);
   return `<div class="ledger" style="margin:4px 0 8px">${rows.map(([l, v]) => `<div><span>${esc(l)}</span><strong class="num">${v < 0 ? "−" : ""}${money(Math.abs(v))}</strong></div>`).join("")}
@@ -3080,7 +3259,6 @@ function openOrder(menuId, opt = {}) {
     ${join || opt.fromPage ? "" : `<div id="revStrip" class="revstrip"></div>`}
     ${join ? `<p class="note">Your plate joins code <strong>${esc(join.code)}</strong>. You pay only for the plate and its service fee: delivery is already paid, and the final split counts every meal under your code.</p>` : ""}
     ${!join && k.added_by_customer ? `<p class="note">A local vendor added by a customer. ChopPool doesn't inspect their kitchen.</p>` : ""}
-    ${!join && isLong(s, tripTo(k, site)) ? `<p class="note"><strong>Long-distance vendor:</strong> delivery is shared at cost (about ${money(tripTo(k, site))} for the trip). The more people join, the less each pays.</p>` : ""}
     ${join || st.open ? "" : waitingHere ? `<p class="note"><strong>${esc(k.public_name)} hasn't confirmed yet.</strong> Join anyway: if they don't confirm ${confirmText(S.date)}, everyone gets their money back.</p>`
       : `<p class="note">You're first today. We'll ask ${esc(k.public_name)} to confirm ${confirmText(S.date)}. Others here can join while you wait. If they don't confirm, you get your money back.</p>`}
     <form id="orderForm" class="stack" novalidate>
@@ -3124,12 +3302,12 @@ function openOrder(menuId, opt = {}) {
     $("#saveTxt").classList.remove("hidden");
     const addT = (item.addons || []).filter(a => extras.has(a.name)).reduce((t, a) => t + Number(a.price), 0);
     // Full delivery at checkout: the lower of the max per meal and the whole trip by distance. What the pool saves comes back as cashback after the cut-off.
-    const tripN = tripNow(k, site), dFee = join ? 0 : feeFor(1, s, tripN), sFee = Number(s.service_fee);
+    const tripN = tripNow(k, site), dFee = join ? 0 : upfrontPerMeal(tripN, qty, s), sFee = Number(s.service_fee);
     const total = (Number(item.price) + addT) * qty + dFee * qty + sFee * qty;
     const useW = $("#fWallet")?.checked ? Math.min(S.balance, total) : 0, due = total - useW;
     $("#sum").innerHTML = `<div><span>${qty} × ${esc(item.name)}</span><span class="num">${money(item.price * qty)}</span></div>` +
       (addT ? `<div><span>Extras</span><span class="num">${money(addT * qty)}</span></div>` : "") +
-      (join ? `<div><span>Delivery</span><span class="num">Already paid</span></div>` : tripN === 0 ? `<div><span>Delivery, by the vendor</span><span class="num">Free</span></div>` : `<div><span>Delivery, full price${qty > 1 ? " (" + money(dFee) + " a meal)" : ""}</span><span class="num">${money(dFee * qty)}</span></div>`) +
+      (join ? `<div><span>Delivery</span><span class="num">Already paid</span></div>` : tripN === 0 ? `<div><span>Delivery, by the vendor</span><span class="num">Free</span></div>` : `<div><span>Delivery, full trip<small class="sumhint">Shared by the pool. Your share comes back as cashback.</small></span><span class="num">${money(dFee * qty)}</span></div>`) +
       `<div><span>Service fee${qty > 1 ? " (" + money(sFee) + " a meal)" : ""}</span><span class="num">${money(sFee * qty)}</span></div>` +
       (useW ? `<div><span>From wallet</span><span class="num">−${money(useW)}</span></div>` : "");
     $("#payPart").classList.toggle("hidden", due <= 0);
@@ -3151,6 +3329,15 @@ function openOrder(menuId, opt = {}) {
     $("#specialToggle").textContent = special ? "Order from the menu instead" : "+ Ask for something not on the menu"; draw();
     if (special) $("#fSpecial").focus();
   });
+  // Before money moves: the moment the customer goes to pay, check the vendor still has space and the dish is still on
+  let prechecked = false;
+  $("#fRef")?.addEventListener("focus", async () => {
+    if (prechecked || join) return; prechecked = true;
+    try { await refreshBoard(); const fresh = (S.items || []).some(i => i.id === (k.menu ? (k.menu.find(x => x.id === $("input[name=dish]:checked")?.value) || {}).id : null) || i.kitchen_id === k.id);
+      const st = menuState(k);
+      if (st.full || !fresh) { $("#formErr").textContent = st.full ? k.public_name + " is now fully booked. Don't send money for this order." : "This dish just came off the menu. Don't send money for this order."; $("#submitBtn").disabled = true; }
+    } catch (e) {}
+  });
   $("#orderForm").addEventListener("submit", async ev => {
     ev.preventDefault();
     const name = $("#fName").value.trim(), phone = $("#fPhone").value.replace(/\D/g, ""), ref = $("#fRef").value.trim(), err = $("#formErr");
@@ -3170,20 +3357,44 @@ function openOrder(menuId, opt = {}) {
       notifyServer({ order_id: r.id }); if (local.get("cp_push")) pushSubscribe({ order_ids: [r.id] }, true);
       if (join) { closeSheet(); closeVendor(); toast("Added to code " + r.code + ". " + (r.status === "paid" ? "Paid." : "Payment being checked.")); setTab("orders"); return; }
       r.myQty = qty; showConfirmation(r, k, site, sp);
-    } catch (e) { $("#submitBtn").disabled = false; err.textContent = cleanErr(e); }
+    } catch (e) {
+      $("#submitBtn").disabled = false; const msg = cleanErr(e);
+      // The money may already have been sent: keep the payment on record for a refund and say so plainly
+      const due = parseFloat(($("#dueTxt").textContent || "").replace(/[^\d.]/g, "")) || 0;
+      if (!special && ref.length >= 4 && due > 0 && /fully booked|closed|no longer|not taking|not active|full|can't take|can no longer/i.test(msg)) {
+        api.recordUnmatched({ name, phone, amount: due, ref, reason: msg });
+        err.innerHTML = esc(msg) + " <b>Your payment is safe:</b> we've noted transaction ID " + esc(ref) + " and will refund " + money(due) + " to " + esc(phone) + " within 24 hours.";
+      } else err.textContent = msg;
+    }
   });
 }
 /* ---------- Share a pool: the phone's own share sheet, or copy the link ---------- */
+// Link messages: one per situation, link last (approved 7 Nov)
+const MSG = {
+  sellerPage: k => "Hello " + k.name + ", this is your ChopPool page. Confirm the days you cook, see each pool's orders, and mark food ready. Keep this link private: " + baseUrl() + "/#kitchen-" + k.token,
+  sellerAdded: (v, site) => "Hello " + v.name + ", a customer at " + site.name + " added you on ChopPool so people there can order from you together. Open your page to see orders and confirm you're cooking: " + baseUrl() + "/#kitchen-" + v.token,
+  sellerConfirm: (k, siteName, d, mins) => "Hello " + k.name + ", customers at " + siteName + " want lunch from you " + (dayLabel(d) === "today" ? "today" : "for " + dayLabel(d)) + ". Please open your page and confirm you're cooking " + (dayLabel(d) === "today" ? "within " + mins + " minutes" : "by " + fmtTime(S.settings.next_day_confirm_by || "08:30") + " " + dayLabel(d)) + ": " + baseUrl() + "/#kitchen-" + k.token,
+  rider: r => "Welcome to ChopPool, " + r.name + ". Your rider page shows each pickup, where to drop it, and the codes to hand over. Keep this link private: " + baseUrl() + "/#rider-" + r.token,
+  host: x => "Hello, you're the ChopPool drop point for " + x.name + ". When lunch arrives, hand each meal over against the customer's code, like K-27. Your page: " + baseUrl() + "/#host-" + x.host_token
+};
 const joinLink = (siteId, kid) => baseUrl() + "/#join=" + siteId + "," + kid;
 function poolInvite(p, k, site) {
-  const s = S.settings, trip = tripTo(k, site), fee = feeFor(Math.max(p.meals, 1), s, trip), drop = nextDrop(p.meals, s, trip);
-  if (p.status === "waiting") return "ChopPool · " + TAGLINE + "\nI've started a lunch pool at " + site.name + " from " + k.public_name + " (" + p.meals + " " + (p.meals === 1 ? "meal" : "meals") + " so far). Join now: every seat makes delivery cheaper, and if " + k.public_name + " doesn't confirm you get your money back. Order before " + fmtTime(s.cutoff) + (dayLabel(S.date) === "today" ? "" : " " + dayLabel(S.date)) + ":";
-  return "ChopPool · " + TAGLINE + "\nLunch pool at " + site.name + " from " + k.public_name + ": " + p.meals + " of " + s.max_meals + " seats taken, delivery now " + money(fee) + " a meal." +
-    (drop ? " " + drop.more + " more and it drops to " + money(drop.fee) + "." : "") + " Order before " + fmtTime(s.cutoff) + (dayLabel(S.date) === "today" ? "" : " " + dayLabel(S.date)) + ":";
+  const s = S.settings, day = dayLabel(S.date), dayTxt = day === "today" ? "today" : day === "tomorrow" ? "tomorrow" : "on " + fmtDate(S.date);
+  const by = "Order before " + fmtTime(s.cutoff) + (day === "today" ? "" : " " + (day === "tomorrow" ? "tomorrow" : fmtDate(S.date))) + ":";
+  const mine = (S.mine || []).some(o => o.pool_id === p.id && !o.parent_id), started = mine && (S.mine || []).find(o => o.pool_id === p.id && !o.parent_id && o.created_at === (S.mine || []).filter(x => x.pool_id === p.id).map(x => x.created_at).sort()[0]);
+  if (p.status === "waiting") return (started || p.meals <= 1 ? "I've started a lunch pool" : "I've joined a lunch pool") + " at " + site.name + " from " + k.public_name + " for " + dayTxt + ". The more people join, the less we each pay for delivery, and if they don't confirm, everyone gets their money back. " + by;
+  return "Lunch from " + k.public_name + " is coming to " + site.name + " " + dayTxt + ". " + p.meals + (p.meals === 1 ? " person is" : " people are") + " in, and each extra person makes delivery cheaper for all of us. " + by;
 }
+// No open pool at this vendor: invite people to start one
+const vendorInvite = (k, site) => "Fancy lunch from " + k.public_name + " " + (dayLabel(S.date) === "today" ? "today" : dayLabel(S.date)) + "? Start a pool at " + site.name + " and we'll split one delivery:";
 async function sharePool(siteId, kid) {
   const k = menuOf(kid), site = siteOf(siteId), p = currentPool(siteId, kid);
-  if (!p || !["collecting", "waiting"].includes(p.status)) return toast("This pool can't take more orders right now.");
+  if (!p || !["collecting", "waiting"].includes(p.status) || !p.meals) {
+    // No open pool yet: share the vendor so someone can start one
+    const text = vendorInvite(k, site), url = baseUrl() + "/#join=" + siteId + "," + kid;
+    if (navigator.share) { try { await navigator.share({ title: "Lunch from " + k.public_name, text, url }); return; } catch (e) { if (e && e.name === "AbortError") return; } }
+    return copy(text + " " + url, "Link copied. Paste it anywhere to invite people.");
+  }
   const text = poolInvite(p, k, site), url = joinLink(siteId, kid);
   if (navigator.share) { try { await navigator.share({ title: "ChopPool lunch pool", text, url }); return; } catch (e) { if (e && e.name === "AbortError") return; } }
   copy(text + " " + url, "Link copied. Paste it anywhere to invite people.");
@@ -3261,7 +3472,7 @@ function openAddVendor() {
   const est = () => {
     const s = S.settings, from = vPin || site, trip = tripFor(from, site, s), km = hasPin(from) && hasPin(site) ? roadKm(from, site) : null, per = feeFor(Number(s.max_meals), s, trip);
     $("#vEst").textContent = (km != null && vPin ? "About " + (km < 1 ? "1" : km.toFixed(km < 10 ? 1 : 0)) + " km by road · trip about " + money(trip) + " · " : "") + money(per) + " a meal for delivery when the pool fills."
-      + (isLong(s, trip) ? " Long-distance vendor: delivery is shared at cost." : "");
+;
   };
   const putPin = (p, z) => { vPin = { lat: p.lat, lng: p.lng }; const L = window.L;
     if (!vMk) { vMk = L.marker([p.lat, p.lng], { draggable: true, icon: pinIcon(L, "on") }).addTo(vMap); vMk.on("dragend", () => { const ll = vMk.getLatLng(); vPin = { lat: ll.lat, lng: ll.lng }; est(); }); } else vMk.setLatLng([p.lat, p.lng]);
@@ -3282,7 +3493,7 @@ function openAddVendor() {
       const v = await api.addVendor({ site: S.siteId, name: $("#vName").value, whatsapp: $("#vWa").value, items, lat: vPin ? vPin.lat : null, lng: vPin ? vPin.lng : null });
       Object.assign(S, await api.load()); renderPools();
       const link = baseUrl() + "/#kitchen-" + v.token;
-      const msg = "Hello " + v.name + ", I've added you on ChopPool so people at " + site.name + " can order from you together. Open your page to see orders (codes only) and confirm you're cooking today: " + link;
+      const msg = MSG.sellerAdded(v, site); void link;
       openSheet(`<div class="top" style="justify-content:flex-end"><button class="closex" data-close aria-label="Close">${ICON.close}</button></div><span class="success">${ICON.check}</span>
         <div class="center" style="display:grid;gap:6px"><h2 id="sheetTitle">${esc(v.name)} is added</h2><p class="muted">Send them their link now. Nobody's order counts until they confirm.</p></div>
         <a class="wa" href="${wa(v.whatsapp)}?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener">${ICON.wa} Send ${esc(v.name)} the link</a>`);
@@ -3296,13 +3507,35 @@ function openAddVendor() {
 const ADMIN_TABS = [["dash", "Dashboard"], ["today", "Today"], ["menus", "Vendors & menus"], ["buildings", "Buildings"], ["riders", "Riders"], ["reports", "Reports"], ["team", "Team"]];
 // Sub-sections per tab; a third value marks owner-only sections
 const ADMIN_SUBS = {
-  today: [["pools", "Pools"], ["orders", "Orders & payments"], ["wallets", "Wallets & refunds"]],
+  today: [["pools", "Pools"], ["orders", "Orders & payments"], ["wallets", "Refunds & problems"], ["owed", "Money owed"]],
   menus: [["list", "Vendors"], ["reviews", "Ratings & photos"], ["requests", "Listing requests"]],
   buildings: [["list", "Active"], ["requests", "Requests"]],
   riders: [["list", "Riders"], ["apply", "Applications"], ["pricing", "Delivery pricing"]],
-  team: [["members", "Team members"], ["payments", "Payment options", true], ["accounts", "Customer accounts", true]]
+  team: [["members", "Team members"], ["payments", "Payment options", true], ["accounts", "Customer accounts", true], ["activity", "Activity log", true]]
 };
 const NETWORKS = ["MTN", "Telecel", "AirtelTigo"];
+// Team screens lock themselves: signed out after a quiet spell (owner sets 5-60 min, default 15) and after 12 hours in total
+function adminTimeout() {
+  if (DEMO || S.adminTimer) return;
+  const idleMs = () => Math.min(60, Math.max(5, Number(S.settings.admin_idle_min || 15))) * 6e4, MAX = 12 * 3600e3;
+  if (!local.get("cp_admin_since")) local.set("cp_admin_since", Date.now());
+  S.adminSeen = Date.now(); S.adminWarned = false;
+  const touch = () => { if (location.hash === "#admin") { S.adminSeen = Date.now(); if (S.adminWarned) { S.adminWarned = false; closeSheet(); } } };
+  ["pointerdown", "keydown", "scroll", "touchstart"].forEach(ev => window.addEventListener(ev, touch, { passive: true }));
+  const out = async why => { clearInterval(S.adminTimer); S.adminTimer = null; local.set("cp_admin_since", null); $("#view").innerHTML = ""; closeSheet();
+    try { await api.signOut(); } catch (e) {} S.user = null; toast(why); if (location.hash === "#admin") viewAdmin(); };
+  const check = () => {
+    if (location.hash !== "#admin" || !S.user) return;
+    const idle = Date.now() - S.adminSeen, since = Date.now() - Number(local.get("cp_admin_since") || Date.now());
+    if (since > MAX) return out("Signed out after 12 hours. Sign in again to continue.");
+    if (idle > idleMs()) return out("Signed out after " + Math.round(idleMs() / 6e4) + " minutes without activity.");
+    if (idle > idleMs() - 6e4 && !S.adminWarned) { S.adminWarned = true;
+      openSheet(`${sheetHead("Still there?", "For safety, the team screens sign out after " + Math.round(idleMs() / 6e4) + " minutes without activity.")}<button class="btn wide" id="stayIn">Stay signed in</button>`);
+      $("#stayIn").addEventListener("click", () => { S.adminSeen = Date.now(); S.adminWarned = false; closeSheet(); }); }
+  };
+  S.adminTimer = setInterval(check, 10000);
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") check(); });
+}
 async function viewAdmin() {
   await refreshUser();
   if (!S.user && !DEMO) {
@@ -3320,7 +3553,7 @@ async function viewAdmin() {
       $("#forgotT")?.addEventListener("click", () => openForgot($("#email").value.trim(), "admin"));
       $("#loginBtn").addEventListener("click", async () => {
         const email = $("#email").value.trim().toLowerCase(), pw = $("#pw").value;
-        try { mode === "signin" ? await api.signIn(email, pw) : await api.signUp(email, pw, ($("#aname")?.value || "").trim()); viewAdmin(); } catch (e) { $("#loginErr").textContent = cleanErr(e); }
+        try { mode === "signin" ? await api.signIn(email, pw) : await api.signUp(email, pw, ($("#aname")?.value || "").trim()); local.set("cp_admin_since", Date.now()); viewAdmin(); } catch (e) { $("#loginErr").textContent = cleanErr(e); }
       });
     };
     draw(); return;
@@ -3339,6 +3572,7 @@ async function viewAdmin() {
     return;
   }
   S.role = role; S.adminTab = S.adminTab || "dash";
+  adminTimeout();
   const day = S.adminDate || opsDate();
   document.body.classList.add("is-admin");
   S.adminTab = ADMIN_TABS.some(t => t[0] === S.adminTab) ? S.adminTab : "dash";
@@ -3531,6 +3765,15 @@ async function renderAdmin(cached) {
     const waiting = livePools.filter(p => p.status === "waiting"), minsLeft = p => waitLeftMin(p);
     const nearCut = new Date() > new Date(at(d, s.cutoff).getTime() - 60 * 6e4);
     const small = livePools.filter(p => p.status === "collecting" && p.meals < s.min_pool && nearCut);
+    // One customer alone in a pool, and steps running late against the delivery time
+    const soloPools = livePools.filter(p => ["collecting", "waiting"].includes(p.status)).map(p => { const os = A.orders.filter(o => o.pool_id === p.id && !o.parent_id && ["pending", "paid"].includes(o.status));
+      return os.length === 1 ? { p, answer: os[0].solo_choice ? os[0].customer_name.split(" ")[0] + ": " + os[0].solo_choice : "" } : null; }).filter(Boolean);
+    const dlv = at(d, s.delivery_time).getTime(), nowT = Date.now(), lateBy = (m, st) => nowT > dlv + m * 6e4 && stepRank(st) < 0;
+    const overdue = d !== today() ? [] : livePools.filter(p => p.meals > 0 && !["waiting", "cancelled"].includes(p.status)).map(p => { const kn = (A.kitchens.find(k => k.id === p.kitchen_id) || {}).public_name || "Vendor";
+      if (stepRank(p.status) < stepRank("ready") && nowT > dlv - 20 * 6e4) return { p, what: kn + ": food not ready" };
+      if (stepRank(p.status) < stepRank("picked_up") && nowT > dlv - 10 * 6e4) return { p, what: kn + ": not picked up" };
+      if (stepRank(p.status) < stepRank("delivered") && nowT > dlv + 15 * 6e4) return { p, what: kn + ": not arrived" };
+      return null; }).filter(Boolean); void lateBy;
     const acts = [
       ["Payments to check", live.filter(o => o.status === "pending").length, "today:orders", "warn", "MoMo references waiting"],
       ["Refunds due", A.orders.filter(o => o.refund_needed).length, "today:wallets", "bad", "Cancelled or vendor no-show"],
@@ -3539,7 +3782,12 @@ async function renderAdmin(cached) {
       ["Building requests", pending.length, "buildings:requests", "warn", "Waiting for approval"],
       ["Vendor listing requests", listReq.length, "menus:requests", "warn", "Vendors asking to be listed"],
       ["Rider applications", riderApps.length, "riders:apply", "warn", "Riders asking to join"],
-      ["Small pools", small.length, "today:pools", "warn", "Under " + s.min_pool + " meals near cut-off"]
+      ["Small pools", small.length, "today:pools", "warn", "Under " + s.min_pool + " meals near cut-off"],
+      ["Unchecked at cut-off", nearCut ? live.filter(o => o.status === "pending" && !o.pay_issue).length : 0, "today:orders", "bad", "Payments still not checked"],
+      ["Only one customer", nearCut ? soloPools.length : 0, "today:pools", "warn", soloPools.map(p => p.answer).filter(Boolean).join(", ") || "Asked to keep, switch or cancel"],
+      ["Running late", overdue.length, "today:pools", "bad", overdue.slice(0, 2).map(x => x.what).join(" · ")],
+      ["Problems reported", (A.problems || []).length, "today:wallets", "bad", "Cashback paused until sorted"],
+      ["Payments with no order", (A.unmatched || []).length, "today:wallets", "bad", "Refund these"]
     ].filter(a => a[1] > 0);
     const byStage = STEPS.map(st => [STEP_LABEL[st], livePools.filter(p => p.status === st).length]).filter(x => x[1]);
     const kUse = A.kitchens.map(k => ({ k, m: livePools.filter(p => p.kitchen_id === k.id).reduce((t, p) => t + p.meals, 0) })).filter(x => x.m > 0).sort((a, b) => b.m - a.m);
@@ -3587,7 +3835,7 @@ async function renderAdmin(cached) {
             <div><label for="tr-${p.id}">Trip ref</label><input id="tr-${p.id}" data-f="trip_ref" value="${esc(p.trip_ref || "")}" placeholder="Booking code"></div>
             <div><label for="tc-${p.id}">Trip cost</label><input id="tc-${p.id}" data-f="trip_cost" inputmode="decimal" value="${esc(p.trip_cost ?? "")}" placeholder="GHS"></div>
             <button class="ghost" data-act="pool-save">Save</button></div>`}
-          ${p.status === "waiting" && k.whatsapp ? `<a class="wa" href="${wa(k.whatsapp)}?text=${encodeURIComponent("Hello " + k.name + ", a customer at " + sName(p.site_id) + " wants to order from you on ChopPool for " + dayLabel(d) + ". Please open your page and tap \"Yes, I'm cooking " + dayLabel(d) + "\" within " + s.accept_timeout_min + " minutes: " + baseUrl() + "/#kitchen-" + k.token)}" target="_blank" rel="noopener">${ICON.wa} Ask ${esc(k.name)} to confirm</a>` : ""}
+          ${p.status === "waiting" && k.whatsapp ? `<a class="wa" href="${wa(k.whatsapp)}?text=${encodeURIComponent(MSG.sellerConfirm(k, sName(p.site_id), d, s.accept_timeout_min))}" target="_blank" rel="noopener">${ICON.wa} Ask ${esc(k.name)} to confirm</a>` : ""}
           <div class="row" style="justify-content:flex-start;gap:8px;flex-wrap:wrap"><button class="ghost" data-act="ticket">Send ticket</button><button class="ghost" data-act="arrival">Arrival message</button>
             <select data-act="pool-status" aria-label="Set pool step" style="width:auto">${(p.status === "waiting" ? ["waiting"] : []).concat(STEPS).map(x => `<option value="${x}"${x === p.status ? " selected" : ""}>${STEP_LABEL[x]}</option>`).join("")}<option value="cancelled">Cancel pool</option></select></div></article>`; }).join("") || `<p class="card muted">No pools for this date yet.</p>`}</div>`;
     if (sub === "orders") {
@@ -3603,8 +3851,8 @@ async function renderAdmin(cached) {
       const row = (o, flag) => { const p = A.pools.find(x => x.id === o.pool_id) || {}, k = K(o.kitchen_id);
         const extras = [addonText(o.addons), o.note ? "Note: " + o.note : "", o.special_request ? "Special: " + o.special_request + (o.quote_price ? " (" + money(o.quote_price) + ")" : " (not priced)") : ""].filter(Boolean).join(" · ");
         const paid = [o.wallet_used > 0 ? "Wallet " + money(o.wallet_used) : "", o.momo_ref ? "MoMo " + o.momo_ref : ""].filter(Boolean).join(" + ");
-        const due = Math.max(0, orderTotal(o) - Number(o.wallet_used || 0)), bad = unpaid[o.phone] || 0;
-        const payCell = o.status === "pending" ? `<div class="stack" style="gap:6px;min-width:190px"><span class="num">${esc(paid || "—")}<br><span class="small muted">Expect ${money(due)}</span></span>
+        const due = Math.max(0, orderTotal(o) - Number(o.wallet_used || 0) - Number(o.carried_amount || 0)), bad = unpaid[o.phone] || 0, reused = o.momo_ref && (S.refsSeen || {})[String(o.momo_ref).trim()];
+        const payCell = o.status === "pending" ? `<div class="stack" style="gap:6px;min-width:190px"><span class="num">${esc(paid || "—")}${reused ? ` <span class="chip bad">Ref used ${reused}×</span>` : ""}<br><span class="small muted">Expect ${money(due)}${Number(o.carried_amount) > 0 ? " (" + money(o.carried_amount) + " moved from another pool)" : ""}</span></span>
             ${o.pay_issue ? `<span class="chip warn">${o.pay_issue === "short" ? "Short: " + money(o.amount_received || 0) + " received" : "Not found"} · customer told</span>` : ""}
             <div class="row" style="gap:6px;flex-wrap:wrap;justify-content:flex-start"><button class="btn" data-act="pay-found" style="padding:7px 12px">Payment found</button><button class="ghost" data-act="pay-issue" style="padding:7px 12px">Not found / short</button></div></div>` : `<span class="num">${esc(paid || "—")}</span>`;
         return `<tr data-orow="${esc(o.id)}"><td class="num">${flag ? `<span class="pdotx" title="Payment to confirm"></span>` : ""}${clock(o.created_at)}</td><td>${esc(o.customer_name)}${bad ? `<br><span class="chip bad" title="Payments not received in the last 60 days">${bad} unpaid before</span>` : ""}</td><td class="num">${esc(o.phone)}</td><td>${esc(sName(o.site_id))}</td>
@@ -3618,18 +3866,47 @@ async function renderAdmin(cached) {
       ${issueL.length ? `<h3>Waiting for the customer to fix · ${issueL.length}</h3><p class="small muted">Cancelled automatically at ${fmtTime(s.cutoff)} if nothing changes.</p><div class="table-wrap"><table>${head}${issueL.map(o => row(o, false)).join("")}</table></div>` : ""}
       <h3>${toCheckL.length || issueL.length ? "All other orders" : "Orders"}</h3>
       <div class="table-wrap"><table>${head}${rest.map(o => row(o, false)).join("") || `<tr><td colspan="9" class="muted">No other orders yet.</td></tr>`}</table></div>`;
+      const refs = [...new Set(A.orders.filter(o => o.status === "pending" && o.momo_ref).map(o => String(o.momo_ref).trim()))], rk = refs.join("|");
+      if (refs.length && S.refsKey !== rk) { S.refsKey = rk; api.refsSeen(refs, d).then(m => { S.refsSeen = m || {}; if (Object.keys(S.refsSeen).length) renderAdmin(true); }).catch(() => {}); }
       if (!S.unpaidLoaded) { S.unpaidLoaded = true; api.unpaidPhones().then(m => { S.unpaidPhones = m; if (Object.keys(m).length) renderAdmin(true); }).catch(() => {}); }
     }
     if (sub === "wallets") {
-      const refunds = A.orders.filter(o => o.refund_needed);
+      const refunds = A.orders.filter(o => o.refund_needed), isOwner = S.role === "super";
+      const amt = o => Number(o.refund_due) > 0 ? Number(o.refund_due) : Math.max(0, orderTotal(o) - Number(o.wallet_used || 0));
       body.innerHTML = `
       <h2>Refunds due</h2>
-      ${refunds.length ? `<div class="table-wrap"><table><tr><th>Customer</th><th>MoMo no.</th><th>Code</th><th>Why</th><th>MoMo ref</th><th></th></tr>${refunds.map(o => `<tr><td>${esc(o.customer_name)}</td><td class="num">${esc(o.phone)}</td><td class="num">${esc(o.code)}</td><td style="white-space:normal">${esc(o.cancel_reason || "Cancelled")}</td><td class="num">${esc(o.momo_ref || "—")}</td><td><button class="ghost" data-refunded="${esc(o.id)}">Mark refunded</button></td></tr>`).join("")}</table></div>` : `<p class="muted small">No refunds due for ${fmtDate(d)}.</p>`}
+      ${refunds.length ? `<div class="stack" style="gap:10px">${refunds.map(o => `<div class="card stack" style="gap:6px" data-refund="${esc(o.id)}"><div class="top"><strong>${esc(o.customer_name)} · <span class="num">${esc(o.code)}</span></strong><b class="num">${money(amt(o))}</b></div>
+          <p class="small">${esc(o.cancel_reason || "Cancelled")} · send to <a class="num" href="tel:${esc(o.phone)}">${esc(fmtPhone(o.phone))}</a>${o.momo_ref ? ` · paid with <span class="num">${esc(o.momo_ref)}</span>` : ""}</p>
+          <form class="inline" data-form="refund" data-id="${esc(o.id)}" data-amt="${amt(o)}" style="grid-template-columns:1fr auto"><div><label>MoMo reference of your refund</label><input name="ref" autocomplete="off" placeholder="e.g. 5123456789"></div><button class="btn">Mark refunded</button></form></div>`).join("")}</div>`
+        : `<p class="muted small">No refunds due for ${fmtDate(d)}.</p>`}
+      <h2>Payments with no order</h2>
+      ${(A.unmatched || []).length ? `<div class="stack" style="gap:10px">${A.unmatched.map(u => `<div class="card stack" style="gap:6px"><div class="top"><strong>${esc(u.name || "Customer")}</strong><b class="num">${money(u.amount)}</b></div>
+          <p class="small">${esc(u.reason || "")} · ref <span class="num">${esc(u.momo_ref || "")}</span> · refund to <a class="num" href="tel:${esc(u.phone)}">${esc(fmtPhone(u.phone))}</a> · ${fmtDate(String(u.created_at).slice(0, 10))}</p>
+          <form class="inline" data-form="unmatched" data-id="${esc(u.id)}" style="grid-template-columns:1fr auto"><div><label>MoMo reference of your refund</label><input name="ref" autocomplete="off"></div><button class="btn">Mark refunded</button></form></div>`).join("")}</div>`
+        : `<p class="muted small">None. When someone pays but their order can't go through (sold out, closed), it shows here for a refund.</p>`}
+      <h2>Problems reported</h2>
+      ${(A.problems || []).length ? `<div class="stack" style="gap:10px">${A.problems.map(o => `<div class="card stack" style="gap:6px"><div class="top"><strong>${esc(o.customer_name)} · <span class="num">${esc(o.code)}</span></strong><span class="small muted">${fmtDate(o.order_date)}</span></div>
+          <p class="small">${esc(o.problem)} · ${esc((A.kitchens.find(k => k.id === o.kitchen_id) || {}).public_name || "")} · <a href="tel:${esc(o.phone)}">${esc(fmtPhone(o.phone))}</a></p>
+          <form class="inline" data-form="resolve" data-id="${esc(o.id)}" style="grid-template-columns:${isOwner ? "1.6fr .7fr" : "1fr"} auto"><div><label>What you did</label><input name="note" placeholder="Called, vendor will replace it tomorrow"></div>${isOwner ? `<div><label>Credit (GHS)</label><input name="credit" inputmode="decimal" placeholder="0"></div>` : ""}<button class="btn">Mark sorted</button></form></div>`).join("")}</div>`
+        : `<p class="muted small">No open problems. Customers can report one after collecting; their cashback waits until it's sorted.</p>`}
       <h2>Wallets</h2>
-      ${(A.wallets || []).length ? `<div class="table-wrap"><table><tr><th>Customer</th><th>Phone</th><th>Balance</th></tr>${A.wallets.map(w => `<tr><td>${esc(w.name || "")} <span class="muted small">${esc(w.email || "")}</span></td><td class="num">${esc(w.phone || "")}</td><td class="num">${money(w.balance)}</td></tr>`).join("")}</table></div>
-        <form class="card inline" data-form="credit" style="grid-template-columns:1.4fr .7fr 1.4fr auto"><div><label for="wUser">Customer</label><select id="wUser" name="user">${A.wallets.map(w => `<option value="${esc(w.user_id)}">${esc(w.name || w.email)}</option>`).join("")}</select></div>
-          <div><label for="wAmt">Amount</label><input id="wAmt" name="amt" inputmode="decimal" placeholder="10 or −5"></div><div><label for="wWhy">Reason</label><input id="wWhy" name="why" placeholder="Late delivery on Mon"></div><button class="btn">Apply</button></form>`
+      ${(A.wallets || []).length ? `<div class="table-wrap"><table><tr><th>Customer</th><th>Phone</th><th>Balance</th></tr>${A.wallets.map(w => `<tr><td>${esc(w.name || "")} <span class="muted small">${esc(w.email || "")}</span></td><td class="num">${esc(fmtPhone(w.phone || ""))}</td><td class="num">${money(w.balance)}</td></tr>`).join("")}</table></div>
+        ${isOwner ? `<form class="card stack" data-form="credit" style="gap:10px"><h3>Adjust a wallet</h3><p class="small muted">Owner only. Adds credit (or takes it back with a minus) and records who did it and why.</p>
+          <div class="grid2"><div><label for="wUser">Customer</label><select id="wUser" name="user">${A.wallets.map(w => `<option value="${esc(w.user_id)}">${esc(w.name || w.email)}</option>`).join("")}</select></div>
+          <div><label for="wAmt">Amount (GHS)</label><input id="wAmt" name="amt" inputmode="decimal" placeholder="10 or -5"></div></div><div><label for="wWhy">Reason</label><input id="wWhy" name="why" placeholder="Late delivery on Mon"></div><button class="btn">Adjust wallet</button></form>` : ""}`
         : `<p class="small muted">No customer accounts yet. Wallets appear when customers create accounts.</p>`}`;
+    }
+    if (sub === "owed") {
+      const from = S.owedFrom || addDays(d, -6);
+      body.innerHTML = `<h2>Money owed</h2><p class="small muted">Sellers are owed food from pools that were delivered and received, minus the ChopPool fee. Riders are owed the trip cost recorded on each delivered pool. What's due is everything earned minus every payout recorded.</p><div id="owedBox"><div class="skeleton" style="height:160px"></div></div>`;
+      Promise.all([api.adminDues(from, d), api.payouts()]).then(([du, pays]) => { const el = $("#owedBox"); if (!el) return; const isOwner = S.role === "super";
+        const row = (t, x) => `<div class="card stack" style="gap:6px"><div class="top"><strong>${esc(x.name)}</strong><b class="num">${money(x.due)}</b></div>
+          <p class="small muted">${t === "seller" ? "Food " + money(x.food) + " · fee " + money(x.fee) + " (this week)" : "Trips " + money(x.trips) + " (this week)"} · paid so far ${money(x.paid)}</p>
+          ${isOwner && Number(x.due) > 0 ? `<form class="inline" data-form="payout" data-type="${t}" data-id="${esc(x.id)}" style="grid-template-columns:.7fr 1.2fr auto"><div><label>Amount</label><input name="amount" inputmode="decimal" value="${Number(x.due).toFixed(2)}"></div><div><label>MoMo reference</label><input name="ref" autocomplete="off"></div><button class="btn">Record payout</button></form>` : ""}</div>`;
+        el.innerHTML = `<h3>Sellers</h3>${(du.sellers || []).map(x => row("seller", x)).join("") || `<p class="small muted">Nothing owed to sellers yet.</p>`}
+          <h3>Riders</h3>${(du.riders || []).map(x => row("rider", x)).join("") || `<p class="small muted">Nothing owed to riders yet. Add the trip cost on each pool.</p>`}
+          <h3>Recent payouts</h3>${(pays || []).length ? `<div class="table-wrap"><table><tr><th>Date</th><th>To</th><th>Amount</th><th>Ref</th><th>By</th></tr>${pays.slice(0, 30).map(x => `<tr><td>${fmtDate(String(x.created_at).slice(0, 10))}</td><td>${esc(x.payee_type === "seller" ? (A.kitchens.find(k => k.id === x.kitchen_id) || {}).name || "Seller" : (A.riders.find(r => r.id === x.rider_id) || {}).name || "Rider")}</td><td class="num">${money(x.amount)}</td><td class="num">${esc(x.momo_ref || "")}</td><td class="small">${esc(x.paid_by || "")}</td></tr>`).join("")}</table></div>` : `<p class="small muted">No payouts recorded yet.</p>`}`;
+      }).catch(e => { const el = $("#owedBox"); if (el) el.innerHTML = `<p class="err">${esc(cleanErr(e))}</p>`; });
     }
   }
 
@@ -3692,7 +3969,7 @@ async function renderAdmin(cached) {
           <label class="choice" style="padding:8px 10px"><input type="checkbox" data-f="active"${k.active ? " checked" : ""}><span>Active</span></label></div>
         <div class="group"><p class="group-title">Days they cook (pools open without the vendor confirming)</p>${autoPicker(k.auto_days)}
           <p class="small muted" style="margin-top:4px">${(k.auto_days || []).length ? "On: " + daysText(k.auto_days) + ". Untick every day to switch it off for a vendor who lets pools down." : "Off: the vendor confirms each day."}${(k.paused_dates || []).filter(x => x >= today()).length ? " Paused: " + k.paused_dates.filter(x => x >= today()).map(fmtDate).join(", ") + "." : ""}</p></div>
-        <div class="row" style="justify-content:flex-start;gap:8px;flex-wrap:wrap"><button class="ghost" data-act="kitchen-save">Save</button>${sendLink(k.whatsapp, "Your ChopPool order page: " + baseUrl() + "/#kitchen-" + k.token)}<button class="ghost" data-act="kitchen-copy">Copy link</button><button class="ghost" data-act="kitchen-reset">Reset link</button><button class="ghost" data-act="kitchen-remove" style="color:var(--danger)">Remove</button></div>
+        <div class="row" style="justify-content:flex-start;gap:8px;flex-wrap:wrap"><button class="ghost" data-act="kitchen-save">Save</button>${sendLink(k.whatsapp, MSG.sellerPage(k))}<button class="ghost" data-act="kitchen-copy">Copy link</button><button class="ghost" data-act="kitchen-reset">Reset link</button><button class="ghost" data-act="kitchen-remove" style="color:var(--danger)">Remove</button></div>
         <p class="group-title">Menu</p>
         ${menuEditor(items.filter(i => i.kitchen_id === k.id), "admin:" + k.id, true)}
         </div></details>`; }).join("") || `<p class="muted">No vendors match.</p>`}</div>`;
@@ -3728,7 +4005,7 @@ async function renderAdmin(cached) {
         <div class="grid2"><div><label>Name</label><input data-f="name" value="${esc(x.name)}"></div><div><label>Drop point</label><input data-f="drop_point" value="${esc(x.drop_point)}"></div></div>
         <div class="grid2"><div><label>Handoff</label><select data-f="handoff"><option value="host"${x.handoff === "host" ? " selected" : ""}>Drop-point host</option><option value="meet_rider"${x.handoff === "meet_rider" ? " selected" : ""}>Meet the rider</option></select></div><div><label>Host</label><input data-f="host_label" value="${esc(x.host_label || "")}"></div></div>
         <div class="row" style="justify-content:flex-start;gap:8px;flex-wrap:wrap"><label class="choice" style="padding:8px 10px"><input type="checkbox" data-f="active"${x.active ? " checked" : ""}><span>Live</span></label><button class="ghost" data-act="site-save">Save</button>
-          ${x.handoff === "host" ? `<button class="ghost" data-act="host-copy">Copy host link</button>` : ""}<button class="ghost" data-act="site-merge">Merge into…</button><button class="ghost" data-act="site-remove" style="color:var(--danger)">Remove</button>${hasPin(x) ? `<a class="linkbtn" href="${osmLink(x)}" target="_blank" rel="noopener">Map</a>` : ""}</div>
+          ${x.handoff === "host" ? `<button class="ghost" data-act="host-copy">Copy host link</button><button class="ghost" data-act="host-reset">Send a new link</button>` : ""}<button class="ghost" data-act="site-merge">Merge into…</button><button class="ghost" data-act="site-remove" style="color:var(--danger)">Remove</button>${hasPin(x) ? `<a class="linkbtn" href="${osmLink(x)}" target="_blank" rel="noopener">Map</a>` : ""}</div>
         </div></details>`; }).join("") || `<p class="muted">No buildings match.</p>`}</div>`;
       makeMap($("#adminMap"), ACCRA, 11).then(m => {
         adminMaps.push(m); const L = window.L, pts = [];
@@ -3757,10 +4034,11 @@ async function renderAdmin(cached) {
         <p class="small muted">Each trip is priced by distance, like Bolt and Yango: base fare + rate per km of road from the kitchen to the building. The trip is then shared across the meals in the pool. Check a few real Bolt or Yango quotes and match them.</p>
         <div class="grid2"><div><label for="pfBase">Base fare (GHS)</label><input id="pfBase" name="base_fare" inputmode="decimal" value="${esc(s.base_fare ?? "")}"></div>
           <div><label for="pfKm">Rate per km (GHS)</label><input id="pfKm" name="per_km" inputmode="decimal" value="${esc(s.per_km ?? "")}"></div>
-          <div><label for="pfMax">Delivery cap per meal (GHS)</label><input id="pfMax" name="max_fee" inputmode="decimal" value="${esc(s.max_fee)}"></div>
+          <div><label for="pfMax">Highest trip price (GHS)</label><input id="pfMax" name="trip_max" inputmode="decimal" value="${esc(s.trip_max ?? 80)}"></div>
           <div><label for="pfFlat">Flat trip cost if a pin is missing (GHS)</label><input id="pfFlat" name="trip_cost" inputmode="decimal" value="${esc(s.trip_cost)}"></div>
-          <div><label for="pfCapKm">Cap applies up to (km by road)</label><input id="pfCapKm" name="cap_km" inputmode="decimal" value="${esc(s.cap_km ?? "")}"></div></div>
-        <p class="small muted">Trips up to ${esc(s.cap_km ?? "the set")} km: nobody pays more than the cap per meal for delivery. Longer trips (long-distance vendors) are shared at cost, with no cap. Leave the km box empty to cap every trip. Changes only affect new orders.</p>
+          <div><label for="pfPay">Minutes to pay a priced special order</label><input id="pfPay" name="quote_pay_min" inputmode="numeric" value="${esc(s.quote_pay_min ?? 15)}"></div>
+          <div><label for="pfRecv">"Got my food" confirms itself after (minutes)</label><input id="pfRecv" name="auto_receive_min" inputmode="numeric" value="${esc(s.auto_receive_min ?? 120)}"></div></div>
+        <p class="small muted">Customers pay the full trip at checkout. Once lunch is received, each person's share is worked out and the rest comes back as cashback. No trip is charged above the highest trip price. Changes only affect new orders.</p>
         ${s.base_fare != null ? `<p class="small" style="color:var(--hint)">Examples: 2 km trip ${money(ex(2))} · 5 km ${money(ex(5))} · 10 km ${money(ex(10))}</p>` : ""}
         <p class="err" data-err></p><button class="btn">Save pricing</button></form>
       <form class="card" data-form="rules"><h2>Vendors near you and free delivery</h2>
@@ -3774,7 +4052,8 @@ async function renderAdmin(cached) {
         ${isSuper ? `<h2 style="margin-top:8px">ChopPool fee on bigger pools <span class="small muted">(owner only)</span></h2>
         <div class="grid2"><div><label for="rlRate">Fee on each meal after the free ones (%)</label><input id="rlRate" name="vendor_fee_pct" inputmode="decimal" value="${esc(Math.round(Number(s.vendor_fee_rate || 0) * 1000) / 10)}"></div>
           <div><label for="rlFreeN">Free meals in every pool</label><input id="rlFreeN" name="vendor_fee_free" inputmode="numeric" value="${esc(s.vendor_fee_free ?? 5)}"></div></div>
-        <p class="small muted">0% switches it off. Vendors see new terms before they confirm their next pool; pools they've already confirmed keep the old terms.</p>` : ""}
+        <p class="small muted">0% switches it off. Vendors see new terms before they confirm their next pool; pools they've already confirmed keep the old terms.</p>
+        <h3>Team screen timeout</h3><div><label for="rlIdle">Sign out after this many quiet minutes (5-60)</label><input id="rlIdle" name="admin_idle_min" inputmode="numeric" value="${esc(s.admin_idle_min ?? 15)}"></div>` : ""}
         <p class="err" data-err></p><button class="btn">Save</button></form>`; }
     if (sub === "apply") body.innerHTML = riderApps.length ? `<div class="stack" style="gap:10px">${riderApps.map(r => `<article class="card" data-rider="${esc(r.id)}"><div class="top" style="align-items:flex-start"><div><h3>${esc(r.name)}</h3><p class="small muted">${esc(added(r))}</p></div>${pill("Applied", "warn")}</div>
         <div class="grid2 small"><p><strong>Phone:</strong> <span class="num">${esc(r.phone || "")}</span></p><p><strong>MoMo:</strong> <span class="num">${esc(r.momo || "—")}</span></p><p><strong>Motorbike:</strong> ${esc(r.bike || "—")}</p><p><strong>Area:</strong> ${esc(r.area || "—")}</p></div>
@@ -3797,7 +4076,7 @@ async function renderAdmin(cached) {
         <div class="ibody">
         <div class="grid2"><div><label>Name</label><input data-f="name" value="${esc(r.name)}"></div><div><label>Phone</label><input data-f="phone" value="${esc(r.phone || "")}"></div></div>
         <div class="row" style="justify-content:flex-start;gap:8px;flex-wrap:wrap"><label class="choice" style="padding:8px 10px"><input type="checkbox" data-f="active"${r.active ? " checked" : ""}><span>Active</span></label><button class="ghost" data-act="rider-save">Save</button>
-          ${sendLink(r.phone, "Your ChopPool rider page: " + baseUrl() + "/#rider-" + r.token)}<button class="ghost" data-act="rider-copy">Copy link</button></div>
+          ${sendLink(r.phone, MSG.rider(r))}<button class="ghost" data-act="rider-copy">Copy link</button><button class="ghost" data-act="rider-reset">Send a new link</button></div>
         </div></details>`; }).join("") || `<p class="muted">No riders yet. Add one under "Add a rider".</p>`}</div>`;
     }
   }
@@ -3833,6 +4112,13 @@ async function renderAdmin(cached) {
         <div class="grid2"><div><label for="pmNum">MoMo number</label><input id="pmNum" name="number" inputmode="tel" placeholder="024 123 4567"></div><div><label for="pmName">Account name</label><input id="pmName" name="name" placeholder="ChopPool Ventures"></div>
           <div><label for="pmNet">Network</label><select id="pmNet" name="network">${NETWORKS.map(n => `<option>${n}</option>`).join("")}</select></div></div>
         <p class="err" data-err></p><button class="btn">Add payment option</button></form>`;
+    }
+    if (sub === "activity" && isSuper) {
+      body.innerHTML = `<h2>Activity log</h2><p class="small muted">Every change the team makes: payments confirmed, refunds, wallet adjustments, settings, pools, payouts. Newest first.</p><div id="logBox"><div class="skeleton" style="height:160px"></div></div>`;
+      const nice = { orders: "Order", wallet_entries: "Wallet", settings: "Settings", pools: "Pool", payouts: "Payout", admins: "Team", kitchens: "Vendor", riders: "Rider", sites: "Building", unmatched_payments: "Unmatched payment" };
+      api.activityLog().then(list => { const el = $("#logBox"); if (!el) return;
+        el.innerHTML = list.length ? `<div class="table-wrap"><table><tr><th>When</th><th>Who</th><th>What</th><th>Change</th></tr>${list.map(x => `<tr><td class="small">${esc(String(x.at).slice(0, 16).replace("T", " "))}</td><td class="small">${esc(x.actor || "")}</td><td>${esc((nice[x.entity] || x.entity) + " " + x.action)}</td><td class="small" style="white-space:normal">${esc(Object.entries(x.changes || {}).filter(([k]) => !/_at$|^updated|^created/.test(k)).slice(0, 4).map(([k, v]) => Array.isArray(v) ? k + ": " + JSON.stringify(v[0]) + " → " + JSON.stringify(v[1]) : k).join(" · "))}</td></tr>`).join("")}</table></div>`
+          : `<p class="small muted">Nothing yet. Changes appear here as the team works.</p>`; }).catch(e => { const el = $("#logBox"); if (el) el.innerHTML = `<p class="err">${esc(cleanErr(e))}</p>`; });
     }
     if (sub === "accounts" && isSuper) {
       body.innerHTML = `<h2>Customer accounts</h2><div class="dash-grid" id="acctTiles"><div class="dtile"><b>&nbsp;</b><span>Customer accounts</span></div></div><p class="small muted">Team members aren't counted. "Active" means they ordered in the last 30 days.</p>`;
@@ -3915,8 +4201,8 @@ async function adminClick(e) {
         ${k.whatsapp ? `<a class="wa" href="${wa(k.whatsapp)}?text=${encodeURIComponent(text)}" target="_blank" rel="noopener">${ICON.wa} Send on WhatsApp</a>` : `<p class="err">Add this vendor's WhatsApp number under Vendors & menus.</p>`}`);
     }
     if (act === "arrival") {
-      const text = site.handoff === "host" ? "Your ChopPool lunch has arrived at " + site.name + ". Collect it from " + (site.host_label || site.drop_point) + " with your 4-digit code."
-        : "Your ChopPool lunch arrives at " + site.name + ", " + site.drop_point + ", in about 5 minutes. Bring your 4-digit code. Delivery waits " + s.arrival_window_min + " minutes.";
+      const text = site.handoff === "host" ? "Your ChopPool lunch is at " + site.name + ". Collect it from " + (site.host_label || site.drop_point) + " with your code, like K-27."
+        : "Your ChopPool lunch arrives at " + site.name + ", " + site.drop_point + ", in about 5 minutes. Bring your code. The rider waits " + s.arrival_window_min + " minutes.";
       return openSheet(`${sheetHead("Arrival message", "Customers with the app open get this automatically. Message the others:")}<textarea rows="4" aria-label="Message">${esc(text)}</textarea>
         ${os.map(o => `<a class="wa quiet" href="${wa(o.phone)}?text=${encodeURIComponent(text + " Your code: " + o.code)}" target="_blank" rel="noopener">${esc(o.customer_name)} · ${esc(o.code)}</a>`).join("")}`);
     }
@@ -3959,14 +4245,16 @@ async function adminClick(e) {
       return;
     }
     if (act === "site-save") return run(() => api.updateSite(x.id, { name: fval(sc, "name"), drop_point: fval(sc, "drop_point"), handoff: fval(sc, "handoff"), host_label: fval(sc, "host_label") || null, active: fval(sc, "active") }), "Building saved");
-    if (act === "host-copy") return copy(baseUrl() + "/#host-" + x.host_token, "Host link copied");
+    if (act === "host-copy") return copy(MSG.host(x), "Host message copied. Paste it into WhatsApp.");
+    if (act === "host-reset") return run(async () => { x.host_token = await api.resetHostLink(x.id); copy(MSG.host(x), "New host link made and copied. The old link no longer works."); });
     if (act === "site-remove") return confirmRemove("Remove " + x.name + "?", "Customers will no longer be able to deliver here, and sellers added only for this building are removed too. Past orders stay in your records.", () => api.removeSite(x.id));
   }
   const rc = t.closest("[data-rider]");
   if (rc) {
     const r = A.riders.find(y => y.id === rc.dataset.rider);
-    if (act === "rider-copy") return copy(baseUrl() + "/#rider-" + r.token, "Link copied");
-    if (act === "rider-approve") return run(async () => { await api.updateRider(r.id, { status: "approved", active: true }); setTimeout(() => openSheet(`${sheetHead("Rider approved")}<p>Send ${esc(r.name)} their private rider link. It opens their rider app.</p>${sendLink(r.phone, "Welcome to ChopPool, " + r.name + ". Your rider page: " + baseUrl() + "/#rider-" + r.token) || ""}<button class="ghost wide" data-close>Done</button>`), 300); }, "Rider approved");
+    if (act === "rider-copy") return copy(MSG.rider(r), "Rider message copied");
+    if (act === "rider-reset") return run(async () => { r.token = await api.resetRiderLink(r.id); copy(MSG.rider(r), "New rider link made and copied. The old link no longer works."); });
+    if (act === "rider-approve") return run(async () => { await api.updateRider(r.id, { status: "approved", active: true }); setTimeout(() => openSheet(`${sheetHead("Rider approved")}<p>Send ${esc(r.name)} their private rider link. It opens their rider app.</p>${sendLink(r.phone, MSG.rider(r)) || ""}<button class="ghost wide" data-close>Done</button>`), 300); }, "Rider approved");
     if (act === "rider-decline") return run(() => api.updateRider(r.id, { status: "declined", active: false }), "Application declined");
     if (act === "rider-save") return run(() => api.updateRider(r.id, { name: fval(rc, "name"), phone: (fval(rc, "phone") || "").replace(/\D/g, "") || null, active: fval(rc, "active") }), "Rider saved");
   }
@@ -4016,10 +4304,10 @@ async function adminSubmit(e) {
       Object.assign(S, await api.load()); toast("Payment option added");
     }
     if (f.dataset.form === "pricing") {
-      const vals = ["base_fare", "per_km", "max_fee", "trip_cost"].map(n => [n, Number(v(n))]);
-      if (vals.some(([, x]) => !isFinite(x) || x < 0) || !Number(v("max_fee")) || !Number(v("per_km"))) return fail("Enter numbers for all four boxes.");
-      const ck = v("cap_km"); if (ck !== "" && (!isFinite(Number(ck)) || Number(ck) <= 0)) return fail("Enter the cap distance in km, or leave it empty.");
-      vals.push(["cap_km", ck === "" ? null : Number(ck)]);
+      const vals = ["base_fare", "per_km", "trip_max", "trip_cost", "quote_pay_min", "auto_receive_min"].map(n => [n, Number(v(n))]);
+      if (vals.some(([, x]) => !isFinite(x) || x < 0) || !Number(v("trip_max")) || !Number(v("per_km"))) return fail("Enter numbers in every box.");
+      const qm = Number(v("quote_pay_min")); if (qm < 10 || qm > 20) return fail("Give customers 10 to 20 minutes to pay for a special order.");
+      if (Number(v("auto_receive_min")) < 30) return fail("Allow at least 30 minutes before \"Got my food\" confirms itself.");
       await api.updateSettings(Object.fromEntries(vals)); Object.assign(S, await api.load()); toast("Pricing saved");
     }
     if (f.dataset.form === "rules") {
@@ -4028,10 +4316,21 @@ async function adminSubmit(e) {
       if (!/^\d{2}:\d{2}$/.test(by) || !/^\d{2}:\d{2}$/.test(cd)) return fail("Enter both times.");
       if (hm(by) >= hm(S.settings.cutoff)) return fail("The confirm-by time must be before orders close at " + fmtTime(S.settings.cutoff) + ".");
       const patch = { near_max_fee: near, free_max_m: Math.round(fkm * 1000), next_day_confirm_by: by, countdown_start: cd };
+      if (f.querySelector("[name=admin_idle_min]")) { const im = Number(v("admin_idle_min")); if (!(im >= 5 && im <= 60)) return fail("Choose 5 to 60 minutes for the team screen timeout."); patch.admin_idle_min = im; }
       if (f.querySelector("[name=vendor_fee_pct]")) { const pc = Number(v("vendor_fee_pct")), fr = Number(v("vendor_fee_free"));
         if (!(pc >= 0 && pc <= 50) || !(Number.isInteger(fr) && fr >= 0 && fr <= 100)) return fail("Enter a fee between 0 and 50% and a whole number of free meals.");
         patch.vendor_fee_rate = Math.round(pc * 10) / 1000; patch.vendor_fee_free = fr; }
       await api.updateSettings(patch); Object.assign(S, await api.load()); toast("Saved");
+    }
+    if (f.dataset.form === "refund") {
+      const ref = v("ref"); if (ref.length < 4) return fail("Enter the MoMo reference of the refund you sent.");
+      await api.updateOrder(f.dataset.id, { refund_needed: false, refund_due: 0, refund_amount: Number(f.dataset.amt) || 0, refund_ref: ref, refunded_at: new Date().toISOString(), refunded_by: (S.user && S.user.email) || "team" }); toast("Refund recorded");
+    }
+    if (f.dataset.form === "unmatched") { await api.markUnmatched(f.dataset.id, v("ref")); toast("Refund recorded"); }
+    if (f.dataset.form === "resolve") { await api.resolveProblem(f.dataset.id, v("note"), Number(v("credit")) || 0); toast("Marked sorted. Cashback released."); }
+    if (f.dataset.form === "payout") {
+      const a = Number(v("amount")); if (!(a > 0)) return fail("Enter the amount you paid.");
+      await api.savePayout({ payee_type: f.dataset.type, kitchen_id: f.dataset.type === "seller" ? f.dataset.id : null, rider_id: f.dataset.type === "rider" ? f.dataset.id : null, amount: a, momo_ref: v("ref") || null }); toast("Payout recorded");
     }
     if (f.dataset.form === "credit") {
       const amt = Number(v("amt")); if (!v("user") || !amt || v("why").length < 3) return fail("Pick a customer, an amount and a reason.");
@@ -4083,7 +4382,7 @@ function reportHtml(R, isSuper) {
   const flag = v => v.expired >= 2 || (v.on_time != null && v.on_time < 70) ? pill("Unreliable", "bad") : v.always_cooking ? pill("Set cooking days", "ok") : "";
   return `<div class="stack" style="gap:14px"><p class="small muted">${fmtDate(R.week_start)}–${fmtDate(R.week_end)}, compared with the week before.</p>
     <div class="dash-grid">${tile("Meals", "meals")}${tile("Orders", "orders")}${tile("Active customers", "customers")}${tile("New customers", "new_customers")}${tile("Repeat rate", "repeat_rate", true)}${tile("Average meals per pool", "avg_meals")}${tile("Pools that filled", "filled")}${tile("Cancelled orders", "cancelled")}</div>
-    ${isSuper && M ? `<section class="stack" style="gap:10px"><h3>Money <span class="small muted">(owner only)</span></h3><div class="dash-grid">${[["Food value", M.food], ["ChopPool vendor fee", M.commission], ["Service fees", M.service_fees], ["Cashback paid", M.cashback], ["Wallet refunds", M.refunds], ["Wallet balances owed", M.wallets_owed]].map(([l, v]) => `<div class="dtile"><b class="num" style="font-size:18px;white-space:nowrap">${money(v || 0)}</b><span>${esc(l)}</span></div>`).join("")}<div class="dtile"><b class="num">${M.momo_refunds || 0}</b><span>MoMo refunds to send</span></div></div></section>` : ""}
+    ${isSuper && M ? `<section class="stack" style="gap:10px"><h3>Money <span class="small muted">(owner only)</span></h3><div class="dash-grid">${[["Food value", M.food], ["ChopPool vendor fee", M.commission], ...(M.trip_estimate != null ? [["Trips priced to customers", M.trip_estimate], ["Paid to riders", M.trip_paid]] : []), ["Service fees", M.service_fees], ["Cashback paid", M.cashback], ["Wallet refunds", M.refunds], ["Wallet balances owed", M.wallets_owed]].map(([l, v]) => `<div class="dtile"><b class="num" style="font-size:18px;white-space:nowrap">${money(v || 0)}</b><span>${esc(l)}</span></div>`).join("")}<div class="dtile"><b class="num">${M.momo_refunds || 0}</b><span>MoMo refunds to send</span></div></div></section>` : ""}
     ${table("Top buildings", [["Building", r => esc(r.name)], ["Meals", r => trend(r.meals, r.prev_meals)], ["Pools", r => r.pools], ["Avg pool", r => r.avg_pool ?? "—"]], R.buildings || [], "No orders this week.")}
     ${(R.quiet || []).length ? table("Went quiet", [["Building", r => esc(r.name)], ["Meals last week", r => r.prev_meals]], R.quiet, "") : ""}
     ${table("Top customers", [["Name", r => esc(r.name)], ["Building", r => esc(r.building || "")], ...(isSuper ? [["Phone", r => esc(r.phone || "")]] : []), ["Orders", r => r.orders], ["Meals", r => r.meals]], R.customers || [], "No customers this week.")}
@@ -4155,11 +4454,11 @@ async function viewKitchen(token) {
         const tally = {}; p.orders.filter(o => !o.special_request || o.status !== "quote_requested").forEach(o => { const key = o.item_name + (o.addons?.length ? " (" + addonText(o.addons) + ")" : "") + (o.special_request ? " · Special: " + o.special_request : ""); tally[key] = (tally[key] || 0) + o.qty; });
         const n = p.orders.reduce((a, o) => a + o.qty, 0), quotes = p.orders.filter(o => ["quote_requested", "quoted"].includes(o.status));
         const btns = p.status === "waiting" ? "" : p.status === "collecting" ? (afterCut ? `<button class="btn wide" data-k="accepted" data-pool="${esc(p.id)}">Confirm final batch</button>` : `<p class="small muted">Orders close at ${fmtTime(S.settings.cutoff)}. Then confirm the final batch.</p>`)
-          : p.status === "accepted" ? `<button class="btn wide" data-k="ready" data-pool="${esc(p.id)}">Mark packed</button>`
+          : p.status === "accepted" ? `<button class="btn wide" data-k="ready" data-pool="${esc(p.id)}">Food is ready</button>`
           : (k.delivery_mode === "runner" || p.free) && p.status === "ready" ? `<button class="btn wide" data-k="picked_up" data-pool="${esc(p.id)}">Runner has picked up</button>`
-          : (k.delivery_mode === "runner" || p.free) && p.status === "picked_up" ? `<button class="btn wide" data-k="arriving" data-pool="${esc(p.id)}">5 minutes away</button>`
+          : (k.delivery_mode === "runner" || p.free) && p.status === "picked_up" ? `<button class="btn wide" data-k="delivered" data-pool="${esc(p.id)}">Arrived</button>`
           : (k.delivery_mode === "runner" || p.free) && p.status === "arriving" ? `<button class="btn wide" data-k="delivered" data-pool="${esc(p.id)}">Arrived</button>`
-          : `<p><span class="chip ok">${STEP_LABEL[p.status]}</span></p>`;
+          : `<p><span class="chip ok">${p.status === "ready" ? "Waiting for the rider" : p.status === "picked_up" || p.status === "arriving" ? "Rider has the food" : STEP_LABEL[p.status]}</span></p>`;
         const runnerHand = (k.delivery_mode === "runner" || p.free) && ["arriving", "delivered"].includes(p.status)
           ? (p.handoff === "host" ? `<p>Hand the bag to <strong>${esc(p.host_label || p.drop_point)}</strong>.</p>` : `<p>At <strong>${esc(p.drop_point)}</strong>, hand each meal over against its code.</p>${codeBox("rc-" + p.id)}`) : "";
         const food = p.orders.filter(o => o.paid).reduce((t, o) => t + (Number(o.quote_price ?? o.unit_price) + Number(o.addons_total || 0)) * o.qty, 0);
@@ -4293,11 +4592,17 @@ function wireCodes(token, d, redraw) {
     const input = f.querySelector("input"), code = normCode(input.value);
     if (!/^[A-Z]-\d{2,3}$|^\d{4}$/.test(code)) return toast("Enter the customer's code, like K-27.");
     const pool = (input.id.match(/^r?c-(.+)$/) || [])[1] || null;
-    try {
-      const r = await api.collectCode(token, code, typeof d === "function" ? d() : d, pool);
-      toast("Give " + (r.items || r.qty + " × " + r.item_name) + " to " + r.name + "." + (r.was_paid ? "" : " Note: payment was not yet confirmed."));
-      input.value = ""; redraw();
-    } catch (err) { toast(cleanErr(err)); }
+    const day = typeof d === "function" ? d() : d;
+    const done = r => { toast("Check the name: " + r.name + ". Give them " + (r.items || r.qty + " × " + r.item_name) + "."); input.value = ""; redraw(); };
+    try { done(await api.collectCode(token, code, day, pool)); }
+    catch (err) {
+      const m = String(err && err.message || "").match(/UNPAID:([^:]*):([\d.]+)/);
+      if (!m) return toast(cleanErr(err));
+      // Not paid yet: hand over only after collecting the money in cash, or keep the meal
+      openSheet(`${sheetHead("Not paid yet", "Code " + esc(code) + " · " + esc(m[1]))}<p>ChopPool hasn't received this payment. Collect <b class="num">${money(Number(m[2]))}</b> in cash before you hand it over, or hold the meal.</p>
+        <button class="btn wide" id="ucCash">I collected ${money(Number(m[2]))} in cash</button><button class="ghost wide" data-close>Hold the meal</button>`);
+      $("#ucCash").addEventListener("click", async () => { try { done(await api.collectCode(token, code, day, pool, "cash")); closeSheet(); } catch (e2) { toast(cleanErr(e2)); } });
+    }
   });
 }
 // Orders grouped by code (a code can hold added plates), sorted A→Z
@@ -4305,21 +4610,34 @@ const byCode = os => { const m = new Map(); os.forEach(o => { if (!m.has(o.code)
 const handList = os => `<div class="labels">${byCode(os).map(([c, g]) => `<div><span class="lc num">${esc(c)}</span><span>${esc(g[0].name)} · ${g.map(o => o.qty + " × " + esc(o.item_name)).join(" + ")}</span>${g.every(o => o.collected) ? `<span class="tick">Collected</span>` : `<span class="muted small">Waiting</span>`}</div>`).join("")}</div>`;
 async function viewRider(token) {
   const d = opsDate();
-  const NEXT = { ready: ["picked_up", "Picked up"], picked_up: ["arriving", "5 minutes away"], arriving: ["delivered", "Arrived"] };
+  // Picked up -> (customers get "about 5 minutes away" automatically) -> Arrived
+  const NEXT = { ready: ["picked_up", "Picked up"], picked_up: ["delivered", "Arrived"], arriving: ["delivered", "Arrived"] };
   const draw = async () => {
     let R; try { R = await api.riderView(token, d); } catch (e) { $("#view").innerHTML = `<p class="card err">${esc(cleanErr(e))}</p>`; return; }
     $("#view").innerHTML = `<header class="topzone pagetop"><div class="pagehead"><div class="pagebrand">${LOGO(30)}<p class="brand" style="font-size:18px">ChopPool rider</p></div>${themeBtn()}</div><h1>${esc(R.rider.name)}</h1><p class="muted">${fmtDate(d)} · deliver by ${fmtTime(S.settings.delivery_time)}</p></header>` +
       (R.pools.map((p, i) => {
         const nx = NEXT[p.status];
-        const btn = nx ? `<button class="btn wide" data-r="${nx[0]}" data-pool="${esc(p.id)}">${nx[1]}</button>` : p.status === "delivered" ? "" : `<p class="chip warn">Wait for the kitchen to pack</p>`;
+        const btn = nx ? `<button class="btn wide" data-r="${nx[0]}" data-pool="${esc(p.id)}">${nx[1]}</button>` : p.status === "delivered" ? "" : `<p class="chip warn">${p.status === "accepted" ? "Cooking. Wait for \"Food is ready\"" : "Wait for the kitchen"}</p>`;
         const hand = p.handoff === "host"
           ? `<p>Hand the sealed bag to <strong>${esc(p.host_label || p.drop_point)}</strong>, then tap Arrived.</p>`
           : `<p>Wait at <strong>${esc(p.drop_point)}</strong> for ${S.settings.arrival_window_min} minutes. Hand each meal over against its code.</p>${["arriving", "delivered"].includes(p.status) ? codeBox("c-" + p.id) : ""}${handList(p.orders)}`;
-        return `<article class="card"><div class="top"><h2>Stop ${i + 1}: ${esc(p.site)}</h2><span class="chip">${p.meals} meals</span></div>${stepsHtml(p.status)}
-          <p class="small"><strong>Pick up:</strong> ${esc(p.kitchen)}${p.kitchen_address ? ", " + esc(p.kitchen_address) : ""}${p.kitchen_phone ? " · " + esc(p.kitchen_phone) : ""}</p>
+        return `<article class="card"><div class="top"><h2>${esc(p.kitchen)} → ${esc(p.site)}</h2><span class="chip">${p.meals} meals</span></div>${stepsHtml(p.status)}
+          <p class="small"><strong>Pick up:</strong> ${esc(p.kitchen)}${p.kitchen_address ? ", " + esc(p.kitchen_address) : ""}${p.kitchen_phone ? ` · <a href="tel:${esc(p.kitchen_phone)}">${esc(fmtPhone(p.kitchen_phone))}</a>` : ""}</p>
           <p class="small"><strong>Drop:</strong> ${esc(p.drop_point)} (Pool ${p.seq}, 1 bag)</p>${hand}${btn}</article>`;
       }).join("") || `<p class="card muted">No deliveries assigned to you today yet.</p>`);
     $("#view").insertAdjacentHTML("beforeend", appTools("#rider-" + token, { rider_token: token }, "Rider"));
+    S.riderPools = R.pools; watchNear();
+  };
+  // While the page is open: when the rider is within about 1 km of a building, customers get "about 5 minutes away" by themselves
+  const sentNear = new Set();
+  const watchNear = () => {
+    if (S.riderWatch != null || !navigator.geolocation || !(S.riderPools || []).some(p => p.status === "picked_up" && p.site_lat != null)) return;
+    try { S.riderWatch = navigator.geolocation.watchPosition(pos => {
+      const me = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      (S.riderPools || []).filter(p => p.status === "picked_up" && p.site_lat != null && !sentNear.has(p.id)).forEach(p => {
+        if (distM(me, { lat: p.site_lat, lng: p.site_lng }) <= 1000) { sentNear.add(p.id); api.riderUpdate(token, p.id, "arriving").then(() => { notifyServer({ pool_id: p.id }); draw(); }).catch(() => {}); }
+      });
+    }, () => {}, { enableHighAccuracy: true, maximumAge: 30000 }); } catch (e) {}
   };
   $("#view").addEventListener("click", async e => {
     const b = e.target.closest("button[data-r]"); if (!b) return;
