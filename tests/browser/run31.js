@@ -18,7 +18,7 @@ const { chromium, devices } = require('playwright');
   await p.addInitScript(() => { localStorage.setItem('cp_splash_v', '1'); ['cp_intro_done', 'cp_intro_kitchen', 'cp_intro_rider', 'cp_intro_host'].forEach(k => localStorage.setItem(k, 'true')); localStorage.setItem('cp_site', JSON.stringify('s1')); });
   await p.goto('http://localhost:8765/index.html'); await p.waitForTimeout(1500);
   // motion: pill + ghost
-  await p.click('.tabbar [data-tab=orders]'); await p.waitForTimeout(80); ok(await p.locator('.pane-ghost').count() >= 1, 'old screen slides out'); await p.waitForTimeout(500);
+  await p.click('.tabbar [data-tab=orders]'); await p.waitForTimeout(80); ok(await p.locator('#tabOrders.pane-in').count() === 1, 'new screen fades in'); await p.waitForTimeout(500);
   ok(await p.locator('.tabbar .tabpill').count() === 1, 'tab bar highlight glides');
   // tray
   await p.click('.tabbar [data-tab=kitchens]'); await p.waitForTimeout(500); await p.locator('#kitchensList [data-vendor]').first().click(); await p.waitForTimeout(800);

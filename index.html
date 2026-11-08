@@ -279,7 +279,7 @@ input::placeholder, textarea::placeholder { color: color-mix(in srgb, var(--mute
 .sheet.searching .searchrow { position: sticky; top: -10px; z-index: 3; background: var(--surface); padding: 8px 0; margin: -8px 0; }
 .sheet-bg.open { opacity: 1; visibility: visible; transition: opacity .32s ease, visibility 0s; }
 .sheet { background: var(--surface); color: var(--ink); width: 100%; max-width: 560px; max-height: 94%; overflow-y: auto; border-radius: 28px 28px 0 0; padding: 10px 20px 0; display: grid; gap: 16px; align-content: start; }
-.sheet { transform: translateY(105%); transition: transform .46s cubic-bezier(.22,1,.36,1); overscroll-behavior: contain; touch-action: pan-y; -webkit-overflow-scrolling: touch; padding-bottom: env(safe-area-inset-bottom); }
+.sheet { transform: translateY(105%); transition: transform .32s cubic-bezier(.25,.8,.25,1); overscroll-behavior: contain; touch-action: pan-y; -webkit-overflow-scrolling: touch; padding-bottom: env(safe-area-inset-bottom); }
 .sheet-bg.open .sheet { transform: translateY(0); }
 .sheet { overflow-x: hidden; } .sheet > * { min-width: 0; }
 .sheet.dragging { transition: none; }
@@ -367,7 +367,7 @@ body.locked { position: fixed; left: 0; right: 0; overflow: hidden; }
 .tabbar button { background: none; border: none; color: var(--muted); display: grid; justify-items: center; gap: 2px; padding: 8px 4px; font-size: 12px; font-weight: 700; border-radius: 16px; position: relative; }
 .tabbar button[aria-current="page"] { color: var(--accent); background: var(--accent-soft); }
 .tabbar:has(.tabpill) button[aria-current="page"] { background: none; }
-.tabpill { position: absolute; left: 0; top: 0; border-radius: 16px; background: var(--accent-soft); transition: transform .42s cubic-bezier(.22,1,.36,1), width .42s cubic-bezier(.22,1,.36,1); pointer-events: none; }
+.tabpill { position: absolute; left: 0; top: 0; border-radius: 16px; background: var(--accent-soft); transition: transform .28s cubic-bezier(.25,.8,.25,1), width .28s cubic-bezier(.25,.8,.25,1); will-change: transform; pointer-events: none; }
 .tabbar button { z-index: 1; }
 .badge { position: absolute; top: 4px; left: calc(50% + 8px); min-width: 18px; height: 18px; border-radius: 99px; background: var(--accent); color: var(--on-accent); font-size: 12px; display: grid; place-items: center; padding: 0 5px; }
 
@@ -686,15 +686,13 @@ html.standalone, html.standalone body { overscroll-behavior: none; }
 .splash.hold .sp-tag { animation: spFade 3.2s ease-in-out infinite; }
 @keyframes spFade { 50% { opacity: .55; } }
 /* Premium motion: installed app only. One soft curve, short and small, never bouncy */
-/* Tab changes: the old screen slides away, the new one slides in from the side you're heading to */
-.is-app .pane-in { animation: paneIn .42s cubic-bezier(.22,1,.36,1) both; will-change: transform, opacity; }
-.is-app .pane-in.from-left { --dx: -22%; }
-@keyframes paneIn { from { opacity: 0; transform: translateX(var(--dx, 22%)); } to { opacity: 1; transform: none; } }
-.pane-ghost { position: fixed; z-index: 1; margin: 0 !important; pointer-events: none; animation: paneOut .3s cubic-bezier(.4,0,.2,1) both; }
-@keyframes paneOut { to { opacity: 0; transform: translateX(var(--dx, -22%)); } }
-.is-app .tabbar button[aria-current="page"] svg { animation: tabPop .22s ease-out; }
+/* Tab changes: a short, quiet fade with a small nudge in the direction you're heading */
+.is-app .pane-in { animation: paneIn .22s cubic-bezier(.25,.8,.25,1) both; }
+.is-app .pane-in.from-left { --dx: -10px; }
+@keyframes paneIn { from { opacity: 0; transform: translate3d(var(--dx, 10px), 0, 0); } to { opacity: 1; transform: none; } }
+
 @keyframes tabPop { 50% { transform: scale(1.12); } }
-.is-app .rv { opacity: 0; transform: translateY(18px) scale(.985); transition: opacity .5s cubic-bezier(.16,1,.3,1), transform .6s cubic-bezier(.16,1,.3,1); will-change: transform, opacity; }
+.is-app .rv { opacity: 0; transform: translate3d(0, 8px, 0); transition: opacity .3s ease-out, transform .35s cubic-bezier(.25,.8,.25,1); }
 .is-app .rv.in { opacity: 1; transform: none; }
 .is-app button, .is-app .btn, .is-app .ghost { transition: transform .12s cubic-bezier(.2,.8,.2,1); }
 .is-app button:active, .is-app .btn:active { transform: scale(.96); }
@@ -814,10 +812,8 @@ body:not(.on-home) #bell, body:not(.on-home) #theme { display: none; }
 /* Vendor page */
 .vpage { position: fixed; inset: 0; z-index: 26; background: var(--bg); overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; transform: translateX(100%); transition: transform .38s cubic-bezier(.2,.85,.25,1); }
 .vpage.open { transform: none; }
-.is-app .vpage { transform: none; opacity: 0; visibility: hidden; transition: opacity .32s ease, visibility 0s .32s; }
-.is-app .vpage.open { opacity: 1; visibility: visible; transition: opacity .28s ease; }
-.is-app .vpage .vbody { transition: transform .5s cubic-bezier(.22,1,.36,1); }
-.is-app .vpage:not(.open) .vbody { transform: translateY(40px); }
+.is-app .vpage { transform: none; opacity: 0; visibility: hidden; transition: opacity .2s ease, visibility 0s .2s; }
+.is-app .vpage.open { opacity: 1; visibility: visible; transition: opacity .2s ease; }
 .vpage.grow .vplate { animation: none; }
 .vpage .vhero { position: relative; height: calc(250px + env(safe-area-inset-top)); display: grid; place-items: center; overflow: hidden; padding-top: env(safe-area-inset-top); }
 .vpage .vhero::after { content: ""; position: absolute; inset: 0; background: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22120%22%20height%3D%22120%22%20fill%3D%22none%22%20stroke%3D%22%23B85A2A%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M10%2030h34a17%2017%200%200%201-34%200z%22/%3E%3Cpath%20d%3D%22M18%2024c0-4%204-4%204-8M27%2024c0-4%204-4%204-8%22/%3E%3Cpath%20d%3D%22M78%2012l14%2030M86%2010v14a4%204%200%200%200%208%200V10M90%2024v22%22/%3E%3Cpath%20d%3D%22M70%2080c6-10%2020-10%2026%200-6%2010-20%2010-26%200z%22/%3E%3Cpath%20d%3D%22M70%2080h26%22/%3E%3Cpath%20d%3D%22M14%2084c8-6%2014%202%2022-4%204%2010-8%2022-22%2014z%22/%3E%3Cpath%20d%3D%22M14%2094c6-4%2012-6%2022-14%22/%3E%3Ccircle%20cx%3D%2256%22%20cy%3D%2256%22%20r%3D%223%22/%3E%3Ccircle%20cx%3D%22104%22%20cy%3D%22104%22%20r%3D%222%22/%3E%3Ccircle%20cx%3D%2250%22%20cy%3D%22108%22%20r%3D%222%22/%3E%3C/svg%3E") 0 0 / 120px repeat; opacity: .16; pointer-events: none; }
@@ -2193,15 +2189,8 @@ function setTab(t) {
   const ORDER = ["home", "kitchens", "orders", "wallet"], prev = S.tab;
   S.tab = t;
   const pane = $("#tab" + t[0].toUpperCase() + t.slice(1));
-  const calm = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const oldPane = prev && prev !== t ? $("#tab" + prev[0].toUpperCase() + prev.slice(1)) : null;
-  if (oldPane && !oldPane.classList.contains("hidden") && !calm && document.body.classList.contains("is-app")) {
-    const r = oldPane.getBoundingClientRect(), g = oldPane.cloneNode(true), back = ORDER.indexOf(t) < ORDER.indexOf(prev);
-    g.removeAttribute("id"); g.querySelectorAll("[id]").forEach(x => x.removeAttribute("id")); g.classList.add("pane-ghost"); g.setAttribute("aria-hidden", "true");
-    Object.assign(g.style, { top: r.top + "px", left: r.left + "px", width: r.width + "px" }); g.style.setProperty("--dx", back ? "22%" : "-22%");
-    document.body.appendChild(g); const kill = () => g.remove(); g.addEventListener("animationend", kill); setTimeout(kill, 600);
-  }
-  if (pane && prev && prev !== t && document.body.classList.contains("is-app")) { pane.classList.remove("pane-in", "from-left"); void pane.offsetWidth; pane.classList.add("pane-in"); if (ORDER.indexOf(t) < ORDER.indexOf(prev)) pane.classList.add("from-left"); }
+  const animate = pane && prev && prev !== t && document.body.classList.contains("is-app"), fromLeft = ORDER.indexOf(t) < ORDER.indexOf(prev);
+  if (animate) { pane.classList.remove("pane-in", "from-left"); pane.style.opacity = "0"; }
   ["home", "kitchens", "orders", "wallet"].forEach(x => {
     $("#tab" + x[0].toUpperCase() + x.slice(1))?.classList.toggle("hidden", x !== t);
     const b = document.querySelector(`.tabbar button[data-tab="${x}"]`);
@@ -2218,6 +2207,8 @@ function setTab(t) {
   if (t === "kitchens") { syncVChips(); renderKitchens(); }
   window.scrollTo(0, 0);
   movePill();
+  // Start the fade only once the new screen is drawn, so it never stutters
+  if (animate) requestAnimationFrame(() => { pane.style.opacity = ""; if (fromLeft) pane.classList.add("from-left"); pane.classList.add("pane-in"); });
   requestAnimationFrame(() => { setKTop(); if (t === "home") { watchHero(); fitStats(); } });
 }
 // The highlight on the tab bar glides to the tab you picked
@@ -2557,7 +2548,7 @@ function renderHero() {
 // Figures count up to their value the first time they show (or when they change)
 const shownNums = {};
 function countUp(root) {
-  if (matchMedia("(prefers-reduced-motion: reduce)").matches || !document.body.classList.contains("is-app")) return;
+  return;   // switched off: Albert found it too busy
   root.querySelectorAll(".hero-stat b.num, .vfacts b").forEach((b, i) => {
     if (b.id === "countdown") return; const m = /^(\D*)(\d+)(\D*)$/.exec(b.textContent.trim()); if (!m) return;
     const to = +m[2], key = (b.closest("[data-vendor]") ? "v" : "h") + i, from = shownNums[key] ?? 0; shownNums[key] = to; if (from === to || to > 9999) return;
@@ -2906,7 +2897,7 @@ function openVendor(kid, from) {
   el.scrollTop = 0; drawVendor();
   // Grow the dish picture from the tile that was tapped into the page header
   const vp = el.querySelector(".vplate");
-  if (vp && src && src.width && !matchMedia("(prefers-reduced-motion: reduce)").matches && document.body.classList.contains("is-app")) {
+  if (false && vp && src && src.width) {
     el.classList.add("grow");
     requestAnimationFrame(() => { const d = vp.getBoundingClientRect(); const sx = src.width / d.width, dx = src.left + src.width / 2 - (d.left + d.width / 2), dy = src.top + src.height / 2 - (d.top + d.height / 2);
       vp.style.transition = "none"; vp.style.transform = `translate(${dx}px, ${dy}px) scale(${sx})`;
@@ -5452,7 +5443,7 @@ const seenCards = new Set();
 let revealObs = null;
 function revealScan() {
   if (!document.body.classList.contains("is-app") || !("IntersectionObserver" in window) || S.splashing) return;
-  revealObs = revealObs || new IntersectionObserver(es => { let n = 0; es.forEach(e => { if (!e.isIntersecting) return; const t = e.target; t.style.transitionDelay = Math.min(n++, 5) * 70 + "ms"; t.classList.add("in"); revealObs.unobserve(t); }); }, { rootMargin: "0px 0px -6% 0px" });
+  revealObs = revealObs || new IntersectionObserver(es => { let n = 0; es.forEach(e => { if (!e.isIntersecting) return; const t = e.target; t.style.transitionDelay = Math.min(n++, 4) * 40 + "ms"; t.classList.add("in"); revealObs.unobserve(t); }); }, { rootMargin: "0px 0px -6% 0px" });
   document.querySelectorAll("#view article, #view .dtile, #view details.item, #view .kcard, #view .order-card, #view section.card").forEach(el => {
     if (el.dataset.rv) return; el.dataset.rv = "1";
     const sig = el.className + "|" + (el.dataset.key || el.dataset.kitchen || el.dataset.pool || el.dataset.site || (el.textContent || "").trim().slice(0, 48));
