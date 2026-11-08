@@ -122,6 +122,21 @@ button.hero-stat { padding-right: 22px !important; font: inherit; color: inherit
 button.hero-stat::after { content: "›"; position: absolute; right: 9px; top: 6px; font-weight: 700; font-size: 17px; opacity: .85; }
 .hero-stat b { font-family: var(--font-display); font-size: 18px; font-weight: 800; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .hero-stat { min-width: 0; }
+.mylunch { position: relative; z-index: 1; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; column-gap: 12px; row-gap: 9px; width: 100%; min-height: 0; text-align: left; color: inherit; font: inherit; line-height: 1.25; background: rgba(0,0,0,.16); border: 1px solid rgba(255,255,255,.2); border-radius: 16px; padding: 11px 14px 12px; cursor: pointer; box-shadow: none; }
+.mylunch .ml-code { display: grid; justify-items: end; line-height: 1.1; }
+.mylunch .ml-code small { opacity: .75; font-size: 12px; }
+.mylunch .ml-code b { font-size: 17px; letter-spacing: .02em; }
+.mylunch .ml-t { display: grid; min-width: 0; }
+.mylunch b { font-size: 15px; font-weight: 700; }
+.mylunch small { font-size: 12px; opacity: .85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mylunch .code { font-weight: 700; letter-spacing: .02em; }
+.ml-dot { width: 10px; height: 10px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 4px rgba(255,255,255,.22); }
+.ml-dot.go { animation: mlPulse 1.6s ease-in-out infinite; }
+@keyframes mlPulse { 50% { box-shadow: 0 0 0 7px rgba(255,255,255,0); } }
+@media (prefers-reduced-motion: reduce) { .ml-dot.go { animation: none; } }
+.ml-bar { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
+.ml-bar i { height: 4px; border-radius: 2px; background: rgba(255,255,255,.28); }
+.ml-bar i.on { background: #fff; }
 .hero-stat b.long { font-size: 15px; line-height: 21px; }
 .hero-stat b.tiny { font-size: 13px; }
 .recv { display: grid; gap: 8px; padding: 12px; border-radius: 14px; background: var(--ok-soft); color: var(--ink); font-weight: 600; }
@@ -2389,10 +2404,13 @@ function renderHero() {
   const meals = here.reduce((t, p) => t + p.meals, 0);
   const dlv = heroDelivery(here, site);
   // Orders closed and I have lunch coming today: show where it is instead of the meal count
-  const mineToday = (S.mine || []).filter(o => !o.parent_id && o.order_date === today() && ["pending", "paid", "collected"].includes(o.status) && new Date() >= at(o.order_date, s.cutoff));
-  const lvl = o => o.status === "collected" ? 6 : stepRank(o.pool_status);
-  const best = mineToday.sort((a, b) => lvl(b) - lvl(a))[0];
-  const myLive = best ? { label: best.received_at ? "Received" : best.status === "collected" || best.pool_status === "delivered" ? "Delivered" : ({ accepted: "Cooking", collecting: "Cooking", ready: "Ready", picked_up: "On the way", arriving: "On the way", delivered: "Arrived" }[best.pool_status] || "Cooking"), more: mineToday.length - 1 } : null;
+  // My lunch today, from payment until I've got it: a slim strip under the figures (the figures stay as they are)
+  const mineAll = (S.mine || []).filter(o => !o.parent_id && o.order_date >= today() && ["paid", "collected"].includes(o.status) && !o.received_at);
+  const firstDay = mineAll.map(o => o.order_date).sort()[0];
+  const mineToday = mineAll.filter(o => o.order_date === firstDay);
+  const best = mineToday.sort((a, b) => progressOf(b) - progressOf(a))[0];
+  const live = best ? (() => { const st = progressOf(best), dl2 = dayLabel(best.order_date), lab = canConfirm(best) ? "Your lunch is here" : st <= 1 ? "Confirmed for " + (dl2 === "today" || dl2 === "tomorrow" ? dl2 : fmtDate(best.order_date)) : ["", "", "Being cooked", "On the way", "Delivered"][Math.min(st, 4)];
+    return `<button class="mylunch" data-gomine aria-label="Your lunch: ${esc(lab)}. Open your order"><span class="ml-dot${st >= 3 ? " go" : ""}"></span><span class="ml-t"><b>${esc(lab)}</b><small>${esc(best.qty + " × " + best.item_name)}${mineToday.length > 1 ? " · +" + (mineToday.length - 1) + " more" : ""}</small></span><span class="ml-code"><small>code</small><b>${esc(best.code)}</b></span><span class="ml-bar" aria-hidden="true">${[1, 2, 3, 4, 5].map(i => `<i class="${i <= st ? "on" : ""}"></i>`).join("")}</span></button>`; })() : "";
   const name = firstName();
   const dl = dayLabel(S.date);
   el.innerHTML = `<div class="hero-text"><p class="small">${greeting()}${name ? ", " + esc(name) : ""}</p>
@@ -2400,9 +2418,9 @@ function renderHero() {
       <p class="small">Order by ${fmtTime(s.cutoff)}${dl === "today" ? "" : " " + (dl === "tomorrow" ? "tomorrow" : fmtDate(S.date))} · lunch at ${fmtTime(s.delivery_time)}</p>
 </div>
     <div class="hero-stats"><div class="hero-stat" id="cdBox"><b class="num" id="countdown">--</b><span id="cdLabel">until orders close</span></div>
-      ${myLive ? `<button class="hero-stat hlink" data-gomine aria-label="Your lunch: ${esc(myLive.label)}. Open your order"><b class="${myLive.label.length > 7 ? "long" : ""}">${esc(myLive.label)}</b><span>your lunch${myLive.more ? " · +" + myLive.more + " more" : ""}</span></button>`
-      : hasMineToday() ? `<button class="hero-stat hlink" data-gomine aria-label="${meals} meals ordered. Open your orders"><b class="num">${meals}</b><span>meals ordered</span></button>` : `<div class="hero-stat"><b class="num">${meals}</b><span>meals ordered</span></div>`}
+      ${hasMineToday() ? `<button class="hero-stat hlink" data-gomine aria-label="${meals} meals ordered. Open your orders"><b class="num">${meals}</b><span>meals ordered</span></button>` : `<div class="hero-stat"><b class="num">${meals}</b><span>meals ordered</span></div>`}
       ${S.noSite ? `<div class="hero-stat"><b class="num">${here.filter(p => p.status === "collecting" && p.meals > 0).length}</b><span>pools open</span></div>` : (dlv ? `<button class="hero-stat hlink" data-vendor="${esc(dlv.kid)}">${(v => `<b class="num${v.length > 7 ? " long" : ""}">${v}</b>`)(dlv.fee === 0 ? "Free" : Number.isInteger(dlv.fee) ? "GHS " + dlv.fee : money(dlv.fee))}<span>${esc(dlv.label)}</span></button>` : `<div class="hero-stat"><b class="num">${menusHere().length}</b><span>vendors cooking</span></div>`)}</div>`;
+  if (live) el.insertAdjacentHTML("beforeend", live);
   tickCountdown(); fitStats();
 }
 // Small phones: a figure that doesn't fit its box steps down a size instead of being cut off
