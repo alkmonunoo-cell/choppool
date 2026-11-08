@@ -1136,7 +1136,7 @@ function makeDemoApi() {
     async signUp(email, pw, name) { if (users.some(u => u.email === email)) throw new Error("That email already has an account. Sign in instead."); if (String(pw).length < 6) throw new Error("Use at least 6 characters for the password."); me = { id: "u" + uid(), email, name: name || null }; users.push({ ...me, pw }); return me; },
     async signIn(email, pw) { const u = users.find(x => x.email === email && x.pw === pw); if (!u) throw new Error("Wrong email or password."); me = { id: u.id, email, name: u.name }; return me; },
     async signInGoogle() { throw new Error("Google sign-in works once the app is live. In the demo, use email and password."); },
-    async sendReset(email) { if (!/^\S+@\S+\.\S+$/.test(email)) throw new Error("Enter a valid email address."); return true; },
+    async sendReset(email, to) { if (!/^\S+@\S+\.\S+$/.test(email)) throw new Error("Enter a valid email address."); return true; },
     async setNewPassword(pw) { const u = users.find(x => me && x.id === me.id); if (u) u.pw = pw; return true; },
     async signOut() { me = null; },
     async updateName(name) { if (!me) throw new Error("Sign in first."); me.name = name; const u = users.find(x => x.id === me.id); if (u) u.name = name; return me; },
@@ -1344,7 +1344,7 @@ function makeDemoApi() {
 function makeSupabaseApi() {
   const sb = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
   // A password-reset email link signs the person in for one step: choose a new password
-  sb.auth.onAuthStateChange(ev => { if (ev === "PASSWORD_RECOVERY") { S.recovery = true; setTimeout(() => openNewPassword(), 600); } });
+  sb.auth.onAuthStateChange(ev => { if (ev === "PASSWORD_RECOVERY") { S.recovery = true; if (S.appReady) showRecovery(); } });
   const must = r => { if (r.error) throw new Error(r.error.message); return r.data; };
   const rpc = async (fn, args) => must(await sb.rpc(fn, args || {}));
   const stamp = { accepted: "accepted_at", ready: "ready_at", picked_up: "picked_up_at", arriving: "arriving_at", delivered: "delivered_at" };
@@ -1389,7 +1389,7 @@ function makeSupabaseApi() {
       must(await sb.from("orders").update(patch).eq("id", id).select("id")); },
     async unpaidPhones() { const since = new Date(Date.now() - 60 * 864e5).toISOString().slice(0, 10);
       const r = must(await sb.from("orders").select("phone").eq("cancel_reason", "Payment not received").gte("order_date", since)) || []; const m = {}; r.forEach(x => { m[x.phone] = (m[x.phone] || 0) + 1; }); return m; },
-    async sendReset(email) { must(await sb.auth.resetPasswordForEmail(email, { redirectTo: baseUrl() + "#reset" })); return true; },
+    async sendReset(email, to) { must(await sb.auth.resetPasswordForEmail(email, { redirectTo: baseUrl() + "/?reset=" + (to === "admin" ? "admin" : "app") })); return true; },
     async setNewPassword(pw) { must(await sb.auth.updateUser({ password: pw })); return true; },
     async signOut() { await sb.auth.signOut(); },
     async updateName(name) { const d = must(await sb.auth.updateUser({ data: { name } })); try { await this.saveProfile({ name }); } catch (e) {} return { id: d.user.id, email: d.user.email, name }; },
@@ -1790,17 +1790,19 @@ function openChangeName() {
   });
 }
 // Forgot password: email a link; the link opens the app on "Choose a new password"
-function openForgot(prefill) {
+function openForgot(prefill, to) {
   openSheet(`${sheetHead("Reset your password", "We'll email you a link to choose a new password.")}
     <form id="fgForm" class="stack" novalidate><div><label for="fgEmail">Email</label><input id="fgEmail" type="email" autocomplete="email" value="${esc(prefill || "")}" placeholder="Email address"></div>
     <p class="err" id="fgErr"></p><button class="btn wide">Send reset link</button></form>`);
   $("#fgForm").addEventListener("submit", async ev => {
     ev.preventDefault(); const em = $("#fgEmail").value.trim().toLowerCase();
     if (!/^\S+@\S+\.\S+$/.test(em)) return ($("#fgErr").textContent = "Enter a valid email address.");
-    try { await api.sendReset(em); openSheet(`${sheetHead("Check your email", "")}<p>If <strong>${esc(em)}</strong> has a ChopPool account, a reset link is on its way. Open it on this phone to choose a new password.</p><p class="small muted">Nothing after a few minutes? Check spam, or try again.</p><button class="btn wide" data-close>OK</button>`); }
+    try { await api.sendReset(em, to); openSheet(`${sheetHead("Check your email", "")}<p>If <strong>${esc(em)}</strong> has a ChopPool account, a reset link is on its way. Open it on this phone to choose a new password.</p><p class="small muted">Nothing after a few minutes? Check spam, or try again.</p><button class="btn wide" data-close>OK</button>`); }
     catch (e) { $("#fgErr").textContent = cleanErr(e); }
   });
 }
+// A reset link: wait for the app to finish loading, then ask for the new password (nothing can close it on the way)
+function showRecovery() { if (!S.recovery || S.recoveryOpen) return; S.recoveryOpen = true; setTimeout(() => { openNewPassword(); S.recoveryOpen = false; }, 150); }
 function openNewPassword() {
   openSheet(`${sheetHead("Choose a new password", "You opened a reset link. Set your new password to finish.")}
     <form id="npForm" class="stack" novalidate><div><label for="npPw">New password</label><input id="npPw" type="password" autocomplete="new-password" placeholder="At least 6 characters"></div>
@@ -1808,7 +1810,9 @@ function openNewPassword() {
   $("#npForm").addEventListener("submit", async ev => {
     ev.preventDefault(); const pw = $("#npPw").value;
     if (pw.length < 6) return ($("#npErr").textContent = "Use at least 6 characters.");
-    try { await api.setNewPassword(pw); S.recovery = false; closeSheet(); toast("Password saved. You're signed in."); if (location.hash === "#reset") history.replaceState(null, "", location.pathname + location.search); refreshUser?.(); }
+    try { await api.setNewPassword(pw); S.recovery = false; closeSheet(); toast("Password saved. You're signed in.");
+      if (S.resetTo === "admin") { if (location.hash !== "#admin") location.hash = "#admin"; else route(); }
+      else { if (location.hash !== "#order") history.replaceState(null, "", location.pathname + "#order"); S.tab = "wallet"; route(); } }
     catch (e) { $("#npErr").textContent = cleanErr(e); }
   });
 }
@@ -2828,7 +2832,7 @@ function openNotifSettings() {
 }
 // The bell: recent updates about your orders, your building and your wallet (only the types you've left on)
 function updatesList() {
-  const out = [], mineIds = new Set((local.get("cp_orders") || []).map(o => o.id));
+  fpMine(); const out = [], mineIds = new Set((local.get("cp_orders") || []).map(o => o.id));
   (S.mine || []).filter(o => !o.parent_id).forEach(o => {
     const k = menuOf(o.kitchen_id), name = k.public_name || "The vendor", at = o.created_at || "";
     let t = null, title = "";
@@ -2839,7 +2843,7 @@ function updatesList() {
     else if (["collecting", "accepted", "ready", "picked_up"].includes(o.pool_status) && o.status !== "collected") { t = "confirm"; title = name + " is cooking"; }
     if (t) out.push({ id: o.id + o.status + o.pool_status, t, title, body: statusLine(o), at });
   });
-  (S.board.activity || []).filter(a => a.site_id === S.siteId && !mineIds.has(a.id)).slice(-4).reverse().forEach(a => out.push({ id: "a" + a.id, t: "building", title: "New order at " + (siteOf(a.site_id).name || "your building"), body: "Someone ordered " + a.item_name + ".", at: a.created_at }));
+  (S.board.activity || []).filter(a => a.site_id === S.siteId && !mineIds.has(a.id) && !(S.mineFp || new Set()).has(a.id)).slice(-4).reverse().forEach(a => out.push({ id: "a" + a.id, t: "building", title: "New order at " + (siteOf(a.site_id).name || "your building"), body: "Someone ordered " + a.item_name + ".", at: a.created_at }));
   (S.walletEntries || []).filter(e => e.amount > 0).slice(0, 3).forEach(e => out.push({ id: "w" + e.at + e.amount, t: "cashback", title: money(e.amount) + " in your wallet", body: e.reason, at: e.at }));
   return out.filter(x => notifOn(x.t));
 }
@@ -2877,9 +2881,17 @@ async function toggleAlerts() {
   await pushSubscribe({ order_ids: (local.get("cp_orders") || []).map(o => o.id) }, true);
   toast("Alerts on.");
 }
+// The activity feed shows a one-way fingerprint of each order (first 16 hex of SHA-256 of its ID); work out mine to hide them
+async function fpMine() {
+  const ids = (local.get("cp_orders") || []).map(o => o.id).filter(Boolean), key = ids.join(",");
+  if (!ids.length || S.mineFpKey === key || !(window.crypto && crypto.subtle)) return; S.mineFpKey = key;
+  const out = new Set();
+  for (const id of ids) { const h = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(id)); out.add([...new Uint8Array(h)].map(b => b.toString(16).padStart(2, "0")).join("").slice(0, 16)); }
+  S.mineFp = out;
+}
 function announceActivity() {
   const mineIds = (local.get("cp_orders") || []).map(o => o.id);
-  const here = S.board.activity.filter(a => a.site_id === S.siteId && !mineIds.includes(a.id));
+  fpMine(); const here = S.board.activity.filter(a => a.site_id === S.siteId && !mineIds.includes(a.id) && !(S.mineFp || new Set()).has(a.id));
   const latest = here.reduce((t, a) => a.created_at > t ? a.created_at : t, "");
   if (!S.seen) { S.seen = latest || new Date().toISOString(); return; }
   const fresh = here.filter(a => a.created_at > S.seen).sort((a, b) => a.created_at < b.created_at ? -1 : 1);
@@ -3305,7 +3317,7 @@ async function viewAdmin() {
         ${mode === "signin" ? `<button class="linkbtn" id="forgotT" style="justify-self:center">Forgot password?</button>` : ""}
         <p class="small center">${mode === "signin" ? "First time here?" : "Already have an account?"} <button class="linkbtn" id="swapMode">${mode === "signin" ? "Create an account" : "Sign in"}</button></p></section>`;
       $("#swapMode").addEventListener("click", () => { mode = mode === "signin" ? "signup" : "signin"; draw(); });
-      $("#forgotT")?.addEventListener("click", () => openForgot($("#email").value.trim()));
+      $("#forgotT")?.addEventListener("click", () => openForgot($("#email").value.trim(), "admin"));
       $("#loginBtn").addEventListener("click", async () => {
         const email = $("#email").value.trim().toLowerCase(), pw = $("#pw").value;
         try { mode === "signin" ? await api.signIn(email, pw) : await api.signUp(email, pw, ($("#aname")?.value || "").trim()); viewAdmin(); } catch (e) { $("#loginErr").textContent = cleanErr(e); }
@@ -3974,7 +3986,7 @@ async function adminClick(e) {
       if (kind === "short" && !(amt > 0 && amt < due)) return ($("#piErr").textContent = "Enter the amount that arrived (less than " + money(due) + ").");
       try { await api.setPayIssue(id, kind, amt); notifyServer({ order_id: id }); closeSheet(); toast("Customer told"); renderAdmin(); } catch (err) { $("#piErr").textContent = cleanErr(err); } });
     return; }
-  if (mr && act === "team-reset") { try { await api.sendReset(mr.dataset.member); toast("Reset link sent to " + mr.dataset.member + ". It works once they've created their account."); } catch (err) { toast(cleanErr(err)); } return; }
+  if (mr && act === "team-reset") { try { await api.sendReset(mr.dataset.member, "admin"); toast("Reset link sent to " + mr.dataset.member + ". It works once they've created their account."); } catch (err) { toast(cleanErr(err)); } return; }
 }
 async function adminChange(e) {
   const t = e.target;
@@ -4550,6 +4562,12 @@ async function start() {
     for (let i = 0; i < 80 && !window.supabase; i++) await new Promise(r => setTimeout(r, 100));
     if (!window.supabase) { $("#view").innerHTML = `<p class="card err">ChopPool couldn't connect. Check your internet connection and refresh.</p>`; S.appReady = true; S.onReady && S.onReady(); return; }
     api = makeSupabaseApi();
+    const qp = new URLSearchParams(location.search), rs = qp.get("reset");
+    if (rs || /type=recovery/.test(location.hash)) {
+      S.resetTo = rs === "admin" ? "admin" : "app";
+      try { await api.user(); } catch (e) {}   // lets Supabase read the link first
+      history.replaceState(null, "", location.pathname + (S.resetTo === "admin" ? "#admin" : "#order"));
+    }
   }
   // Instant start: last-seen menus and board from this phone, refreshed quietly in the background
   const boot = !DEMO && local.get("cp_boot");
@@ -4594,6 +4612,7 @@ async function start() {
   await route();
   S.splashPainted && S.splashPainted();
   S.appReady = true; if (S.onReady) S.onReady();
+  showRecovery();
 }
 start();
 </script>

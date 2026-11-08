@@ -81,6 +81,8 @@ async function orderEvents(orderId: string) {
       (o.pay_issue === "short" ? "We received " + money(o.amount_received || 0) + ". Pay the rest" : "Check the MoMo reference or pay again") + " before orders close so your lunch counts.", APP + "/#order", "order-" + o.id);
   if (o.status === "cancelled" && o.cancel_reason === "Payment not received" && await once("unpaid:" + o.id))
     await send(await customerSubs([o]), "Order cancelled", "We didn't receive your payment before orders closed, so code " + o.code + " was cancelled.", APP + "/#order", "order-" + o.id);
+  if (o.status === "cancelled" && o.cancel_reason === "Special request not paid before cut-off" && await once("unpaidquote:" + o.id))
+    await send(await customerSubs([o]), "Special request closed", "Orders closed before your special request was paid, so code " + o.code + " was released. Nothing was charged.", APP + "/#order", "order-" + o.id);
   if (o.status === "cancelled" && /^The seller can't/.test(o.cancel_reason || "") && await once("declined:" + o.id))
     await send(await customerSubs([o]), k.public_name + " can't do your request", (o.cancel_reason || "") + ". Nothing was charged.", APP + "/#order", "order-" + o.id, "confirm");
   await poolEvents(o.pool_id);
@@ -92,6 +94,10 @@ async function tick() {
   await db.rpc("housekeeping");
   const { data: s } = await db.from("settings").select("*").eq("id", 1).single(); if (!s) return;
   const now = new Date(), today = now.toISOString().slice(0, 10), since = new Date(now.getTime() - 2 * 864e5).toISOString().slice(0, 10);
+  // Orders the database cancelled on its own at cut-off (payment never arrived, special request never paid): tell the customer
+  const { data: autoCancelled } = await db.from("orders").select("id").eq("status", "cancelled")
+    .in("cancel_reason", ["Payment not received", "Special request not paid before cut-off"]).gte("order_date", since);
+  for (const o of autoCancelled || []) await orderEvents(o.id);
   const { data: pools } = await db.from("pools").select("*").gte("order_date", since);
   for (const p of pools || []) {
     if (p.status === "waiting" && laterDay(p)) {

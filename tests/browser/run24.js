@@ -1,0 +1,20 @@
+const { chromium, devices } = require('playwright');
+(async () => { const b = await chromium.launch(); const ctx = await b.newContext({ ...devices['iPhone 14'] });
+  const p = await ctx.newPage(); const errs = []; p.on('pageerror', e => errs.push(e.message));
+  await p.route(/tile\.openstreetmap|cdnjs|nominatim/, r => r.abort());
+  await p.addInitScript(() => { localStorage.setItem('cp_splash_v','1'); localStorage.setItem('cp_site', JSON.stringify('s1')); localStorage.setItem('cp_me', JSON.stringify({ name: 'Ama Owusu', phone: '0241234567' })); });
+  const step = async (n, f) => { try { await f(); console.log('ok', n); } catch (e) { console.log('FAIL', n, e.message.split('\n')[0]); } };
+  await p.goto('file:///home/claude/choppool/index.html'); await p.waitForTimeout(1500);
+  console.log('title:', await p.title());
+  await step('search recent + combined', async () => { await p.click('#placeBtn'); await p.waitForTimeout(400); console.log('  recent rows:', await p.locator('#siteList .siterow').count(), '| title:', await p.locator('#fbSitesT').innerText());
+    await p.fill('#fbQ', 'pent'); await p.waitForTimeout(300); console.log('  typed rows:', (await p.locator('#siteList').innerText()).replace(/\n+/g, ' | '), '| heading hidden:', await p.locator('#fbSitesT').isHidden()); await p.screenshot({ path: '/tmp/b16_search.png' }); await p.evaluate(() => closeSheet()); await p.waitForTimeout(400); });
+  let oid;
+  await step('rate a collected order', async () => {
+    oid = await p.evaluate(async () => { const r = await api.placeOrder({ site: 's1', item: 'i1', qty: 1, name: 'Ama Owusu', phone: '0241234567', ref: '51234567' }); local.set('cp_orders', [{ id: r.id, order_date: r.order_date }]); await api.collectCode('demoh1', r.code, r.order_date); await refreshMine(); setTab('orders'); return r.id; });
+    await p.waitForTimeout(500); await p.locator('#tabOrders [data-rate]').first().click(); await p.waitForTimeout(500); await p.click('#rvStars [data-s="4"]');
+    await p.fill('#rvText', 'Great jollof, still warm'); await p.click('#rvSend'); await p.waitForTimeout(700);
+    console.log('  toast:', await p.locator('#toast').innerText(), '| card:', (await p.locator('#tabOrders .orow').first().innerText()).replace(/\n/g, ' ')); });
+  await step('menu sheet shows ratings', async () => { await p.evaluate(() => { setTab('home'); openOrder('k1'); }); await p.waitForTimeout(800); console.log('  strip:', (await p.locator('#revStrip').innerText()).replace(/\n+/g, ' | ')); await p.locator('#sheet').screenshot({ path: '/tmp/b16_sheet.png' }); await p.evaluate(() => closeSheet()); });
+  await step('admin hides', async () => { await p.evaluate(() => location.hash = '#admin'); await p.waitForTimeout(1500); console.log('  title:', await p.title()); await p.click('[data-atab=menus]'); await p.waitForTimeout(300); await p.click('[data-asub=reviews]'); await p.waitForTimeout(600);
+    console.log('  cards:', await p.locator('.revcard').count()); await p.locator('.revcard [data-act=rev-hide]').first().click(); await p.waitForTimeout(600); console.log('  hidden:', await p.locator('.hiddenrev').count(), await p.evaluate(async () => (await api.kitchenReviews('k1')).length)); });
+  console.log('errors', JSON.stringify(errs)); await b.close(); })();

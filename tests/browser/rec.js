@@ -1,0 +1,13 @@
+const { chromium, devices } = require('playwright');
+(async () => { const b = await chromium.launch(); const p = await (await b.newContext({ ...devices['iPhone 14'] })).newPage(); const errs=[]; p.on('pageerror', e => errs.push(e.message));
+  await p.addInitScript(() => localStorage.setItem('cp_splash_v','1'));
+  await p.goto('http://localhost:8765/index.html#admin'); await p.waitForTimeout(2500);
+  await p.evaluate(() => { S.recovery = true; S.resetTo = 'admin'; showRecovery(); }); await p.waitForTimeout(500);
+  console.log('sheet:', await p.locator('#sheetTitle').innerText().catch(() => 'none'));
+  await p.fill('#npPw', 'secret123'); await p.locator('#npForm button').click(); await p.waitForTimeout(800);
+  console.log('after save hash:', await p.evaluate(() => location.hash), 'admin shown:', await p.locator('[data-atab]').count() > 0);
+  await p.goto('http://localhost:8765/index.html#order'); await p.waitForTimeout(2000);
+  await p.evaluate(() => { S.recovery = true; S.resetTo = 'app'; showRecovery(); }); await p.waitForTimeout(500);
+  await p.fill('#npPw', 'secret123'); await p.locator('#npForm button').click(); await p.waitForTimeout(800);
+  console.log('customer lands on:', await p.evaluate(() => S.tab), await p.evaluate(() => location.hash));
+  console.log('errors', errs); await b.close(); })();

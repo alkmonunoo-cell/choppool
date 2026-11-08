@@ -1,0 +1,17 @@
+const { chromium, devices } = require('playwright');
+(async () => { const b = await chromium.launch(); const ctx = await b.newContext({ ...devices['iPhone 14'] });
+  const p = await ctx.newPage(); const errs=[]; p.on('pageerror', e => errs.push(e.message)); await p.route(/tile\.openstreetmap|cdnjs|nominatim/, r => r.abort());
+  await p.addInitScript(() => { localStorage.setItem('cp_splash_v','1'); localStorage.setItem('cp_site', JSON.stringify('s1')); });
+  await p.goto('http://localhost:8765/index.html'); await p.waitForSelector('#tabHome'); await p.waitForTimeout(800);
+  console.log(await p.evaluate(() => { const n = nearRows(); return n.rows.concat(n.further).map(r=>[r.k.public_name, Math.round(r.trip)]); })); await p.evaluate(() => { S.settings.near_max_fee = 50; });
+  await p.locator('.tabbar button', { hasText: 'Vendors' }).click(); await p.waitForTimeout(600);
+  const st = () => p.evaluate(() => ({ vf: S.vf, farChip: !document.querySelector('#vchips [data-vf=far]').classList.contains('hidden'), cards: document.querySelectorAll('#kitchensList [data-vendor]').length, link: document.querySelector('.farlink')?.innerText, hasHeading: /Further away/.test(document.querySelector('#kitchensList').innerText) }));
+  console.log('near:', await st());
+  await p.screenshot({path:'/tmp/far1.png', fullPage: true});
+  await p.locator('.farlink').click(); await p.waitForTimeout(700);
+  console.log('after link:', await st());
+  await p.screenshot({path:'/tmp/far2.png'});
+  await p.locator('#vchips [data-vf=top]').click(); await p.waitForTimeout(300); console.log('top:', await st());
+  await p.locator('#vq').fill('a'); await p.waitForTimeout(300); console.log('search hits:', await p.locator('#vsugg [data-vendor]').count());
+  await p.evaluate(() => { S.settings.near_max_fee = 500; S.vf = 'far'; renderKitchens(); }); await p.waitForTimeout(200); console.log('no far:', await st());
+  console.log('errors', errs); await b.close(); })();
