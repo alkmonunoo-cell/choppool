@@ -286,7 +286,13 @@ input::placeholder, textarea::placeholder { color: color-mix(in srgb, var(--mute
 .sheet::before { content: ""; width: 44px; height: 5px; border-radius: 99px; background: var(--line); justify-self: center; margin-top: 2px; }
 body.locked { position: fixed; left: 0; right: 0; overflow: hidden; }
 .sheet > :last-child { margin-bottom: 20px; }
-.sheet-foot { position: sticky; bottom: 0; background: var(--surface); -webkit-backdrop-filter: blur(20px) saturate(160%); backdrop-filter: blur(20px) saturate(160%); padding: 12px 0 calc(18px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); display: flex; align-items: center; gap: 14px; margin-bottom: 0 !important; }
+/* Sheets sit flush on the bottom edge: the surface carries on under the home bar (no gap, no band),
+   and the pay bar spans the full width of the sheet instead of floating inside it */
+.sheet { padding-bottom: 0; box-shadow: 0 400px 0 0 var(--surface); }
+.sheet a, .legal a, .pagetop ~ p a { color: var(--accent); font-weight: 600; }
+.sheet > :last-child { margin-bottom: calc(20px + env(safe-area-inset-bottom)); }
+.sheet-foot { position: sticky; bottom: 0; z-index: 2; background: var(--surface); margin: 4px -20px 0 !important; padding: 12px 20px calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); box-shadow: 0 -10px 24px -14px rgba(0,0,0,.35); display: flex; align-items: center; gap: 14px; }
+form > .sheet-foot:last-child, .sheet > .sheet-foot:last-child { margin-bottom: 0 !important; }
 .sheet-foot .tot { display: grid; line-height: 1.2; }
 .sheet-foot .tot b { font-family: var(--font-display); font-size: 22px; font-weight: 800; }
 .sheet-foot .tot span { font-size: 12px; color: var(--muted); }
