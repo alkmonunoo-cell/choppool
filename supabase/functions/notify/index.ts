@@ -176,10 +176,11 @@ async function tick() {
       }
     }
     if (p.status === "cancelled" && await once("expired_check:" + p.id)) {
-      const { data: os } = await db.from("orders").select("*").eq("pool_id", p.id).eq("cancel_reason", "The seller did not confirm in time");
+      const { data: os } = await db.from("orders").select("*").eq("pool_id", p.id).in("cancel_reason", ["The seller did not confirm in time", "The vendor isn't cooking today"]);
       if (os && os.length) {
         const { data: k } = await db.from("kitchens").select("public_name").eq("id", p.kitchen_id).single();
-        await send(await customerSubs(os), (k ? k.public_name : "The vendor") + " didn't confirm", "Your money is back. Tap Order again if they start cooking later.", APP + "/#order", "pool-" + p.id, "confirm");
+        const skip = os.some((o: any) => o.cancel_reason === "The vendor isn't cooking today");
+        await send(await customerSubs(os), (k ? k.public_name : "The vendor") + (skip ? " isn't cooking today" : " didn't confirm"), skip ? "You get your money back. Choose another vendor for lunch." : "Your money is back. Tap Order again if they start cooking later.", APP + "/#order", "pool-" + p.id, "confirm");
       }
     }
   }
