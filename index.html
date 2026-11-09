@@ -650,6 +650,9 @@ button.dtile:not([disabled]):hover { outline: 2px solid var(--accent-soft); }
 .siterow { position: relative; }
 .siterow input { position: absolute; opacity: 0; pointer-events: none; }
 .siterow:has(input:checked) { background: var(--accent-soft); }
+.place-row strong.sname { display: flex; align-items: center; gap: 6px; }
+.place-row strong.sname > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.place-row strong.sname .onchop { flex: none; margin-left: 0; }
 .onchop { font-style: normal; font-size: 12px; font-weight: 800; color: var(--accent); background: var(--accent-soft); border-radius: 999px; padding: 2px 7px; margin-left: 4px; vertical-align: 2px; white-space: nowrap; }
 #wRes:not(:empty) { margin-top: -2px; }
 .pdot { width: 36px; height: 36px; border-radius: 12px; display: grid; place-items: center; background: var(--surface-2); color: var(--accent); }
@@ -2426,7 +2429,6 @@ function openSitePicker(opt) {
     ${searchRow("fbQ", "Building, office, hostel or area")}
     <div class="chips" id="fbChips"><button type="button" class="tog" id="nearMe">${ICON.pin} Use my location</button><button type="button" class="tog" id="mapToggle">Show on map</button></div>
     <div id="siteMap" class="map hidden" aria-label="Map of ChopPool buildings"></div>
-    <p class="group-title" id="fbSitesT">Recent</p>
     <p class="small muted" id="siteHint"></p>
     <div class="places" id="siteList"></div>
     <div id="fbPlaces" class="stack"></div>
@@ -2434,7 +2436,7 @@ function openSitePicker(opt) {
       <span class="blob">${ICON.pin.replace('width="13" height="13"', 'width="24" height="24"')}</span>
       <span style="display:grid;gap:2px"><strong>Can't find it? Pin it on the map</strong><span class="small muted">Drop a pin on your building and we'll add it.</span></span></button>`);
   const norm = x => String(x || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
-  // Before typing: recent buildings (or the nearest, after "Use my location"). While typing: matching ChopPool buildings first, then places, in one list.
+  // Before typing: recent buildings, then nearest or popular ones. While typing: matching ChopPool buildings first, then places, in one list.
   const list = () => {
     const q = norm($("#fbQ").value.trim()), words = q.split(/\s+/).filter(Boolean), near = !!here && !words.length && showNear;
     let rows = S.sites.map((x, i) => ({ x, i, d: here && hasPin(x) ? distM(here, x) : null }));
@@ -2442,21 +2444,34 @@ function openSitePicker(opt) {
       // Similar names too, so a typo still finds the ChopPool building
       const fz = rows.filter(r => !ex.includes(r)).map(r => ({ r, h: fuzzyHit(q, r.x.name + " " + r.x.drop_point + " " + (r.x.host_label || "")) })).filter(z => z.h).sort((a, b) => a.h.s - b.h.s).map(z => z.r);
       rows = ex.concat(fz).slice(0, 8); }
-    else if (near) rows = rows.filter(r => r.d != null).sort((a, b) => a.d - b.d).slice(0, 3);
-    else { const rec = recentSites(); rows = rec.map(id => rows.find(r => r.x.id === id)).filter(Boolean); }
-    $("#fbSitesT").textContent = near ? "Nearest to you" : "Recent";
-    $("#fbSitesT").classList.toggle("hidden", !!words.length || !rows.length);
-    $("#siteHint").textContent = near && !rows.length ? "No ChopPool buildings near you yet. Search for yours or pin it on the map." : "";
-    $("#siteList").innerHTML = rows.map(({ x, d }) => { const n = poolsOpenAt(x.id);
+    const row = ({ x, d }) => { const n = poolsOpenAt(x.id);
       return `<label class="place-row siterow"><input type="radio" name="site" value="${esc(x.id)}"${x.id === S.siteId ? " checked" : ""}>
         <span class="pdot on">${ICON.store.replace(/width="\d+" height="\d+"/, 'width="18" height="18"')}</span>
-        <span><strong>${esc(x.name)} <em class="onchop">On ChopPool</em></strong><span class="small muted">${n ? n + (n === 1 ? " pool" : " pools") + " open today" : esc(x.drop_point)}${d != null ? " · " + fmtDist(d) : ""}</span></span></label>`; }).join("");
+        <span><strong class="sname"><span>${esc(x.name)}</span><em class="onchop">On ChopPool</em></strong><span class="small muted">${n ? n + (n === 1 ? " pool" : " pools") + " open today" : esc(x.drop_point)}${d != null ? " · " + fmtDist(d) : ""}</span></span></label>`; };
+    let html = ""; $("#siteHint").textContent = "";
+    if (words.length) html = rows.map(row).join("");
+    else {
+      // Before typing: your recent buildings, then the nearest (once we know where you are) or the busiest ones, so the list is never empty
+      const rec = recentSites().map(id => rows.find(r => r.x.id === id)).filter(Boolean).slice(0, 2);
+      const rest = rows.filter(r => !rec.includes(r));
+      const more = here ? rest.filter(r => r.d != null).sort((a, b) => a.d - b.d).slice(0, rec.length ? 3 : 4)
+                        : rest.sort((a, b) => poolsOpenAt(b.x.id) - poolsOpenAt(a.x.id) || a.i - b.i).slice(0, rec.length ? 3 : 4);
+      if (rec.length) html += `<p class="group-title">Recent</p>` + rec.map(row).join("");
+      if (more.length) html += `<p class="group-title">${here ? "Near you" : "Popular on ChopPool"}</p>` + more.map(row).join("");
+      if (here && !more.length && !rec.length) $("#siteHint").textContent = "No ChopPool buildings near you yet. Search for yours or pin it on the map.";
+    }
+    $("#siteList").innerHTML = html;
   };
   list();
   const pick = id => setSite(id, then);
   $("#siteList").addEventListener("click", e => { if (e.target.name === "site") pick(e.target.value); });
   $("#fbQ").addEventListener("input", () => { const typing = !!$("#fbQ").value.trim(); $("#sheet").classList.toggle("searching", typing); $("#fbChips").classList.toggle("hidden", typing); if (typing) { $("#siteMap").classList.add("hidden"); $("#mapToggle").textContent = "Show on map"; } list(); });
   placeSearch($("#fbQ"), $("#fbPlaces"), r => openRequestSite({ lat: r.lat, lng: r.lng }, { name: r.short, then }), { none: "No places found. Pin it on the map below." });
+  // If this phone already allowed location, sort by distance straight away (never asks on its own)
+  if (!here && navigator.permissions && navigator.geolocation) navigator.permissions.query({ name: "geolocation" }).then(st => {
+    if (st.state !== "granted") return;
+    navigator.geolocation.getCurrentPosition(pos => { if (!$("#siteList")) return; here = S.here = { lat: pos.coords.latitude, lng: pos.coords.longitude }; $("#nearMe").setAttribute("aria-pressed", "true"); list(); }, () => {}, { maximumAge: 600000, timeout: 8000 });
+  }).catch(() => {});
   $("#nearMe").addEventListener("click", async () => {
     $("#siteHint").textContent = "Finding buildings near you…";
     try { here = S.here = await myPosition(); showNear = true; $("#nearMe").setAttribute("aria-pressed", "true"); if (map) map.setView([here.lat, here.lng], 14); }

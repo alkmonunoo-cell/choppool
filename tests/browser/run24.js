@@ -6,8 +6,8 @@ const { chromium, devices } = require('playwright');
   const step = async (n, f) => { try { await f(); console.log('ok', n); } catch (e) { console.log('FAIL', n, e.message.split('\n')[0]); } };
   await p.goto('file:///home/claude/choppool/index.html'); await p.waitForTimeout(1500);
   console.log('title:', await p.title());
-  await step('search recent + combined', async () => { await p.click('#placeBtn'); await p.waitForTimeout(400); console.log('  recent rows:', await p.locator('#siteList .siterow').count(), '| title:', await p.locator('#fbSitesT').innerText());
-    await p.fill('#fbQ', 'pent'); await p.waitForTimeout(300); console.log('  typed rows:', (await p.locator('#siteList').innerText()).replace(/\n+/g, ' | '), '| heading hidden:', await p.locator('#fbSitesT').isHidden()); await p.screenshot({ path: '/tmp/b16_search.png' }); await p.evaluate(() => closeSheet()); await p.waitForTimeout(400); });
+  await step('search recent + combined', async () => { await p.click('#placeBtn'); await p.waitForTimeout(400); console.log('  recent rows:', await p.locator('#siteList .siterow').count(), '| title:', await p.locator('#siteList .group-title').first().innerText());
+    await p.fill('#fbQ', 'pent'); await p.waitForTimeout(300); console.log('  typed rows:', (await p.locator('#siteList').innerText()).replace(/\n+/g, ' | '), '| heading hidden:', (await p.locator('#siteList .group-title').count()) === 0); await p.screenshot({ path: '/tmp/b16_search.png' }); await p.evaluate(() => closeSheet()); await p.waitForTimeout(400); });
   let oid;
   await step('rate a collected order', async () => {
     oid = await p.evaluate(async () => { const r = await api.placeOrder({ site: 's1', item: 'i1', qty: 1, name: 'Ama Owusu', phone: '0241234567', ref: '51234567' }); local.set('cp_orders', [{ id: r.id, order_date: r.order_date }]); await api.collectCode('demoh1', r.code, r.order_date, null, 'cash'); await refreshMine(); setTab('orders'); return r.id; });
