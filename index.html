@@ -890,6 +890,10 @@ body:not(.on-home) #bell, body:not(.on-home) #theme { display: none; }
 .vitem strong { font-size: 14.5px; line-height: 1.3; }
 .vitem .ds { font-size: 12px; color: var(--muted); }
 .vitem .pr { font-size: 14px; font-weight: 800; margin-top: 3px; }
+.gl { width: 16px; height: 16px; display: block; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; flex: none; }
+.vitem .plus .gl { width: 16px; height: 16px; stroke-width: 2.4; }
+.qty button { display: grid; place-items: center; }
+.logo.net.gen .gl { width: 14px; height: 14px; }
 .vitem .plus { width: 36px; height: 36px; border-radius: 99px; background: var(--accent-soft); color: var(--accent-2); display: grid; place-items: center; flex: none; font: 800 21px/1 var(--font-body); }
 .vfoot { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(12px + env(safe-area-inset-bottom)); width: min(460px, calc(100% - 24px)); z-index: 27; }
 .vfoot .btn { width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 15px 18px; font-size: 15.5px; border-radius: 20px; box-shadow: 0 14px 28px -12px rgba(185,58,8,.7); }
@@ -1877,6 +1881,12 @@ const handCount = os => { const all = (os || []).filter(o => !["quote_requested"
 const siteOf = id => S.sites.find(x => x.id === id) || {};
 const menuOf = id => S.menus.find(x => x.id === id) || {};
 const SV = (d, w = 20) => `<svg width="${w}" height="${w}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+// Plus / minus / remove drawn as lines, so they sit exactly in the middle of round and square buttons
+const GLYPH = {
+  plus: '<svg class="gl" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10"/></svg>',
+  minus: '<svg class="gl" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10"/></svg>',
+  x: '<svg class="gl" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg>',
+};
 const ICON = {
   bell: SV(`<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>`),
   auto: SV(`<circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/>`),
@@ -3005,7 +3015,7 @@ const payToFor = net => payList().find(p => net && p.network === net) || payList
 function pickPayFrom(cur, done) {
   const L = payMethods(); const back = $("#sheet").innerHTML;
   const host = document.createElement("div"); host.className = "pmpick"; host.innerHTML = `<p class="group-title">Pay from</p>${L.map(m => `<button type="button" class="pmrow${cur && cur.id === m.id ? " on" : ""}" data-pm="${esc(m.id)}">${netBadge(m.network)}<span><b>${esc(m.nick || m.network)}</b> <span class="num muted">${esc(maskNum(m.number))}</span></span>${m.def ? `<span class="chip">Default</span>` : ""}</button>`).join("")}
-    <button type="button" class="pmrow" data-pm="new"><span class="logo net gen">+</span><span><b>Another number</b></span></button>`;
+    <button type="button" class="pmrow" data-pm="new"><span class="logo net gen">${GLYPH.plus}</span><span><b>Another number</b></span></button>`;
   const box = $("#payFrom"); box.innerHTML = ""; box.appendChild(host);
   host.addEventListener("click", e => { const b = e.target.closest("[data-pm]"); if (!b) return; done(b.dataset.pm === "new" ? null : L.find(m => m.id === b.dataset.pm)); });
 }
@@ -3024,7 +3034,7 @@ function openDish(k, dishId) {
   let qty = 1; const extras = new Set(), i0 = menuIndex(k.id);
   const specialOpen = !(S.date === today() && new Date() >= at(S.date, S.settings.special_cutoff));
   openSheet(`<div class="dishhead"><span class="tile" style="background:${tint(i0)}">${plate(d, k.id)}</span><div><h2>${esc(d.name)}</h2><p class="small muted">${esc(k.public_name)} · <span class="num">${money(d.price)}</span></p></div><button class="closex" data-close aria-label="Close">${ICON.close}</button></div>
-    <div class="row"><p class="group-title">How many</p><div class="qty"><button type="button" id="dMinus" aria-label="One less">−</button><output id="dQ">1</output><button type="button" id="dPlus" aria-label="One more">+</button></div></div>
+    <div class="row"><p class="group-title">How many</p><div class="qty"><button type="button" id="dMinus" aria-label="One less">${GLYPH.minus}</button><output id="dQ">1</output><button type="button" id="dPlus" aria-label="One more">${GLYPH.plus}</button></div></div>
     ${(d.addons || []).length ? `<div class="group"><p class="group-title">Extras <span class="muted" style="font-weight:500">(optional, added to each plate)</span></p><div class="chips" id="dExtras">${d.addons.map(a => `<button type="button" class="tog" data-addon="${esc(a.name)}" aria-pressed="false">${esc(a.name)}${a.price ? " +" + money(a.price) : ""}</button>`).join("")}</div></div>` : ""}
     <div class="group"><label for="dNote">Note for the kitchen <span class="muted" style="font-weight:500">(optional)</span></label><input id="dNote" maxlength="140" placeholder="Less oil, extra napkins"></div>
     ${specialOpen ? `<button type="button" class="linkbtn" id="dSpecial" style="justify-self:start">Want something not on the menu? Send a special request</button>` : ""}
@@ -3069,7 +3079,7 @@ function drawVendor() {
       <div id="vpBanner">${vendorBanner(k)}</div>
       <div class="vtabs" role="tablist"><button data-vtab="menu" aria-pressed="${S.vp.tab === "menu"}">Menu</button><button data-vtab="rev" aria-pressed="${S.vp.tab === "rev"}">Reviews${sc.ratings ? " · " + sc.ratings : ""}</button></div>
       <div id="vpBody" class="stack" style="gap:8px">${S.vp.tab === "menu" ? groups.map(([t, ds]) => `<h3 class="vcat">${esc(t)}</h3>` + ds.map(d => `<button class="vitem" data-dish="${esc(d.id)}"${v.st.full && !(S.noSite ? null : myOrderIn(k)) ? " disabled" : ""}>
-          <span class="vph" style="background:${tint(i0)}">${plate(d, k.id)}</span><span class="vtx"><strong>${esc(d.name)}</strong>${(d.addons || []).length ? `<span class="ds">Extras: ${esc(d.addons.map(a => a.name).join(", "))}</span>` : ""}<span class="pr num">${money(d.price)}</span></span><span class="plus" aria-hidden="true">+</span></button>`).join("")).join("")
+          <span class="vph" style="background:${tint(i0)}">${plate(d, k.id)}</span><span class="vtx"><strong>${esc(d.name)}</strong>${(d.addons || []).length ? `<span class="ds">Extras: ${esc(d.addons.map(a => a.name).join(", "))}</span>` : ""}<span class="pr num">${money(d.price)}</span></span><span class="plus" aria-hidden="true">${GLYPH.plus}</span></button>`).join("")).join("")
         || `<p class="small muted">No dishes on the menu yet.</p>` : `<p class="small muted">Loading reviews…</p>`}</div>
     </div>`;
   if ($("#vfoot")) { $("#vfoot").innerHTML = vendorFoot(k); $("#vfoot").classList.toggle("on", !!$("#vfoot").innerHTML); }
@@ -3813,7 +3823,7 @@ function openOrder(menuId, opt = {}) {
       <div class="group${trayMode ? " hidden" : ""}"><p class="group-title">Choose your meal</p><div class="dishes">
         ${dishes.map((d, n) => `<label class="dish"><input type="radio" name="dish" value="${esc(d.id)}"${d === item ? " checked" : ""}><span class="tile" style="background:${tint(i0)}">${plate(d, k.id)}</span><span>${esc(d.name)}</span><span class="price num">${money(d.price)}</span></label>`).join("")}
       </div></div>
-      <div class="row${trayMode ? " hidden" : ""}"><p class="group-title">How many</p><div class="qty"><button type="button" id="minus" aria-label="One less">−</button><output id="q">${qty}</output><button type="button" id="plus" aria-label="One more">+</button></div></div>
+      <div class="row${trayMode ? " hidden" : ""}"><p class="group-title">How many</p><div class="qty"><button type="button" id="minus" aria-label="One less">${GLYPH.minus}</button><output id="q">${qty}</output><button type="button" id="plus" aria-label="One more">${GLYPH.plus}</button></div></div>
       <div class="group${trayMode ? " hidden" : ""}" id="extrasGroup"></div>
       <div class="group${trayMode ? " hidden" : ""}"><button type="button" class="linkbtn" id="noteToggle" style="justify-self:start">+ Add a note for the kitchen</button>
         <div id="noteBox" class="hidden"><input id="fNote" maxlength="140" placeholder="Less oil, extra napkins" aria-label="Note for the kitchen"></div>
@@ -3854,7 +3864,7 @@ function openOrder(menuId, opt = {}) {
   };
   const drawTray = () => {
     $("#tLines").innerHTML = tray.lines.map((l, n) => { const it = lineItem(l), ad = lineAdd(l); return `<div class="tline"><span class="tx"><b>${l.qty} × ${esc(it.name || "Dish")}</b><small>${[(l.addons || []).join(", "), l.note].filter(Boolean).map(esc).join(" · ")}${(l.addons || []).length || l.note ? " · " : ""}<span class="num">${money((Number(it.price || 0) + ad) * l.qty)}</span></small></span>
-      <div class="qty"><button type="button" data-tl="${n}" data-d="-1" aria-label="${l.qty === 1 ? "Remove" : "One less"}">${l.qty === 1 ? "×" : "−"}</button><output>${l.qty}</output><button type="button" data-tl="${n}" data-d="1" aria-label="One more">+</button></div></div>`; }).join("");
+      <div class="qty"><button type="button" data-tl="${n}" data-d="-1" aria-label="${l.qty === 1 ? "Remove" : "One less"}">${l.qty === 1 ? GLYPH.x : GLYPH.minus}</button><output>${l.qty}</output><button type="button" data-tl="${n}" data-d="1" aria-label="One more">${GLYPH.plus}</button></div></div>`; }).join("");
   };
   const draw = () => {
     $("#q").textContent = qty;
