@@ -1541,6 +1541,23 @@ function makeDemoApi() {
       const pl = pools.find(p => p.id === o.pool_id); if (pl && pl.status === "waiting" && !meals(pl.id)) pl.status = "cancelled";
       return { refund: to, wallet_credit: wc, momo: mm };
     },
+    async reducePlates(id, n, reason, refund) {
+      const o = orders.find(x => x.id === id); if (!o) throw new Error("Order not found.");
+      if (o.user_id && (!me || me.id !== o.user_id)) throw new Error("Sign in with the account that placed this order.");
+      if (o.status === "pending") throw new Error("Your payment is still being checked. You can remove plates once it's confirmed, or cancel this order.");
+      if (o.status !== "paid" || o.special_request) throw new Error("Plates can't be removed from this order.");
+      { const pl0 = pools.find(p => p.id === o.pool_id); if (pl0 && !["waiting", "collecting"].includes(pl0.status)) throw new Error("The vendor is already cooking this order, so it can't be changed now."); }
+      if (pastCutoff(o.order_date)) throw new Error("Orders close at " + settings.cutoff + ". The kitchen is already cooking, so it can't be changed now.");
+      if (!(n >= 1 && n < o.qty)) throw new Error("Choose between 1 and " + (o.qty - 1) + " plates to remove. To remove them all, cancel the order.");
+      const per = Number(o.unit_price) + Number(o.addons_total || 0) + (o.fee_per_meal ? Number(o.service_fee) : 0), back = Math.round(per * n * 100) / 100;
+      const w = Math.min(back, Number(o.wallet_used || 0)); let m = back - w, credit = o.user_id ? w : 0;
+      if (m > 0 && o.user_id && (refund || "wallet") === "wallet") { credit += m; m = 0; }
+      const old = o.qty; o.qty = old - n; if (!o.parent_id && Number(o.max_fee) > 0) o.max_fee = Number(o.max_fee) * old / o.qty;
+      o.wallet_used = Number(o.wallet_used || 0) - w;
+      if (m > 0) { o.refund_due = (o.refund_needed ? Number(o.refund_due || 0) : 0) + m; o.refund_needed = true; }
+      if (credit > 0) ledger.push({ user_id: o.user_id, amount: credit, reason: "Refund: removed " + n + " plate" + (n === 1 ? "" : "s") + " from code " + o.code, created_at: nowIso(), order_id: o.id });
+      return { refund: m > 0 ? "momo" : "wallet", wallet_credit: credit, momo: m, qty: o.qty };
+    },
     async waitingPools(date) { return pools.filter(p => p.order_date === date && p.status === "waiting" && meals(p.id) > 0); },
     async vendorSetMenu(token, list) {
       const k = byToken(kitchens, "token", token);
@@ -1734,6 +1751,8 @@ function makeSupabaseApi() {
       if (r.error && /function|schema cache/i.test(r.error.message)) throw new Error("ChopPool needs a quick update before you can decline. Please tell ChopPool."); return must(r); },
     async cancelOrder(id, reason, refund) { const r = await sb.rpc("cancel_order", { p_order: id, p_reason: reason || null, p_refund: refund || "wallet" });
       if (r.error && /function|schema cache/i.test(r.error.message)) throw new Error("Cancelling isn't switched on yet. Please contact ChopPool."); return must(r); },
+    async reducePlates(id, n, reason, refund) { const r = await sb.rpc("reduce_plates", { p_order: id, p_remove: n, p_reason: reason || null, p_refund: refund || "wallet" });
+      if (r.error && /function|schema cache/i.test(r.error.message)) throw new Error("Removing some plates isn't switched on yet. Cancel the plate instead, or contact ChopPool."); return must(r); },
     async waitingPools(date) { const ps = must(await sb.from("public_pools").select("*").eq("order_date", date).eq("status", "waiting")); return ps.filter(p => p.meals > 0); },
     vendorSetMenu: (t, items) => rpc("vendor_set_menu", { p_token: t, p_items: items }),
     riderView: (t, d) => rpc("rider_view", { p_token: t, p_date: d }),
@@ -2366,7 +2385,7 @@ async function viewOrder() {
     const b = e.target.closest("button[data-pay]"); if (b) openPayQuote(b.dataset.pay); const ro = e.target.closest("[data-reorder]"); if (ro) openOrder(ro.dataset.reorder);
     const ap = e.target.closest("[data-addplate]"); if (ap) { const o = (S.mine || []).find(x => x.id === ap.dataset.addplate); if (o) openOrder(o.kitchen_id, { join: o }); }
     const rt = e.target.closest("[data-rate]"); if (rt) { const o = (S.mine || []).find(x => x.id === rt.dataset.rate); if (o) openReview(o, +rt.dataset.n || 0); return; }
-    const ag = e.target.closest("[data-again]"); if (ag) { const o = (S.mine || []).find(x => x.id === ag.dataset.again); if (o) openOrder(o.kitchen_id, { preset: { item_id: o.item_id, qty: o.qty, addons: (o.addons || []).map(a => a.name), site_id: o.site_id } }); } const cx = e.target.closest("[data-cancel]"); if (cx) openCancel(cx.dataset.cancel); const sh = e.target.closest("[data-share]"); if (sh) { const [a, c] = sh.dataset.share.split(","); sharePool(a, c); } if (e.target.closest("[data-keepcb]")) openAccount("Your cashback moves into your new wallet."); const h = e.target.closest("[data-gohome]"); if (h) setTab("home"); });
+    const ag = e.target.closest("[data-again]"); if (ag) { const o = (S.mine || []).find(x => x.id === ag.dataset.again); if (o) openOrder(o.kitchen_id, { preset: { item_id: o.item_id, qty: o.qty, addons: (o.addons || []).map(a => a.name), site_id: o.site_id } }); } const cx = e.target.closest("[data-cancel]"); if (cx) openCancel(cx.dataset.cancel); const lp = e.target.closest("[data-lessplates]"); if (lp) openLessPlates(lp.dataset.lessplates, lp.dataset.key); const sh = e.target.closest("[data-share]"); if (sh) { const [a, c] = sh.dataset.share.split(","); sharePool(a, c); } if (e.target.closest("[data-keepcb]")) openAccount("Your cashback moves into your new wallet."); const h = e.target.closest("[data-gohome]"); if (h) setTab("home"); });
   setKTop();
   renderWhen(); refreshUser(); if (S.board.pools.length) renderPools(); await refreshBoard(); await refreshMine();
   setTab(S.tab);
@@ -3299,14 +3318,75 @@ function pickSwitchDish(o, t) {
 }
 // "Got my food" shows once the rider has marked the delivery Delivered (or the code was checked), until received or a problem is reported
 const canConfirm = o => !o.parent_id && !o.received_at && !o.problem && (o.status === "collected" || (o.status === "paid" && o.pool_status === "delivered"));
+// ---- Remove some plates of one dish (newest added first). Paid orders can lose part of their plates;
+// an added plate still waiting for its payment check can only go whole. The first order always keeps 1 plate.
+const dishKey = c => c.item_name + "|" + [addonText(c.addons), c.note].filter(Boolean).join(" · ");
+function plateSources(main, kids, key) {
+  const list = [...kids.filter(c => dishKey(c) === key && canCancel(c)).sort((a, b) => a.created_at < b.created_at ? 1 : -1)];
+  if (dishKey(main) === key && main.status === "paid" && canCancel(main) && main.qty > 1 && !main.special_request) list.push(main);
+  return list.map(c => ({ o: c, max: c === main ? c.qty - 1 : c.status === "paid" ? c.qty : c.qty, whole: c !== main && c.status !== "paid" }));
+}
+function removable(main, kids, key) { return plateSources(main, kids, key).reduce((t, x) => t + x.max, 0); }
+function planRemoval(src, n) {   // which orders to change: cancel whole added plates or reduce, newest first
+  const steps = []; let left = n;
+  for (const x of src) { if (!left) break;
+    if (x.whole) { if (left >= x.max) { steps.push({ o: x.o, cancel: true, n: x.max }); left -= x.max; } continue; }
+    const take = Math.min(left, x.max); if (!take) continue;
+    steps.push({ o: x.o, cancel: x.o.parent_id && take === x.o.qty, n: take }); left -= take; }
+  return { steps, left };
+}
+const platePrice = o => Number(o.unit_price) + Number(o.addons_total || 0) + (o.fee_per_meal ? Number(o.service_fee) : 0);
+function openLessPlates(mainId, key) {
+  const all = S.mine || [], main = all.find(o => o.id === mainId); if (!main) return;
+  const kids = all.filter(c => c.parent_id === main.id && c.status !== "cancelled"), src = plateSources(main, kids, key), max = src.reduce((t, x) => t + x.max, 0);
+  if (!max) return toast("These plates can't be changed now.");
+  const name = key.split("|")[0], have = [main, ...kids].filter(c => dishKey(c) === key).reduce((t, c) => t + Number(c.qty), 0);
+  let n = 1;
+  const refundOf = k => { const { steps } = planRemoval(src, k); return steps.reduce((t, st) => t + (st.cancel ? Math.max(0, orderTotal(st.o)) : platePrice(st.o) * st.n), 0); };
+  const viaMomo = k => planRemoval(src, k).steps.some(st => st.o.status === "paid" && Math.max(0, orderTotal(st.o) - Number(st.o.wallet_used || 0)) > 0);
+  const waitNote = src.some(x => x.whole) ? `<p class="note">An added plate whose payment is still being checked can only be removed whole.</p>` : "";
+  openSheet(`${sheetHead("Remove " + esc(name) + "?", "You have " + have + " on code " + esc(main.code) + ". Choose how many to take off.")}
+    <form id="lessForm" class="stack" novalidate>
+      <div class="row"><p class="group-title">Plates to remove</p><div class="qty"><button type="button" id="lpMinus" aria-label="One less">${GLYPH.minus}</button><output id="lpN">1</output><button type="button" id="lpPlus" aria-label="One more">${GLYPH.plus}</button></div></div>
+      <p class="small muted" id="lpKeep"></p>
+      ${waitNote}
+      <div id="lpRefund"></div>
+      <p class="err" id="lpErr"></p>
+      <div class="row" style="justify-content:flex-start;gap:8px"><button class="btn" id="lpGo" style="background:var(--danger);box-shadow:none">Remove</button><button class="ghost" type="button" data-close>Keep them</button></div>
+    </form>`);
+  const draw = () => {
+    const { left } = planRemoval(src, n), ok = !left, back = refundOf(n);
+    $("#lpN").textContent = n; $("#lpMinus").disabled = n <= 1; $("#lpPlus").disabled = n >= max;
+    $("#lpKeep").textContent = ok ? "You'll keep " + (have - n) + " × " + name + "." : "Pick a different number: a plate still being checked can only be removed whole.";
+    $("#lpGo").textContent = "Remove " + n + " plate" + (n === 1 ? "" : "s"); $("#lpGo").disabled = !ok;
+    const momo = viaMomo(n);
+    $("#lpRefund").innerHTML = !back ? "" : main.has_account && momo ? `<p class="group-title">Your refund (${money(back)})</p><div class="stack" style="gap:6px">
+        <label class="choice"><input type="radio" name="to" value="wallet" checked><span>To my ChopPool wallet, straight away</span></label>
+        <label class="choice"><input type="radio" name="to" value="momo"><span>Back to my mobile money (ChopPool sends it, usually the same day)</span></label></div>`
+      : main.has_account || !momo ? `<p class="note">${money(back)} goes back to your wallet straight away.</p>` : `<p class="note">ChopPool will refund ${money(back)} to your mobile money, usually the same day.</p>`;
+  };
+  $("#lpMinus").addEventListener("click", () => { if (n > 1) { n--; draw(); } });
+  $("#lpPlus").addEventListener("click", () => { if (n < max) { n++; draw(); } });
+  draw();
+  $("#lessForm").addEventListener("submit", async e => {
+    e.preventDefault(); const to = $("#lessForm [name=to]:checked")?.value || "wallet", { steps, left } = planRemoval(src, n); if (left) return;
+    $("#lpGo").disabled = true; let wallet = 0, momo = 0;
+    try {
+      for (const st of steps) { const r = st.cancel ? await api.cancelOrder(st.o.id, "Removed plates", to) : await api.reducePlates(st.o.id, st.n, "Removed plates", to);
+        wallet += Number(r.wallet_credit || 0); momo += Number(r.momo || 0); }
+      closeSheet(); await refreshMine(); if (S.user) refreshUser?.().catch?.(() => {});
+      toast("Removed " + n + " plate" + (n === 1 ? "" : "s") + "." + (wallet > 0 ? " " + money(wallet) + " is back in your wallet." : momo > 0 ? " ChopPool will refund " + money(momo) + " to your mobile money." : ""));
+    } catch (err) { $("#lpErr").textContent = cleanErr(err); $("#lpGo").disabled = false; await refreshMine(); }
+  });
+}
 function orderCard(o, all, next) {
   const step = progressOf(o), k = menuOf(o.kitchen_id), kids = all.filter(c => c.parent_id === o.id).sort((a, b) => a.created_at < b.created_at ? -1 : 1), liveKids = kids.filter(c => c.status !== "cancelled");
   const s4 = Math.min(5, step);
   const needsYou = canConfirm(o) || o.status === "quoted" || (o.status === "pending" && o.pay_issue);   // outline = something for you to do
   return `<article class="order-card${needsYou ? " next" : ""}" data-ocard="${esc(o.id)}"><div class="head"><span class="tile" style="background:${tint(menuIndex(o.kitchen_id))}">${art(dishKind(S.items.find(i => i.kitchen_id === o.kitchen_id && i.name === o.item_name) || o.item_name))}</span>
       <div><strong>${esc(k.public_name || "")}</strong>${groupDishes([o, ...liveKids]).map(g => { const key = c => c.item_name + "|" + [addonText(c.addons), c.note].filter(Boolean).join(" · ");
-        const last = liveKids.filter(c => key(c) === g.key && canCancel(c)).pop();   // the most recent plate you added of this dish
-        return `<p class="small odish" style="font-weight:600">${last ? `<button class="minus1" data-cancel="${esc(last.id)}" aria-label="Remove one added ${esc(g.name)}">${GLYPH.minus}</button>` : ""}<span>${g.qty} × ${esc(g.name)}${g.extra ? ` <span class="muted" style="font-weight:500">· ${esc(g.extra)}</span>` : ""}</span></p>`; }).join("")}${liveKids.length ? `<p class="small muted">Same code, packed together</p>` : ""}</div>
+        const can = removable(o, liveKids, g.key) > 0;   // plates of this dish you could take off now
+        return `<p class="small odish" style="font-weight:600">${can ? `<button class="minus1" data-lessplates="${esc(o.id)}" data-key="${esc(g.key)}" aria-label="Remove ${esc(g.name)} plates">${GLYPH.minus}</button>` : ""}<span>${g.qty} × ${esc(g.name)}${g.extra ? ` <span class="muted" style="font-weight:500">· ${esc(g.extra)}</span>` : ""}</span></p>`; }).join("")}${liveKids.length ? `<p class="small muted">Same code, packed together</p>` : ""}</div>
       <div class="c"><span>Code</span><b class="num">${esc(o.code)}</b></div></div>
       ${["quote_requested", "quoted"].includes(o.status) ? "" : `<div class="steps4" aria-label="Progress ${s4} of 5">${[1, 2, 3, 4, 5].map(n => `<i class="${n <= s4 ? "on" : ""}"></i>`).join("")}</div><div class="steps4l">${STEP_LABELS.map((l, n) => `<span class="${n < s4 ? "on" : ""}">${l}</span>`).join("")}</div>`}
       <p class="status-text">${esc(statusLine(o))}</p>
