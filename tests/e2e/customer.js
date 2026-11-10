@@ -20,7 +20,7 @@ const { chromium, results, setArea, ok, note, phone, txt, hideToast } = require(
   // ---------- 2. Browsing ----------
   setArea('2. Browsing');
   p = await phone(b, { time: T });
-  const hero = await txt(p, '#hero'); ok(/until orders close|orders close/.test(hero) && /ordered in your building/.test(hero), '2.01', 'home figures', hero);
+  const hero = await txt(p, '#hero'); ok(/\d+[hm] \d+[ms] until orders close/.test(hero) && !/ordered in your building/.test(hero), '2.01', 'home figures: countdown + join price', hero);
   const fits = await p.evaluate(() => [...document.querySelectorAll('.hero-stat b, .hero-stat span')].every(e => e.scrollWidth <= e.clientWidth + 1)); ok(fits, '2.01b', 'home figures fit their boxes');
   await p.click('.tabbar [data-tab=kitchens]'); await p.waitForTimeout(500);
   await p.fill('#vq', 'waakye'); await p.waitForTimeout(500); const sres = await p.locator('#kitchensList [data-vendor], #vsugg [data-vendor]').count(); ok(sres > 0, '2.02', 'search finds a dish', sres);
@@ -79,7 +79,7 @@ const { chromium, results, setArea, ok, note, phone, txt, hideToast } = require(
   const pm = JSON.parse(await p.evaluate(() => localStorage.getItem('cp_paymethods')) || '[]'); ok(pm.length === 1 && pm[0].network === 'MTN', '3.06b', 'pay-from number saved with network', JSON.stringify(pm));
   // Home after ordering
   await p.evaluate(() => setTab('home')); await p.waitForTimeout(600);
-  const h2 = await txt(p, '#hero'); ok(/your meals/.test(h2), '3.18', 'home shows my meals', h2);
+  const h2 = await txt(p, '#hero'); ok(/code [A-Z]-\d\d/.test(h2) && !/your meals/.test(h2), '3.18', 'home shows my order in the strip, no meals box', h2);
   ok(/Confirmed|Being cooked|payment/i.test(h2) || true, '3.18b', 'lunch strip');
   note('Lunch strip shows only after payment is confirmed; pending orders show nothing until then: ' + (/Confirmed for|Being cooked/.test(h2) ? 'strip visible' : 'no strip (payment pending)'));
   // join as customer B

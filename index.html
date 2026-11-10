@@ -113,7 +113,8 @@ p { margin: 0; }
 .hero::before { content: none; }
 .hero h1 { color: inherit; position: relative; z-index: 1; }
 .hero p { opacity: .92; position: relative; z-index: 1; }
-.hero-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; position: relative; z-index: 1; }
+.cdu { font-size: max(12px, .62em); font-weight: 700; margin-left: 1px; opacity: .8; letter-spacing: 0; }
+.hero-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; position: relative; z-index: 1; }
 .hero-stat { background: rgba(255,255,255,.16); border: 1px solid rgba(255,255,255,.22); border-radius: 16px; padding: 10px 12px; display: grid; align-content: start; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
 .hero-stat.hurry { box-shadow: 0 0 0 2px #fff; animation: hurry 1.6s ease-in-out infinite; }
 @keyframes hurry { 50% { box-shadow: 0 0 0 2px rgba(255,255,255,.35); } }
@@ -778,7 +779,6 @@ body:not(.on-home) #bell, body:not(.on-home) #theme { display: none; }
 /* Narrow phones (360 px and below): nothing squeezed or cut off */
 @media (max-width: 360px) {
   .hero-stats { grid-template-columns: 1fr 1fr; }
-  .hero-stats > :nth-child(3) { grid-column: 1 / -1; }
   .prow { gap: 10px; padding: 10px; }
   .prow .ptile { width: 46px; height: 46px; } .prow .ptile svg { width: 38px; height: 38px; }
   .prow .acts .iconround { display: none; }
@@ -2762,7 +2762,6 @@ function renderHero() {
       <p class="small">Order by ${fmtTime(s.cutoff)}${dl === "today" ? "" : " " + (dl === "tomorrow" ? "tomorrow" : fmtDate(S.date))} · lunch at ${fmtTime(s.delivery_time)}</p>
 </div>
     <div class="hero-stats"><div class="hero-stat" id="cdBox"><b class="num" id="countdown">--</b><span id="cdLabel">until orders close</span></div>
-      ${myMeals ? `<button class="hero-stat hlink" data-gomine aria-label="${myMeals} of your meals, ${meals} in your building. Open your orders"><b class="num">${myMeals}</b><span>your meal${myMeals === 1 ? "" : "s"}${meals > myMeals ? ` <span class="of">of ${meals} here</span>` : ""}</span></button>` : `<div class="hero-stat"><b class="num">${meals}</b><span>ordered in your building</span></div>`}
       ${S.noSite ? `<div class="hero-stat"><b class="num">${here.filter(p => p.status === "collecting" && p.meals > 0).length}</b><span>pools open</span></div>` : (dlv ? `<button class="hero-stat hlink" data-vendor="${esc(dlv.kid)}">${(v => `<b class="num${v.length > 7 ? " long" : ""}">${v}</b>`)(dlv.fee === 0 ? "Free" : Number.isInteger(dlv.fee) ? "GHS " + dlv.fee : money(dlv.fee))}<span>${esc(dlv.label)}</span></button>` : `<div class="hero-stat"><b class="num">${menusHere().length}</b><span>vendors cooking</span></div>`)}</div>`;
   // Top part (greeting + figures) is only rebuilt when it changed; the strip lives in its own box and is patched in place
   let host = $("#mlHost");
@@ -2794,17 +2793,14 @@ function tickCountdown() {
   const fresh = orderDate(S.settings);
   if (fresh !== S.date) { S.date = fresh; renderWhen(); refreshBoard(); }
   const ms = Math.max(0, at(S.date, S.settings.cutoff) - new Date());
-  // Before the order day's countdown starts (6:00 by default), say when orders close instead of a long countdown
-  if (new Date() < at(S.date, S.settings.countdown_start || "06:00")) {
-    const dl = dayLabel(S.date), day = dl === "tomorrow" ? "tomorrow" : new Date(S.date + "T00:00:00Z").toLocaleDateString("en-GB", { weekday: "short", timeZone: "UTC" }), when = (([h, m]) => `${(+h % 12) || 12}:${m}<small class="ampm">${+h < 12 ? "a.m." : "p.m."}</small>`)(fmtTime(S.settings.cutoff).split(":"));
-    if ($("#countdown").innerHTML !== when) { $("#countdown").innerHTML = when; fitStats(); $("#cdLabel").textContent = "orders close " + day; }
-    $("#cdBox")?.classList.remove("hurry");
-  } else {
-    const h = Math.floor(ms / 3.6e6), m = Math.floor(ms % 3.6e6 / 6e4), sec = Math.floor(ms % 6e4 / 1000);
-    $("#countdown").textContent = (h ? h + ":" + String(m).padStart(2, "0") : String(m)) + ":" + String(sec).padStart(2, "0");
-    if ($("#cdLabel").textContent !== "until orders close") $("#cdLabel").textContent = "until orders close"; $("#countdown").classList.remove("long", "tiny");
-    $("#cdBox")?.classList.toggle("hurry", ms > 0 && ms <= 30 * 6e4);
-  }
+  // Always a live countdown to the cut-off (days and hours when it's more than a day away)
+  const d = Math.floor(ms / 8.64e7), h = Math.floor(ms % 8.64e7 / 3.6e6), m = Math.floor(ms % 3.6e6 / 6e4), sec = Math.floor(ms % 6e4 / 1000);
+  // Units, not colons, so it reads as time left rather than the time of day: 2d 11h · 11h 47m · 24m 57s
+  const u = (n, x) => n + `<small class="cdu">${x}</small>`;
+  const cd = d ? u(d, "d") + " " + u(h, "h") : h ? u(h, "h") + " " + u(String(m).padStart(2, "0"), "m") : u(m, "m") + " " + u(String(sec).padStart(2, "0"), "s");
+  if ($("#countdown").innerHTML !== cd) $("#countdown").innerHTML = cd;
+  if ($("#cdLabel").textContent !== "until orders close") $("#cdLabel").textContent = "until orders close"; $("#countdown").classList.remove("tiny"); 
+  $("#cdBox")?.classList.toggle("hurry", ms > 0 && ms <= 30 * 6e4);
   if ($("#countdownMini")) $("#countdownMini").textContent = $("#countdown").textContent;
   if ($("#ghNow")) $("#ghNow").textContent = ghanaNow();
 }
