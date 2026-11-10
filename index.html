@@ -599,7 +599,7 @@ button.dtile:not([disabled]):hover { outline: 2px solid var(--accent-soft); }
 .ptr .ring { fill: none; stroke: var(--accent); stroke-width: 2.6; stroke-linecap: round; transform: rotate(-90deg); transform-origin: 50% 50%; }
 .ptr .ring-bg { fill: none; stroke: var(--line); stroke-width: 2.6; }
 .ptr .ptr-logo { position: relative; display: grid; place-items: center; transition: transform .2s; }
-.ptr .ptr-logo svg { position: static; width: 22px; height: 22px; }
+.ptr .ptr-logo svg { position: static; width: 20px; height: 20px; }
 .ptr.ready .ptr-logo { transform: scale(1.15); }
 .ptr.loading svg.track { animation: spin .9s linear infinite; }
 .ptr-pull { will-change: transform; }
@@ -3354,7 +3354,7 @@ function initPullRefresh() {
   const R = 16, C = 2 * Math.PI * R;
   const ind = document.createElement("div"); ind.id = "ptr"; ind.className = "ptr"; ind.setAttribute("aria-hidden", "true");
   ind.innerHTML = `<svg class="track" viewBox="0 0 40 40"><circle class="ring-bg" cx="20" cy="20" r="${R}"/><circle class="ring" cx="20" cy="20" r="${R}" stroke-dasharray="${C}" stroke-dashoffset="${C}"/></svg>
-    <span class="ptr-logo">${LOGO(22)}</span>`;
+    <span class="ptr-logo">${PACKS(22)}</span>`;
   document.body.appendChild(ind);
   const ring = ind.querySelector(".ring"), track = ind.querySelector(".track"), MARK = 70, MAXP = 120; let top0 = 0;
   const reduce = () => window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -4508,6 +4508,8 @@ const textToAddons = t => String(t || "").split(",").map(x => x.trim()).filter(B
 const sendLink = (num, msg) => num ? `<a class="wa quiet" style="padding:8px 12px" href="${wa(num)}?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener">${ICON.wa} Send link</a>` : "";
 const TAGLINE = "Order together, pay less.";
 // ChopPool mark: three takeaway packs travelling together, yours in amber
+// Just the stacked lunch packs from the logo, no tile: orange and amber packs, lids cut in the page colour
+const PACKS = n => `<svg width="${n}" height="${n}" viewBox="16 22 66 60" aria-hidden="true" style="flex:none">${[[20, 61, "var(--accent)"], [25, 44, "#F5B04A"], [21, 27, "var(--accent)"]].map(([x, y, c]) => `<rect x="${x}" y="${y}" width="56" height="15" rx="4" fill="${c}"/><path d="M${x} ${y + 7}h56" stroke="var(--surface)" stroke-width="2.5"/><rect x="${x + 24}" y="${y + 5}" width="8" height="5" rx="1.5" fill="var(--surface)"/>`).join("")}</svg>`;
 const LOGO = (n, bg = "#D9480F") => `<svg width="${n}" height="${n}" viewBox="0 0 100 100" role="img" aria-label="ChopPool" style="flex:none"><rect width="100" height="100" rx="24" fill="${bg}"/>${[[20, 61, "#FFF7EE"], [25, 44, "#F5B04A"], [21, 27, "#FFF7EE"]].map(([x, y, c]) => `<rect x="${x}" y="${y}" width="56" height="15" rx="4" fill="${c}"/><path d="M${x} ${y + 7}h56" stroke="${bg}" stroke-width="2.5"/><rect x="${x + 24}" y="${y + 5}" width="8" height="5" rx="1.5" fill="${bg}"/>`).join("")}</svg>`;
 const pill = (txt, cls) => `<span class="chip ${cls || ""}">${esc(txt)}</span>`;
 let adminMaps = [];

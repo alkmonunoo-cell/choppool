@@ -1,5 +1,5 @@
 // ChopPool service worker: opens fast and offline (app shell), always fetches fresh data, shows push alerts.
-const CACHE = "choppool-v202611101533";
+const CACHE = "choppool-v202611101542";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icons/icon-192-v2.png", "./icons/icon-512-v2.png", "./icons/apple-touch-icon-v2.png",
   "./fonts/plus-jakarta-sans.woff", "./fonts/bricolage-grotesque.woff"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });
