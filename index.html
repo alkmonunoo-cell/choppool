@@ -937,6 +937,10 @@ body:not(.on-home) #bell, body:not(.on-home) #theme { display: none; }
 .oseg button { flex: 1; padding: 9px; border-radius: 11px; border: none; background: none; font: 800 13.5px var(--font-body); color: var(--muted); }
 .oseg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 2px 6px -2px rgba(30,15,5,.3); }
 .ohead { position: -webkit-sticky; position: sticky; top: var(--kh, 80px); z-index: 6; margin: 0 -16px -6px; padding: 8px 18px 6px; background: var(--bg); font: 800 13.5px var(--font-body); color: var(--muted); }
+.odish { display: flex; align-items: center; gap: 8px; margin: 2px 0; }
+.minus1 { width: 26px; height: 26px; flex: none; border-radius: 50%; display: grid; place-items: center; padding: 0; border: 1.5px solid var(--line); background: var(--surface); color: var(--danger); cursor: pointer; }
+.minus1 .gl { width: 12px; height: 12px; stroke-width: 2.6; }
+.minus1:active { transform: scale(.92); }
 .order-card.next { box-shadow: 0 0 0 1.5px var(--accent), var(--shadow); }
 .steps4 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
 .steps4 i { height: 5px; border-radius: 9px; background: var(--surface-2); display: block; }
@@ -3298,8 +3302,11 @@ const canConfirm = o => !o.parent_id && !o.received_at && !o.problem && (o.statu
 function orderCard(o, all, next) {
   const step = progressOf(o), k = menuOf(o.kitchen_id), kids = all.filter(c => c.parent_id === o.id).sort((a, b) => a.created_at < b.created_at ? -1 : 1), liveKids = kids.filter(c => c.status !== "cancelled");
   const s4 = Math.min(5, step);
-  return `<article class="order-card${next ? " next" : ""}" data-ocard="${esc(o.id)}"><div class="head"><span class="tile" style="background:${tint(menuIndex(o.kitchen_id))}">${art(dishKind(S.items.find(i => i.kitchen_id === o.kitchen_id && i.name === o.item_name) || o.item_name))}</span>
-      <div><strong>${esc(k.public_name || "")}</strong>${groupDishes([o, ...liveKids]).map(g => `<p class="small" style="font-weight:600">${g.qty} × ${esc(g.name)}${g.extra ? ` <span class="muted" style="font-weight:500">· ${esc(g.extra)}</span>` : ""}</p>`).join("")}${liveKids.length ? `<p class="small muted">Same code, packed together</p>` : ""}</div>
+  const needsYou = canConfirm(o) || o.status === "quoted" || (o.status === "pending" && o.pay_issue);   // outline = something for you to do
+  return `<article class="order-card${needsYou ? " next" : ""}" data-ocard="${esc(o.id)}"><div class="head"><span class="tile" style="background:${tint(menuIndex(o.kitchen_id))}">${art(dishKind(S.items.find(i => i.kitchen_id === o.kitchen_id && i.name === o.item_name) || o.item_name))}</span>
+      <div><strong>${esc(k.public_name || "")}</strong>${groupDishes([o, ...liveKids]).map(g => { const key = c => c.item_name + "|" + [addonText(c.addons), c.note].filter(Boolean).join(" · ");
+        const last = liveKids.filter(c => key(c) === g.key && canCancel(c)).pop();   // the most recent plate you added of this dish
+        return `<p class="small odish" style="font-weight:600">${last ? `<button class="minus1" data-cancel="${esc(last.id)}" aria-label="Remove one added ${esc(g.name)}">${GLYPH.minus}</button>` : ""}<span>${g.qty} × ${esc(g.name)}${g.extra ? ` <span class="muted" style="font-weight:500">· ${esc(g.extra)}</span>` : ""}</span></p>`; }).join("")}${liveKids.length ? `<p class="small muted">Same code, packed together</p>` : ""}</div>
       <div class="c"><span>Code</span><b class="num">${esc(o.code)}</b></div></div>
       ${["quote_requested", "quoted"].includes(o.status) ? "" : `<div class="steps4" aria-label="Progress ${s4} of 5">${[1, 2, 3, 4, 5].map(n => `<i class="${n <= s4 ? "on" : ""}"></i>`).join("")}</div><div class="steps4l">${STEP_LABELS.map((l, n) => `<span class="${n < s4 ? "on" : ""}">${l}</span>`).join("")}</div>`}
       <p class="status-text">${esc(statusLine(o))}</p>
@@ -3312,7 +3319,7 @@ function orderCard(o, all, next) {
       ${liveKids.filter(c => c.status === "pending" && !isTrayKid(c)).length ? `<p class="small muted">Added plate: payment being checked.</p>` : ""}
       ${savingLine(o)}
       ${canAddPlate(o) || shareablePool(o) ? `<div class="minebtns">${canAddPlate(o) ? `<button class="btn wide" data-addplate="${esc(o.id)}">${SV('<path d="M12 5v14M5 12h14"/>', 18)} Add a plate</button>` : ""}${shareablePool(o) ? `<button class="ghost sharebtn" data-share="${esc(o.site_id)},${esc(o.kitchen_id)}" aria-label="Share this pool">${SHARE}</button>` : ""}</div>` : ""}
-      ${canCancel(o) || liveKids.some(canCancel) ? `<div class="row" style="justify-content:flex-start;gap:14px;flex-wrap:wrap">${canCancel(o) ? `<button class="linkbtn" data-cancel="${esc(o.id)}" style="color:var(--danger)">Cancel order</button>` : ""}${liveKids.filter(canCancel).map(c => `<button class="linkbtn" data-cancel="${esc(c.id)}" style="color:var(--danger)">Remove ${esc(c.item_name.split(" with ")[0])}</button>`).join("")}</div>` : ""}</article>`;
+      ${canCancel(o) ? `<div class="row" style="justify-content:flex-start"><button class="linkbtn" data-cancel="${esc(o.id)}" style="color:var(--danger)">${liveKids.length ? "Cancel whole order" : "Cancel order"}</button></div>` : ""}</article>`;
 }
 function pastRow(o) {
   const k = menuOf(o.kitchen_id), cancelled = o.status === "cancelled";
@@ -3889,8 +3896,9 @@ function openCancel(id) {
   const o = (S.mine || []).find(x => x.id === id); if (!o) return;
   const paidMomo = o.status === "paid" && Number(o.amount_due) > 0, special = ["quote_requested", "quoted"].includes(o.status);
   const R = ["Changed my plans", "Ordered by mistake", "Ordered the wrong meal", "Other"];
-  openSheet(`${sheetHead("Cancel order " + esc(o.code) + "?", "You can cancel until " + fmtTime(S.settings.cutoff) + ". After that the kitchen is cooking.")}
-    <form id="cancelForm" class="stack" novalidate><p class="group-title">Why are you cancelling?</p>
+  const plate = !!o.parent_id, kidsLive = (S.mine || []).filter(c => c.parent_id === o.id && c.status !== "cancelled").length;
+  openSheet(`${sheetHead(plate ? "Remove " + o.qty + " × " + esc(o.item_name) + "?" : "Cancel order " + esc(o.code) + "?", plate ? "Takes this added plate off code " + esc(o.code) + ". The rest of your order stays." : kidsLive ? "Cancels everything on code " + esc(o.code) + ", including the plates you added." : "You can cancel until " + fmtTime(S.settings.cutoff) + ". After that the kitchen is cooking.")}
+    <form id="cancelForm" class="stack" novalidate><p class="group-title">${plate ? "Why are you removing it?" : "Why are you cancelling?"}</p>
       <div class="stack" style="gap:6px">${R.map((r, n) => `<label class="choice"><input type="radio" name="why" value="${esc(r)}"${n === 0 ? " checked" : ""}><span>${esc(r)}</span></label>`).join("")}</div>
       <div id="whyOtherBox" class="hidden"><textarea id="whyOther" aria-label="Tell us why" rows="2" maxlength="200" placeholder="Tell us why (helps us improve)"></textarea></div>
       ${special ? `<p class="note">You haven't paid for this request, so nothing is charged.</p>`
@@ -3901,7 +3909,7 @@ function openCancel(id) {
         : o.status === "pending" && Number(o.amount_due) > 0 ? `<p class="note">Your mobile money payment is still being checked. Once it's confirmed, ChopPool refunds it to your mobile money.</p>`
         : `<p class="note">Your wallet payment goes straight back to your wallet.</p>`}
       <p class="err" id="cancelErr"></p>
-      <div class="row" style="justify-content:flex-start;gap:8px"><button class="btn" style="background:var(--danger);box-shadow:none">Cancel order</button><button class="ghost" type="button" data-close>Keep it</button></div></form>`);
+      <div class="row" style="justify-content:flex-start;gap:8px"><button class="btn" style="background:var(--danger);box-shadow:none">${plate ? "Remove plate" : "Cancel order"}</button><button class="ghost" type="button" data-close>Keep it</button></div></form>`);
   $("#cancelForm").addEventListener("change", e => { if (e.target.name === "why") { const o2 = e.target.value === "Other"; $("#whyOtherBox").classList.toggle("hidden", !o2); if (o2) $("#whyOther").focus(); } });
   $("#cancelForm").addEventListener("submit", async e => {
     e.preventDefault(); const f = e.target, to = f.querySelector("[name=to]:checked")?.value || "wallet";
