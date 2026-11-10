@@ -83,6 +83,14 @@ async function orderEvents(orderId: string) {
     await send(await kitchenSubs(o.kitchen_id), "Custom order to price", o.qty + " × " + o.item_name + ": " + o.special_request, APP + "/#kitchen-" + k.token, "special-" + o.id);
   if (o.status === "quoted" && await once("quoted:" + o.id + ":" + o.quote_price))
     await send(await customerSubs([o]), "Your request is priced", k.public_name + " priced it at " + money(o.quote_price) + " a meal. Pay within " + quoteMins(o) + " minutes to keep it.", APP + "/#order", "order-" + o.id, "priced");
+  // The team confirmed the mobile money payment (orders paid only from the wallet are confirmed at once and need no alert)
+  if (o.status === "paid" && o.momo_ref && o.momo_ref !== "BASKET" && await once("paidok:" + o.id)) {
+    const { data: pl } = await db.from("pools").select("status,order_date").eq("id", o.pool_id).single();
+    const day = pl && pl.order_date > new Date().toISOString().slice(0, 10) ? "tomorrow" : "today";
+    await send(await customerSubs([o]), "Payment confirmed · code " + o.code,
+      pl && pl.status === "waiting" ? "You're in. We'll tell you as soon as " + k.public_name + " confirms they're cooking." : "You're in for lunch " + day + " from " + k.public_name + ".",
+      APP + "/#order", "order-" + o.id, "confirm");
+  }
   // Payment we couldn't find, or short: the customer can fix it from Orders before cut-off (always sent; not a type you can switch off)
   if (o.status === "pending" && o.pay_issue && await once("payissue:" + o.id + ":" + o.pay_issue + ":" + (o.momo_ref || "")))
     await send(await customerSubs([o]), o.pay_issue === "short" ? "Your payment was short" : "We couldn't find your payment",

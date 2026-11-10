@@ -47,7 +47,7 @@ const overflow = p => p.evaluate(() => { const W = document.documentElement.clie
   // rider sign-up page then approve
   await go(p, '#rider-signup', 1300); v = await view(p); note('Rider sign-up page: ' + v.slice(0, 200));
   const ins = await p.$$eval('#view input, #view select', x => x.map(i => i.id || i.name)); note('Rider sign-up fields: ' + ins.join(', '));
-  if (ins.length) { for (const [sel, val] of [['#rsName', 'Yaw Mensah'], ['#rsPhone', '0244001122']]) await p.fill(sel, val).catch(() => {});
+  if (ins.length) { for (const [sel, val] of [['#rsName', 'Yaw Mensah'], ['#rsPhone', '0244001122'], ['#rsCard', 'GHA-123456789-0'], ['#rsLic', 'DL123456'], ['#rsExp', '2028-06-30']]) await p.fill(sel, val).catch(() => {});
     await p.locator('#view .btn').last().click(); await p.waitForTimeout(900); note('After rider sign-up: ' + (await view(p)).slice(0, 200)); }
   await go(p, '#admin', 1800); await tab(p, 'riders', 'apply'); v = await view(p);
   const pend = p.locator('[data-act="rider-approve"]'); ok(await pend.count() > 0, '19.07', 'rider application waiting for approval', v.slice(0, 200));

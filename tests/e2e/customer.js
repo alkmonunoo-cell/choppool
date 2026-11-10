@@ -93,7 +93,11 @@ const { chromium, results, setArea, ok, note, phone, txt, hideToast } = require(
   // add to my order (same code)
   await p.click('.tabbar [data-tab=kitchens]'); await p.waitForTimeout(400); await p.locator('#kitchensList [data-vendor]').first().click(); await p.waitForTimeout(700);
   const ban = await txt(p, '#vpBanner'); ok(/You're in this pool/.test(ban), '3.12a', 'banner says you are in the pool', ban);
-  await p.locator('#vpage [data-dish]:not([disabled])').nth(1).click(); await p.waitForTimeout(500);
+  await p.locator('#vpage [data-dish]:not([disabled])').nth(1).click(); await p.waitForTimeout(400); await p.click('#dAdd'); await p.waitForTimeout(300);
+  await p.locator('#vpage [data-dish]:not([disabled])').nth(0).click(); await p.waitForTimeout(400); await p.click('#dAdd'); await p.waitForTimeout(300);
+  ok(/2 dishes/.test(await txt(p, '#vfoot')), '3.11c', 'two dishes in the tray', await txt(p, '#vfoot'));
+  await p.locator('#vfoot [data-vcheckout]').click(); await p.waitForTimeout(500);
+  ok(/Add to my order/.test(await txt(p, '#submitBtn')), '3.11d', 'one payment for all added dishes', await txt(p, '#submitBtn'));
   const addSheet = await txt(p, '#sheet'); ok(/Add to my order/.test(addSheet) && /packed together/.test(addSheet), '3.12', 'add to my order sheet');
   ok(/Already paid/.test(addSheet), '3.12b', 'delivery shows already paid');
   await p.fill('#fRef', '59876543210').catch(() => {}); await p.click('#submitBtn'); await p.waitForTimeout(1000);

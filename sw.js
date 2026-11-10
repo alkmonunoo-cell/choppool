@@ -1,9 +1,9 @@
 // ChopPool service worker: opens fast and offline (app shell), always fetches fresh data, shows push alerts.
-const CACHE = "choppool-v202611102050";
+const CACHE = "choppool-v202611102215";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icons/icon-192-v2.png", "./icons/icon-512-v2.png", "./icons/apple-touch-icon-v2.png",
   "./fonts/plus-jakarta-sans.woff", "./fonts/bricolage-grotesque.woff"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });
-self.addEventListener("activate", e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
+self.addEventListener("activate", e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE && k !== "cp-inbox").map(k => caches.delete(k)))).then(() => self.clients.claim())); });
 // Files that never change once published (fonts, map library, the versioned Supabase library): cache first
 const immutable = u => (u.origin === location.origin && /\/(fonts|vendor)\//.test(u.pathname)) || (u.hostname === "cdn.jsdelivr.net" && /@\d+\.\d+\.\d+/.test(u.pathname));
 self.addEventListener("fetch", e => {
@@ -21,7 +21,12 @@ self.addEventListener("fetch", e => {
 });
 self.addEventListener("push", e => {
   let d = {}; try { d = e.data ? e.data.json() : {}; } catch (x) { d = { title: "ChopPool", body: e.data && e.data.text() }; }
-  e.waitUntil(self.registration.showNotification(d.title || "ChopPool", { body: d.body || "", icon: "icons/icon-192-v2.png", badge: "icons/icon-192-v2.png", tag: d.tag, data: { url: d.url || "./" } }));
+  // Keep a copy for the bell inside the app (last 40 alerts), and tell any open app window straight away
+  const item = { id: "p" + Date.now() + Math.random().toString(36).slice(2, 6), title: d.title || "ChopPool", body: d.body || "", url: d.url || "./", at: new Date().toISOString() };
+  const keep = caches.open("cp-inbox").then(c => c.match("/__inbox").then(r => r ? r.json() : []).catch(() => [])
+    .then(list => c.put("/__inbox", new Response(JSON.stringify([item, ...list].slice(0, 40)), { headers: { "content-type": "application/json" } }))))
+    .then(() => self.clients.matchAll({ type: "window", includeUncontrolled: true })).then(ws => ws.forEach(w => w.postMessage({ type: "cp-inbox", item }))).catch(() => {});
+  e.waitUntil(Promise.all([keep, self.registration.showNotification(d.title || "ChopPool", { body: d.body || "", icon: "icons/icon-192-v2.png", badge: "icons/icon-192-v2.png", tag: d.tag, data: { url: d.url || "./" } })]));
 });
 self.addEventListener("notificationclick", e => {
   e.notification.close();
