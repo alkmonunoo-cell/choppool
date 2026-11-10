@@ -11,7 +11,7 @@ const { chromium, results, setArea, ok, note, phone, txt } = require('./h');
     await p.waitForTimeout(900);
     const card = p.locator(`[data-ocard="${ids.a}"]`); const ct = await card.innerText();
     ok(/6 × /.test(ct), 'O1', 'grouped: 6 plates on one line', ct.split('\n').slice(0, 4).join(' | '));
-    ok(!/Remove /.test(ct) && /Cancel whole order/.test(ct), 'O2', 'no repeated "Remove" links; one "Cancel whole order"');
+    ok(!/Remove /.test(ct) && /Cancel order/.test(ct), 'O2', 'no repeated "Remove" links; one "Cancel order"');
     ok(await card.locator('.minus1').count() === 1, 'O3', 'one "−" on the dish line');
     ok(await p.locator('.order-card.next').count() === 0, 'O4', 'no outline when nothing needs you');
     await card.screenshot({ path: `/tmp/e2e/shots/ocard_${scheme}.png` });

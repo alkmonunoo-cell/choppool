@@ -3399,7 +3399,7 @@ function orderCard(o, all, next) {
       ${liveKids.filter(c => c.status === "pending" && !isTrayKid(c)).length ? `<p class="small muted">Added plate: payment being checked.</p>` : ""}
       ${savingLine(o)}
       ${canAddPlate(o) || shareablePool(o) ? `<div class="minebtns">${canAddPlate(o) ? `<button class="btn wide" data-addplate="${esc(o.id)}">${SV('<path d="M12 5v14M5 12h14"/>', 18)} Add a plate</button>` : ""}${shareablePool(o) ? `<button class="ghost sharebtn" data-share="${esc(o.site_id)},${esc(o.kitchen_id)}" aria-label="Share this pool">${SHARE}</button>` : ""}</div>` : ""}
-      ${canCancel(o) ? `<div class="row" style="justify-content:flex-start"><button class="linkbtn" data-cancel="${esc(o.id)}" style="color:var(--danger)">${liveKids.length ? "Cancel whole order" : "Cancel order"}</button></div>` : ""}</article>`;
+      ${canCancel(o) ? `<div class="row" style="justify-content:flex-start"><button class="linkbtn" data-cancel="${esc(o.id)}" style="color:var(--danger)">Cancel order</button></div>` : ""}</article>`;
 }
 function pastRow(o) {
   const k = menuOf(o.kitchen_id), cancelled = o.status === "cancelled";
