@@ -42,7 +42,19 @@ const { chromium, results, setArea, ok, note, phone, txt } = require('./h');
       for (const it of ['i1', 'i2']) add(await api.placeOrder({ site: 's1', item: it, qty: 1, name: 'A', phone: '0241112223', ref: '5' + Math.floor(Math.random() * 1e10) })); await refreshMine(); });
     await p.waitForTimeout(700); const bx = await p.locator('.mlswipe').boundingBox();
     up = await drag(bx.x + bx.width / 2, bx.y + bx.height / 2, 200); const s7 = await state(); await up(); await p.waitForTimeout(500);
-    ok(!s7.ready, 'P10', 'dragging on the lunch strip does not pull');
+    ok(s7.ready, 'P10', 'pulling down from on the lunch strip also pulls', JSON.stringify(s7));
+    await p.waitForTimeout(1500);
+    // sideways on the strip: no pull
+    const hs = async () => { await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: bx.x + bx.width * .8, y: bx.y + bx.height / 2 }] });
+      for (let i = 1; i <= 10; i++) { await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: bx.x + bx.width * .8 - 180 * i / 10, y: bx.y + bx.height / 2 + 12 * i / 10 }] }); await new Promise(r => setTimeout(r, 16)); } };
+    await hs(); const s8 = await state(); await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); await p.waitForTimeout(600);
+    ok(!s8.ready && !s8.tf, 'P11', 'swiping sideways on the strip does not pull');
+    // quick pulls one after another: every one moves the page (the old spring-back timer used to freeze the next pull)
+    let moved = 0; for (let k = 0; k < 6; k++) { const u = await drag(195, 470, k % 2 ? 60 : 40, 6); const st = await state(); if (/translateY\(\d/.test(st.tf) && parseFloat(st.tf.match(/[\d.]+/)[0]) > 15) moved++; await u(); await p.waitForTimeout(120); }
+    await p.waitForTimeout(600);
+    ok(moved === 6, 'P12', 'six quick pulls in a row all move the page', moved + '/6');
+    const r9 = (await state()).r; const u9 = await drag(195, 470, 260); await u9(); await p.waitForTimeout(1500);
+    ok((await state()).r > r9, 'P13', 'and a full pull right after still refreshes');
     ok(p.errs.length === 0, 'Px', 'no page errors', p.errs.join(' | ')); await p.context().close();
   }
   setArea('Orders badge');

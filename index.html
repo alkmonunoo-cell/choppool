@@ -3358,10 +3358,11 @@ function initPullRefresh() {
   document.body.appendChild(ind);
   const ring = ind.querySelector(".ring"), track = ind.querySelector(".track"), MARK = 70, MAXP = 120; let top0 = 0;
   const reduce = () => window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
-  let y0 = null, x0 = 0, pull = 0, pane = null, armed = false, busy = false, locked = null;
+  let y0 = null, x0 = 0, pull = 0, pane = null, armed = false, busy = false, locked = null, tidyT = 0;
+  const atTop = () => Math.max(0, window.scrollY || document.documentElement.scrollTop || 0);   // iPhone can sit a fraction of a pixel off the top
   const paneFor = () => S.tab === "home" ? $("#tabHome") : S.tab === "orders" ? $("#tabOrders") : null;
   const blocked = t => $("#sheetBg")?.classList.contains("open") || document.querySelector(".vpage.open") || document.querySelector(".intro") ||
-    (t && t.closest && t.closest(".mlswipe, .sheet, .vpage, input, textarea, select, .leaflet-container, .hscroll, .fchips"));
+    (t && t.closest && t.closest(".sheet, .vpage, input, textarea, select, .leaflet-container"));   // sideways strips are fine: the first move decides (down = pull, sideways = their swipe)
   const draw = d => {
     const p = Math.min(1, d / MARK);
     ring.style.strokeDashoffset = String(C * (1 - p));
@@ -3374,12 +3375,14 @@ function initPullRefresh() {
   const reset = () => {
     ind.classList.add("ptr-out"); ind.classList.remove("ready", "loading");
     ind.style.opacity = "0"; ind.style.transform = `translateY(${top0 - 10}px) scale(.6)`; track.style.transform = "";
-    if (pane) { pane.classList.add("ptr-back"); pane.style.transform = ""; const p0 = pane; setTimeout(() => { p0.classList.remove("ptr-back", "ptr-pull"); p0.style.transform = ""; }, 420); }
-    setTimeout(() => ind.classList.remove("ptr-out"), 420);
+    // tidy-up after the spring-back; cancelled if a new pull starts first (else it would freeze that pull mid-way)
+    if (pane) { pane.classList.add("ptr-back"); pane.style.transform = ""; const p0 = pane; clearTimeout(tidyT); tidyT = setTimeout(() => { p0.classList.remove("ptr-back", "ptr-pull"); p0.style.transform = ""; ind.classList.remove("ptr-out"); }, 420); }
+    else { clearTimeout(tidyT); tidyT = setTimeout(() => ind.classList.remove("ptr-out"), 420); }
     pull = 0; armed = false; pane = null;
   };
   document.addEventListener("touchstart", e => {
-    if (busy || e.touches.length !== 1 || !["home", "orders"].includes(S.tab) || (window.scrollY || document.documentElement.scrollTop) > 0 || blocked(e.target)) { y0 = null; return; }
+    if (busy || e.touches.length !== 1 || !["home", "orders"].includes(S.tab) || atTop() > 1 || blocked(e.target)) { y0 = null; return; }
+    clearTimeout(tidyT); ind.classList.remove("ptr-out");
     y0 = e.touches[0].clientY; x0 = e.touches[0].clientX; locked = null; pane = paneFor(); top0 = pane ? Math.max(0, pane.getBoundingClientRect().top) : 0;
   }, { passive: true });
   document.addEventListener("touchmove", e => {
@@ -3387,9 +3390,9 @@ function initPullRefresh() {
     const dy = e.touches[0].clientY - y0, dx = e.touches[0].clientX - x0;
     if (locked == null && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) locked = Math.abs(dy) > Math.abs(dx) && dy > 0 ? "pull" : "no";
     if (locked !== "pull") return;
-    if ((window.scrollY || document.documentElement.scrollTop) > 0) { y0 = null; reset(); return; }
-    e.preventDefault();   // our stretch replaces the browser's bounce here
-    if (pane && !pane.classList.contains("ptr-pull")) { pane.classList.remove("ptr-back"); pane.classList.add("ptr-pull"); }
+    if (atTop() > 1) { y0 = null; reset(); return; }
+    if (e.cancelable) e.preventDefault();   // our stretch replaces the browser's bounce here
+    if (pane) { pane.classList.remove("ptr-back"); pane.classList.add("ptr-pull"); }
     pull = MAXP * (1 - Math.exp(-dy / 160));   // more pull, less movement: a rubber-band feel
     draw(pull);
   }, { passive: false });
@@ -3401,7 +3404,7 @@ function initPullRefresh() {
     if (pane && !reduce()) { pane.classList.add("ptr-back"); pane.style.transform = "translateY(56px)"; }
     ind.style.transform = `translateY(${top0 + 8}px) scale(1)`; track.style.transform = ""; ring.style.strokeDashoffset = String(C * .7);
     const t0 = Date.now();
-    try { await Promise.all([refreshMine(), refreshBoard()]); } catch (e) {}
+    try { await Promise.race([Promise.all([refreshMine(), refreshBoard()]), new Promise(r => setTimeout(r, 8000))]); } catch (e) {}   // never stuck: a slow network gives up after 8 s
     await new Promise(r => setTimeout(r, Math.max(0, 650 - (Date.now() - t0))));
     reset(); busy = false; toast("Updated");
   };
