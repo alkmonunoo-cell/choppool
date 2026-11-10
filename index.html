@@ -592,6 +592,20 @@ button.dtile:not([disabled]):hover { outline: 2px solid var(--accent-soft); }
 .poolhead { display: grid; gap: 2px; }
 #aRefresh.spin svg { animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+/* Pull to refresh (Home and Orders) */
+.ptr { position: fixed; left: 50%; top: 0; z-index: 25; width: 40px; height: 40px; margin-left: -20px; border-radius: 50%;
+  background: var(--surface); box-shadow: var(--shadow); display: grid; place-items: center; opacity: 0; transform: translateY(-48px) scale(.6); pointer-events: none; color: var(--accent); }
+.ptr svg { width: 40px; height: 40px; position: absolute; inset: 0; }
+.ptr .ring { fill: none; stroke: var(--accent); stroke-width: 2.6; stroke-linecap: round; transform: rotate(-90deg); transform-origin: 50% 50%; }
+.ptr .ring-bg { fill: none; stroke: var(--line); stroke-width: 2.6; }
+.ptr .bowl { width: 20px; height: 20px; position: relative; inset: auto; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: transform .2s; }
+.ptr.ready .bowl { transform: scale(1.12); }
+.ptr.ready .bowl path.fill { fill: currentColor; fill-opacity: .25; }
+.ptr.loading svg.track { animation: spin .9s linear infinite; }
+.ptr-pull { will-change: transform; }
+.ptr-back { transition: transform .38s cubic-bezier(.2,.9,.25,1.15); }
+.ptr-out { transition: opacity .25s, transform .38s cubic-bezier(.2,.9,.25,1.15); }
+
 .intro { position: fixed; inset: 0; z-index: 70; background: rgba(10,6,4,.55); display: flex; align-items: flex-end; justify-content: center; opacity: 0; transition: opacity .3s ease; }
 .intro.on { opacity: 1; }
 .intro-card { position: relative; width: min(560px, 100%); min-width: 0; overflow: hidden; background: var(--surface); border-radius: 28px 28px 0 0; padding: 18px 0 calc(18px + env(safe-area-inset-bottom)); transform: translateY(40px); transition: transform .5s cubic-bezier(.22,1,.36,1); }
@@ -2315,6 +2329,7 @@ async function viewOrder() {
       <button data-tab="wallet">${ICON.user.replace('width="20" height="20"', 'width="22" height="22"')}<span>Account</span></button>
     </nav>`;
   document.querySelectorAll(".tabbar button").forEach(b => b.addEventListener("click", () => { if (b.dataset.tab === S.tab) return resetTab(b.dataset.tab); setTab(b.dataset.tab); }));
+  initPullRefresh();
   $("#placeBtn").addEventListener("click", openSitePicker);
   $("#bell").addEventListener("click", openUpdates);
   $("#theme").addEventListener("click", toggleTheme);
@@ -3330,13 +3345,77 @@ function openFixPayment(o, mode) {
   });
 }
 function dateHead(d) { const t = today(), tm = new Date(Date.parse(t + "T00:00:00Z") + 864e5).toISOString().slice(0, 10); return (d === t ? "Today · " : d === tm ? "Tomorrow · " : "") + fmtDate(d); }
-function renderOrders() {
-  const el = $("#tabOrders"); if (!el) return;
-  const all = S.mine || [], ids = new Set(all.map(o => o.id)), rows = all.filter(o => !o.parent_id || !ids.has(o.parent_id));
+// ---- Pull to refresh on Home and Orders: stretch with resistance, let go past the mark to refresh ----
+function initPullRefresh() {
+  if (document.getElementById("ptr")) return;
+  const R = 16, C = 2 * Math.PI * R;
+  const ind = document.createElement("div"); ind.id = "ptr"; ind.className = "ptr"; ind.setAttribute("aria-hidden", "true");
+  ind.innerHTML = `<svg class="track" viewBox="0 0 40 40"><circle class="ring-bg" cx="20" cy="20" r="${R}"/><circle class="ring" cx="20" cy="20" r="${R}" stroke-dasharray="${C}" stroke-dashoffset="${C}"/></svg>
+    <svg class="bowl" viewBox="0 0 24 24"><path class="fill" d="M3 12h18a9 9 0 0 1-18 0z"/><path d="M8 3c-1 1.5 1 2.5 0 4M12 3c-1 1.5 1 2.5 0 4M16 3c-1 1.5 1 2.5 0 4"/></svg>`;
+  document.body.appendChild(ind);
+  const ring = ind.querySelector(".ring"), track = ind.querySelector(".track"), MARK = 70, MAXP = 120; let top0 = 0;
+  const reduce = () => window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let y0 = null, x0 = 0, pull = 0, pane = null, armed = false, busy = false, locked = null;
+  const paneFor = () => S.tab === "home" ? $("#tabHome") : S.tab === "orders" ? $("#tabOrders") : null;
+  const blocked = t => $("#sheetBg")?.classList.contains("open") || document.querySelector(".vpage.open") || document.querySelector(".intro") ||
+    (t && t.closest && t.closest(".mlswipe, .sheet, .vpage, input, textarea, select, .leaflet-container, .hscroll, .fchips"));
+  const draw = d => {
+    const p = Math.min(1, d / MARK);
+    ring.style.strokeDashoffset = String(C * (1 - p));
+    ind.style.opacity = String(Math.min(1, d / 30));
+    // sits in the gap that opens above the page, turning as you pull
+    ind.style.transform = `translateY(${top0 + Math.max(0, d / 2 - 20)}px) scale(${.6 + .4 * p})`; track.style.transform = `rotate(${d * 2.2}deg)`;
+    if (pane && !reduce()) pane.style.transform = `translateY(${d}px)`;
+    const now = d >= MARK; if (now !== armed) { armed = now; ind.classList.toggle("ready", now); if (now && navigator.vibrate) try { navigator.vibrate(8); } catch (e) {} }
+  };
+  const reset = () => {
+    ind.classList.add("ptr-out"); ind.classList.remove("ready", "loading");
+    ind.style.opacity = "0"; ind.style.transform = `translateY(${top0 - 10}px) scale(.6)`; track.style.transform = "";
+    if (pane) { pane.classList.add("ptr-back"); pane.style.transform = ""; const p0 = pane; setTimeout(() => { p0.classList.remove("ptr-back", "ptr-pull"); p0.style.transform = ""; }, 420); }
+    setTimeout(() => ind.classList.remove("ptr-out"), 420);
+    pull = 0; armed = false; pane = null;
+  };
+  document.addEventListener("touchstart", e => {
+    if (busy || e.touches.length !== 1 || !["home", "orders"].includes(S.tab) || (window.scrollY || document.documentElement.scrollTop) > 0 || blocked(e.target)) { y0 = null; return; }
+    y0 = e.touches[0].clientY; x0 = e.touches[0].clientX; locked = null; pane = paneFor(); top0 = pane ? Math.max(0, pane.getBoundingClientRect().top) : 0;
+  }, { passive: true });
+  document.addEventListener("touchmove", e => {
+    if (y0 == null || busy) return;
+    const dy = e.touches[0].clientY - y0, dx = e.touches[0].clientX - x0;
+    if (locked == null && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) locked = Math.abs(dy) > Math.abs(dx) && dy > 0 ? "pull" : "no";
+    if (locked !== "pull") return;
+    if ((window.scrollY || document.documentElement.scrollTop) > 0) { y0 = null; reset(); return; }
+    e.preventDefault();   // our stretch replaces the browser's bounce here
+    if (pane && !pane.classList.contains("ptr-pull")) { pane.classList.remove("ptr-back"); pane.classList.add("ptr-pull"); }
+    pull = MAXP * (1 - Math.exp(-dy / 160));   // more pull, less movement: a rubber-band feel
+    draw(pull);
+  }, { passive: false });
+  const end = async () => {
+    if (y0 == null) return; y0 = null;
+    if (locked !== "pull" || !pull) { if (pull) reset(); return; }
+    if (!armed) return reset();
+    busy = true; ind.classList.add("loading");
+    if (pane && !reduce()) { pane.classList.add("ptr-back"); pane.style.transform = "translateY(56px)"; }
+    ind.style.transform = `translateY(${top0 + 8}px) scale(1)`; track.style.transform = ""; ring.style.strokeDashoffset = String(C * .7);
+    const t0 = Date.now();
+    try { await Promise.all([refreshMine(), refreshBoard()]); } catch (e) {}
+    await new Promise(r => setTimeout(r, Math.max(0, 650 - (Date.now() - t0))));
+    reset(); busy = false; toast("Updated");
+  };
+  document.addEventListener("touchend", end, { passive: true });
+  document.addEventListener("touchcancel", () => { if (y0 != null) { y0 = null; reset(); } }, { passive: true });
+}
+// Upcoming vs past, one rule for the Orders list and the tab badge (the badge = how many orders Upcoming shows)
+function splitOrders(all) {
+  const ids = new Set(all.map(o => o.id)), rows = all.filter(o => !o.parent_id || !ids.has(o.parent_id));
   // A collected order stays in Upcoming until it's received (or a problem is reported), so "Got my food" is easy to find
   const awaiting = o => canConfirm(o) && !o.cashback_posted;
   const isPast = o => (o.status === "cancelled" || (o.status === "collected" && !awaiting(o) && !(o.problem && !o.problem_resolved)) || o.order_date < today()) && !awaiting(o);
-  const up = rows.filter(o => !isPast(o)).sort((a, b) => a.order_date < b.order_date ? -1 : a.order_date > b.order_date ? 1 : 0), past = rows.filter(isPast).sort((a, b) => a.order_date < b.order_date ? 1 : -1);
+  return { up: rows.filter(o => !isPast(o)).sort((a, b) => a.order_date < b.order_date ? -1 : a.order_date > b.order_date ? 1 : 0), past: rows.filter(isPast).sort((a, b) => a.order_date < b.order_date ? 1 : -1) };
+}
+function renderOrders() {
+  const el = $("#tabOrders"); if (!el) return;
+  const all = S.mine || [], { up, past } = splitOrders(all);
   if (!S.osegPicked) S.oseg = up.length || !past.length ? "up" : "past";
   let body = "";
   if (S.oseg === "up") {
@@ -3773,7 +3852,7 @@ async function refreshMine() {
     }
   });
   askReviewLater();
-  const active = rows.filter(o => !["collected", "cancelled"].includes(o.status)).length;
+  const active = splitOrders(rows).up.length;
   $("#ordBadge").textContent = active; $("#ordBadge").classList.toggle("hidden", !active);
   if (S.tab === "orders") renderOrders();
   updateBellDot(); if (S.tab === "home") renderHero();
