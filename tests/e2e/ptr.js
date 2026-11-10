@@ -9,14 +9,14 @@ const { chromium, results, setArea, ok, note, phone, txt } = require('./h');
     const drag = async (x, y, dy, steps = 12) => { await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
       for (let i = 1; i <= steps; i++) { await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y: y + dy * i / steps }] }); await new Promise(r => setTimeout(r, 16)); }
       return async () => cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); };
-    const state = () => p.evaluate(() => ({ op: +getComputedStyle($('#ptr')).opacity, ready: $('#ptr').classList.contains('ready'), tf: $('#tabHome').style.transform, r: window.__r, toast: document.querySelector('.toast')?.innerText || '' }));
+    const state = () => p.evaluate(() => ({ op: +getComputedStyle($('#ptr')).opacity, ready: $('#ptr').classList.contains('ready'), tf: $('#tabHome').style.transform, ty: (() => { const m = $('#tabHome').style.transform.match(/-?[\d.]+px/g); return m ? parseFloat(m[1] || m[0]) : 0; })(), r: window.__r, toast: document.querySelector('.toast')?.innerText || '' }));
     await p.waitForTimeout(800);
     // long pull
     const r0 = (await state()).r;
     let up = await drag(195, 420, 260); let s1 = await state();
-    ok(s1.op > .9 && s1.ready && /translateY\(\d/.test(s1.tf), 'P1', 'pulling down at the top stretches the page and shows the ChopPool icon, ready to refresh', JSON.stringify(s1));
+    ok(s1.op > .9 && s1.ready && s1.ty > 0, 'P1', 'pulling down at the top stretches the page and shows the ChopPool icon, ready to refresh', JSON.stringify(s1));
     if (scheme === 'dark') await p.screenshot({ path: '/tmp/e2e/shots/ptr_pull.png' });
-    const stretch = parseFloat((s1.tf.match(/[\d.]+/) || [0])[0]); ok(stretch < 130 && stretch > 60, 'P2', 'stretch has resistance (260px finger → ' + Math.round(stretch) + 'px page)');
+    const stretch = s1.ty; ok(stretch < 130 && stretch > 60, 'P2', 'stretch has resistance (260px finger → ' + Math.round(stretch) + 'px page)');
     await up(); await p.waitForTimeout(250);
     if (scheme === 'dark') await p.screenshot({ path: '/tmp/e2e/shots/ptr_load.png' });
     await p.waitForTimeout(1200); let s2 = await state();
@@ -50,11 +50,16 @@ const { chromium, results, setArea, ok, note, phone, txt } = require('./h');
     await hs(); const s8 = await state(); await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); await p.waitForTimeout(600);
     ok(!s8.ready && !s8.tf, 'P11', 'swiping sideways on the strip does not pull');
     // quick pulls one after another: every one moves the page (the old spring-back timer used to freeze the next pull)
-    let moved = 0; for (let k = 0; k < 6; k++) { const u = await drag(195, 470, k % 2 ? 60 : 40, 6); const st = await state(); if (/translateY\(\d/.test(st.tf) && parseFloat(st.tf.match(/[\d.]+/)[0]) > 15) moved++; await u(); await p.waitForTimeout(120); }
+    let moved = 0; for (let k = 0; k < 6; k++) { const u = await drag(195, 470, k % 2 ? 60 : 40, 6); const st = await state(); if (st.ty > 15) moved++; await u(); await p.waitForTimeout(120); }
     await p.waitForTimeout(600);
     ok(moved === 6, 'P12', 'six quick pulls in a row all move the page', moved + '/6');
     const r9 = (await state()).r; const u9 = await drag(195, 470, 260); await u9(); await p.waitForTimeout(1500);
     ok((await state()).r > r9, 'P13', 'and a full pull right after still refreshes');
+    // after switching tabs (the tab's entrance animation), pulls still move the page — several times
+    let mv = 0; for (let k = 0; k < 3; k++) { await p.evaluate(() => { setTab('orders'); }); await p.waitForTimeout(500); await p.evaluate(() => { setTab('home'); }); await p.waitForTimeout(600);
+      const u = await drag(195, 470, 260); const st = await p.evaluate(() => { const r = $('#tabHome').getBoundingClientRect(); return { top: r.top, isApp: document.documentElement.classList.contains('is-app') || document.body.classList.contains('is-app') }; }); await u(); await p.waitForTimeout(1500);
+      note('after tab switch ' + k + ': pane top ' + Math.round(st.top) + ' is-app ' + st.isApp); if (st.top > 150) mv++; }
+    ok(mv === 3, 'P14', 'after switching tabs, every pull still moves the page', mv + '/3');
     ok(p.errs.length === 0, 'Px', 'no page errors', p.errs.join(' | ')); await p.context().close();
   }
   setArea('Orders badge');

@@ -2284,7 +2284,9 @@ function setTab(t) {
   window.scrollTo(0, 0);
   movePill();
   // Start the fade only once the new screen is drawn, so it never stutters
-  if (animate) requestAnimationFrame(() => { pane.style.opacity = ""; if (fromLeft) pane.classList.add("from-left"); pane.classList.add("pane-in"); });
+  // the entrance animation is dropped once it has played, so it can't hold the pane in place afterwards (pull to refresh moves it)
+  if (animate) requestAnimationFrame(() => { pane.style.opacity = ""; if (fromLeft) pane.classList.add("from-left"); pane.classList.add("pane-in");
+    pane.addEventListener("animationend", () => pane.classList.remove("pane-in", "from-left"), { once: true }); });
   requestAnimationFrame(() => { setKTop(); if (t === "home") { watchHero(); fitStats(); } });
 }
 // The highlight on the tab bar glides to the tab you picked
@@ -3369,7 +3371,7 @@ function initPullRefresh() {
     ind.style.opacity = String(Math.min(1, d / 30));
     // sits in the gap that opens above the page, turning as you pull
     ind.style.transform = `translateY(${top0 + Math.max(0, d / 2 - 20)}px) scale(${.6 + .4 * p})`; track.style.transform = `rotate(${d * 2.2}deg)`;
-    if (pane && !reduce()) pane.style.transform = `translateY(${d}px)`;
+    if (pane && !reduce()) pane.style.transform = `translate3d(0, ${d}px, 0)`;
     const now = d >= MARK; if (now !== armed) { armed = now; ind.classList.toggle("ready", now); if (now && navigator.vibrate) try { navigator.vibrate(8); } catch (e) {} }
   };
   const reset = () => {
@@ -3388,11 +3390,14 @@ function initPullRefresh() {
   document.addEventListener("touchmove", e => {
     if (y0 == null || busy) return;
     const dy = e.touches[0].clientY - y0, dx = e.touches[0].clientX - x0;
+    // iPhone: claim a downward drag from its very first move. If the browser starts its own scroll first,
+    // later moves can't be stopped and the page isn't redrawn while it "scrolls", so only the circle would show.
+    if (locked == null && dy > 0 && dy >= Math.abs(dx) && e.cancelable) e.preventDefault();
     if (locked == null && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) locked = Math.abs(dy) > Math.abs(dx) && dy > 0 ? "pull" : "no";
     if (locked !== "pull") return;
     if (atTop() > 1) { y0 = null; reset(); return; }
     if (e.cancelable) e.preventDefault();   // our stretch replaces the browser's bounce here
-    if (pane) { pane.classList.remove("ptr-back"); pane.classList.add("ptr-pull"); }
+    if (pane) { pane.classList.remove("ptr-back", "pane-in", "from-left"); pane.classList.add("ptr-pull"); }
     pull = MAXP * (1 - Math.exp(-dy / 160));   // more pull, less movement: a rubber-band feel
     draw(pull);
   }, { passive: false });
@@ -3401,7 +3406,7 @@ function initPullRefresh() {
     if (locked !== "pull" || !pull) { if (pull) reset(); return; }
     if (!armed) return reset();
     busy = true; ind.classList.add("loading");
-    if (pane && !reduce()) { pane.classList.add("ptr-back"); pane.style.transform = "translateY(56px)"; }
+    if (pane && !reduce()) { pane.classList.add("ptr-back"); pane.style.transform = "translate3d(0, 56px, 0)"; }
     ind.style.transform = `translateY(${top0 + 8}px) scale(1)`; track.style.transform = ""; ring.style.strokeDashoffset = String(C * .7);
     const t0 = Date.now();
     try { await Promise.race([Promise.all([refreshMine(), refreshBoard()]), new Promise(r => setTimeout(r, 8000))]); } catch (e) {}   // never stuck: a slow network gives up after 8 s
