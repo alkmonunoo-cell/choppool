@@ -598,9 +598,9 @@ button.dtile:not([disabled]):hover { outline: 2px solid var(--accent-soft); }
 .ptr svg { width: 40px; height: 40px; position: absolute; inset: 0; }
 .ptr .ring { fill: none; stroke: var(--accent); stroke-width: 2.6; stroke-linecap: round; transform: rotate(-90deg); transform-origin: 50% 50%; }
 .ptr .ring-bg { fill: none; stroke: var(--line); stroke-width: 2.6; }
-.ptr .bowl { width: 20px; height: 20px; position: relative; inset: auto; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: transform .2s; }
-.ptr.ready .bowl { transform: scale(1.12); }
-.ptr.ready .bowl path.fill { fill: currentColor; fill-opacity: .25; }
+.ptr .ptr-logo { position: relative; display: grid; place-items: center; transition: transform .2s; }
+.ptr .ptr-logo svg { position: static; width: 22px; height: 22px; }
+.ptr.ready .ptr-logo { transform: scale(1.15); }
 .ptr.loading svg.track { animation: spin .9s linear infinite; }
 .ptr-pull { will-change: transform; }
 .ptr-back { transition: transform .38s cubic-bezier(.2,.9,.25,1.15); }
@@ -1839,7 +1839,10 @@ const S = { settings: null, sites: [], menus: [], items: [], board: { pools: [],
 let toastTimer;
 function toast(msg) {
   const t = $("#toast"); t.textContent = msg; t.classList.add("show");
-  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("show"), 6000);
+  // Short notes go quickly, longer ones stay long enough to read (1.6 s, plus a little per word, at most 4.5 s); tap to dismiss
+  const ms = Math.min(4500, 1600 + String(msg).length * 35);
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("show"), ms);
+  if (!t.dataset.tap) { t.dataset.tap = 1; t.addEventListener("click", () => { clearTimeout(toastTimer); t.classList.remove("show"); }); }
 }
 function sysNotify(title, body) {
   try { if ("Notification" in window && Notification.permission === "granted") new Notification(title, { body }); } catch (e) {}
@@ -3351,7 +3354,7 @@ function initPullRefresh() {
   const R = 16, C = 2 * Math.PI * R;
   const ind = document.createElement("div"); ind.id = "ptr"; ind.className = "ptr"; ind.setAttribute("aria-hidden", "true");
   ind.innerHTML = `<svg class="track" viewBox="0 0 40 40"><circle class="ring-bg" cx="20" cy="20" r="${R}"/><circle class="ring" cx="20" cy="20" r="${R}" stroke-dasharray="${C}" stroke-dashoffset="${C}"/></svg>
-    <svg class="bowl" viewBox="0 0 24 24"><path class="fill" d="M3 12h18a9 9 0 0 1-18 0z"/><path d="M8 3c-1 1.5 1 2.5 0 4M12 3c-1 1.5 1 2.5 0 4M16 3c-1 1.5 1 2.5 0 4"/></svg>`;
+    <span class="ptr-logo">${LOGO(22)}</span>`;
   document.body.appendChild(ind);
   const ring = ind.querySelector(".ring"), track = ind.querySelector(".track"), MARK = 70, MAXP = 120; let top0 = 0;
   const reduce = () => window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
