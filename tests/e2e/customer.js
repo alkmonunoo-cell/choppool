@@ -106,7 +106,7 @@ const { chromium, results, setArea, ok, note, phone, txt, hideToast } = require(
   await p.locator('#vpage [data-dish]:not([disabled])').first().click(); await p.waitForTimeout(400);
   const spBtn = p.locator('#dSpecial'); ok(await spBtn.count() === 1, '3.13a', 'special request link on dish sheet');
   if (await spBtn.count()) { await spBtn.click(); await p.waitForTimeout(500); await p.fill('#fSpecial', 'Jollof with fried fish, no pepper'); await p.click('#submitBtn'); await p.waitForTimeout(1000);
-    ok(/Request sent/.test(await txt(p, '#sheet')), '3.13', 'special request sent'); }
+    ok(/Custom order sent/.test(await txt(p, '#sheet')), '3.13', 'custom order sent'); }
   await p.evaluate(() => { closeSheet(); closeVendor(true); setTab('orders'); }); await p.waitForTimeout(600);
   const orders = await txt(p, '#tabOrders'); ok(/price|priced|Waiting/i.test(orders), '3.13b', 'special shows waiting for price');
   // vendor prices, customer pays

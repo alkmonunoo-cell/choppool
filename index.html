@@ -137,11 +137,21 @@ button.hero-stat::after { content: "›"; position: absolute; right: 9px; top: 6
 @media (prefers-reduced-motion: reduce) { .ml-dot.go { animation: none; } }
 .mylunch.bad { background: #7F1D1D; border-color: rgba(255,255,255,.35); }
 .mylunch.bad .ml-dot { background: #FCA5A5; }
+.mlwrap { position: relative; z-index: 1; display: grid; gap: 8px; min-width: 0; }
+.mlswipe { display: flex; gap: 8px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; }
+.mlswipe::-webkit-scrollbar { display: none; }
+.mlswipe > .mylunch { flex: 0 0 calc(100% - 26px); scroll-snap-align: start; }
+.mldots { display: flex; justify-content: center; gap: 5px; }
+.mldots i { width: 6px; height: 6px; border-radius: 3px; background: rgba(255,255,255,.35); transition: width .2s, background .2s; }
+.mldots i.on { width: 16px; background: #fff; }
 .ml-bar { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
 .ml-bar i { height: 4px; border-radius: 2px; background: rgba(255,255,255,.28); }
 .ml-bar i.on { background: #fff; }
 .hero-stat b.long { font-size: 15px; line-height: 21px; }
 .hero-stat b.tiny { font-size: 13px; }
+.hero-stat b.xs { font-size: 12px; letter-spacing: -.01em; }
+button.hero-stat { padding-right: 18px !important; }
+button.hero-stat::after { right: 7px; }
 .recv { display: grid; gap: 8px; padding: 12px; border-radius: 14px; background: var(--ok-soft); color: var(--ink); font-weight: 600; }
 .solo .row .btn, .solo .row .ghost { padding: 9px 12px; }
 .sumhint { display: block; font-size: 12px; font-weight: 500; color: var(--muted); margin-top: 1px; }
@@ -1197,8 +1207,8 @@ function makeDemoApi() {
     });
     const payMin = Number(settings.quote_pay_min || 15);
     orders.filter(o => o.status === "quote_requested" && new Date() >= new Date(at(o.order_date, settings.cutoff).getTime() - payMin * 6e4)).forEach(o => { o.status = "cancelled"; o.cancel_reason = "The seller didn't price your request in time"; });
-    orders.filter(o => o.status === "quoted" && o.quote_pay_by && Date.now() > Date.parse(o.quote_pay_by) + 30e3).forEach(o => { o.status = "cancelled"; o.cancel_reason = "Special request not paid in time"; });
-    orders.filter(o => ["quote_requested", "quoted"].includes(o.status) && pastCutoff(o.order_date)).forEach(o => { o.status = "cancelled"; o.cancel_reason = "Special request not paid before cut-off"; });
+    orders.filter(o => o.status === "quoted" && o.quote_pay_by && Date.now() > Date.parse(o.quote_pay_by) + 30e3).forEach(o => { o.status = "cancelled"; o.cancel_reason = "Custom order not paid in time"; });
+    orders.filter(o => ["quote_requested", "quoted"].includes(o.status) && pastCutoff(o.order_date)).forEach(o => { o.status = "cancelled"; o.cancel_reason = "Custom order not paid before cut-off"; });
     // "Got my food" confirms itself a while after handover; then cashback is posted once
     const rcv = Number(settings.auto_receive_min || 120) * 6e4;
     const recv = (o, by) => { o.received_at = o.received_at || nowIso(); o.status = "collected"; o.collected_at = o.collected_at || nowIso(); o.collected_by = o.collected_by || by;
@@ -1223,7 +1233,7 @@ function makeDemoApi() {
     if (orders.filter(o => !o.parent_id && o.status === "pending" && String(o.phone || "").replace(/\D/g, "") === ph && Date.now() - new Date(o.created_at) < 864e5).length >= 3) throw new Error("You have 3 orders waiting for their payment to be checked. Wait for those before placing another.");
     const d = orderDate(settings), special = (r.special || "").trim() || null;
     if ((k.paused_dates || []).includes(d) && !days.some(x => x.kitchen_id === k.id && x.order_date === d)) throw new Error(k.public_name + " isn't cooking " + (d === today() ? "today" : "on that day") + ". Choose another vendor.");
-    if (special && d === today() && new Date() >= at(d, settings.special_cutoff)) throw new Error("Special requests close at " + settings.special_cutoff + ". You can still order from the menu.");
+    if (special && d === today() && new Date() >= at(d, settings.special_cutoff)) throw new Error("Custom orders close at " + settings.special_cutoff + ". You can still order from the menu.");
     const add = (m.addons || []).filter(a => (r.addons || []).includes(a.name)), addT = add.reduce((t, a) => t + a.price, 0);
     const load = orders.filter(o => o.kitchen_id === k.id && o.order_date === d && o.status !== "cancelled").reduce((t, o) => t + o.qty, 0);
     if (load + r.qty > k.capacity) throw new Error("This menu is fully booked for today. Try another one.");
@@ -1271,7 +1281,7 @@ function makeDemoApi() {
   const seed = { s1: { k1: 8, k2: 4 }, s2: { k1: 12, k2: 2 }, s3: { k1: 5 } };
   for (const s in seed) for (const k in seed[s]) for (let i = 0; i < seed[s][k]; i++) fake(s, k, 30 + Math.floor(Math.random() * 120));
   pools.forEach(p => { if (p.site_id !== "s2") p.rider_id = "r1"; });
-  // One special request waiting for a price, so the kitchen view shows the price box
+  // One custom order waiting for a price, so the kitchen view shows the price box
   try { place({ site: "s1", item: "i1", qty: 1, name: "Akua", phone: "0241112222", special: "Jollof with fried fish instead of chicken, no pepper" }, true); } catch (e) {}
   setInterval(() => {
     if (document.hidden) return;
@@ -1323,7 +1333,7 @@ function makeDemoApi() {
       }
     },
     async payQuote(id, ref, useWallet) { housekeeping(); const o = orders.find(x => x.id === id); if (!o || o.status !== "quoted") throw new Error("This request is not waiting for payment.");
-      if (o.quote_pay_by && Date.now() > Date.parse(o.quote_pay_by) + 30e3) throw new Error("The time to pay for this special order has run out."); return settle(o, ref, useWallet); },
+      if (o.quote_pay_by && Date.now() > Date.parse(o.quote_pay_by) + 30e3) throw new Error("The time to pay for this custom order has run out."); return settle(o, ref, useWallet); },
     async myOrders(ids) {
       housekeeping();
       return orders.filter(o => ids.includes(o.id) || ids.includes(o.parent_id) || (me && o.user_id === me.id)).filter(o => o.order_date >= today()).sort((a, b) => a.created_at < b.created_at ? 1 : -1).map(o => {
@@ -2313,7 +2323,8 @@ async function viewOrder() {
   $("#tabHome").addEventListener("click", e => { if (mineClick(e)) return; if (e.target.closest("[data-findb]")) { openSitePicker(); $("#fbQ")?.focus(); return; } const ws = e.target.closest("[data-site]"); if (ws) return setSite(ws.dataset.site);
     if (e.target.closest(".locchip")) return openSitePicker();
     if (e.target.closest("[data-seeall]")) { S.vf = "near"; S.vq = ""; return setTab("kitchens"); }
-    if (e.target.closest("[data-gomine]")) return setTab("orders");
+    if (e.target.closest("[data-gomine]")) { const id = e.target.closest("[data-gomine]").dataset.gomine; setTab("orders");
+      if (id) setTimeout(() => { const c = document.querySelector(`#tabOrders [data-ocard="${CSS.escape(id)}"]`); c && c.scrollIntoView({ block: "center", behavior: "smooth" }); }, 120); return; }
     const v = e.target.closest("[data-vendor]"); if (v) return openVendor(v.dataset.vendor);
     const b = e.target.closest("button[data-menu]"); if (b) openOrder(b.dataset.menu); const g = e.target.closest("[data-gokitchens]"); if (g) setTab("kitchens"); });
   $("#kitchensList").addEventListener("click", e => { if (mineClick(e)) return; const v = e.target.closest("[data-vendor]"); if (v) return openVendor(v.dataset.vendor); const b = e.target.closest("button[data-menu]"); if (b) openOrder(b.dataset.menu); });
@@ -2575,8 +2586,51 @@ function heroDelivery(here, site) {
   }
   return opts.sort((a, b) => a.fee - b.fee || (b.pool ? 1 : 0) - (a.pool ? 1 : 0))[0] || null;
 }
+// ---- Home: my lunch strip (one card per live order; swipe when there are several) ----
+function lunchCard(o) {
+  const seller = menuOf(o.kitchen_id).public_name || "the vendor", what = o.qty + " × " + o.item_name, dl = dayLabel(o.order_date);
+  const day = dl === "today" || dl === "tomorrow" ? dl : fmtDate(o.order_date), st = progressOf(o);
+  const hm = d => d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "UTC" });
+  let t, sub = what, rank, bad = false, fix = false, bar = true;
+  if (o.status === "pending" && o.pay_issue) { bad = fix = true; bar = false; rank = 0;
+    t = o.pay_issue === "short" ? "Your payment was short" : "We couldn't find your payment"; sub = "Code " + o.code + " · fix it before " + fmtTime(S.settings.cutoff) + " so your lunch counts"; }
+  else if (o.status === "quoted") { rank = 1; bar = false; t = "Pay for your custom order"; sub = seller[0].toUpperCase() + seller.slice(1) + " priced it at " + money(o.quote_price) + " a meal"; }
+  else if (o.status === "quote_requested") { rank = 8; bar = false; t = "Waiting for a price"; sub = what + " · " + seller; }
+  else if (canConfirm(o)) { rank = 2; t = "Your lunch is here"; }
+  else if (o.status === "pending") { rank = 7; t = "Checking your payment"; }
+  else if (o.pool_status === "waiting") { rank = 6; const w = o.wait_until && new Date(o.wait_until);
+    t = "Paid · waiting for vendor"; sub = w && isFinite(w) ? "Confirms by " + hm(w) + (w.toISOString().slice(0, 10) > today() ? " " + (dayLabel(w.toISOString().slice(0, 10)) === "tomorrow" ? "tomorrow" : fmtDate(w.toISOString().slice(0, 10))) : "") : what; }
+  else if (st <= 1) { rank = 5; t = "Confirmed for " + day; }
+  else { rank = { 2: 4, 3: 3, 4: 2 }[Math.min(st, 4)]; t = ["", "", "Being cooked", "On the way", "Delivered"][Math.min(st, 4)]; }
+  return { o, rank, html: `<button class="mylunch${bad ? " bad" : ""}" data-gomine="${esc(o.id)}" aria-label="${esc(t)}, code ${esc(o.code)}. Open your order">
+    <span class="ml-dot${!bad && st >= 3 ? " go" : ""}"></span><span class="ml-t"><b>${esc(t)}</b><small>${esc(sub)}</small></span>
+    <span class="ml-code"><small>${fix ? "tap" : "code"}</small><b>${fix ? "Fix" : esc(o.code)}</b></span>
+    ${bar ? `<span class="ml-bar" aria-hidden="true">${[1, 2, 3, 4, 5].map(i => `<i class="${i <= st ? "on" : ""}"></i>`).join("")}</span>` : ""}</button>` };
+}
+function lunchStrip() {
+  const cards = (S.mine || []).filter(o => !o.parent_id && o.order_date >= today() && !o.received_at && ["pending", "quote_requested", "quoted", "paid", "collected"].includes(o.status))
+    .map(lunchCard).sort((a, b) => a.rank - b.rank || a.o.order_date.localeCompare(b.o.order_date) || String(a.o.created_at).localeCompare(String(b.o.created_at)));
+  if (!cards.length) return "";
+  if (cards.length === 1) return cards[0].html;
+  return `<div class="mlwrap"><div class="mlswipe" id="mlSwipe">${cards.map(c => c.html).join("")}</div>
+    <div class="mldots" aria-hidden="true">${cards.map((c, i) => `<i class="${i ? "" : "on"}"></i>`).join("")}</div></div>`;
+}
+function wireLunchStrip(keepId) {
+  const sw = $("#mlSwipe"); if (!sw) return;
+  const dots = [...sw.parentElement.querySelectorAll(".mldots i")], step = () => sw.firstElementChild.getBoundingClientRect().width + 8;
+  const mark = () => { const i = Math.round(sw.scrollLeft / step()); dots.forEach((d, n) => d.classList.toggle("on", n === i)); };
+  sw.addEventListener("scroll", mark, { passive: true });
+  sw.addEventListener("touchstart", () => { S.mlTouch = true; }, { passive: true });
+  sw.addEventListener("touchend", () => setTimeout(() => { S.mlTouch = false; }, 600), { passive: true });
+  const k = keepId ? [...sw.children].findIndex(c => c.dataset.gomine === keepId) : -1;
+  if (k > 0) { sw.style.scrollSnapType = "none"; sw.scrollLeft = k * step(); sw.style.scrollSnapType = ""; mark(); }
+}
 function renderHero() {
   const el = $("#hero"); if (!el) return;
+  // The strip re-draws every few seconds: keep the card the person swiped to, and never redraw mid-swipe
+  const sw0 = $("#mlSwipe");
+  if (sw0 && S.mlTouch) return;
+  const keepId = sw0 ? [...sw0.children].map(c => c.dataset.gomine)[Math.round(sw0.scrollLeft / Math.max(1, sw0.firstElementChild.getBoundingClientRect().width + 8))] : null;
   const s = S.settings, site = siteOf(S.siteId);
   const here = S.board.pools.filter(p => S.noSite || p.site_id === S.siteId);
   const meals = here.reduce((t, p) => t + p.meals, 0);
@@ -2585,13 +2639,8 @@ function renderHero() {
   const myMeals = (S.mine || []).filter(o => o.order_date === S.date && ["pending", "paid", "collected", "quote_requested", "quoted"].includes(o.status) && (S.noSite || o.site_id === S.siteId)).reduce((t, o) => t + (o.qty || 0), 0);
   // Orders closed and I have lunch coming today: show where it is instead of the meal count
   // My lunch today, from payment until I've got it: a slim strip under the figures (the figures stay as they are)
-  const payProb = (S.mine || []).find(o => !o.parent_id && o.order_date >= today() && o.status === "pending" && o.pay_issue);
-  const mineAll = (S.mine || []).filter(o => !o.parent_id && o.order_date >= today() && ["paid", "collected"].includes(o.status) && !o.received_at);
-  const firstDay = mineAll.map(o => o.order_date).sort()[0];
-  const mineToday = mineAll.filter(o => o.order_date === firstDay);
-  const best = mineToday.sort((a, b) => progressOf(b) - progressOf(a))[0];
-  const live = payProb ? `<button class="mylunch bad" data-gomine aria-label="Payment problem on code ${esc(payProb.code)}. Open your order to fix it"><span class="ml-dot"></span><span class="ml-t"><b>${payProb.pay_issue === "short" ? "Your payment was short" : "We couldn't find your payment"}</b><small>Code ${esc(payProb.code)} · fix it before ${fmtTime(S.settings.cutoff)} so your lunch counts</small></span><span class="ml-code"><small>tap</small><b>Fix</b></span></button>` : best ? (() => { const st = progressOf(best), dl2 = dayLabel(best.order_date), lab = canConfirm(best) ? "Your lunch is here" : st <= 1 ? "Confirmed for " + (dl2 === "today" || dl2 === "tomorrow" ? dl2 : fmtDate(best.order_date)) : ["", "", "Being cooked", "On the way", "Delivered"][Math.min(st, 4)];
-    return `<button class="mylunch" data-gomine aria-label="Your lunch: ${esc(lab)}. Open your order"><span class="ml-dot${st >= 3 ? " go" : ""}"></span><span class="ml-t"><b>${esc(lab)}</b><small>${esc(best.qty + " × " + best.item_name)}${mineToday.length > 1 ? " · +" + (mineToday.length - 1) + " more" : ""}</small></span><span class="ml-code"><small>code</small><b>${esc(best.code)}</b></span><span class="ml-bar" aria-hidden="true">${[1, 2, 3, 4, 5].map(i => `<i class="${i <= st ? "on" : ""}"></i>`).join("")}</span></button>`; })() : "";
+  // My live orders (from placing until I've got it): one card each, swipe between them, most urgent first
+  const live = lunchStrip();
   const name = firstName();
   const dl = dayLabel(S.date);
   el.innerHTML = `<div class="hero-text"><p class="small">${greeting()}${name ? ", " + esc(name) : ""}</p>
@@ -2602,6 +2651,7 @@ function renderHero() {
       ${myMeals ? `<button class="hero-stat hlink" data-gomine aria-label="${myMeals} of your meals, ${meals} in your building. Open your orders"><b class="num">${myMeals}</b><span>your meal${myMeals === 1 ? "" : "s"}${meals > myMeals ? ` <span class="of">of ${meals} here</span>` : ""}</span></button>` : `<div class="hero-stat"><b class="num">${meals}</b><span>ordered in your building</span></div>`}
       ${S.noSite ? `<div class="hero-stat"><b class="num">${here.filter(p => p.status === "collecting" && p.meals > 0).length}</b><span>pools open</span></div>` : (dlv ? `<button class="hero-stat hlink" data-vendor="${esc(dlv.kid)}">${(v => `<b class="num${v.length > 7 ? " long" : ""}">${v}</b>`)(dlv.fee === 0 ? "Free" : Number.isInteger(dlv.fee) ? "GHS " + dlv.fee : money(dlv.fee))}<span>${esc(dlv.label)}</span></button>` : `<div class="hero-stat"><b class="num">${menusHere().length}</b><span>vendors cooking</span></div>`)}</div>`;
   if (live) el.insertAdjacentHTML("beforeend", live);
+  wireLunchStrip(keepId);
   tickCountdown(); fitStats(); countUp(el);
 }
 // Figures count up to their value the first time they show (or when they change)
@@ -2616,7 +2666,7 @@ function countUp(root) {
   });
 }
 // Small phones: a figure that doesn't fit its box steps down a size instead of being cut off
-function fitStats() { requestAnimationFrame(() => document.querySelectorAll(".hero-stat b").forEach(b => { if (b.id === "countdown" && !b.querySelector(".ampm")) return; if (!b.clientWidth) return; b.classList.remove("long", "tiny"); if (b.scrollWidth > b.clientWidth + 1) b.classList.add("long"); if (b.scrollWidth > b.clientWidth + 1) b.classList.add("tiny"); })); }
+function fitStats() { requestAnimationFrame(() => document.querySelectorAll(".hero-stat b").forEach(b => { if (b.id === "countdown" && !b.querySelector(".ampm")) return; if (!b.clientWidth) return; b.classList.remove("long", "tiny", "xs"); if (b.scrollWidth > b.clientWidth + 1) b.classList.add("long"); if (b.scrollWidth > b.clientWidth + 1) b.classList.add("tiny"); if (b.scrollWidth > b.clientWidth + 1) b.classList.add("xs"); })); }
 function tickCountdown() {
   document.querySelectorAll("[data-paywin]").forEach(el => { el.textContent = payWindowText(el.dataset.paywin); });
   if (!$("#countdown")) return;
@@ -3037,7 +3087,7 @@ function openDish(k, dishId) {
     <div class="row"><p class="group-title">How many</p><div class="qty"><button type="button" id="dMinus" aria-label="One less">${GLYPH.minus}</button><output id="dQ">1</output><button type="button" id="dPlus" aria-label="One more">${GLYPH.plus}</button></div></div>
     ${(d.addons || []).length ? `<div class="group"><p class="group-title">Extras <span class="muted" style="font-weight:500">(optional, added to each plate)</span></p><div class="chips" id="dExtras">${d.addons.map(a => `<button type="button" class="tog" data-addon="${esc(a.name)}" aria-pressed="false">${esc(a.name)}${a.price ? " +" + money(a.price) : ""}</button>`).join("")}</div></div>` : ""}
     <div class="group"><label for="dNote">Note for the kitchen <span class="muted" style="font-weight:500">(optional)</span></label><input id="dNote" maxlength="140" placeholder="Less oil, extra napkins"></div>
-    ${specialOpen ? `<button type="button" class="linkbtn" id="dSpecial" style="justify-self:start">Want something not on the menu? Send a special request</button>` : ""}
+    ${specialOpen ? `<button type="button" class="linkbtn" id="dSpecial" style="justify-self:start">Want something not on the menu? Make a custom order</button>` : ""}
     <div class="sheet-foot"><button class="btn wide" id="dAdd">Add to order · <span class="num" id="dTot"></span></button></div>`);
   const draw = () => { $("#dQ").textContent = qty; const a = (d.addons || []).filter(x => extras.has(x.name)).reduce((t, x) => t + Number(x.price), 0); $("#dTot").textContent = money((Number(d.price) + a) * qty); };
   draw();
@@ -3192,7 +3242,7 @@ const canConfirm = o => !o.parent_id && !o.received_at && !o.problem && (o.statu
 function orderCard(o, all, next) {
   const step = progressOf(o), k = menuOf(o.kitchen_id), kids = all.filter(c => c.parent_id === o.id).sort((a, b) => a.created_at < b.created_at ? -1 : 1), liveKids = kids.filter(c => c.status !== "cancelled");
   const s4 = Math.min(5, step);
-  return `<article class="order-card${next ? " next" : ""}"><div class="head"><span class="tile" style="background:${tint(menuIndex(o.kitchen_id))}">${art(dishKind(S.items.find(i => i.kitchen_id === o.kitchen_id && i.name === o.item_name) || o.item_name))}</span>
+  return `<article class="order-card${next ? " next" : ""}" data-ocard="${esc(o.id)}"><div class="head"><span class="tile" style="background:${tint(menuIndex(o.kitchen_id))}">${art(dishKind(S.items.find(i => i.kitchen_id === o.kitchen_id && i.name === o.item_name) || o.item_name))}</span>
       <div><strong>${esc(k.public_name || "")}</strong>${groupDishes([o, ...liveKids]).map(g => `<p class="small" style="font-weight:600">${g.qty} × ${esc(g.name)}${g.extra ? ` <span class="muted" style="font-weight:500">· ${esc(g.extra)}</span>` : ""}</p>`).join("")}${liveKids.length ? `<p class="small muted">Same code, packed together</p>` : ""}</div>
       <div class="c"><span>Code</span><b class="num">${esc(o.code)}</b></div></div>
       ${["quote_requested", "quoted"].includes(o.status) ? "" : `<div class="steps4" aria-label="Progress ${s4} of 5">${[1, 2, 3, 4, 5].map(n => `<i class="${n <= s4 ? "on" : ""}"></i>`).join("")}</div><div class="steps4l">${STEP_LABELS.map((l, n) => `<span class="${n < s4 ? "on" : ""}">${l}</span>`).join("")}</div>`}
@@ -3271,7 +3321,7 @@ const meNow = () => local.get("cp_me") || {};
 const avatarHtml = (name, big, pic = local.get("cp_avatar")) => { const ini = String(name || "").trim().split(/\s+/).map(w => w[0] || "").slice(0, 2).join("").toUpperCase();
   return `<span class="pavatar${big ? " big" : ""}">${pic ? `<img src="${esc(pic)}" alt="">` : ini ? esc(ini) : ICON.user}</span>`; };
 const txRow = e => `<div class="grow"><span class="gic">${ICON.wallet}</span><span class="gtx">${esc(e.reason)}<small>${esc(e.at ? fmtDate(String(e.at).slice(0, 10)) : "")}</small></span><span class="amt num${e.amount > 0 ? " pos" : ""}">${e.amount < 0 ? "−" : "+"}${money(Math.abs(e.amount))}</span></div>`;
-const MUTE_TYPES = [["Your orders", [["confirm", "The vendor confirms or cancels your pool"], ["priced", "Your special request is priced"], ["arriving", "Lunch is about 5 minutes away or here"], ["almost", "Your pool is almost full"], ["cashback", "Cashback and refunds"], ["solo", "You're alone in a pool before orders close"]]],
+const MUTE_TYPES = [["Your orders", [["confirm", "The vendor confirms or cancels your pool"], ["priced", "Your custom order is priced"], ["arriving", "Lunch is about 5 minutes away or here"], ["almost", "Your pool is almost full"], ["cashback", "Cashback and refunds"], ["solo", "You're alone in a pool before orders close"]]],
   ["Your building", [["building", "Someone orders at your building"]]]];
 const muted = () => new Set(local.get("cp_mute") || []);
 const notifOn = type => !muted().has(type);
@@ -3361,7 +3411,7 @@ function legalHtml(which) {
       <li><strong>Your location</strong>, only when you tap "Use my location" (customers) or while a rider's page is open, to find nearby buildings and tell customers lunch is close. We don't track you in the background.</li>
       <li><strong>Ratings and photos</strong> you choose to add.</li></ul>
     <h3>Who sees it</h3>
-    <ul><li>The vendor sees your order and code. For special requests, they see what you asked for.</li>
+    <ul><li>The vendor sees your order and code. For custom orders, they see what you asked for.</li>
       <li>The rider or drop-point host sees your first name, code and phone number to hand over your meal.</li>
       <li>Other customers never see your phone number. Your first name shows next to ratings you leave, unless you turn it off in Account › Edit profile.</li>
       <li>The ChopPool team sees orders and payments to run deliveries, refunds and support.</li>
@@ -3381,7 +3431,7 @@ function legalHtml(which) {
     <h3>Cancellations and refunds</h3>
     <ul><li>You can cancel before orders close. Paid orders go back to your wallet, or to mobile money if you ask.</li>
       <li>If a vendor doesn't confirm, can't cook, or your pool is cancelled, you get your money back in full.</li>
-      <li>Special requests are priced by the vendor first. You then have ${esc(s.quote_pay_min || 15)} minutes to pay, or the request is released and nothing is charged.</li>
+      <li>Custom orders (something not on the menu) are priced by the vendor first. You then have ${esc(s.quote_pay_min || 15)} minutes to pay, or the request is released and nothing is charged.</li>
       <li>If something is wrong with your meal, tap <strong>Report a problem</strong> on the order the same day. We'll look into it and credit you where it's fair.</li></ul>
     <h3>Collecting your meal</h3>
     <p>Bring your code to the drop point. Tap <strong>Got my food</strong> once you have it. If you don't, your order is treated as received ${esc(s.auto_receive_min || 120)} minutes after delivery. Please check allergies and ingredients with the vendor before ordering; ChopPool doesn't prepare food.</p>
@@ -3498,7 +3548,7 @@ function openIntro() {
 function introFor(h) {
   const kind = h.startsWith("kitchen-") ? "kitchen" : h.startsWith("rider-") && h !== "rider-signup" ? "rider" : h.startsWith("host-") ? "host" : null; if (!kind || local.get("cp_intro_" + kind)) return;
   const s = S.settings, txt = {
-    kitchen: ["Your ChopPool page", [`When customers ask, tap <b>Confirm</b> (by ${fmtTime(confirmBy())} for the day's orders).`, "Price any special requests before the time shown.", `At ${fmtTime(s.cutoff)} you get the final count. Cook, pack and write each code on its pack.`, "Tap <b>Food is ready</b>. The line at the top always says what to do next."]],
+    kitchen: ["Your ChopPool page", [`When customers ask, tap <b>Confirm</b> (by ${fmtTime(confirmBy())} for the day's orders).`, "Price any custom orders before the time shown.", `At ${fmtTime(s.cutoff)} you get the final count. Cook, pack and write each code on its pack.`, "Tap <b>Food is ready</b>. The line at the top always says what to do next."]],
     rider: ["Your rider page", ["Each pickup shows the vendor, the building and how many meals.", "Tap <b>Picked up</b> at the vendor, then <b>Delivered</b> at the building.", "Hand each meal over against the customer's code, like K-27."]],
     host: ["Your drop-point page", ["When the bag arrives, keep it safe.", "Hand each meal over when the customer shows their code, like K-27.", "Type the code here so they know it's been collected."]] }[kind];
   setTimeout(() => {
@@ -3513,7 +3563,7 @@ function openHelp() {
     <div class="stack small" style="gap:12px">
       <p><strong>Pools.</strong> People in the same building order from the same vendor, and one rider brings everything. The delivery cost is shared, so it drops as more people join.</p>
       <p><strong>Paying.</strong> You pay the full trip at checkout. Once you've got your lunch, everyone's share is worked out and the rest comes back to your wallet as cashback.</p>
-      <p><strong>Special requests.</strong> The vendor prices it first. You then have ${s.quote_pay_min || 15} minutes to pay, or it's released and nothing is charged.</p>
+      <p><strong>Custom orders.</strong> Something not on the menu. The vendor prices it first. You then have ${s.quote_pay_min || 15} minutes to pay, or it's released and nothing is charged.</p>
       <p><strong>If the vendor doesn't confirm.</strong> Your money comes back: to your wallet if you have an account, or ChopPool refunds your mobile money.</p>
       <p><strong>Collecting.</strong> Lunch arrives around ${fmtTime(s.delivery_time)}. Show your code at the drop point. Then tap "Got my food", or "Report a problem" if something's wrong.</p>
       <p><strong>Cancelling.</strong> You can cancel from Orders until ${fmtTime(s.cutoff)}.</p></div>`);
@@ -3579,7 +3629,7 @@ async function toggleAlerts() {
   }
   if (!local.get("cp_alerts_explained")) {
     openSheet(`${sheetHead("Turn on alerts?", "ChopPool will let you know:")}
-      <ul class="stack small" style="padding-left:20px;margin:0;gap:6px"><li>When the vendor confirms or cancels your pool</li><li>When your special request is priced</li><li>When lunch is 5 minutes away</li><li>When someone in ${esc(siteOf(S.siteId).name || "your building")} starts a pool (up to ${S.settings.notify_daily_cap} a day)</li></ul>
+      <ul class="stack small" style="padding-left:20px;margin:0;gap:6px"><li>When the vendor confirms or cancels your pool</li><li>When your custom order is priced</li><li>When lunch is 5 minutes away</li><li>When someone in ${esc(siteOf(S.siteId).name || "your building")} starts a pool (up to ${S.settings.notify_daily_cap} a day)</li></ul>
       ${isIOS() && !isStandalone() && pushReady() ? `<p class="note small">On iPhone, alerts reach you when the app is closed only after you add ChopPool to your Home Screen.</p>` : ""}
       <button class="btn wide" id="alertsYes">Turn on alerts</button><button class="ghost wide" data-close>Not now</button>`);
     $("#alertsYes").addEventListener("click", () => { local.set("cp_alerts_explained", true); closeSheet(); toggleAlerts(); });
@@ -3617,7 +3667,8 @@ function announceActivity() {
 
 /* Orders tab */
 const vendorWord = t => String(t || "").replace(/\bseller\b/g, "vendor").replace(/\bSeller\b/g, "Vendor");
-function statusLine(o) { return vendorWord(statusLine0(o)); }
+const OLD_CUSTOM = { "Special request not paid in time": "Custom order not paid in time", "Special request not paid before cut-off": "Custom order not paid before cut-off" };
+function statusLine(o) { if (o && OLD_CUSTOM[o.cancel_reason]) o = { ...o, cancel_reason: OLD_CUSTOM[o.cancel_reason] }; return vendorWord(statusLine0(o)); }
 function statusLine0(o) {
   const site = siteOf(o.site_id), st = o.pool_status, seller = menuOf(o.kitchen_id).public_name || "The vendor";
   if (o.status === "cancelled" && /^You cancelled/.test(o.cancel_reason || "")) return o.cancel_reason + "." + (o.refund_needed ? " ChopPool will refund your mobile money payment." : o.has_account && Number(o.max_fee) ? " Your money is back in your wallet." : "");
@@ -3639,7 +3690,7 @@ function statusLine0(o) {
   if (o.received_at) return "Received. Enjoy your lunch.";
   if (o.status === "collected") return "Handed over. Tap Got my food to confirm.";
   if (o.status === "cancelled" && o.cancel_reason === "Moved to another pool") return "Moved to another pool." + (o.refund_needed && Number(o.refund_due) > 0 ? " ChopPool will refund the difference, " + money(o.refund_due) + ", to your mobile money." : "");
-  if (o.status === "quote_requested") return "Waiting for " + seller + " to price your special request. You'll then have " + (S.settings.quote_pay_min || 15) + " minutes to pay.";
+  if (o.status === "quote_requested") return "Waiting for " + seller + " to price your custom order. You'll then have " + (S.settings.quote_pay_min || 15) + " minutes to pay.";
   if (o.status === "quoted") return seller + " priced your request at " + money(o.quote_price) + " a meal. Check the total and pay to confirm.";
   if (st === "waiting") { const w = o.wait_until && new Date(o.wait_until), by = w && isFinite(w) ? "by " + w.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "UTC" }) + (w.toISOString().slice(0, 10) > today() ? " " + (dayLabel(w.toISOString().slice(0, 10)) === "tomorrow" ? "tomorrow" : fmtDate(w.toISOString().slice(0, 10))) : "") : confirmText(o.order_date);
     return "Waiting for " + seller + " to confirm " + by + ". If they don't, you get your money back."; }
@@ -3827,9 +3878,9 @@ function openOrder(menuId, opt = {}) {
       <div class="group${trayMode ? " hidden" : ""}" id="extrasGroup"></div>
       <div class="group${trayMode ? " hidden" : ""}"><button type="button" class="linkbtn" id="noteToggle" style="justify-self:start">+ Add a note for the kitchen</button>
         <div id="noteBox" class="hidden"><input id="fNote" maxlength="140" placeholder="Less oil, extra napkins" aria-label="Note for the kitchen"></div>
-        ${specialOpen ? `<button type="button" class="linkbtn" id="specialToggle" style="justify-self:start">+ Ask for something not on the menu</button>
-        <div id="specialBox" class="hidden stack"><textarea id="fSpecial" rows="3" maxlength="300" placeholder="Jollof with fried fish instead of chicken" aria-label="Special request"></textarea>
-          <p class="small muted">The vendor prices it before ${fmtTime(s.special_cutoff)}. You pay after you see the price.</p></div>` : join ? "" : `<p class="small muted">Special requests close at ${fmtTime(s.special_cutoff)}.</p>`}
+        ${specialOpen ? `<button type="button" class="linkbtn" id="specialToggle" style="justify-self:start">+ Make a custom order (not on the menu)</button>
+        <div id="specialBox" class="hidden stack"><p class="small"><b>Custom order:</b> something not on the menu. The vendor sets the price.</p><textarea id="fSpecial" rows="3" maxlength="300" placeholder="Jollof with fried fish instead of chicken" aria-label="Custom order"></textarea>
+          <p class="small muted">The vendor prices it before ${fmtTime(s.special_cutoff)}. You pay after you see the price.</p></div>` : join ? "" : `<p class="small muted">Custom orders close at ${fmtTime(s.special_cutoff)}.</p>`}
       </div>
       <div class="group"><p class="group-title">Your details</p>
         ${known ? `<div class="me-row" id="meRow"><span class="avatar">${esc(me.name.slice(0, 1).toUpperCase())}</span><span style="flex:1;display:grid"><strong>${esc(me.name)}</strong><span class="small muted num">${esc(me.phone)}</span></span><button type="button" class="linkbtn" id="meEdit">Change</button></div>` : ""}
@@ -3883,7 +3934,7 @@ function openOrder(menuId, opt = {}) {
       $("#submitBtn").textContent = startsPool ? "Create pool" : "Join pool"; return;
     }
     if (special) {
-      $("#sum").innerHTML = `<div><span>${qty} × special request</span><span>Priced by the vendor</span></div>`;
+      $("#sum").innerHTML = `<div><span>${qty} × custom order</span><span>Priced by the vendor</span></div>`;
       $("#payPart").classList.add("hidden"); $("#saveTxt").classList.add("hidden");
       $("#totTxt").textContent = "Request"; $("#totSub").textContent = "You pay after it's priced"; $("#submitBtn").textContent = "Send request"; return;
     }
@@ -3918,7 +3969,7 @@ function openOrder(menuId, opt = {}) {
   $("#meEdit")?.addEventListener("click", () => { $("#meRow").classList.add("hidden"); $("#meFields").classList.remove("hidden"); $("#fName").focus(); });
   $("#specialToggle")?.addEventListener("click", () => {
     special = !special; $("#specialBox").classList.toggle("hidden", !special);
-    $("#specialToggle").textContent = special ? "Order from the menu instead" : "+ Ask for something not on the menu"; draw();
+    $("#specialToggle").textContent = special ? "Order from the menu instead" : "+ Make a custom order (not on the menu)"; draw();
     if (special) $("#fSpecial").focus();
   });
   // Before money moves: the moment the customer goes to pay, check the vendor still has space and the dish is still on
@@ -4014,7 +4065,7 @@ function showConfirmation(r, k, site, special) {
   const askInstall = !isStandalone() && !local.get("cp_install_asked"); if (askInstall) local.set("cp_install_asked", true);
   const s = S.settings, trip = tripTo(k, site), fee = feeFor(r.meals, s, trip), drop = nextDrop(r.meals, s, trip);
   const waiting = r.pool_status === "waiting", back = S.user ? "your money goes straight back to your wallet" : "you get your money back";
-  const head = special ? "Request sent" : waiting ? (r.meals > r.myQty ? "You're in the pool" : "You've started a pool") : "You're in the pool";
+  const head = special ? "Custom order sent" : waiting ? (r.meals > r.myQty ? "You're in the pool" : "You've started a pool") : "You're in the pool";
   const body = special ? `${esc(k.public_name)} will price your request before ${fmtTime(s.special_cutoff)}. You'll see the price under Orders, then pay to confirm.`
     : waiting ? `We've asked ${esc(k.public_name)} to confirm they're cooking. Share the pool now: every person who joins makes delivery cheaper. If they don't confirm ${confirmText(S.date)}, ${back}.`
     : `${esc(collectLine(site))} ${r.meals} of ${s.max_meals} seats are taken and delivery is now ${money(fee)} a meal.`;
@@ -4041,14 +4092,14 @@ function openPayQuote(id) {
   const o = (S.mine || []).find(x => x.id === id); if (!o) return;
   const s = S.settings;
   openSheet(`
-    ${sheetHead("Confirm your special request", esc(menuOf(o.kitchen_id).public_name) + " priced it at " + money(o.quote_price) + " a meal.")}
+    ${sheetHead("Confirm your custom order", esc(menuOf(o.kitchen_id).public_name) + " priced it at " + money(o.quote_price) + " a meal.")}
     <div class="sum"><div><span>Total with delivery and service</span><span class="num">${money(o.amount_due)}</span></div></div>
     ${S.user && S.balance > 0 ? `<label class="switch"><span>Use wallet <span class="muted num">(${money(S.balance)})</span></span><input type="checkbox" id="qWallet" checked></label>` : ""}
     <div class="pay"><div class="momo"><span class="logo">Mobile money</span><span style="flex:1;display:grid"><span class="small muted">Send the rest to</span><strong class="num">${esc(payList()[0].number)}</strong><span class="small muted">${esc(payList()[0].name)}${payList()[0].network ? " · " + esc(payList()[0].network) : ""} · before ${fmtTime(s.cutoff)}</span></span><button type="button" class="ghost" data-copynum="${esc(payList()[0].number)}" style="padding:8px 10px" aria-label="Copy mobile money number">${ICON.copy}</button></div>${payAlts()}
       <div><label for="qRef">Transaction ID from your mobile money SMS</label><input id="qRef" placeholder="e.g. 51234567890"></div></div>
     <p class="err" id="qErr"></p><button class="btn wide" id="qPay">Confirm payment</button>`);
   $("#qPay").addEventListener("click", async () => {
-    try { await api.payQuote(id, $("#qRef").value.trim(), !!$("#qWallet")?.checked); closeSheet(); toast("Paid. Your special request is confirmed."); refreshMine(); refreshUser(); }
+    try { await api.payQuote(id, $("#qRef").value.trim(), !!$("#qWallet")?.checked); closeSheet(); toast("Paid. Your custom order is confirmed."); refreshMine(); refreshUser(); }
     catch (e) { $("#qErr").textContent = cleanErr(e); }
   });
 }
@@ -4438,7 +4489,7 @@ async function renderAdmin(cached) {
       ["Payments to check", live.filter(o => o.status === "pending").length, "today:orders", "warn", "Mobile money references waiting"],
       ["Refunds due", A.orders.filter(o => o.refund_needed).length, "today:wallets", "bad", "Cancelled or vendor no-show"],
       ["Vendors not confirmed", waiting.length + otherWait.length, "today:pools", "bad", waiting.length ? "Least time left: " + Math.min(...waiting.map(minsLeft)) + " min" : otherWait.length ? "For " + dayLabel(d === dToday ? dNext : dToday) : ""],
-      ["Special requests to price", A.orders.filter(o => o.status === "quote_requested").length, "today:orders", "warn", "Vendors haven't priced yet"],
+      ["Custom orders to price", A.orders.filter(o => o.status === "quote_requested").length, "today:orders", "warn", "Vendors haven't priced yet"],
       ["Building requests", pending.length, "buildings:requests", "warn", "Waiting for approval"],
       ["Vendor listing requests", listReq.length, "menus:requests", "warn", "Vendors asking to be listed"],
       ["Rider applications", riderApps.length, "riders:apply", "warn", "Riders asking to join"],
@@ -4509,7 +4560,7 @@ async function renderAdmin(cached) {
         vendor: (a, b) => String(K(a.kitchen_id).public_name || "").localeCompare(String(K(b.kitchen_id).public_name || "")) || (a.created_at < b.created_at ? 1 : -1) }[sortBy] || ((a, b) => a.created_at < b.created_at ? 1 : -1);
       rest.sort(cmp); toCheckL.sort((a, b) => a.created_at < b.created_at ? -1 : 1);
       const row = (o, flag) => { const p = A.pools.find(x => x.id === o.pool_id) || {}, k = K(o.kitchen_id);
-        const extras = [addonText(o.addons), o.note ? "Note: " + o.note : "", o.special_request ? "Special: " + o.special_request + (o.quote_price ? " (" + money(o.quote_price) + ")" : " (not priced)") : ""].filter(Boolean).join(" · ");
+        const extras = [addonText(o.addons), o.note ? "Note: " + o.note : "", o.special_request ? "Custom: " + o.special_request + (o.quote_price ? " (" + money(o.quote_price) + ")" : " (not priced)") : ""].filter(Boolean).join(" · ");
         const paid = [o.wallet_used > 0 ? "Wallet " + money(o.wallet_used) : "", o.momo_ref ? "Ref " + o.momo_ref : ""].filter(Boolean).join(" + ");
         // A tray order is paid once, on its first dish: expect the whole amount there
         const own = o2 => Math.max(0, orderTotal(o2) - Number(o2.wallet_used || 0) - Number(o2.carried_amount || 0));
@@ -4708,7 +4759,7 @@ async function renderAdmin(cached) {
           <div><label for="pfKm">Rate per km (GHS)</label><input id="pfKm" name="per_km" inputmode="decimal" value="${esc(s.per_km ?? "")}"></div>
           <div><label for="pfMax">Highest trip price (GHS)</label><input id="pfMax" name="trip_max" inputmode="decimal" value="${esc(s.trip_max ?? 80)}"></div>
           <div><label for="pfFlat">Flat trip cost if a pin is missing (GHS)</label><input id="pfFlat" name="trip_cost" inputmode="decimal" value="${esc(s.trip_cost)}"></div>
-          <div><label for="pfPay">Minutes to pay a priced special order</label><input id="pfPay" name="quote_pay_min" inputmode="numeric" value="${esc(s.quote_pay_min ?? 15)}"></div>
+          <div><label for="pfPay">Minutes to pay a priced custom order</label><input id="pfPay" name="quote_pay_min" inputmode="numeric" value="${esc(s.quote_pay_min ?? 15)}"></div>
           <div><label for="pfRecv">"Got my food" confirms itself after (minutes)</label><input id="pfRecv" name="auto_receive_min" inputmode="numeric" value="${esc(s.auto_receive_min ?? 120)}"></div></div>
         <p class="small muted">Customers pay the full trip at checkout. Once lunch is received, each person's share is worked out and the rest comes back as cashback. No trip is charged above the highest trip price. Changes only affect new orders.</p>
         ${s.base_fare != null ? `<p class="small" style="color:var(--hint)">Examples: 2 km trip ${money(ex(2))} · 5 km ${money(ex(5))} · 10 km ${money(ex(10))}</p>` : ""}
@@ -4984,7 +5035,7 @@ async function adminSubmit(e) {
     if (f.dataset.form === "settings") {
       const vals = ["base_fare", "per_km", "trip_max", "trip_cost", "quote_pay_min", "auto_receive_min"].map(n => [n, Number(v(n))]);
       if (vals.some(([, x]) => !isFinite(x) || x < 0) || !Number(v("trip_max")) || !Number(v("per_km"))) return fail("Enter numbers in every box.");
-      const qm = Number(v("quote_pay_min")); if (qm < 10 || qm > 20) return fail("Give customers 10 to 20 minutes to pay for a special order.");
+      const qm = Number(v("quote_pay_min")); if (qm < 10 || qm > 20) return fail("Give customers 10 to 20 minutes to pay for a custom order.");
       if (Number(v("auto_receive_min")) < 30) return fail("Allow at least 30 minutes before \"Got my food\" confirms itself.");
       const near = Number(v("near_max_fee")), fkm = Number(v("free_max_km")), by = v("next_day_confirm_by"), cd = v("countdown_start");
       if (!(near > 0) || !(fkm >= 0) || fkm > 10) return fail("Enter a delivery limit above 0 and a free-delivery distance up to 10 km.");
@@ -5128,7 +5179,7 @@ async function viewKitchen(token) {
       if (!k.open && !k.paused && closedToday) return { t: "Orders for " + dayLabel(d) + " have closed." + (dNext !== d ? " Tap " + dayLabel(dNext)[0].toUpperCase() + dayLabel(dNext).slice(1) + " to see what's next." : ""), go: "", b: "" };
       if (!k.open && !k.paused) return { t: waiting.length ? waitLine() : "Confirm you're cooking " + dayLabel(d) + ".", go: "#cookCard", b: "Confirm" };
       const sp = specials.filter(o => o.status === "quote_requested").length;
-      if (sp) return { t: `Price ${sp} special request${sp > 1 ? "s" : ""} by ${fmtTime(priceBy)}.`, go: "#specials", b: "Price now" };
+      if (sp) return { t: `Price ${sp} custom order${sp > 1 ? "s" : ""} by ${fmtTime(priceBy)}.`, go: "#specials", b: "Price now" };
       const st = s => pools.find(p => p.status === s);
       if (afterCut && st("collecting")) return { t: "Orders are closed. Confirm the final batch.", go: "#pool-" + st("collecting").id, b: "Confirm batch" };
       if (st("accepted")) return { t: "Cook and pack. Tap Food is ready when done.", go: "#pool-" + st("accepted").id, b: "Go to order" };
@@ -5158,9 +5209,9 @@ async function viewKitchen(token) {
           ${termsNeed(k) ? termsBox(k, K.menu) : ""}
           ${termsNeed(k) ? `<button class="btn wide" id="acceptTerms">Accept terms and confirm I'm cooking ${dayLabel(d)}</button>` : `${Number(k.fee_rate) > 0 ? `<p class="small muted">${esc(termsLine(k))}</p>` : ""}<button class="btn wide" id="openDay">Yes, I'm cooking ${dayLabel(d)}</button>`}
           ${waiting.length ? `<button class="linkbtn" id="skipDay" style="justify-self:center;color:var(--danger)">Not cooking ${dayLabel(d)}? Let customers know</button>` : ""}</section>`}
-      ${specials.length ? `<section class="card stack" id="specials"><div class="top"><h2>Special requests</h2><span class="chip warn">Price by ${fmtTime(priceBy)}</span></div><p class="small muted">The customer pays after you price it. Requests not priced in time are cancelled.</p>${specials.map(quoteForm).join("")}</section>` : ""}
+      ${specials.length ? `<section class="card stack" id="specials"><div class="top"><h2>Custom orders</h2><span class="chip warn">Price by ${fmtTime(priceBy)}</span></div><p class="small muted">The customer pays after you price it. Requests not priced in time are cancelled.</p>${specials.map(quoteForm).join("")}</section>` : ""}
       ${pools.map(p => {
-        const tally = {}; p.orders.filter(o => !o.special_request || o.status !== "quote_requested").forEach(o => { const key = o.item_name + (o.addons?.length ? " (" + addonText(o.addons) + ")" : "") + (o.special_request ? " · Special: " + o.special_request : ""); tally[key] = (tally[key] || 0) + o.qty; });
+        const tally = {}; p.orders.filter(o => !o.special_request || o.status !== "quote_requested").forEach(o => { const key = o.item_name + (o.addons?.length ? " (" + addonText(o.addons) + ")" : "") + (o.special_request ? " · Custom: " + o.special_request : ""); tally[key] = (tally[key] || 0) + o.qty; });
         const n = p.orders.reduce((a, o) => a + o.qty, 0);
         const btns = p.status === "waiting" ? "" : p.status === "collecting" ? (afterCut ? `<button class="btn wide" data-k="accepted" data-pool="${esc(p.id)}">Confirm final batch</button>` : `<p class="small muted">Orders close at ${fmtTime(S.settings.cutoff)}. Then confirm the final batch.</p>`)
           : p.status === "accepted" ? `<button class="btn wide" data-k="ready" data-pool="${esc(p.id)}">Food is ready</button>`
@@ -5176,7 +5227,7 @@ async function viewKitchen(token) {
           ${food > 0 ? `<div class="sumgrid small"><span>Food paid for</span><b class="num">${money(food)}</b>${Number(p.fee) > 0 ? `<span>ChopPool fee (${Math.round(Number(p.fee_rate) * 1000) / 10}% after ${p.fee_free} meals)</span><b class="num">−${money(p.fee)}</b>` : ""}<span>Due to you</span><b class="num">${money(food - Number(p.fee || 0))}</b></div>` : ""}
           ${Object.keys(tally).length ? `<ul style="margin:0;padding-left:20px">${Object.entries(tally).map(([nm, q]) => `<li class="num"><strong>${q} ×</strong> ${esc(nm)}</li>`).join("")}</ul>` : ""}
           <p class="small muted">Label each pack with its code:</p>
-          <div class="labels">${byCode(p.orders.filter(o => !["quote_requested", "quoted"].includes(o.status))).sort((x, y) => (x[1][0].created_at || "") < (y[1][0].created_at || "") ? -1 : 1).map(([c, g]) => `<div><span class="lc num">${esc(c)}</span><span class="items">${groupDishes(g.filter(o => !o.special_request)).map(x => `<span>${x.qty} × ${esc(x.name)}${x.extra ? ` <span class="small muted">· ${esc(x.extra)}</span>` : ""}</span>`).join("")}${g.filter(o => o.special_request).map(o => `<span>${o.qty} × ${esc(o.item_name)}<br><strong>Special: ${esc(o.special_request)}</strong></span>`).join("")}${g.length > 1 ? `<span class="small muted">Pack together · ${g.reduce((t, o) => t + o.qty, 0)} meals</span>` : ""}</span>${g.every(o => o.collected) ? `<span class="tick">Collected</span>` : g.every(o => o.paid) ? "" : `<span class="chip warn">Payment pending</span>`}</div>`).join("") || `<p class="small muted">No paid orders yet.</p>`}</div>
+          <div class="labels">${byCode(p.orders.filter(o => !["quote_requested", "quoted"].includes(o.status))).sort((x, y) => (x[1][0].created_at || "") < (y[1][0].created_at || "") ? -1 : 1).map(([c, g]) => `<div><span class="lc num">${esc(c)}</span><span class="items">${groupDishes(g.filter(o => !o.special_request)).map(x => `<span>${x.qty} × ${esc(x.name)}${x.extra ? ` <span class="small muted">· ${esc(x.extra)}</span>` : ""}</span>`).join("")}${g.filter(o => o.special_request).map(o => `<span>${o.qty} × ${esc(o.item_name)}<br><strong>Custom: ${esc(o.special_request)}</strong></span>`).join("")}${g.length > 1 ? `<span class="small muted">Pack together · ${g.reduce((t, o) => t + o.qty, 0)} meals</span>` : ""}</span>${g.every(o => o.collected) ? `<span class="tick">Collected</span>` : g.every(o => o.paid) ? "" : `<span class="chip warn">Payment pending</span>`}</div>`).join("") || `<p class="small muted">No paid orders yet.</p>`}</div>
           ${runnerHand}${btns}</article>`;
       }).join("")}
       <details class="card settingsfold"${S.kset ? " open" : ""}><summary><h2>Your settings</h2><span class="small muted">Cooking days, free delivery, menu, photos, alerts</span></summary>

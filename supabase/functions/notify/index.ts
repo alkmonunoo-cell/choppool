@@ -80,7 +80,7 @@ async function orderEvents(orderId: string) {
   const { data: o } = await db.from("orders").select("*").eq("id", orderId).single(); if (!o) return;
   const { data: k } = await db.from("kitchens").select("*").eq("id", o.kitchen_id).single();
   if (o.status === "quote_requested" && await once("special:" + o.id))
-    await send(await kitchenSubs(o.kitchen_id), "Special request to price", o.qty + " × " + o.item_name + ": " + o.special_request, APP + "/#kitchen-" + k.token, "special-" + o.id);
+    await send(await kitchenSubs(o.kitchen_id), "Custom order to price", o.qty + " × " + o.item_name + ": " + o.special_request, APP + "/#kitchen-" + k.token, "special-" + o.id);
   if (o.status === "quoted" && await once("quoted:" + o.id + ":" + o.quote_price))
     await send(await customerSubs([o]), "Your request is priced", k.public_name + " priced it at " + money(o.quote_price) + " a meal. Pay within " + quoteMins(o) + " minutes to keep it.", APP + "/#order", "order-" + o.id, "priced");
   // Payment we couldn't find, or short: the customer can fix it from Orders before cut-off (always sent; not a type you can switch off)
@@ -89,10 +89,10 @@ async function orderEvents(orderId: string) {
       (o.pay_issue === "short" ? "We received " + money(o.amount_received || 0) + ". Pay the rest" : "Check the mobile money transaction ID or pay again") + " before orders close so your lunch counts.", APP + "/#order", "order-" + o.id);
   if (o.status === "cancelled" && o.cancel_reason === "Payment not received" && await once("unpaid:" + o.id))
     await send(await customerSubs([o]), "Order cancelled", "We didn't receive your payment before orders closed, so code " + o.code + " was cancelled.", APP + "/#order", "order-" + o.id);
-  if (o.status === "cancelled" && ["Special request not paid in time", "The seller didn't price your request in time"].includes(o.cancel_reason || "") && await once("quoteclosed:" + o.id))
-    await send(await customerSubs([o]), "Special request closed", (o.cancel_reason || "") + ", so code " + o.code + " was released. Nothing was charged.", APP + "/#order", "order-" + o.id);
-  if (o.status === "cancelled" && o.cancel_reason === "Special request not paid before cut-off" && await once("unpaidquote:" + o.id))
-    await send(await customerSubs([o]), "Special request closed", "Orders closed before your special request was paid, so code " + o.code + " was released. Nothing was charged.", APP + "/#order", "order-" + o.id);
+  if (o.status === "cancelled" && ["Special request not paid in time", "Custom order not paid in time", "The seller didn't price your request in time"].includes(o.cancel_reason || "") && await once("quoteclosed:" + o.id))
+    await send(await customerSubs([o]), "Custom order closed", (o.cancel_reason || "").replace("Special request", "Custom order") + ", so code " + o.code + " was released. Nothing was charged.", APP + "/#order", "order-" + o.id);
+  if (o.status === "cancelled" && ["Special request not paid before cut-off", "Custom order not paid before cut-off"].includes(o.cancel_reason) && await once("unpaidquote:" + o.id))
+    await send(await customerSubs([o]), "Custom order closed", "Orders closed before your custom order was paid, so code " + o.code + " was released. Nothing was charged.", APP + "/#order", "order-" + o.id);
   if (o.status === "cancelled" && /^The seller can't/.test(o.cancel_reason || "") && await once("declined:" + o.id))
     await send(await customerSubs([o]), k.public_name + " can't do your request", (o.cancel_reason || "") + ". Nothing was charged.", APP + "/#order", "order-" + o.id, "confirm");
   await poolEvents(o.pool_id);
@@ -104,12 +104,12 @@ async function tick() {
   await db.rpc("housekeeping");
   const { data: s } = await db.from("settings").select("*").eq("id", 1).single(); if (!s) return;
   const now = new Date(), today = now.toISOString().slice(0, 10), since = new Date(now.getTime() - 2 * 864e5).toISOString().slice(0, 10);
-  // Orders the database cancelled on its own at cut-off (payment never arrived, special request never paid): tell the customer
+  // Orders the database cancelled on its own at cut-off (payment never arrived, custom order never paid): tell the customer
   const { data: autoCancelled } = await db.from("orders").select("id").eq("status", "cancelled")
-    .in("cancel_reason", ["Payment not received", "Special request not paid before cut-off"]).gte("order_date", since);
+    .in("cancel_reason", ["Payment not received", "Special request not paid before cut-off", "Custom order not paid before cut-off"]).gte("order_date", since);
   for (const o of autoCancelled || []) await orderEvents(o.id);
   const { data: qClosed } = await db.from("orders").select("id").eq("status", "cancelled")
-    .in("cancel_reason", ["Special request not paid in time", "The seller didn't price your request in time"]).gte("order_date", since);
+    .in("cancel_reason", ["Special request not paid in time", "Custom order not paid in time", "The seller didn't price your request in time"]).gte("order_date", since);
   for (const o of qClosed || []) await orderEvents(o.id);
 
   // Cashback posted to a wallet in the last 15 minutes: tell the customer
@@ -118,13 +118,13 @@ async function tick() {
     await send(((await db.from("push_subs").select("*").eq("user_id", e.user_id)).data || []), money(e.amount) + " cashback added", "Your share of the delivery is back in your ChopPool wallet.", APP + "/#order", "cashback-" + e.order_id, "cashback");
 
   const cutToday = new Date(today + "T" + String(s.cutoff).slice(0, 5) + ":00Z"), payMin = Number(s.quote_pay_min || 15);
-  // Sellers: reminder 15 minutes before pricing for special requests closes
+  // Sellers: reminder 15 minutes before pricing for custom orders closes
   const priceBy = new Date(cutToday.getTime() - payMin * 6e4);
   if (now >= new Date(priceBy.getTime() - 15 * 6e4) && now < priceBy) {
     const { data: qs } = await db.from("orders").select("*").eq("status", "quote_requested").eq("order_date", today);
     for (const o of qs || []) if (await once("quoteremind:" + o.id)) {
       const { data: k } = await db.from("kitchens").select("*").eq("id", o.kitchen_id).single();
-      if (k) await send(await kitchenSubs(k.id), "Price a special request", "Price code " + o.code + " before " + priceBy.toISOString().slice(11, 16) + " or it closes.", APP + "/#kitchen-" + k.token, "special-" + o.id);
+      if (k) await send(await kitchenSubs(k.id), "Price a custom order", "Price code " + o.code + " before " + priceBy.toISOString().slice(11, 16) + " or it closes.", APP + "/#kitchen-" + k.token, "special-" + o.id);
     }
   }
   // Solo pools: 10 minutes before cut-off, ask the only customer if they still want it
@@ -209,7 +209,7 @@ async function tick() {
         db.from("orders").select("qty,special_request,status").in("pool_id", byK[kid].map((p: any) => p.id)).in("status", ["pending", "paid", "collected"])]);
       const n = (os || []).reduce((a: number, o: any) => a + o.qty, 0), sp = (os || []).filter((o: any) => o.special_request).length;
       const [h, m] = String(s.delivery_time).slice(0, 5).split(":").map(Number), ready = new Date(Date.UTC(2000, 0, 1, h, m - 30)).toISOString().slice(11, 16);
-      if (k && n) await send(await kitchenSubs(k.id), "Orders closed: " + n + " meals", byK[kid].length + " pool" + (byK[kid].length > 1 ? "s" : "") + (sp ? ", " + sp + " special request" + (sp > 1 ? "s" : "") : "") + ". Ready by " + ready + ". Confirm the final batch on your page.", APP + "/#kitchen-" + k.token, "summary-" + kid);
+      if (k && n) await send(await kitchenSubs(k.id), "Orders closed: " + n + " meals", byK[kid].length + " pool" + (byK[kid].length > 1 ? "s" : "") + (sp ? ", " + sp + " custom order" + (sp > 1 ? "s" : "") : "") + ". Ready by " + ready + ". Confirm the final batch on your page.", APP + "/#kitchen-" + k.token, "summary-" + kid);
     }
   }
 }

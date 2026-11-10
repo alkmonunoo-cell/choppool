@@ -62,7 +62,7 @@ select kitchen_quote(:'tk', :'q1', 70);
 select 'Q1 pay window set', quote_pay_by between now() + interval '14 minutes' and now() + interval '16 minutes' as ok from orders where id = :'q1';
 update orders set quote_pay_by = now() - interval '1 minute' where id = :'q1';
 select housekeeping();
-select 'Q2 unpaid special released', status = 'cancelled' and cancel_reason = 'Special request not paid in time' as ok from orders where id = :'q1';
+select 'Q2 unpaid special released', status = 'cancelled' and cancel_reason in ('Special request not paid in time', 'Custom order not paid in time') as ok from orders where id = :'q1';
 -- switch a guest order to another vendor's pool
 set role anon;
 select place_order(:'s1', :'i1', 1, 'Yaw', '0240000044', 'REF-Y1') ->> 'id' as g1 \gset

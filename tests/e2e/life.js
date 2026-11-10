@@ -82,7 +82,7 @@ const tick = async (p, iso) => { await p.clock.setSystemTime(new Date(iso)); awa
   await p.evaluate(o => { const m = JSON.parse(localStorage.getItem('cp_orders') || '[]'); m.push({ id: o.kofi.id, order_date: o.kofi.order_date }, { id: o.esi.id, order_date: o.esi.order_date }); localStorage.setItem('cp_orders', JSON.stringify(m)); }, others);
   await go(p, '#order', 1500); await p.evaluate(() => refreshMine()); await p.waitForTimeout(800);
   const home = await txt(p, '#tabHome');
-  ok(/payment|Payment/.test(home) && await p.locator('.mylunch.bad').count() === 1, '6.01', 'red payment strip on Home', home.slice(0, 300));
+  ok(/payment|Payment/.test(home) && await p.locator('.mylunch.bad').count() === 2, '6.01', 'red payment strip on Home', home.slice(0, 300));
   await p.evaluate(() => setTab('orders')); await p.waitForTimeout(700);
   let ot = await txt(p, '#tabOrders');
   ok(/couldn't find your payment/i.test(ot), '6.02', 'order card: payment not found + fix');
