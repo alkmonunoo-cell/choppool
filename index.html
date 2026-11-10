@@ -140,7 +140,9 @@ button.hero-stat::after { content: "›"; position: absolute; right: 9px; top: 6
 .mlwrap { position: relative; z-index: 1; display: grid; gap: 8px; min-width: 0; }
 .mlswipe { display: flex; gap: 8px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; }
 .mlswipe::-webkit-scrollbar { display: none; }
-.mlswipe > .mylunch { flex: 0 0 calc(100% - 26px); scroll-snap-align: start; }
+.mlhost { position: relative; z-index: 1; min-width: 0; }
+.mlhost:empty { display: none; }
+.mlswipe > .mylunch { flex: 0 0 calc(100% - 26px); scroll-snap-align: start; scroll-snap-stop: always; }
 .mldots { display: flex; justify-content: center; gap: 5px; }
 .mldots i { width: 6px; height: 6px; border-radius: 3px; background: rgba(255,255,255,.35); transition: width .2s, background .2s; }
 .mldots i.on { width: 16px; background: #fff; }
@@ -2323,6 +2325,8 @@ async function viewOrder() {
   $("#tabHome").addEventListener("click", e => { if (mineClick(e)) return; if (e.target.closest("[data-findb]")) { openSitePicker(); $("#fbQ")?.focus(); return; } const ws = e.target.closest("[data-site]"); if (ws) return setSite(ws.dataset.site);
     if (e.target.closest(".locchip")) return openSitePicker();
     if (e.target.closest("[data-seeall]")) { S.vf = "near"; S.vq = ""; return setTab("kitchens"); }
+    // A swipe that ends on a card is not a tap: only a clean tap opens the order
+    if (e.target.closest(".mlswipe [data-gomine]") && (S.mlMoved || Date.now() - (S.mlScrollAt || 0) < 300)) { S.mlMoved = false; return; }
     if (e.target.closest("[data-gomine]")) { const id = e.target.closest("[data-gomine]").dataset.gomine; setTab("orders");
       if (id) setTimeout(() => { const c = document.querySelector(`#tabOrders [data-ocard="${CSS.escape(id)}"]`); c && c.scrollIntoView({ block: "center", behavior: "smooth" }); }, 120); return; }
     const v = e.target.closest("[data-vendor]"); if (v) return openVendor(v.dataset.vendor);
@@ -2602,35 +2606,60 @@ function lunchCard(o) {
     t = "Paid · waiting for vendor"; sub = w && isFinite(w) ? "Confirms by " + hm(w) + (w.toISOString().slice(0, 10) > today() ? " " + (dayLabel(w.toISOString().slice(0, 10)) === "tomorrow" ? "tomorrow" : fmtDate(w.toISOString().slice(0, 10))) : "") : what; }
   else if (st <= 1) { rank = 5; t = "Confirmed for " + day; }
   else { rank = { 2: 4, 3: 3, 4: 2 }[Math.min(st, 4)]; t = ["", "", "Being cooked", "On the way", "Delivered"][Math.min(st, 4)]; }
-  return { o, rank, html: `<button class="mylunch${bad ? " bad" : ""}" data-gomine="${esc(o.id)}" aria-label="${esc(t)}, code ${esc(o.code)}. Open your order">
+  const hash = [t, sub, st, bad, fix, bar, o.code].join("|");
+  return { o, rank, hash, html: `<button class="mylunch${bad ? " bad" : ""}" data-gomine="${esc(o.id)}" data-h="${esc(hash)}" aria-label="${esc(t)}, code ${esc(o.code)}. Open your order">
     <span class="ml-dot${!bad && st >= 3 ? " go" : ""}"></span><span class="ml-t"><b>${esc(t)}</b><small>${esc(sub)}</small></span>
     <span class="ml-code"><small>${fix ? "tap" : "code"}</small><b>${fix ? "Fix" : esc(o.code)}</b></span>
     ${bar ? `<span class="ml-bar" aria-hidden="true">${[1, 2, 3, 4, 5].map(i => `<i class="${i <= st ? "on" : ""}"></i>`).join("")}</span>` : ""}</button>` };
 }
 function lunchStrip() {
-  const cards = (S.mine || []).filter(o => !o.parent_id && o.order_date >= today() && !o.received_at && ["pending", "quote_requested", "quoted", "paid", "collected"].includes(o.status))
+  return (S.mine || []).filter(o => !o.parent_id && o.order_date >= today() && !o.received_at && ["pending", "quote_requested", "quoted", "paid", "collected"].includes(o.status))
     .map(lunchCard).sort((a, b) => a.rank - b.rank || a.o.order_date.localeCompare(b.o.order_date) || String(a.o.created_at).localeCompare(String(b.o.created_at)));
-  if (!cards.length) return "";
-  if (cards.length === 1) return cards[0].html;
-  return `<div class="mlwrap"><div class="mlswipe" id="mlSwipe">${cards.map(c => c.html).join("")}</div>
-    <div class="mldots" aria-hidden="true">${cards.map((c, i) => `<i class="${i ? "" : "on"}"></i>`).join("")}</div></div>`;
 }
-function wireLunchStrip(keepId) {
-  const sw = $("#mlSwipe"); if (!sw) return;
-  const dots = [...sw.parentElement.querySelectorAll(".mldots i")], step = () => sw.firstElementChild.getBoundingClientRect().width + 8;
-  const mark = () => { const i = Math.round(sw.scrollLeft / step()); dots.forEach((d, n) => d.classList.toggle("on", n === i)); };
-  sw.addEventListener("scroll", mark, { passive: true });
-  sw.addEventListener("touchstart", () => { S.mlTouch = true; }, { passive: true });
-  sw.addEventListener("touchend", () => setTimeout(() => { S.mlTouch = false; }, 600), { passive: true });
+// The strip is patched, not rebuilt: a card whose words changed is swapped on its own; the scroll position is never touched.
+// While the person is swiping (finger down, or the swipe still gliding) changes wait until it settles.
+function updateLunchStrip(host, cards) {
+  const sw = host.querySelector(".mlswipe"), busy = sw && (S.mlTouch || Date.now() - (S.mlScrollAt || 0) < 350);
+  if (busy) { S.mlPending = true; return; }
+  S.mlPending = false;
+  const ids = cards.map(c => c.o.id).join(",");
+  if (!cards.length) { host.innerHTML = ""; host.dataset.ids = ""; return; }
+  const multi = cards.length > 1;
+  if (host.dataset.ids !== ids || host.dataset.multi !== String(multi)) {
+    // The list of orders changed: rebuild, then stay on the card that was showing (if it's still there)
+    const keep = sw ? [...sw.children][Math.round(sw.scrollLeft / Math.max(1, sw.firstElementChild.getBoundingClientRect().width + 8))]?.dataset.gomine : null;
+    host.innerHTML = multi ? `<div class="mlwrap"><div class="mlswipe">${cards.map(c => c.html).join("")}</div><div class="mldots" aria-hidden="true">${cards.map(() => "<i></i>").join("")}</div></div>` : cards[0].html;
+    host.dataset.ids = ids; host.dataset.multi = String(multi);
+    if (multi) wireLunchStrip(host, keep);
+    return;
+  }
+  // Same orders: swap only the cards whose text changed
+  const els = multi ? [...host.querySelector(".mlswipe").children] : [host.firstElementChild];
+  cards.forEach((c, n) => { const e = els[n]; if (e && e.dataset.h !== c.hash) { const t = document.createElement("template"); t.innerHTML = c.html.trim(); e.replaceWith(t.content.firstElementChild); } });
+}
+function wireLunchStrip(host, keepId) {
+  const sw = host.querySelector(".mlswipe"), dots = [...host.querySelectorAll(".mldots i")];
+  const step = () => sw.firstElementChild.getBoundingClientRect().width + 8;
+  const mark = () => { const i = Math.min(dots.length - 1, Math.max(0, Math.round(sw.scrollLeft / step()))); dots.forEach((d, n) => d.classList.toggle("on", n === i)); };
+  // Finger on the strip, or the swipe still gliding = busy; once both stop, apply any update that waited
+  let settle;
+  const idle = () => { clearTimeout(settle); settle = setTimeout(() => { if (S.mlFinger) return; S.mlTouch = false; if (S.mlPending) renderHero(); }, 250); };
+  sw.addEventListener("scroll", () => { S.mlScrollAt = Date.now(); S.mlTouch = true; mark(); idle(); }, { passive: true });
+  sw.addEventListener("scrollend", () => { mark(); idle(); }, { passive: true });
+  const down = e => { S.mlFinger = S.mlTouch = true; const t = e.touches ? e.touches[0] : e; S.mlDown = [t.clientX, t.clientY]; S.mlMoved = false; };
+  const move = e => { const t = e.touches ? e.touches[0] : e; if (S.mlDown && Math.hypot(t.clientX - S.mlDown[0], t.clientY - S.mlDown[1]) > 10) S.mlMoved = true; };
+  const up = () => { S.mlFinger = false; idle(); };
+  sw.addEventListener("touchstart", down, { passive: true }); sw.addEventListener("touchmove", move, { passive: true });
+  sw.addEventListener("touchend", up, { passive: true }); sw.addEventListener("touchcancel", up, { passive: true });
+  sw.addEventListener("pointerdown", e => { if (e.pointerType !== "touch") down(e); }, { passive: true });
+  sw.addEventListener("pointermove", e => { if (e.pointerType !== "touch") move(e); }, { passive: true });
+  sw.addEventListener("pointerup", e => { if (e.pointerType !== "touch") up(); }, { passive: true });
   const k = keepId ? [...sw.children].findIndex(c => c.dataset.gomine === keepId) : -1;
-  if (k > 0) { sw.style.scrollSnapType = "none"; sw.scrollLeft = k * step(); sw.style.scrollSnapType = ""; mark(); }
+  if (k >= 0) sw.scrollLeft = k * step();
+  mark();
 }
 function renderHero() {
   const el = $("#hero"); if (!el) return;
-  // The strip re-draws every few seconds: keep the card the person swiped to, and never redraw mid-swipe
-  const sw0 = $("#mlSwipe");
-  if (sw0 && S.mlTouch) return;
-  const keepId = sw0 ? [...sw0.children].map(c => c.dataset.gomine)[Math.round(sw0.scrollLeft / Math.max(1, sw0.firstElementChild.getBoundingClientRect().width + 8))] : null;
   const s = S.settings, site = siteOf(S.siteId);
   const here = S.board.pools.filter(p => S.noSite || p.site_id === S.siteId);
   const meals = here.reduce((t, p) => t + p.meals, 0);
@@ -2643,16 +2672,23 @@ function renderHero() {
   const live = lunchStrip();
   const name = firstName();
   const dl = dayLabel(S.date);
-  el.innerHTML = `<div class="hero-text"><p class="small">${greeting()}${name ? ", " + esc(name) : ""}</p>
+  const top = `<div class="hero-text"><p class="small">${greeting()}${name ? ", " + esc(name) : ""}</p>
       <h1>Lunch for ${dl === "today" || dl === "tomorrow" ? dl : fmtDate(S.date)}</h1>
       <p class="small">Order by ${fmtTime(s.cutoff)}${dl === "today" ? "" : " " + (dl === "tomorrow" ? "tomorrow" : fmtDate(S.date))} · lunch at ${fmtTime(s.delivery_time)}</p>
 </div>
     <div class="hero-stats"><div class="hero-stat" id="cdBox"><b class="num" id="countdown">--</b><span id="cdLabel">until orders close</span></div>
       ${myMeals ? `<button class="hero-stat hlink" data-gomine aria-label="${myMeals} of your meals, ${meals} in your building. Open your orders"><b class="num">${myMeals}</b><span>your meal${myMeals === 1 ? "" : "s"}${meals > myMeals ? ` <span class="of">of ${meals} here</span>` : ""}</span></button>` : `<div class="hero-stat"><b class="num">${meals}</b><span>ordered in your building</span></div>`}
       ${S.noSite ? `<div class="hero-stat"><b class="num">${here.filter(p => p.status === "collecting" && p.meals > 0).length}</b><span>pools open</span></div>` : (dlv ? `<button class="hero-stat hlink" data-vendor="${esc(dlv.kid)}">${(v => `<b class="num${v.length > 7 ? " long" : ""}">${v}</b>`)(dlv.fee === 0 ? "Free" : Number.isInteger(dlv.fee) ? "GHS " + dlv.fee : money(dlv.fee))}<span>${esc(dlv.label)}</span></button>` : `<div class="hero-stat"><b class="num">${menusHere().length}</b><span>vendors cooking</span></div>`)}</div>`;
-  if (live) el.insertAdjacentHTML("beforeend", live);
-  wireLunchStrip(keepId);
-  tickCountdown(); fitStats(); countUp(el);
+  // Top part (greeting + figures) is only rebuilt when it changed; the strip lives in its own box and is patched in place
+  let host = $("#mlHost");
+  if (!host || host.parentElement !== el) { el.innerHTML = ""; host = document.createElement("div"); host.id = "mlHost"; host.className = "mlhost"; el.appendChild(host); el.dataset.top = ""; }
+  if (el.dataset.top !== top) {
+    // Swap the greeting and figures without touching the strip (moving it would reset the swipe position)
+    [...el.children].forEach(c => { if (c !== host) c.remove(); });
+    host.insertAdjacentHTML("beforebegin", top); el.dataset.top = top;
+    tickCountdown(); fitStats(); countUp(el);
+  }
+  updateLunchStrip(host, live);
 }
 // Figures count up to their value the first time they show (or when they change)
 const shownNums = {};

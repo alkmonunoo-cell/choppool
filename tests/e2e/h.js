@@ -7,7 +7,7 @@ const setArea = a => { area = a; console.log('\n## ' + a); };
 const ok = (c, id, m, extra) => { results.push({ area, id, ok: !!c, m, extra }); console.log((c ? 'ok  ' : 'FAIL') + ' ' + id + ' ' + m + (extra ? ' | ' + String(extra).slice(0, 220) : '')); };
 const note = m => { results.push({ area, id: 'note', ok: null, m }); console.log('NOTE ' + m); };
 async function phone(b, opt = {}) {
-  const ctx = await b.newContext({ ...devices[opt.device || 'iPhone 14'], colorScheme: opt.scheme || 'light', ...(opt.viewport ? { viewport: opt.viewport } : {}), ...(opt.geo ? { geolocation: opt.geo, permissions: ['geolocation'] } : {}) });
+  const ctx = await b.newContext({ ...devices[opt.device || 'iPhone 14'], colorScheme: opt.scheme || 'light', ...(opt.viewport ? { viewport: opt.viewport } : {}), ...(opt.geo ? { geolocation: opt.geo, permissions: ['geolocation'] } : {}), ...(opt.touch ? { hasTouch: true, isMobile: true } : {}) });
   const p = await ctx.newPage(); p.errs = []; p.on('pageerror', e => p.errs.push(e.message));
   await p.route(/tile\.openstreetmap|cdnjs|nominatim|jsdelivr/, r => r.abort());
   if (opt.time) await p.clock.install({ time: new Date(opt.time) });
