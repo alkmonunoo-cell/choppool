@@ -2279,6 +2279,13 @@ const tripTo = (k, site, meals = 1) => isFreeFor(k, site, meals) ? 0 : tripFor(k
 const poolTrip = (p, meals = p.meals) => p.free ? 0 : tripTo(S.menus.find(k => k.id === p.kitchen_id) || {}, siteOf(p.site_id), meals);
 // What a new order pays for delivery now: the server looks at the pool as it stands before this order
 const tripNow = (k, site) => tripTo(k, site, (S.board.pools.find(p => p.site_id === S.siteId && p.kitchen_id === k.id && ["waiting", "collecting"].includes(p.status)) || {}).meals || 0);
+// Seats in a pool: the app's limit, or fewer when the vendor's daily capacity (shared across buildings) runs out first
+function poolCap(kid, meals) {
+  const k = menuOf(kid) || {}, max = Number(S.settings.max_meals) || 15, cap = Number(k.capacity);
+  if (!cap) return max;
+  const left = Math.max(0, cap - ((S.board && S.board.load && S.board.load[kid]) || 0));
+  return Math.max(Number(meals) || 0, Math.min(max, (Number(meals) || 0) + left));
+}
 function menuState(k) {
   const off = (S.board.off || []).includes(k.id);   // the vendor said they're not cooking this day
   return { off, full: off || (S.board.load[k.id] || 0) >= k.capacity, open: !off && S.board.open.includes(k.id), waiting: S.board.pools.some(p => p.kitchen_id === k.id && p.site_id === S.siteId && p.status === "waiting" && p.meals > 0) };
@@ -2389,6 +2396,9 @@ async function viewOrder() {
   $("#tabHome").addEventListener("click", e => { if (mineClick(e)) return; if (e.target.closest("[data-findb]")) { openSitePicker(); $("#fbQ")?.focus(); return; } const ws = e.target.closest("[data-site]"); if (ws) return setSite(ws.dataset.site);
     if (e.target.closest(".locchip")) return openSitePicker();
     if (e.target.closest("[data-seeall]")) { S.vf = "near"; S.vq = ""; return setTab("kitchens"); }
+    // This vendor is fully booked (or not cooking): start a pool with another one
+    const np = e.target.closest("[data-newpool]"); if (np) { const k = menuOf(np.dataset.newpool); S.vf = "near"; S.vq = ""; setTab("kitchens");
+      return toast((k.public_name || "This vendor") + ((S.board.off || []).includes(k.id) ? " isn't cooking " : " is fully booked ") + dayLabel(S.date) + ". Pick another vendor to start a new pool."); }
     // A swipe that ends on a card is not a tap: only a clean tap opens the order
     if (e.target.closest(".mlswipe [data-gomine]") && (S.mlMoved || Date.now() - (S.mlScrollAt || 0) < 300)) { S.mlMoved = false; return; }
     if (e.target.closest("[data-gomine]")) { const id = e.target.closest("[data-gomine]").dataset.gomine; setTab("orders");
@@ -2656,7 +2666,7 @@ function renderWhen() {
 // or, with no live pool, the nearest vendor's full trip estimate (no per-meal cap: it is shared as people join).
 function heroDelivery(here, site) {
   const s = S.settings, opts = [];
-  here.filter(p => p.status === "collecting" && p.meals > 0 && p.meals < s.max_meals)
+  here.filter(p => p.status === "collecting" && p.meals > 0 && p.meals < poolCap(p.kitchen_id, p.meals))
     .forEach(p => opts.push({ fee: feeFor(p.meals + 1, s, poolTrip(p, p.meals + 1)), label: "to join a pool", kid: p.kitchen_id, pool: true }));
   if (hasPin(site)) {
     // Lowest delivery among the vendors near you (within the "near you" limit)
@@ -3000,7 +3010,7 @@ function nearRows() {
   return { far: rows.filter(r => !inArea(r)).length, rows: near, further };
 }
 function poolRow(k) {
-  const s = S.settings, max = Number(s.max_meals), st = menuState(k), p = currentPool(S.siteId, k.id), trip = poolTrip(p), mo = myOrderIn(k), i = menuIndex(k.id);
+  const s = S.settings, st = menuState(k), p = currentPool(S.siteId, k.id), max = poolCap(k.id, p.meals), trip = poolTrip(p), mo = myOrderIn(k), i = menuIndex(k.id);
   const now = feeFor(Math.max(p.meals, 1), s, trip), j = feeFor(p.meals + 1, s, poolTrip(p, p.meals + 1));
   let l2, warn = false;
   if (st.full) { l2 = (st.off ? "Not cooking " : "Fully booked ") + dayLabel(S.date); warn = true; }
@@ -3009,7 +3019,7 @@ function poolRow(k) {
     l2 = mo ? "Waiting for the vendor · " + leftText(wp) : "Waiting for the vendor · " + leftText(wp) + ". Full refund if they don't confirm"; warn = true;
   } else if (mo) l2 = j < now ? "Add and delivery drops to " + money(j) + " a meal" : "Your share " + money(now) + " a meal";
   else l2 = j < now ? "Join and delivery drops to " + money(j) + " a meal" : money(j) + " a meal in this pool";
-  const act = mo ? `<button class="btn" data-addplate="${esc(mo.id)}">Add</button>` : st.full ? `<button class="btn" disabled>${st.off ? "Off" : "Full"}</button>` : `<button class="btn" data-vendor="${esc(k.id)}">Join</button>`;
+  const act = mo && !st.full ? `<button class="btn" data-addplate="${esc(mo.id)}">Add</button>` : st.full ? `<button class="btn" data-newpool="${esc(k.id)}">New pool</button>` : `<button class="btn" data-vendor="${esc(k.id)}">Join</button>`;
   return `<article class="prow${mo ? " mine" : ""}"><span class="ptile" data-vendor="${esc(k.id)}" style="background:${tint(i)}">${plate(topDish(k.id), k.id)}</span>
     <span class="ptx" data-vendor="${esc(k.id)}"><strong>${esc(k.public_name)}${mo ? ` <span class="ytag">Your pool</span>` : ""}</strong><span class="l1"><span class="num">${p.meals} of ${max} meals</span>${mo ? ` · <span class="num">code ${esc(mo.code)}</span>` : ""}</span>
       <span class="l2${warn ? " warn" : ""}">${esc(l2).replace(/GHS [\d,.]+/, m => "<b>" + m + "</b>")}</span><span class="pbar"><i style="width:${Math.min(100, Math.round(p.meals / max * 100))}%"></i></span></span>
@@ -3925,7 +3935,7 @@ function announceActivity() {
   const key = "cp_alert_count_" + today(), n = local.get(key) || 0;
   if (n >= S.settings.notify_daily_cap) return;
   const a = fresh.at(-1), p = S.board.pools.find(x => x.id === a.pool_id) || { meals: 1, seq: 1 };
-  const msg = "Someone at " + siteOf(a.site_id).name + " just ordered " + a.item_name + ". " + p.meals + " of " + S.settings.max_meals + " seats taken, delivery now " + money(feeFor(p.meals, S.settings, poolTrip(p))) + ".";
+  const msg = "Someone at " + siteOf(a.site_id).name + " just ordered " + a.item_name + ". " + p.meals + " of " + poolCap(p.kitchen_id || a.kitchen_id, p.meals) + " seats taken, delivery now " + money(feeFor(p.meals, S.settings, poolTrip(p))) + ".";
   local.set(key, n + 1); toast(msg); sysNotify("ChopPool", msg);
 }
 
@@ -4324,7 +4334,7 @@ async function sharePool(siteId, kid) {
 function shareablePool(o) {
   if (["cancelled", "quote_requested", "quoted"].includes(o.status) || !["collecting", "waiting"].includes(o.pool_status) || o.order_date !== S.date) return null;
   const p = S.board.pools.find(x => x.site_id === o.site_id && x.kitchen_id === o.kitchen_id && x.seq === o.pool_seq && ["collecting", "waiting"].includes(x.status));
-  return p && p.meals < Number(S.settings.max_meals) && new Date() < at(o.order_date, S.settings.cutoff) ? p : null;
+  return p && p.meals < poolCap(p.kitchen_id, p.meals) && new Date() < at(o.order_date, S.settings.cutoff) ? p : null;
 }
 function showConfirmation(r, k, site, special) {
   // The install suggestion appears once, after the first order on this phone
@@ -4334,14 +4344,14 @@ function showConfirmation(r, k, site, special) {
   const head = special ? "Custom order sent" : waiting ? (r.meals > r.myQty ? "You're in the pool" : "You've started a pool") : "You're in the pool";
   const body = special ? `${esc(k.public_name)} will price your request before ${fmtTime(s.special_cutoff)}. You'll see the price under Orders, then pay to confirm.`
     : waiting ? `We've asked ${esc(k.public_name)} to confirm they're cooking. Share the pool now: every person who joins makes delivery cheaper. If they don't confirm ${confirmText(S.date)}, ${back}.`
-    : `${esc(collectLine(site))} ${r.meals} of ${s.max_meals} seats are taken and delivery is now ${money(fee)} a meal.`;
+    : `${esc(collectLine(site))} ${r.meals} of ${poolCap(k.id, r.meals)} seats are taken and delivery is now ${money(fee)} a meal.`;
   openSheet(`
     <div class="top" style="justify-content:flex-end"><button class="closex" data-close aria-label="Close">${ICON.close}</button></div>
     <span class="success">${ICON.check}</span>
     <div class="center" style="display:grid;gap:6px"><h2 id="sheetTitle">${esc(head)}</h2><p class="muted">${body}</p></div>
     <div class="center" style="display:grid;gap:8px"><p class="eyebrow">Your collection code</p><div class="codetiles">${String(r.code).split("").map(c => c === "-" ? `<i class="cdash">–</i>` : `<span>${esc(c)}</span>`).join("")}</div></div>
     ${!special && drop ? `<p class="note center">${drop.more} more ${drop.more === 1 ? "person" : "people"} and everyone's delivery drops to ${money(drop.fee)}.</p>` : ""}
-    ${!special && r.meals < s.max_meals ? `<button class="btn wide" id="sharePool">Share this pool</button>` : ""}
+    ${!special && r.meals < poolCap(k.id, r.meals) ? `<button class="btn wide" id="sharePool">Share this pool</button>` : ""}
     ${!S.user && !special ? `<button class="ghost wide" id="toAccount">Create an account to keep your cashback</button>` : ""}
     <button class="linkbtn" id="toOrders" style="justify-self:center">Track this order</button>
     ${!special && !local.get("cp_alerts") && (pushReady() || DEMO) ? `<div class="installhint alertask"><span>${ICON.bell || ""}<span class="small"><b>Get told if there's a problem with your payment</b>, when your vendor confirms and when lunch arrives.</span></span><button class="btn" id="confAlerts">Turn on</button></div>` : ""}

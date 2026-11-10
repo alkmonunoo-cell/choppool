@@ -1,0 +1,16 @@
+const { chromium, phone, ok, txt } = require('./h');
+(async () => { const b = await chromium.launch();
+  const p = await phone(b, { time: '2026-11-09T09:00:00Z', me: { name: 'Ama', phone: '0244111222' } });
+  const r = await p.evaluate(async () => { await api.updateKitchen('k1', { capacity: 10 }).catch(e => console.log(e.message)); S.menus.find(m => m.id === 'k1').capacity = 10;
+    const a = await api.placeOrder({ site: 's1', item: 'i1', qty: 3, name: 'Ama', phone: '0244111222', ref: '5123456781' }); local.set('cp_orders', [{ id: a.id, order_date: a.order_date }]);
+    await refreshBoard(); await refreshMine(); S.menus.find(m => m.id === 'k1').capacity = 10; renderPools(); return a.meals; });
+  await p.waitForTimeout(500);
+  const t = await txt(p, '#pools .prow'); ok(/3 of 10 meals/.test(t), 'cap.1', 'pool shows vendor capacity', t.slice(0, 120));
+  const w = await p.evaluate(() => document.querySelector('#pools .prow .pbar i').style.width); ok(w === '30%', 'cap.2', 'bar measured against 10', w);
+  await p.evaluate(async () => { await api.placeOrder({ site: 's1', item: 'i1', qty: 5, name: 'Kofi', phone: '0244111333', ref: '5123456782' }); await api.placeOrder({ site: 's1', item: 'i1', qty: 2, name: 'Esi', phone: '0244111444', ref: '5123456783' }); await refreshBoard(); S.menus.find(m => m.id === 'k1').capacity = 10; renderPools(); });
+  await p.waitForTimeout(500);
+  const t2 = await txt(p, '#pools .prow'); ok(/10 of 10 meals/.test(t2) && /Fully booked/.test(t2) && /New pool/.test(t2), 'cap.3', 'full pool reads 10 of 10', t2.slice(0, 140));
+  const w2 = await p.evaluate(() => document.querySelector('#pools .prow .pbar i').style.width); ok(w2 === '100%', 'cap.4', 'bar full', w2);
+  await p.click('#pools .prow [data-newpool]'); await p.waitForTimeout(600);
+  ok(await p.evaluate(() => S.tab) === 'kitchens' && /Pick another vendor/.test(await txt(p, '.toast')), 'cap.5', 'New pool opens vendors with a hint', await txt(p, '.toast'));
+  console.log('errs', p.errs); await b.close(); })();
