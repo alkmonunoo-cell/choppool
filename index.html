@@ -1109,9 +1109,9 @@ const fmtPhone = n => { const d = String(n || "").replace(/\D/g, ""); return d.l
 const newToken = () => [...crypto.getRandomValues(new Uint8Array(18))].map(b => b.toString(36).padStart(2, "0")).join("").slice(0, 24);
 const stepRank = st => ["waiting", "collecting", "accepted", "ready", "picked_up", "arriving", "delivered"].indexOf(st);
 const upfrontPerMeal = (trip, qty, s) => Math.ceil(feeFor(0, s, trip) / Math.max(1, qty) * 2) / 2;
-function nextDrop(meals, s, trip) {
+function nextDrop(meals, s, trip, max = s.max_meals) {
   const cur = feeFor(Math.max(meals, 1), s, trip);
-  for (let m = meals + 1; m <= s.max_meals; m++) { const f = feeFor(m, s, trip); if (f < cur) return { more: m - meals, fee: f }; }
+  for (let m = meals + 1; m <= max; m++) { const f = feeFor(m, s, trip); if (f < cur) return { more: m - meals, fee: f }; }
   return null;
 }
 
@@ -1757,7 +1757,7 @@ function makeSupabaseApi() {
       const r = must(await sb.from("orders").select("phone").eq("cancel_reason", "Payment not received").gte("order_date", since)) || []; const m = {}; r.forEach(x => { m[x.phone] = (m[x.phone] || 0) + 1; }); return m; },
     async sendReset(email, to) { must(await sb.auth.resetPasswordForEmail(email, { redirectTo: baseUrl() + "/?reset=" + (to === "admin" ? "admin" : "app") })); return true; },
     async setNewPassword(pw) { must(await sb.auth.updateUser({ password: pw })); return true; },
-    async signOut() { await sb.auth.signOut(); },
+    async signOut() { await sb.auth.signOut({ scope: "local" }); },   // this phone and this screen only: the customer side stays signed in
     async updateName(name) { const d = must(await sb.auth.updateUser({ data: { name } })); try { await this.saveProfile({ name }); } catch (e) {} return { id: d.user.id, email: d.user.email, name }; },
     async accountStats() { const r = await sb.rpc("admin_account_stats"); if (r.error && /function|schema cache/i.test(r.error.message)) throw new Error("Run update-7.sql in the Supabase SQL Editor once."); return must(r); },
     async savePayMethod(p) {
@@ -4247,7 +4247,7 @@ function openOrder(menuId, opt = {}) {
       const tripN = tripNow(k, site), dTot = join ? 0 : upfrontPerMeal(tripN, first, s) * first, sFee = Number(s.service_fee), total = food + dTot + sFee * meals;
       const useW = $("#fWallet")?.checked ? Math.min(S.balance, total) : 0, due = total - useW;
       $("#sum").innerHTML = `<div><span>Food (${meals} meal${meals === 1 ? "" : "s"})</span><span class="num">${money(food)}</span></div>` +
-        (join ? `<div><span>Delivery</span><span class="num">Already paid</span></div>` : tripN === 0 ? `<div><span>Delivery, by the vendor</span><span class="num">Free</span></div>` : `<div><span>Delivery, full trip<small class="sumhint">Shared by the pool. What others save you comes back as cashback.</small></span><span class="num">${money(dTot)}</span></div>`) +
+        (join ? `<div><span>Delivery</span><span class="num">Already paid</span></div>` : tripN === 0 ? `<div><span>Delivery, by the vendor</span><span class="num">Free</span></div>` : `<div><span>Delivery, full trip<small class="sumhint">You pay the full trip now. As others join, your share drops and the difference comes back to you as cashback.</small></span><span class="num">${money(dTot)}</span></div>`) +
         `<div><span>Service fee (${money(sFee)} a meal)</span><span class="num">${money(sFee * meals)}</span></div>` + (useW ? `<div><span>From wallet</span><span class="num">−${money(useW)}</span></div>` : "");
       $("#payPart").classList.toggle("hidden", due <= 0); drawPay(due);
       $("#totTxt").textContent = due <= 0 ? money(useW) : money(due);
@@ -4268,7 +4268,7 @@ function openOrder(menuId, opt = {}) {
     const useW = $("#fWallet")?.checked ? Math.min(S.balance, total) : 0, due = total - useW;
     $("#sum").innerHTML = `<div><span>${qty} × ${esc(item.name)}</span><span class="num">${money(item.price * qty)}</span></div>` +
       (addT ? `<div><span>Extras</span><span class="num">${money(addT * qty)}</span></div>` : "") +
-      (join ? `<div><span>Delivery</span><span class="num">Already paid</span></div>` : tripN === 0 ? `<div><span>Delivery, by the vendor</span><span class="num">Free</span></div>` : `<div><span>Delivery, full trip<small class="sumhint">Shared by the pool. Your share comes back as cashback.</small></span><span class="num">${money(dFee * qty)}</span></div>`) +
+      (join ? `<div><span>Delivery</span><span class="num">Already paid</span></div>` : tripN === 0 ? `<div><span>Delivery, by the vendor</span><span class="num">Free</span></div>` : `<div><span>Delivery, full trip<small class="sumhint">You pay the full trip now. As others join, your share drops and the difference comes back to you as cashback.</small></span><span class="num">${money(dFee * qty)}</span></div>`) +
       `<div><span>Service fee${qty > 1 ? " (" + money(sFee) + " a meal)" : ""}</span><span class="num">${money(sFee * qty)}</span></div>` +
       (useW ? `<div><span>From wallet</span><span class="num">−${money(useW)}</span></div>` : "");
     $("#payPart").classList.toggle("hidden", due <= 0); drawPay(due);
@@ -4330,7 +4330,7 @@ function openOrder(menuId, opt = {}) {
       local.set("cp_me", { name, phone });
       const mine = (local.get("cp_orders") || []).filter(o => o.order_date >= today()); mine.push({ id: r.id, order_date: r.order_date }); local.set("cp_orders", mine); if (local.get("cp_hide_name")) syncNamePrivacy();
       if (S.user) { try { await api.saveProfile({ name, phone }); } catch (e) {} }
-      await refreshBoard(); refreshMine(); refreshUser();
+      await refreshBoard(); try { await refreshMine(); } catch (e) {} refreshUser();
       notifyServer({ order_id: r.id }); if (local.get("cp_push")) pushSubscribe({ order_ids: [r.id] }, true);
       if (join) { closeSheet(); closeVendor(); toast("Added to code " + r.code + ". " + (r.status === "paid" ? "Paid." : "Payment being checked.")); setTab("orders"); return; }
       r.myQty = trayMeals || qty; showConfirmation(r, k, site, sp);
@@ -4383,14 +4383,21 @@ function shareablePool(o) {
   return p && p.meals < poolCap(p.kitchen_id, p.meals) && new Date() < at(o.order_date, S.settings.cutoff) ? p : null;
 }
 function showConfirmation(r, k, site, special) {
+  if (!special && r.meals == null) {   // a tray order returns only its code: take the pool from your orders and the board
+    const o = (S.mine || []).find(x => x.id === r.id) || {}, p = (S.board.pools || []).find(x => x.id === (r.pool_id || o.pool_id));
+    r.pool_id = r.pool_id || o.pool_id; r.pool_status = r.pool_status || o.pool_status || (p && p.status); r.pool_seq = r.pool_seq || o.pool_seq;
+    r.meals = p ? p.meals : r.myQty || 1;
+  }
   // The install suggestion appears once, after the first order on this phone
   const askInstall = !isStandalone() && !local.get("cp_install_asked"); if (askInstall) local.set("cp_install_asked", true);
-  const s = S.settings, trip = tripTo(k, site), fee = feeFor(r.meals, s, trip), drop = nextDrop(r.meals, s, trip);
+  const s = S.settings, trip = tripTo(k, site), fee = feeFor(r.meals, s, trip), drop = nextDrop(r.meals, s, trip, poolCap(k.id, r.meals));
   const waiting = r.pool_status === "waiting", back = S.user ? "your money goes straight back to your wallet" : "you get your money back";
-  const head = special ? "Custom order sent" : waiting ? (r.meals > r.myQty ? "You're in the pool" : "You've started a pool") : "You're in the pool";
+  const started = r.meals <= (r.myQty || 1);
+  const head = special ? "Custom order sent" : started ? (r.pool_seq > 1 ? "You've started pool " + r.pool_seq : "You've started a pool") : "You're in the pool";
   const body = special ? `${esc(k.public_name)} will price your request before ${fmtTime(s.special_cutoff)}. You'll see the price under Orders, then pay to confirm.`
     : waiting ? `We've asked ${esc(k.public_name)} to confirm they're cooking. Share the pool now: every person who joins makes delivery cheaper. If they don't confirm ${confirmText(S.date)}, ${back}.`
-    : `${esc(collectLine(site))} ${r.meals} of ${poolCap(k.id, r.meals)} seats are taken and delivery is now ${money(fee)} a meal.`;
+    : started ? `${esc(collectLine(site))} Share the pool now: every person who joins makes delivery cheaper, and what you overpaid comes back as cashback.`
+    : `${esc(collectLine(site))} ${r.meals} of ${poolCap(k.id, r.meals)} meals are in and delivery is now ${money(fee)} a meal.`;
   openSheet(`
     <div class="top" style="justify-content:flex-end"><button class="closex" data-close aria-label="Close">${ICON.close}</button></div>
     <span class="success">${ICON.check}</span>
