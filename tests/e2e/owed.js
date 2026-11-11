@@ -1,0 +1,14 @@
+const { chromium, phone, ok, txt } = require('./h');
+(async () => { const b = await chromium.launch();
+  const p = await phone(b, { time: '2026-11-09T09:00:00Z', viewport: { width: 1200, height: 900 } });
+  await p.evaluate(async () => { const a = await api.placeOrder({ site: 's1', item: 'i1', qty: 3, name: 'Ama', phone: '0244111201', ref: '5123456711' });
+    for (const o of (await api.adminData(a.order_date)).orders) await api.updateOrder(o.id, { status: 'paid' });
+    const pl = (await api.adminData(a.order_date)).pools.find(x => x.id === a.pool_id) || (await api.adminData(a.order_date)).pools[0];
+    await api.updatePool(pl.id, { status: 'delivered' }); });
+  await p.evaluate(() => location.hash = '#admin'); await p.waitForTimeout(2000);
+  await p.evaluate(() => document.querySelector('[data-atab="today"]').click()); await p.waitForTimeout(400);
+  await p.evaluate(() => document.querySelector('[data-asub="owed"]').click()); await p.waitForTimeout(1500);
+  const t = await txt(p, '#owedBox');
+  ok(/GHS [\d.,]+ more once customers confirm today's delivery \(by \d+:\d\d (am|pm)\)/.test(t), 'o.1', 'seller shows money waiting for confirmation', t.replace(/\n/g, ' ').slice(0, 300));
+  await p.locator('#owedBox').screenshot({ path: '/tmp/e2e/shots27/owed.png' });
+  console.log(p.errs); await b.close(); })();

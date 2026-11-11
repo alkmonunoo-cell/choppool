@@ -5057,13 +5057,22 @@ async function renderAdmin(cached, quiet) {   // quiet = background/refresh-butt
     }
     if (sub === "owed") {
       const from = S.owedFrom || addDays(d, -6);
-      body.innerHTML = `<h2>Money owed</h2><p class="small muted">Sellers are owed food from pools that were delivered and received, minus the ChopPool fee. Riders are owed the trip cost recorded on each delivered pool. What's due is everything earned minus every payout recorded.</p><div id="owedBox"><div class="skeleton" style="height:160px"></div></div>`;
+      body.innerHTML = `<h2>Money owed</h2><p class="small muted">Sellers are owed food from pools that were delivered and received, minus the ChopPool fee. Riders are owed each delivered pool's trip cost, filled in automatically when it's delivered (change it on the pool if needed). What's due is everything earned minus every payout recorded.</p><div id="owedBox"><div class="skeleton" style="height:160px"></div></div>`;
       Promise.all([api.adminDues(from, d), api.payouts()]).then(([du, pays]) => { const el = $("#owedBox"); if (!el) return; const isOwner = S.role === "super";
+        // Delivered on the day shown but not yet confirmed by the customer: counted once they tap Got my food, or automatically
+        const rcvMin = Number(s.auto_receive_min || 120), soon = {};
+        A.pools.filter(p => p.status === "delivered").forEach(p => {
+          const os = A.orders.filter(o => o.pool_id === p.id && ["paid", "collected"].includes(o.status) && !o.received_at && !o.cashback_posted);
+          const food = os.reduce((t, o) => t + (Number(o.quote_price ?? o.unit_price) + Number(o.addons_total || 0)) * o.qty, 0); if (!food) return;
+          const by = p.delivered_at ? new Date(Date.parse(p.delivered_at) + rcvMin * 6e4) : null, x = soon[p.kitchen_id] || (soon[p.kitchen_id] = { food: 0, by: null });
+          x.food += food; if (by && (!x.by || by > x.by)) x.by = by; });
+        const sellers = [...(du.sellers || [])]; Object.keys(soon).forEach(id => { if (!sellers.some(x => x.id === id)) { const k = A.kitchens.find(k => k.id === id) || {}; sellers.push({ id, name: k.name || k.public_name || "Vendor", food: 0, fee: 0, due: 0, paid: 0 }); } });
+        const soonLine = x => { const z = soon[x.id]; return z ? `<p class="small" style="color:var(--hint)"><strong>${money(z.food)} more</strong> once customers confirm ${dayLabel(d) === "today" ? "today's" : fmtDate(d) + "'s"} delivery${z.by ? (z.by > new Date() ? " (by " + fmtTime(z.by.toISOString().slice(11, 16)) + ")" : " (any minute now)") : ""} · less the ChopPool fee</p>` : ""; };
         const row = (t, x) => `<div class="card stack" style="gap:6px"><div class="top"><strong>${esc(x.name)}</strong><b class="num">${money(x.due)}</b></div>
-          <p class="small muted">${t === "seller" ? "Food " + money(x.food) + " · fee " + money(x.fee) + " (this week)" : "Trips " + money(x.trips) + " (this week)"} · paid so far ${money(x.paid)}</p>
+          <p class="small muted">${t === "seller" ? "Food " + money(x.food) + " · fee " + money(x.fee) + " (this week)" : "Trips " + money(x.trips) + " (this week)"} · paid so far ${money(x.paid)}</p>${t === "seller" ? soonLine(x) : ""}
           ${isOwner && Number(x.due) > 0 ? `<form class="inline" data-form="payout" data-type="${t}" data-id="${esc(x.id)}" style="grid-template-columns:.7fr 1.2fr auto"><div><label>Amount</label><input name="amount" inputmode="decimal" value="${Number(x.due).toFixed(2)}"></div><div><label>Mobile money reference</label><input name="ref" autocomplete="off"></div><button class="btn">Record payout</button></form>` : ""}</div>`;
-        el.innerHTML = `<h3>Sellers</h3>${(du.sellers || []).map(x => row("seller", x)).join("") || `<p class="small muted">Nothing owed to sellers yet.</p>`}
-          <h3>Riders</h3>${(du.riders || []).map(x => row("rider", x)).join("") || `<p class="small muted">Nothing owed to riders yet. Add the trip cost on each pool.</p>`}
+        el.innerHTML = `<h3>Sellers</h3>${sellers.map(x => row("seller", x)).join("") || `<p class="small muted">Nothing owed to sellers yet.</p>`}
+          <h3>Riders</h3>${(du.riders || []).map(x => row("rider", x)).join("") || `<p class="small muted">Nothing owed to riders yet. Trip costs are added as pools are delivered.</p>`}
           <h3>Recent payouts</h3>${(pays || []).length ? `<div class="table-wrap"><table><tr><th>Date</th><th>To</th><th>Amount</th><th>Ref</th><th>By</th></tr>${pays.slice(0, 30).map(x => `<tr><td>${fmtDate(String(x.created_at).slice(0, 10))}</td><td>${esc(x.payee_type === "seller" ? (A.kitchens.find(k => k.id === x.kitchen_id) || {}).name || "Seller" : (A.riders.find(r => r.id === x.rider_id) || {}).name || "Rider")}</td><td class="num">${money(x.amount)}</td><td class="num">${esc(x.momo_ref || "")}</td><td class="small">${esc(x.paid_by || "")}</td></tr>`).join("")}</table></div>` : `<p class="small muted">No payouts recorded yet.</p>`}`;
       }).catch(e => { const el = $("#owedBox"); if (el) el.innerHTML = `<p class="err">${esc(cleanErr(e))}</p>`; });
     }
