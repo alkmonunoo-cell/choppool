@@ -119,6 +119,8 @@ p { margin: 0; }
 .setlink small { display: block; font-size: 12.5px; margin-top: 2px; }
 @keyframes ocflash { 0%, 100% { box-shadow: 0 0 0 0 transparent; } 30% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 45%, transparent); } }
 .order-card.flash { animation: ocflash 1.4s ease 1; }
+.tripbox { background: var(--surface-2); border-radius: 12px; padding: 10px 12px; display: grid; gap: 2px; }
+.tripbox p { margin: 0; }
 .hero-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; position: relative; z-index: 1; }
 .hero-stat { background: rgba(255,255,255,.16); border: 1px solid rgba(255,255,255,.22); border-radius: 16px; padding: 10px 12px; display: grid; align-content: start; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
 .hero-stat.hurry { box-shadow: 0 0 0 2px #fff; animation: hurry 1.6s ease-in-out infinite; }
@@ -1989,6 +1991,10 @@ const stepsHtml = (st, orders) => {
   const done = st === "delivered" && handedOver(orders), list = [...STEPS, "handed"], cur = done ? "handed" : st;
   return `<div class="steps">${list.map((x, i) => `<span class="${x === cur ? (x === "handed" ? "now fin" : "now") : i < list.indexOf(cur) ? "done" : ""}">${STEP_LABEL[x]}</span>`).join("")}</div>`;
 };
+// Who delivers a pool: a ChopPool rider, or a ride app noted at the start of the booking ref ("Bolt Send · ABC123")
+const VIA_APPS = ["Bolt Send", "Yango", "Other"];
+const poolVia = p => p.rider_id ? "rider" : (VIA_APPS.find(a => String(p.trip_ref || "").startsWith(a)) || (p.trip_ref ? "Other" : ""));
+const poolRef = p => { const r = String(p.trip_ref || ""), a = VIA_APPS.find(x => r.startsWith(x)); return a ? r.slice(a.length).replace(/^\s*·\s*/, "") : r; };
 const handInfo = (st, os) => { if (st !== "delivered") return ""; const c = handCount(os); if (!c.all) return "";
   return c.got >= c.all ? `<p class="handline fin">${ICON.check} All ${c.all} meal${c.all === 1 ? "" : "s"} received. This delivery is done.</p>` : `<p class="handline">${c.got} of ${c.all} meals received · ${c.all - c.got} waiting</p>`; };
 const handCount = os => { const all = (os || []).filter(o => !["quote_requested", "quoted", "cancelled"].includes(o.status)); return { got: all.filter(o => o.collected || o.status === "collected").reduce((t, o) => t + (o.qty || 1), 0), all: all.reduce((t, o) => t + (o.qty || 1), 0) }; };
@@ -4980,10 +4986,17 @@ async function renderAdmin(cached, quiet) {   // quiet = background/refresh-butt
           <div class="poolhead"><div class="ph-t"><h3>${esc(sName(p.site_id))} · Pool ${p.seq}</h3><span class="chip num">${p.meals}/${poolSize(A.kitchens.find(k => k.id === p.kitchen_id) || {})} meals</span></div>
             <p class="small muted">${esc(k.public_name)}${k.added_by_customer ? " (added by a customer)" : k.name !== k.public_name ? " · " + esc(k.name) : ""}${p.runner ? " · own runner" : ""} · ${money(feeFor(p.meals, s, aTrip(p)))} a meal · trip est. ${money(aTrip(p))}</p></div>
           ${stepsHtml(p.status, A.orders.filter(o => o.pool_id === p.id && !o.parent_id && ["paid", "collected"].includes(o.status)))}${handInfo(p.status, A.orders.filter(o => o.pool_id === p.id && !o.parent_id && ["paid", "collected"].includes(o.status)))}${fl.length ? `<p class="small" style="color:var(--danger)">${fl.map(esc).join(" · ")}</p>` : ""}
-          ${p.runner ? "" : `<div class="inline poolrider"><div class="full"><label for="rd-${p.id}">Rider</label><select id="rd-${p.id}" data-f="rider_id"><option value="">Bolt Send / Yango</option>${ridersOk.filter(r => r.active).map(r => `<option value="${esc(r.id)}"${r.id === p.rider_id ? " selected" : ""}>${esc(r.name)}</option>`).join("")}</select></div>
-            <div><label for="tr-${p.id}">Trip ref</label><input id="tr-${p.id}" data-f="trip_ref" value="${esc(p.trip_ref || "")}" placeholder="Booking code"></div>
-            <div><label for="tc-${p.id}">Trip cost</label><input id="tc-${p.id}" data-f="trip_cost" inputmode="decimal" value="${esc(p.trip_cost ?? "")}" placeholder="GHS"></div>
-            <button class="ghost" data-act="pool-save">Save</button></div>`}
+          ${p.runner ? "" : (() => { // Who delivers: a ChopPool rider (pick one) or a ride app; and what customers pay for this trip, before you book
+            const via = poolVia(p), ref = poolRef(p), mealsP = A.orders.filter(o => o.pool_id === p.id && ["paid", "collected"].includes(o.status)).reduce((t, o) => t + o.qty, 0) || p.meals;
+            const per = feeFor(mealsP, s, aTrip(p)), charged = per * mealsP;
+            const busy = r => A.pools.some(x => x.id !== p.id && x.rider_id === r.id && ["ready", "picked_up", "arriving"].includes(x.status));
+            return `<div class="tripbox"><p><strong>Customers pay ${money(charged)} for delivery</strong> <span class="small muted">· ${money(per)} a meal × ${mealsP} · trip price ${money(aTrip(p))}</span></p>
+              <p class="small muted">Book a ride for up to this amount to break even on delivery.</p></div>
+            <div class="inline poolrider" data-via-box><div class="full"><label for="via-${p.id}">Delivered by</label><select id="via-${p.id}" data-f="via"><option value="">Choose…</option>${[["rider", "ChopPool rider"], ["Bolt Send", "Bolt Send"], ["Yango", "Yango"], ["Other", "Other ride app"]].map(([v, l]) => `<option value="${v}"${v === via ? " selected" : ""}>${l}</option>`).join("")}</select></div>
+              <div data-via-rider${via === "rider" ? "" : " hidden"}><label for="rd-${p.id}">Rider</label><select id="rd-${p.id}" data-f="rider_id"><option value="">Pick a rider</option>${ridersOk.filter(r => r.active).map(r => `<option value="${esc(r.id)}"${r.id === p.rider_id ? " selected" : ""}>${esc(r.name)}${busy(r) ? " (on a trip)" : ""}</option>`).join("")}</select></div>
+              <div data-via-app${via && via !== "rider" ? "" : " hidden"}><label for="tr-${p.id}">Booking code</label><input id="tr-${p.id}" data-f="trip_ref" value="${esc(ref)}" placeholder="From the app"></div>
+              <div><label for="tc-${p.id}">${via === "rider" ? "Trip cost (auto)" : "What the ride cost"}</label><input id="tc-${p.id}" data-f="trip_cost" inputmode="decimal" value="${esc(p.trip_cost ?? "")}" placeholder="${via === "rider" ? esc(money(aTrip(p))) : "GHS"}" data-est="${esc(money(aTrip(p)))}"></div>
+              <button class="ghost" data-act="pool-save">Save</button></div>`; })()}
           ${p.status === "waiting" && k.whatsapp ? `<a class="wa" href="${wa(k.whatsapp)}?text=${encodeURIComponent(MSG.sellerConfirm(k, sName(p.site_id), d, s.accept_timeout_min))}" target="_blank" rel="noopener">${ICON.wa} Ask ${esc(k.name)} to confirm</a>` : ""}
           <div class="row" style="justify-content:flex-start;gap:8px;flex-wrap:wrap"><button class="ghost" data-act="ticket">Send ticket</button><button class="ghost" data-act="arrival">Arrival message</button>
             <select data-act="pool-status" aria-label="Set pool step" style="width:auto">${(p.status === "waiting" ? ["waiting"] : []).concat(STEPS).map(x => `<option value="${x}"${x === p.status ? " selected" : ""}>${STEP_LABEL[x]}</option>`).join("")}<option value="cancelled">Cancel pool</option></select></div></article>`; }).join("") || `<p class="card muted">No pools for this date yet.</p>`}</div>`;
@@ -5415,7 +5428,10 @@ async function adminClick(e) {
     const id = poolCard.dataset.pool, p = A.pools.find(x => x.id === id), d = p.order_date;
     const k = A.kitchens.find(x => x.id === p.kitchen_id), site = A.sites.find(x => x.id === p.site_id);
     const os = A.orders.filter(o => o.pool_id === id && !["cancelled", "quote_requested", "quoted"].includes(o.status));
-    if (act === "pool-save") return run(() => api.updatePool(id, { rider_id: fval(poolCard, "rider_id") || null, trip_ref: fval(poolCard, "trip_ref") || null, trip_cost: fval(poolCard, "trip_cost") ? Number(fval(poolCard, "trip_cost")) : null }).then(() => notifyServer({ pool_id: id })), "Pool saved");
+    if (act === "pool-save") { const via = fval(poolCard, "via"), rid = fval(poolCard, "rider_id"), ref = (fval(poolCard, "trip_ref") || "").trim();
+      if (via === "rider" && !rid) return toast("Pick which ChopPool rider is taking it.");
+      if (!via && !rid && !ref && !fval(poolCard, "trip_cost")) return toast("Choose who's delivering this pool.");
+      return run(() => api.updatePool(id, { rider_id: via === "rider" ? rid : null, trip_ref: via === "rider" ? null : via ? via + (ref ? " · " + ref : "") : ref || null, trip_cost: fval(poolCard, "trip_cost") ? Number(fval(poolCard, "trip_cost")) : null }).then(() => notifyServer({ pool_id: id })), "Pool saved"); }
     if (act === "ticket") {
       const tally = {}; os.forEach(o => { const key = o.item_name + (o.addons?.length ? " (" + addonText(o.addons) + ")" : ""); tally[key] = (tally[key] || 0) + o.qty; });
       const text = "ChopPool order for " + fmtDate(d) + ". Ready by " + fmtTime(minus(s.delivery_time, 30)) + ".\n" + site.name + ", Pool " + p.seq + " (" + p.meals + " meals):\n" +
@@ -5515,6 +5531,9 @@ async function adminClick(e) {
 }
 async function adminChange(e) {
   const t = e.target;
+  if (t.matches('[data-f="via"]')) { const box = t.closest("[data-via-box]"), v = t.value; // show the rider list or the booking code
+    box.querySelector("[data-via-rider]").hidden = v !== "rider"; box.querySelector("[data-via-app]").hidden = !v || v === "rider";
+    const tc = box.querySelector('[data-f="trip_cost"]'); tc.previousElementSibling.textContent = v === "rider" ? "Trip cost (auto)" : "What the ride cost"; tc.placeholder = v === "rider" ? tc.dataset.est : "GHS"; return; }
   if (t.matches("[data-ls]")) { (S.ls = S.ls || {})[t.dataset.ls] = t.value; return renderAdmin(true); }
   const run = async (fn, ok) => { try { await fn(); toast(ok); renderAdmin(); } catch (err) { toast(cleanErr(err)); } };
   if (t.matches("select[data-act=pool-status]")) { const pid = t.closest("[data-pool]").dataset.pool; return run(() => api.updatePool(pid, { status: t.value }).then(() => notifyServer({ pool_id: pid })), "Pool updated"); }

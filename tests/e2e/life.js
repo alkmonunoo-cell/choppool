@@ -118,7 +118,7 @@ const tick = async (p, iso) => { await p.clock.setSystemTime(new Date(iso)); awa
   await go(p, '#admin', 1800); await p.evaluate(() => { document.querySelector('[data-atab="today"]')?.click(); }); await p.waitForTimeout(500); await p.evaluate(() => { document.querySelector('[data-asub="pools"]')?.click(); }); await p.waitForTimeout(700);
   const pc = p.locator(`[data-pool="${ama.pool_id}"]`);
   console.log('DBG', (await view(p)).slice(200, 900), ' ids ' + (await p.$$eval('[data-pool]', x => x.map(e => e.dataset.pool).join(','))) + ' want ' + ama.pool_id); ok(await pc.count() === 1, '8.00', 'team sees the pool card', ' ids ' + (await p.$$eval('[data-pool]', x => x.map(e => e.dataset.pool).join(','))) + ' want ' + ama.pool_id);
-  await pc.locator('[data-f=rider_id]').selectOption('r1'); await pc.locator('[data-f=trip_cost]').fill('55'); await pc.locator('[data-act=pool-save]').click(); await p.waitForTimeout(900);
+  await pc.locator('[data-f=via]').selectOption('rider'); await pc.locator('[data-f=rider_id]').selectOption('r1'); await pc.locator('[data-f=trip_cost]').fill('55'); await pc.locator('[data-act=pool-save]').click(); await p.waitForTimeout(900);
   await tick(p, '2026-11-09T11:45:00Z');
   await go(p, '#rider-demor1', 1500); v = await view(p);
   note('Rider screen: ' + v.slice(0, 500));
