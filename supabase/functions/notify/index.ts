@@ -42,11 +42,11 @@ async function poolEvents(poolId: string, opened = false) {
   const live = (orders || []).filter((o: any) => !["quote_requested", "quoted"].includes(o.status)), meals = live.reduce((t: number, o: any) => t + o.qty, 0);
   const cust = () => customerSubs(live), url = APP + "/#order";
   if (p.status === "waiting" && await once("new_pool:" + p.id))
-    await send(await kitchenSubs(k.id), "New pool at " + site.name, laterDay(p) ? "Customers want lunch from you on " + dayName(p.order_date) + ". Confirm you're cooking by " + String(s.next_day_confirm_by || "08:30").slice(0, 5) + " that morning."
+    await send(await kitchenSubs(k.id), "New pool at " + site.name, laterDay(p) ? "Customers want lunch from you on " + dayName(p.order_date) + ". Confirm you're cooking by " + ampm(s.next_day_confirm_by || "08:30") + " that morning."
       : "Customers want lunch from you today. Confirm you're cooking by " + hhmm(waitUntil(p, s)) + ".", APP + "/#kitchen-" + k.token, "pool-" + p.id);
   // "Always cooking" vendors: the pool opened by itself, so tell them it started
   if (p.status === "collecting" && (k.auto_days || []).length && meals && await once("auto_start:" + p.id))
-    await send(await kitchenSubs(k.id), "New pool at " + site.name, meals + " meal" + (meals > 1 ? "s" : "") + " so far. Orders close at " + String(s.cutoff).slice(0, 5) + "; you'll get the final count then.", APP + "/#kitchen-" + k.token, "pool-" + p.id);
+    await send(await kitchenSubs(k.id), "New pool at " + site.name, meals + " meal" + (meals > 1 ? "s" : "") + " so far. Orders close at " + ampm(s.cutoff) + "; you'll get the final count then.", APP + "/#kitchen-" + k.token, "pool-" + p.id);
   if (opened && p.status === "collecting" && meals && await once("pool_open:" + p.id))
     await send(await cust(), k.public_name + " is cooking", "Your pool at " + site.name + " is open. Share it so delivery gets cheaper.", url, "pool-" + p.id, "confirm");
   const poolSize = Math.max(5, Math.min(Number(k.pool_size || s.max_meals), Number(s.pool_ceiling || 15)));   // the vendor's pool size (update 28)
@@ -76,7 +76,9 @@ function waitUntil(p: any, s: any) {
   const cutAt = new Date(p.order_date + "T" + cut + ":00Z");
   return new Date(Math.min(cutAt.getTime(), Math.max(Date.parse(p.created_at) + s.accept_timeout_min * 6e4, confirmAt.getTime())));
 }
-const hhmm = (d: Date) => d.toISOString().slice(11, 16);
+// Times in messages read 10:30 am / 12:30 pm
+const ampm = (t: string) => { const [h, m] = String(t).slice(0, 5).split(":").map(Number); return ((h % 12) || 12) + ":" + String(m).padStart(2, "0") + (h < 12 ? " am" : " pm"); };
+const hhmm = (d: Date) => ampm(d.toISOString().slice(11, 16));
 async function orderEvents(orderId: string) {
   const { data: o } = await db.from("orders").select("*").eq("id", orderId).single(); if (!o) return;
   const { data: k } = await db.from("kitchens").select("*").eq("id", o.kitchen_id).single();
@@ -143,7 +145,7 @@ async function tick() {
       const { data: os } = await db.from("orders").select("*").eq("pool_id", p.id).is("parent_id", null).in("status", ["pending", "paid"]);
       if (!os || os.length !== 1 || os[0].solo_choice) continue;
       if (await once("solo:" + os[0].id))
-        await send(await customerSubs(os), "You're the only one in this pool", "Delivery is the full trip. Keep it, switch to another pool, or cancel before " + String(s.cutoff).slice(0, 5) + ".", APP + "/#order", "solo-" + os[0].id, "solo");
+        await send(await customerSubs(os), "You're the only one in this pool", "Delivery is the full trip. Keep it, switch to another pool, or cancel before " + ampm(s.cutoff) + ".", APP + "/#order", "solo-" + os[0].id, "solo");
     }
   }
   // On the way: if the rider's phone hasn't said they're close, estimate it from pickup time and road distance (20 km/h)
@@ -218,7 +220,7 @@ async function tick() {
         db.from("orders").select("qty,special_request,status").in("pool_id", byK[kid].map((p: any) => p.id)).in("status", ["pending", "paid", "collected"])]);
       const n = (os || []).reduce((a: number, o: any) => a + o.qty, 0), sp = (os || []).filter((o: any) => o.special_request).length;
       const [h, m] = String(s.delivery_time).slice(0, 5).split(":").map(Number), ready = new Date(Date.UTC(2000, 0, 1, h, m - 30)).toISOString().slice(11, 16);
-      if (k && n) await send(await kitchenSubs(k.id), "Orders closed: " + n + " meals", byK[kid].length + " pool" + (byK[kid].length > 1 ? "s" : "") + (sp ? ", " + sp + " custom order" + (sp > 1 ? "s" : "") : "") + ". Ready by " + ready + ". Confirm the final batch on your page.", APP + "/#kitchen-" + k.token, "summary-" + kid);
+      if (k && n) await send(await kitchenSubs(k.id), "Orders closed: " + n + " meals", byK[kid].length + " pool" + (byK[kid].length > 1 ? "s" : "") + (sp ? ", " + sp + " custom order" + (sp > 1 ? "s" : "") : "") + ". Ready by " + ampm(ready) + ". Confirm the final batch on your page.", APP + "/#kitchen-" + k.token, "summary-" + kid);
     }
   }
 }

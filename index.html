@@ -1126,7 +1126,8 @@ const at = (date, t) => new Date(date + "T" + String(Math.floor(hm(t) / 60)).pad
 const today = () => new Date().toISOString().slice(0, 10);
 const opsDate = () => today();
 const fmtDate = iso => new Date(iso + "T00:00:00Z").toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
-const fmtTime = t => String(t).slice(0, 5);
+// Times read the Ghana way: 10:30 am, 12:30 pm (settings keep 24-hour HH:MM)
+const fmtTime = t => { const m = /^(\d{1,2}):(\d{2})/.exec(String(t || "")); if (!m) return String(t || "").slice(0, 5); const h = +m[1]; return ((h % 12) || 12) + ":" + m[2] + (h < 12 ? " am" : " pm"); };
 const minus = (t, mins) => { const m = (hm(t) - mins + 1440) % 1440; return String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0"); };
 const clock = iso => new Date(iso).toISOString().slice(11, 16);
 const minsAgo = iso => Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 6e4));
@@ -2283,6 +2284,16 @@ function openWallet() { setTab("wallet"); }
 const poolSize = k => Math.max(5, Math.min(Number((k && (k.pool_size_own ?? k.pool_size)) || S.settings.max_meals || 10), Number(S.settings.pool_ceiling || 15)));
 // The vendor has no more room today (or isn't cooking)
 const dayFull = k => !k.no_daily_limit && (S.board.load[k.id] || 0) >= Number(k.capacity || 0);
+// Checkout: why the full trip now. Joining shows your share as it stands (it can still change, so no promise of a set
+// cash back); starting shows the most you could get back. The bottom note explains where the money goes.
+function delivHint(k, site, n, charged) {
+  const s = S.settings; n = Math.max(1, n || 1); if (!(charged > 0)) return "";
+  const p = S.board.pools.find(x => x.site_id === S.siteId && x.kitchen_id === k.id && ["waiting", "collecting"].includes(x.status) && x.meals > 0 && x.meals + n <= poolSize(k));
+  if (p) { const share = feeFor(p.meals + n, s, poolTrip(p, p.meals + n)) * n;
+    if (share < charged) return `<small class="sumhint">Your share right now: ${money(share)}. The rest comes back to your wallet</small>`; }
+  const cap = Math.max(n, poolCap(k.id, 0)), best = feeFor(cap, s, tripTo(k, site, cap)) * n, back = charged - best;
+  return back > 0 ? `<small class="sumhint">Up to ${money(back)} cash back as others join</small>` : "";
+}
 // Is there a pool here with people in it and room for this many meals? If not, this order starts a new pool
 const roomyPool = (k, n) => S.board.pools.some(p => p.site_id === S.siteId && p.kitchen_id === k.id && ["waiting", "collecting"].includes(p.status) && p.meals > 0 && p.meals + (n || 1) <= poolSize(k));
 function currentPool(siteId, kid) {
@@ -2704,7 +2715,7 @@ function heroDelivery(here, site) {
 function lunchCard(o) {
   const seller = menuOf(o.kitchen_id).public_name || "the vendor", what = o.qty + " × " + o.item_name, dl = dayLabel(o.order_date);
   const day = dl === "today" || dl === "tomorrow" ? dl : fmtDate(o.order_date), st = progressOf(o);
-  const hm = d => d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "UTC" });
+  const hm = d => fmtTime(d.toISOString().slice(11, 16));
   let t, sub = what, rank, bad = false, fix = false, bar = true;
   if (o.status === "pending" && o.pay_issue) { bad = fix = true; bar = false; rank = 0;
     t = o.pay_issue === "short" ? "Your payment was short" : "We couldn't find your payment"; sub = "Code " + o.code + " · fix it before " + fmtTime(S.settings.cutoff) + " so your lunch counts"; }
@@ -2788,7 +2799,7 @@ function renderHero() {
 </div>
     <div class="hero-stats"><div class="hero-stat" id="cdBox"><b class="num" id="countdown">--</b><span id="cdLabel">until orders close</span></div>
       ${S.noSite ? "" : (n => `<button class="hero-stat hlink" data-gopools aria-label="${n} active pool${n === 1 ? "" : "s"} in your building. See vendors with pools open"><b class="num">${n}</b><span>active pool${n === 1 ? "" : "s"}</span></button>`)(here.filter(p => ["collecting", "waiting"].includes(p.status) && p.meals > 0).length)}
-      ${S.noSite ? `<div class="hero-stat"><b class="num">${here.filter(p => p.status === "collecting" && p.meals > 0).length}</b><span>pools open</span></div>` : (dlv ? `<button class="hero-stat hlink" data-vendor="${esc(dlv.kid)}">${(v => `<b class="num${v.length > 7 ? " long" : ""}">${v}</b>`)(dlv.fee === 0 ? "Free" : Number.isInteger(dlv.fee) ? "GHS " + dlv.fee : money(dlv.fee))}<span>${esc(dlv.label)}${dlv.pool ? `<span class="of lown">lowest now</span>` : ""}</span></button>` : `<div class="hero-stat"><b class="num">${menusHere().length}</b><span>vendors cooking</span></div>`)}</div>`;
+      ${S.noSite ? `<div class="hero-stat"><b class="num">${here.filter(p => p.status === "collecting" && p.meals > 0).length}</b><span>pools open</span></div>` : (dlv ? `<button class="hero-stat hlink" data-vendor="${esc(dlv.kid)}">${(v => `<b class="num${v.length > 7 ? " long" : ""}">${v}</b>`)(dlv.fee === 0 ? "Free" : Number.isInteger(dlv.fee) ? "GHS " + dlv.fee : money(dlv.fee))}<span>${esc(dlv.label)}${dlv.pool ? `<span class="of lown">(lowest now)</span>` : ""}</span></button>` : `<div class="hero-stat"><b class="num">${menusHere().length}</b><span>vendors cooking</span></div>`)}</div>`;
   // Top part (greeting + figures) is only rebuilt when it changed; the strip lives in its own box and is patched in place
   let host = $("#mlHost");
   if (!host || host.parentElement !== el) { el.innerHTML = ""; host = document.createElement("div"); host.id = "mlHost"; host.className = "mlhost"; el.appendChild(host); el.dataset.top = ""; }
@@ -3035,12 +3046,21 @@ function nearRows() {
   return { far: rows.filter(r => !inArea(r)).length, rows: near, further };
 }
 function poolRow(k) {
-  const s = S.settings, st = menuState(k), mo = myOrderIn(k), i = menuIndex(k.id), size = poolSize(k);
-  const mine = mo && S.board.pools.find(x => x.id === mo.pool_id);
-  // Your pool is full: show it as done, then the next pool with the same vendor (unless the vendor has no room left today)
-  if (mine && mine.meals >= size) return rowHtml(k, i, mine, mo, size, { l2: "Pool full · delivery at its lowest", ok: true, act: st.full ? `<button class="btn" data-newpool="${esc(k.id)}">New pool</button>` : "" }) + (st.full ? "" : nextRow(k, i, st));
-  if (mo) return rowHtml(k, i, mine || currentPool(S.siteId, k.id), mo, null, rowInfo(k, mine || currentPool(S.siteId, k.id), st, mo));
-  return nextRow(k, i, st);
+  const st = menuState(k), i = menuIndex(k.id), size = poolSize(k);
+  // Every pool you're in today stays listed (full ones too), oldest first; then the pool others can join
+  const mine = (S.mine || []).filter(o => !o.parent_id && o.kitchen_id === k.id && o.site_id === S.siteId && o.order_date === S.date
+    && ["pending", "paid"].includes(o.status) && ["waiting", "collecting"].includes(o.pool_status));
+  const byPool = [...new Map(mine.map(o => [o.pool_id, o])).values()].map(o => ({ o, p: S.board.pools.find(x => x.id === o.pool_id) || currentPool(S.siteId, k.id) }))
+    .sort((x, y) => (x.p.seq || 0) - (y.p.seq || 0));
+  const many = byPool.length > 1, room = byPool.find(x => x.p.meals < size);
+  const rows = byPool.map(({ o, p }, n) => {
+    const tag = many ? "Your pool " + p.seq : "Your pool";
+    if (p.meals >= size) return rowHtml(k, i, p, o, size, { l2: "Pool full · delivery at its lowest", ok: true, tag,
+      act: st.full && n === byPool.length - 1 ? `<button class="btn" data-newpool="${esc(k.id)}">New pool</button>` : "" });
+    return rowHtml(k, i, p, o, null, { ...rowInfo(k, p, st, o), tag });
+  });
+  if (!byPool.length || (!room && !st.full)) rows.push(nextRow(k, i, st));
+  return rows.join("");
 }
 // The pool a new customer would join: the open one, or the next one once earlier pools are full
 function nextRow(k, i, st) {
@@ -3065,7 +3085,7 @@ function rowInfo(k, p, st, mo) {
 function rowHtml(k, i, p, mo, size, x) {
   const max = size || poolCap(k.id, p.meals);
   return `<article class="prow${mo ? " mine" : ""}${x.ok ? " done" : ""}"><span class="ptile" data-vendor="${esc(k.id)}" style="background:${tint(i)}">${plate(topDish(k.id), k.id)}</span>
-    <span class="ptx" data-vendor="${esc(k.id)}"><strong>${esc(k.public_name)}${mo ? ` <span class="ytag">Your pool</span>` : ""}</strong><span class="l1"><span class="num">${p.meals} of ${max} meals</span>${mo ? ` · <span class="num">code ${esc(mo.code)}</span>` : ""}</span>
+    <span class="ptx" data-vendor="${esc(k.id)}"><strong>${esc(k.public_name)}${mo ? ` <span class="ytag">${esc(x.tag || "Your pool")}</span>` : ""}</strong><span class="l1"><span class="num">${p.meals} of ${max} meals</span>${mo ? ` · <span class="num">code ${esc(mo.code)}</span>` : ""}</span>
       <span class="l2${x.warn ? " warn" : ""}${x.ok ? " okl" : ""}">${esc(x.l2).replace(/GHS [\d,.]+/, m => "<b>" + m + "</b>")}</span><span class="pbar"><i style="width:${Math.min(100, Math.round(p.meals / max * 100))}%"></i></span></span>
     <span class="acts">${x.act || ""}${x.share ? `<button class="iconround" data-share="${esc(S.siteId)},${esc(k.id)}" aria-label="Share this pool">${ICON.share}</button>` : ""}</span></article>`;
 }
@@ -4012,7 +4032,7 @@ function statusLine0(o) {
   if (o.status === "cancelled" && o.cancel_reason === "Moved to another pool") return "Moved to another pool." + (o.refund_needed && Number(o.refund_due) > 0 ? " ChopPool will refund the difference, " + money(o.refund_due) + ", to your mobile money." : "");
   if (o.status === "quote_requested") return "Waiting for " + seller + " to price your custom order. You'll then have " + (S.settings.quote_pay_min || 15) + " minutes to pay.";
   if (o.status === "quoted") return seller + " priced your request at " + money(o.quote_price) + " a meal. Check the total and pay to confirm.";
-  if (st === "waiting") { const w = o.wait_until && new Date(o.wait_until), by = w && isFinite(w) ? "by " + w.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "UTC" }) + (w.toISOString().slice(0, 10) > today() ? " " + (dayLabel(w.toISOString().slice(0, 10)) === "tomorrow" ? "tomorrow" : fmtDate(w.toISOString().slice(0, 10))) : "") : confirmText(o.order_date);
+  if (st === "waiting") { const w = o.wait_until && new Date(o.wait_until), by = w && isFinite(w) ? "by " + fmtTime(w.toISOString().slice(11, 16)) + (w.toISOString().slice(0, 10) > today() ? " " + (dayLabel(w.toISOString().slice(0, 10)) === "tomorrow" ? "tomorrow" : fmtDate(w.toISOString().slice(0, 10))) : "") : confirmText(o.order_date);
     return "Waiting for " + seller + " to confirm " + by + ". If they don't, you get your money back."; }
   if (o.status === "pending" && st === "collecting") return "Payment being checked.";
   if (st === "collecting") return "Confirmed. Pool " + o.pool_seq + " closes at " + fmtTime(S.settings.cutoff) + ".";
@@ -4247,7 +4267,7 @@ function openOrder(menuId, opt = {}) {
       const tripN = tripNow(k, site), dTot = join ? 0 : upfrontPerMeal(tripN, first, s) * first, sFee = Number(s.service_fee), total = food + dTot + sFee * meals;
       const useW = $("#fWallet")?.checked ? Math.min(S.balance, total) : 0, due = total - useW;
       $("#sum").innerHTML = `<div><span>Food (${meals} meal${meals === 1 ? "" : "s"})</span><span class="num">${money(food)}</span></div>` +
-        (join ? `<div><span>Delivery</span><span class="num">Already paid</span></div>` : tripN === 0 ? `<div><span>Delivery, by the vendor</span><span class="num">Free</span></div>` : `<div><span>Delivery, full trip<small class="sumhint">You pay the full trip now. As others join, your share drops and the difference comes back to you as cashback.</small></span><span class="num">${money(dTot)}</span></div>`) +
+        (join ? `<div><span>Delivery</span><span class="num">Already paid</span></div>` : tripN === 0 ? `<div><span>Delivery, by the vendor</span><span class="num">Free</span></div>` : `<div><span>Delivery (full trip)${delivHint(k, site, meals, dTot)}</span><span class="num">${money(dTot)}</span></div>`) +
         `<div><span>Service fee (${money(sFee)} a meal)</span><span class="num">${money(sFee * meals)}</span></div>` + (useW ? `<div><span>From wallet</span><span class="num">−${money(useW)}</span></div>` : "");
       $("#payPart").classList.toggle("hidden", due <= 0); drawPay(due);
       $("#totTxt").textContent = due <= 0 ? money(useW) : money(due);
@@ -4268,7 +4288,7 @@ function openOrder(menuId, opt = {}) {
     const useW = $("#fWallet")?.checked ? Math.min(S.balance, total) : 0, due = total - useW;
     $("#sum").innerHTML = `<div><span>${qty} × ${esc(item.name)}</span><span class="num">${money(item.price * qty)}</span></div>` +
       (addT ? `<div><span>Extras</span><span class="num">${money(addT * qty)}</span></div>` : "") +
-      (join ? `<div><span>Delivery</span><span class="num">Already paid</span></div>` : tripN === 0 ? `<div><span>Delivery, by the vendor</span><span class="num">Free</span></div>` : `<div><span>Delivery, full trip<small class="sumhint">You pay the full trip now. As others join, your share drops and the difference comes back to you as cashback.</small></span><span class="num">${money(dFee * qty)}</span></div>`) +
+      (join ? `<div><span>Delivery</span><span class="num">Already paid</span></div>` : tripN === 0 ? `<div><span>Delivery, by the vendor</span><span class="num">Free</span></div>` : `<div><span>Delivery (full trip)${delivHint(k, site, qty, dFee * qty)}</span><span class="num">${money(dFee * qty)}</span></div>`) +
       `<div><span>Service fee${qty > 1 ? " (" + money(sFee) + " a meal)" : ""}</span><span class="num">${money(sFee * qty)}</span></div>` +
       (useW ? `<div><span>From wallet</span><span class="num">−${money(useW)}</span></div>` : "");
     $("#payPart").classList.toggle("hidden", due <= 0); drawPay(due);
@@ -4875,7 +4895,7 @@ async function renderAdmin(cached, quiet) {   // quiet = background/refresh-butt
           ${tile("Owed to delivery", money(mny.delivery), "today:pools", "", mny.tripEst ? "Includes estimated trips not booked yet" : "Trip costs of today's pools")}
           ${tile("Cashback to customers", money(mny.cashback), "today:wallets", "", cashback == null ? "Estimate until " + fmtTime(s.cutoff) : "Delivery shares paid back")}
           ${tile(cashback == null ? "Your profit so far" : "Your profit", money(mny.profit), "", mny.profit < 0 ? "bad" : "", "Service fees " + money(mny.service) + " + vendor fee " + money(mny.vfee) + (Math.abs(mny.dmargin) >= 0.01 ? (mny.dmargin >= 0 ? " + " : " − ") + "delivery " + money(Math.abs(mny.dmargin)) : ""))}
-          ${tile("Cashback for this day", cashback == null ? "After " + fmtTime(s.cutoff) : money(cashback), "today:wallets")}
+          ${tile("Cashback for this day", cashback == null ? "Pending" : money(cashback), "today:wallets", "", cashback == null ? "Worked out after " + fmtTime(s.cutoff) : "")}
           ${tile("Wallet balances owed", money(owed), "today:wallets", "", "Money customers hold with ChopPool")}
           <button class="dtile" data-go="team:accounts" id="dashAccts"><b class="num">…</b><span>Customer accounts</span></button>
         </div></section>` : ""}`;
@@ -5170,7 +5190,13 @@ async function renderAdmin(cached, quiet) {   // quiet = background/refresh-butt
         <p class="small muted">If a customer forgets to tap Got my food, the order is marked received after this time. At least 30 minutes.</p></section>`);
   if (tab === "settings") {
     const go = (t, sb, l, d) => `<button type="button" class="setlink" data-goset="${t},${sb}"><span><strong>${l}</strong><small class="muted">${d}</small></span><span aria-hidden="true" class="muted" style="font-size:20px">›</span></button>`;
-    body.innerHTML = `${isSuper ? setForm(`<section class="card stack"><h2>Team screens</h2><div><label for="rlIdle">Sign out after this many quiet minutes (5-60)</label><input id="rlIdle" name="admin_idle_min" inputmode="numeric" value="${esc(s.admin_idle_min ?? 15)}"></div>
+    const tv = t => esc(String(t || "").slice(0, 5));
+    body.innerHTML = `${isSuper ? setForm(`<section class="card stack"><h2>Ordering times</h2>
+        <div class="grid2"><div><label for="stCut">Orders close</label><input id="stCut" name="cutoff" type="time" value="${tv(s.cutoff)}"></div>
+          <div><label for="stLunch">Lunch arrives</label><input id="stLunch" name="delivery_time" type="time" value="${tv(s.delivery_time)}"></div>
+          <div><label for="stSpec">Custom orders close</label><input id="stSpec" name="special_cutoff" type="time" value="${tv(s.special_cutoff)}"></div></div>
+        <p class="small muted">Customers see "Order by ${fmtTime(s.cutoff)} · lunch at ${fmtTime(s.delivery_time)}". Vendors have lunch ready 30 minutes before it arrives. Changes apply from the next order.</p></section>`) : ""}
+      ${isSuper ? setForm(`<section class="card stack"><h2>Team screens</h2><div><label for="rlIdle">Sign out after this many quiet minutes (5-60)</label><input id="rlIdle" name="admin_idle_min" inputmode="numeric" value="${esc(s.admin_idle_min ?? 15)}"></div>
         <p class="small muted">Everyone on the team is also signed out after 12 hours.</p></section>`) : ""}
       <section class="card stack"><h2>Other settings</h2><p class="small muted">Each setting now sits with what it controls.</p>
         <div class="setlinks">${go("riders", "rules", "Delivery pricing", "Riders › Settings")}${go("menus", "rules", "Pool size, vendors near you, ChopPool fee", "Vendors & menus › Settings")}${go("today", "rules", "Got my food timing", "Today › Settings")}${isSuper ? go("team", "payments", "Mobile money accounts", "Team › Payment options") : ""}</div></section>`;
@@ -5320,7 +5346,7 @@ async function adminClick(e) {
     if (act === "pool-save") return run(() => api.updatePool(id, { rider_id: fval(poolCard, "rider_id") || null, trip_ref: fval(poolCard, "trip_ref") || null, trip_cost: fval(poolCard, "trip_cost") ? Number(fval(poolCard, "trip_cost")) : null }).then(() => notifyServer({ pool_id: id })), "Pool saved");
     if (act === "ticket") {
       const tally = {}; os.forEach(o => { const key = o.item_name + (o.addons?.length ? " (" + addonText(o.addons) + ")" : ""); tally[key] = (tally[key] || 0) + o.qty; });
-      const text = "ChopPool order for " + fmtDate(d) + ". Ready by " + minus(s.delivery_time, 30) + ".\n" + site.name + ", Pool " + p.seq + " (" + p.meals + " meals):\n" +
+      const text = "ChopPool order for " + fmtDate(d) + ". Ready by " + fmtTime(minus(s.delivery_time, 30)) + ".\n" + site.name + ", Pool " + p.seq + " (" + p.meals + " meals):\n" +
         Object.entries(tally).map(([n, q]) => "- " + q + " × " + n).join("\n") + "\nLabel codes: " + os.map(o => o.code + (o.qty > 1 ? " (×" + o.qty + ")" : "")).join(", ") +
         "\nOpen your page to confirm: " + baseUrl() + "/#kitchen-" + k.token;
       return openSheet(`${sheetHead("Ticket for " + esc(k.name))}<textarea rows="10" aria-label="Vendor ticket">${esc(text)}</textarea>
@@ -5461,6 +5487,12 @@ async function adminSubmit(e) {
         if (!(Number.isInteger(pc2) && pc2 >= 5 && pc2 <= 50)) return fail("The most a vendor can choose must be a whole number from 5 to 50.");
         if (!(Number.isInteger(pm) && pm >= 5 && pm <= pc2)) return fail("The default meals per pool must be from 5 to " + pc2 + ".");
         patch.max_meals = pm; patch.pool_ceiling = pc2; }
+      if (has("cutoff")) { const cut = v("cutoff"), lunch = v("delivery_time"), spec = v("special_cutoff"), ok5 = x => /^\d{2}:\d{2}$/.test(x);
+        if (![cut, lunch, spec].every(ok5)) return fail("Enter all three times.");
+        if (hm(lunch) - hm(cut) < 60) return fail("Lunch should arrive at least an hour after orders close.");
+        if (hm(spec) > hm(cut)) return fail("Custom orders must close at or before " + fmtTime(cut) + ".");
+        if (hm(String(S.settings.next_day_confirm_by || "08:30").slice(0, 5)) >= hm(cut)) return fail("Orders must close after vendors confirm (" + fmtTime(S.settings.next_day_confirm_by || "08:30") + "). Change that under Vendors & menus › Settings first.");
+        Object.assign(patch, { cutoff: cut, delivery_time: lunch, special_cutoff: spec }); }
       if (has("admin_idle_min")) { const im = num("admin_idle_min"); if (!(im >= 5 && im <= 60)) return fail("Choose 5 to 60 minutes for the team screen timeout."); patch.admin_idle_min = im; }
       if (has("vendor_fee_pct")) { const pc = num("vendor_fee_pct"), fr = num("vendor_fee_free");
         if (!(pc >= 0 && pc <= 50) || !(Number.isInteger(fr) && fr >= 0 && fr <= 100)) return fail("Enter a fee between 0 and 50% and a whole number of free meals.");
@@ -5593,7 +5625,7 @@ async function viewKitchen(token) {
     // "Customers at Heritage Tower want lunch tomorrow (3 meals). Confirm by 8:30 tomorrow · 42 min left."
     const waitLine = () => { const by = waiting.map(p => waitUntilOf({ ...p, order_date: p.order_date || d })).filter(x => x && isFinite(x)).sort((a, b) => a - b)[0], meals = waiting.reduce((t, p) => t + p.orders.reduce((a, o) => a + o.qty, 0), 0);
       const left = by ? Math.max(0, Math.round((by - new Date()) / 6e4)) : null, dl = dayLabel(d);
-      return "Customers at " + waiting.map(p => p.site).join(", ") + " want lunch " + (dl === "today" || dl === "tomorrow" ? dl : "on " + fmtDate(d)) + " (" + meals + " meal" + (meals === 1 ? "" : "s") + "). Confirm by " + (by ? by.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "UTC" }) : fmtTime(confirmBy())) + (by && by.toISOString().slice(0, 10) !== today() ? " " + (dayLabel(by.toISOString().slice(0, 10)) === "tomorrow" ? "tomorrow" : fmtDate(by.toISOString().slice(0, 10))) : "") + (left != null && left < 180 ? " · " + left + " min left" : "") + "."; };
+      return "Customers at " + waiting.map(p => p.site).join(", ") + " want lunch " + (dl === "today" || dl === "tomorrow" ? dl : "on " + fmtDate(d)) + " (" + meals + " meal" + (meals === 1 ? "" : "s") + "). Confirm by " + (by ? fmtTime(by.toISOString().slice(11, 16)) : fmtTime(confirmBy())) + (by && by.toISOString().slice(0, 10) !== today() ? " " + (dayLabel(by.toISOString().slice(0, 10)) === "tomorrow" ? "tomorrow" : fmtDate(by.toISOString().slice(0, 10))) : "") + (left != null && left < 180 ? " · " + left + " min left" : "") + "."; };
     const nextUp = (() => {
       if (!k.open && !k.paused && closedToday) return { t: "Orders for " + dayLabel(d) + " have closed." + (dNext !== d ? " Tap " + dayLabel(dNext)[0].toUpperCase() + dayLabel(dNext).slice(1) + " to see what's next." : ""), go: "", b: "" };
       if (!k.open && !k.paused) return { t: waiting.length ? waitLine() : "Confirm you're cooking " + dayLabel(d) + ".", go: "#cookCard", b: "Confirm" };
@@ -5621,7 +5653,7 @@ async function viewKitchen(token) {
     const settingsHtml = `${autoCard(k, d)}${poolCard(k)}${freeCard(k)}`;
     $("#view").innerHTML = `
       <header class="topzone pagetop"><div class="pagehead"><div class="pagebrand">${LOGO(30)}<p class="brand" style="font-size:18px">ChopPool vendor</p></div>${themeBtn()}</div><h1>${esc(k.name)}</h1>
-        <p class="muted">${fmtDate(d)} · ready by ${minus(S.settings.delivery_time, 30)} · ${k.no_daily_limit ? used + " meal" + (used === 1 ? "" : "s") + " so far" : used + " of " + k.capacity + " meals"} · ${k.delivery_mode === "runner" ? "you deliver with your own runner" : "a ChopPool rider collects"}</p></header>
+        <p class="muted">${fmtDate(d)} · ready by ${fmtTime(minus(S.settings.delivery_time, 30))} · ${k.no_daily_limit ? used + " meal" + (used === 1 ? "" : "s") + " so far" : used + " of " + k.capacity + " meals"} · ${k.delivery_mode === "runner" ? "you deliver with your own runner" : "a ChopPool rider collects"}</p></header>
       ${dayTabs}
       ${termsTop}
       ${nextUp.go === "#cookCard" || (k.paused && !k.open) ? "" : `<section class="card nextup" aria-live="polite"><p>${esc(nextUp.t)}</p>${nextUp.b ? `<button class="btn wide" data-jump="${esc(nextUp.go)}">${esc(nextUp.b)}</button>` : ""}</section>`}

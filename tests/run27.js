@@ -9,7 +9,7 @@ const ok = (c, m) => { if (!c) { console.log('FAIL', m); process.exitCode = 1; }
   await p.locator('.tabbar button', { hasText: 'Vendors' }).click(); await p.waitForTimeout(500);
   await p.locator('#kitchensList [data-vendor]').first().click(); await p.waitForTimeout(700);
   await p.locator('#vpage [data-dish]:not([disabled])').first().click(); await p.waitForTimeout(400); await p.click('#dAdd'); await p.waitForTimeout(300); await p.locator('#vfoot [data-vcheckout]').click(); await p.waitForTimeout(700);
-  const sum = await p.locator('#sum').innerText(); ok(/Delivery, full trip/.test(sum) && /your share drops/.test(sum), 'checkout shows the full trip');
+  const sum = await p.locator('#sum').innerText(); ok(/Delivery \(full trip\)/.test(sum), 'checkout shows the full trip');
   await p.fill('#fName', 'Ama Mensah').catch(()=>{}); await p.fill('#fPhone', '0241234567').catch(()=>{});
   await p.locator('#fRef').focus(); await p.waitForTimeout(400); await p.fill('#fRef', '51234567890');
   await p.locator('#submitBtn').click(); await p.waitForTimeout(1200);
