@@ -1959,7 +1959,7 @@ async function copy(text, okMsg) {
   catch (e) { openSheet(`<h2 id="sheetTitle">Copy this</h2><textarea rows="8" aria-label="Text to copy">${esc(text)}</textarea><button class="ghost" data-close>Close</button>`); }
 }
 const STEPS = ["collecting", "accepted", "ready", "picked_up", "arriving", "delivered"];
-const STEP_LABEL = { waiting: "Waiting for vendor", collecting: "Taking orders", accepted: "Cooking", ready: "Food ready", picked_up: "On the way", arriving: "Nearly there", delivered: "Delivered", handed: "Done" };
+const STEP_LABEL = { waiting: "Waiting for vendor", collecting: "Taking orders", accepted: "Packing", ready: "Food ready", picked_up: "On the way", arriving: "Nearly there", delivered: "Delivered", handed: "Done" };
 // The last step, "Handed over", is reached when every meal in the pool has been collected against its code
 const handedOver = os => (os || []).length > 0 && os.every(o => o.collected || o.status === "collected");
 const stepsHtml = (st, orders) => {
@@ -2741,7 +2741,7 @@ function lunchCard(o) {
   else if (o.pool_status === "waiting") { rank = 6; const w = o.wait_until && new Date(o.wait_until);
     t = "Paid · waiting for vendor"; sub = w && isFinite(w) ? "Confirms by " + hm(w) + (w.toISOString().slice(0, 10) > today() ? " " + (dayLabel(w.toISOString().slice(0, 10)) === "tomorrow" ? "tomorrow" : fmtDate(w.toISOString().slice(0, 10))) : "") : what; }
   else if (st <= 1) { rank = 5; t = "Confirmed for " + day; }
-  else { rank = { 2: 4, 3: 3, 4: 2 }[Math.min(st, 4)]; t = ["", "", "Being cooked", "On the way", "Delivered"][Math.min(st, 4)]; }
+  else { rank = { 2: 4, 3: 3, 4: 2 }[Math.min(st, 4)]; t = ["", "", "Packing your order", "On the way", "Delivered"][Math.min(st, 4)]; }
   const hash = [t, sub, st, bad, fix, bar, o.code].join("|");
   return { o, rank, hash, html: `<button class="mylunch${bad ? " bad" : ""}" data-gomine="${esc(o.id)}" data-h="${esc(hash)}" aria-label="${esc(t)}, code ${esc(o.code)}. Open your order">
     <span class="ml-dot${!bad && st >= 3 ? " go" : ""}"></span><span class="ml-t"><b>${esc(t)}</b><small>${esc(sub)}</small></span>
@@ -3371,7 +3371,7 @@ function vendorClick(e) {
 }
 
 /* ---------- Orders: Upcoming / Past ---------- */
-const STEP_LABELS = ["Paid", "Cooking", "On the way", "Delivered", "Received"];
+const STEP_LABELS = ["Paid", "Packing", "On the way", "Delivered", "Received"];
 // Priced special order: time left to pay
 async function run0(fn) { try { await fn(); } catch (e) { toast(cleanErr(e)); } }
 function soloClick(e) {
@@ -3950,7 +3950,7 @@ function updatesList() {
     else if (o.status === "cancelled") { t = VENDOR_NO.test(o.cancel_reason || "") ? "cashback" : "confirm"; title = /isn't cooking/.test(o.cancel_reason || "") ? name + " isn't cooking today" : /did not confirm/.test(o.cancel_reason || "") ? name + " didn't confirm" : "Order cancelled"; }
     else if (["arriving", "delivered"].includes(o.pool_status) && !o.received_at) { t = "arriving"; title = o.pool_status === "arriving" ? "Lunch is 5 minutes away" : "Lunch is here"; }
     else if (o.pool_status === "waiting") { t = "confirm"; title = "Waiting for " + name; }
-    else if (["collecting", "accepted", "ready", "picked_up"].includes(o.pool_status) && o.status !== "collected") { t = "confirm"; title = name + " is cooking"; }
+    else if (["collecting", "accepted", "ready", "picked_up"].includes(o.pool_status) && o.status !== "collected") { t = "confirm"; title = name + " confirmed your lunch"; }
     if (t) out.push({ id: o.id + o.status + o.pool_status, t, title, body: statusLine(o), at, act: o.status === "quoted" || (t === "arriving" && o.status !== "collected") });
   });
   // Building activity is one grouped line, not one per order
@@ -4051,7 +4051,7 @@ function statusLine0(o) {
     return "Waiting for " + seller + " to confirm " + by + ". If they don't, you get your money back."; }
   if (o.status === "pending" && st === "collecting") return "Payment being checked.";
   if (st === "collecting") return "Confirmed. Pool " + o.pool_seq + " closes at " + fmtTime(S.settings.cutoff) + ".";
-  if (st === "accepted") return "The kitchen is cooking.";
+  if (st === "accepted") return "The vendor is packing your order.";
   if (st === "ready") return "Packed and waiting for delivery.";
   if (st === "picked_up") return "On the way to " + site.drop_point + ".";
   if (st === "arriving") return site.handoff === "host" ? "Arriving at " + site.drop_point + " in about 5 minutes." : "Arriving at " + site.drop_point + " in about 5 minutes. Bring code " + o.code + ".";
