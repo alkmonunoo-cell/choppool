@@ -1241,6 +1241,9 @@ function makeDemoApi() {
     return { total, wallet_used: use, momo_due: total - use };
   }
   function housekeeping() {
+    // A delivered pool's trip cost fills itself in (update 29); own-runner vendors and free delivery owe no rider
+    pools.forEach(p => { if (p.status === "delivered" && p.trip_cost == null) { const k = kitchens.find(x => x.id === p.kitchen_id);
+      if (k && k.delivery_mode !== "runner" && !pfree(p.id)) p.trip_cost = tripFor(k, sites.find(x => x.id === p.site_id), settings); } });
     // Payment never found by cut-off: cancelled; a short payment goes back
     orders.filter(o => o.status === "pending" && o.pay_issue && pastCutoff(o.order_date)).forEach(o => {
       o.status = "cancelled"; o.cancel_reason = "Payment not received"; o.refund_due = Number(o.amount_received || 0); o.refund_needed = o.refund_due > 0 && !o.user_id;
@@ -4682,7 +4685,8 @@ async function viewAdmin() {
   $("#aBody").addEventListener("change", adminChange);
   $("#aBody").addEventListener("submit", adminSubmit);
   await renderAdmin();
-  every(() => { if (["dash", "today"].includes(S.adminTab) && !$("#sheetBg").classList.contains("open") && !document.activeElement?.closest("#view input, #view select, #view textarea")) renderAdmin(); }, 30000);
+  // Dashboard and Today stay current: a quiet check that only redraws when something actually changed (no flicker)
+  every(() => { if (["dash", "today"].includes(S.adminTab) && !S.adminBusy && !$("#sheetBg").classList.contains("open") && !document.activeElement?.closest("#view input, #view select, #view textarea")) adminRefresh(false); }, 30000);
   every(() => notifyServer({ tick: true }), 60000);   // vendor reminders, cut-off summaries (also run by the Supabase schedule)
 }
 function poolFlags(p, s, d, now = new Date()) {
@@ -4820,7 +4824,10 @@ async function renderAdmin(cached, quiet) {   // quiet = background/refresh-butt
     otherWait = two && [dToday, dNext].includes(cur) ? (cur === dToday ? wn : wt) : [];
     S.adminOtherWait = otherWait;
     data.date = cur; data.kitchens = data.kitchens.filter(k => !k.archived); data.sites = data.sites.filter(x => !x.archived);
-    const sig = JSON.stringify([data, otherWait.length]);
+    // Compare what's there, not the order rows came back in (rows with the same timestamp come back shuffled)
+    const norm = v => Array.isArray(v) ? v.map(norm).sort((x, y) => { const a = (x && x.id) || JSON.stringify(x), b = (y && y.id) || JSON.stringify(y); return a < b ? -1 : a > b ? 1 : 0; })
+      : v && typeof v === "object" ? Object.fromEntries(Object.keys(v).sort().map(k => [k, norm(v[k])])) : v;
+    const sig = JSON.stringify([norm(data), otherWait.length]);
     if (quiet && sig === S.adminSig && S.admin && S.admin.date === cur) {   // nothing changed: just say when we checked
       S.adminAt = new Date(); $("#aUpdated") && ($("#aUpdated").textContent = "Updated " + S.adminAt.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })); return; }
     S.adminSig = sig; S.admin = data; S.adminAt = new Date();
