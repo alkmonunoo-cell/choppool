@@ -110,7 +110,8 @@ const tick = async (p, iso) => { await p.clock.setSystemTime(new Date(iso)); awa
   if (await fb.count()) { await fb.first().click(); await p.waitForTimeout(900); }
   v = await view(p); ok(await p.locator('button[data-k="ready"]').count() > 0, '7.04', '"Food is ready" next');
   note('Vendor cooking list: ' + v.slice(0, 600));
-  await p.locator('button[data-k="ready"]').first().click(); await p.waitForTimeout(900);
+  await p.locator('button[data-k="ready"]').first().click(); await p.waitForTimeout(600);
+  if (await p.locator('#rdyYes').count()) { ok(/not ticked/.test(await txt(p, '#sheet')), '7.05', 'asks before Food ready with unticked packs'); await p.click('#rdyYes'); await p.waitForTimeout(900); }
 
   setArea('8. Rider');
   // Team assigns the rider on Today > Pools

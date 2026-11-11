@@ -138,14 +138,18 @@ async function tick() {
       if (k) await send(await kitchenSubs(k.id), "Price a custom order", "Price code " + o.code + " before " + priceBy.toISOString().slice(11, 16) + " or it closes.", APP + "/#kitchen-" + k.token, "special-" + o.id);
     }
   }
-  // Solo pools: 10 minutes before cut-off, ask the only customer if they still want it
-  if (now >= new Date(cutToday.getTime() - 10 * 6e4) && now < cutToday) {
+  // Solo pools: 30 and again 10 minutes before cut-off, tell the only customer (share it, or switch / cancel)
+  const soloAt = [30, 10].find(m => now >= new Date(cutToday.getTime() - m * 6e4) && now < new Date(cutToday.getTime() - (m === 30 ? 10 : 0) * 6e4));
+  if (soloAt) {
     const { data: tp } = await db.from("pools").select("id,kitchen_id").eq("order_date", today).in("status", ["collecting", "waiting"]);
     for (const p of tp || []) {
       const { data: os } = await db.from("orders").select("*").eq("pool_id", p.id).is("parent_id", null).in("status", ["pending", "paid"]);
-      if (!os || os.length !== 1 || os[0].solo_choice) continue;
-      if (await once("solo:" + os[0].id))
-        await send(await customerSubs(os), "You're the only one in this pool", "Delivery is the full trip. Keep it, switch to another pool, or cancel before " + ampm(s.cutoff) + ".", APP + "/#order", "solo-" + os[0].id, "solo");
+      if (!os || new Set(os.map((o: any) => o.phone)).size !== 1 || os.some((o: any) => o.solo_choice)) continue;
+      if (await once((soloAt === 30 ? "solo30:" : "solo:") + os[0].id))
+        await send(await customerSubs(os), "You're the only one in this pool",
+          soloAt === 30 ? "Share it now: everyone who joins makes delivery cheaper. Orders close at " + ampm(s.cutoff) + "."
+            : "Delivery is the full trip unless someone joins. Keep it, switch to another pool, or cancel before " + ampm(s.cutoff) + ".",
+          APP + "/#order", "solo-" + os[0].id, "solo");
     }
   }
   // On the way: if the rider's phone hasn't said they're close, estimate it from pickup time and road distance (20 km/h)

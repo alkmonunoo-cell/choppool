@@ -170,7 +170,7 @@ button.hero-stat::after { right: 7px; }
 /* Pool cards */
 .pool { background: var(--surface); border-radius: 24px; box-shadow: var(--shadow); overflow: hidden; display: grid; }
 /* Pool and vendor cards: dish photo (or illustration on a warm gradient) with a dark fade, title over it */
-.pool-art { position: relative; height: 176px; overflow: hidden; display: grid; place-items: center; color: #fff; }
+.pool-art { position: relative; height: 176px; overflow: hidden; display: grid; place-items: center; color: var(--surface-2); }
 .pool-art.small { height: 132px; }
 .pool-art.g0 { background: linear-gradient(135deg, #7A3A12 0%, #C8641F 45%, #E9A23B 100%); }
 .pool-art.g1 { background: linear-gradient(135deg, #3A1414 0%, #6E2F2B 50%, #B8682E 100%); }
@@ -428,6 +428,23 @@ th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--li
 th { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 700; }
 td select { padding: 6px 8px; width: auto; }
 .labels { display: grid; gap: 8px; }
+.pkrow { display: grid; grid-template-columns: auto auto 1fr; gap: 12px; align-items: center; width: 100%; text-align: left; background: var(--surface-2); border: 0; border-radius: 14px; padding: 12px; color: var(--ink); font: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.pkrow.ro { grid-template-columns: auto 1fr auto; cursor: default; }
+.pkrow .items { display: grid; gap: 2px; line-height: 1.35; }
+.pkbox { width: 26px; height: 26px; border-radius: 8px; border: 2px solid var(--line-strong, var(--muted)); display: grid; place-items: center; color: var(--surface-2); }
+.pkbox svg { width: 16px; height: 16px; }
+.pkrow.on .pkbox { background: var(--ok); border-color: var(--ok); }
+.pkrow.on:not(.ro) .lc, .pkrow.on:not(.ro) .items { opacity: .5; text-decoration: line-through; }
+.pkrow.wait { opacity: .6; }
+.pkbar { height: 5px; border-radius: 3px; background: var(--line); overflow: hidden; margin-top: 4px; }
+.pkbar i { display: block; height: 100%; background: var(--ok); border-radius: 3px; transition: width .25s; }
+.pkwait { display: grid; gap: 6px; border-top: 1px dashed var(--line); padding-top: 10px; }
+.vmake .vmk { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; }
+.vmake .vmk > div { background: var(--surface-2); border-radius: 12px; padding: 10px 12px; display: grid; gap: 2px; }
+.vmake .vmk b { font-size: 24px; font-family: var(--font-display); }
+.vmake .vmk span { font-size: 13.5px; color: var(--muted); }
+.vpool.vdone { opacity: .75; }
+.vfold summary { cursor: pointer; color: var(--muted); }
 .labels > div { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; background: var(--surface-2); border-radius: 14px; padding: 10px 12px; }
 .labels .lc { font-family: var(--font-display); font-weight: 800; font-size: 20px; letter-spacing: .06em; }
 .tick { color: var(--ok); font-weight: 700; }
@@ -2727,6 +2744,13 @@ function heroDelivery(here, site) {
   return opts.sort((a, b) => a.fee - b.fee || (b.pool ? 1 : 0) - (a.pool ? 1 : 0))[0] || null;
 }
 // ---- Home: my lunch strip (one card per live order; swipe when there are several) ----
+// You're the only person in your pool (before orders close): say so, so people can share it in time
+function soloPool(o) {
+  if (!o || !["waiting", "collecting"].includes(o.pool_status) || !["pending", "paid"].includes(o.status) || o.special_request) return false;
+  const p = (S.board.pools || []).find(x => x.id === o.pool_id); if (!p || !p.meals) return false;
+  const mine = (S.mine || []).filter(x => x.pool_id === o.pool_id && ["pending", "paid"].includes(x.status)).reduce((t, x) => t + Number(x.qty || 1), 0);
+  return mine >= p.meals && new Date() < at(o.order_date, S.settings.cutoff);
+}
 function lunchCard(o) {
   const seller = menuOf(o.kitchen_id).public_name || "the vendor", what = o.qty + " × " + o.item_name, dl = dayLabel(o.order_date);
   const day = dl === "today" || dl === "tomorrow" ? dl : fmtDate(o.order_date), st = progressOf(o);
@@ -2740,7 +2764,7 @@ function lunchCard(o) {
   else if (o.status === "pending") { rank = 7; t = "Checking your payment"; }
   else if (o.pool_status === "waiting") { rank = 6; const w = o.wait_until && new Date(o.wait_until);
     t = "Paid · waiting for vendor"; sub = w && isFinite(w) ? "Confirms by " + hm(w) + (w.toISOString().slice(0, 10) > today() ? " " + (dayLabel(w.toISOString().slice(0, 10)) === "tomorrow" ? "tomorrow" : fmtDate(w.toISOString().slice(0, 10))) : "") : what; }
-  else if (st <= 1) { rank = 5; t = "Confirmed for " + day; }
+  else if (st <= 1) { rank = 5; t = "Confirmed for " + day; if (soloPool(o)) sub = "You're the only one so far · share your pool"; }
   else { rank = { 2: 4, 3: 3, 4: 2 }[Math.min(st, 4)]; t = ["", "", "Packing your order", "On the way", "Delivered"][Math.min(st, 4)]; }
   const hash = [t, sub, st, bad, fix, bar, o.code].join("|");
   return { o, rank, hash, html: `<button class="mylunch${bad ? " bad" : ""}" data-gomine="${esc(o.id)}" data-h="${esc(hash)}" aria-label="${esc(t)}, code ${esc(o.code)}. Open your order">
@@ -3089,7 +3113,8 @@ function rowInfo(k, p, st, mo) {
   if (st.full) { l2 = (st.off ? "Not cooking " : "Fully booked ") + dayLabel(S.date); warn = true; }
   else if (st.waiting && p.status === "waiting") {
     l2 = mo ? "Waiting for the vendor · " + leftText(p) : "Waiting for the vendor · " + leftText(p) + ". Full refund if they don't confirm"; warn = true;
-  } else if (mo) l2 = j < now ? "Add and delivery drops to " + money(j) + " a meal" : "Your share " + money(now) + " a meal";
+  } else if (mo && soloPool(mo)) { l2 = "You're the only one so far · share it so delivery drops to " + money(j) + " a meal"; warn = true; }
+  else if (mo) l2 = j < now ? "Add and delivery drops to " + money(j) + " a meal" : "Your share " + money(now) + " a meal";
   else if (fullBefore) l2 = "Pool " + (p.seq - 1) + " is full. Start pool " + p.seq;
   else l2 = j < now ? "Join and delivery drops to " + money(j) + " a meal" : money(j) + " a meal in this pool";
   const act = st.full ? `<button class="btn" data-newpool="${esc(k.id)}">New pool</button>`
@@ -5650,7 +5675,7 @@ async function viewKitchen(token) {
       if (sp) return { t: `Price ${sp} custom order${sp > 1 ? "s" : ""} by ${fmtTime(priceBy)}.`, go: "#specials", b: "Price now" };
       const st = s => pools.find(p => p.status === s);
       if (afterCut && st("collecting")) return { t: "Orders are closed. Confirm the final batch.", go: "#pool-" + st("collecting").id, b: "Confirm batch" };
-      if (st("accepted")) return { t: "Cook and pack. Tap Food is ready when done.", go: "#pool-" + st("accepted").id, b: "Go to order" };
+      if (st("accepted")) return { t: "Pack each order and tick it off. Tap All packed when the bag is ready.", go: "#pool-" + st("accepted").id, b: "Go to packing list" };
       if ((k.delivery_mode === "runner") && (st("ready") || st("picked_up") || st("arriving"))) { const p = st("ready") || st("picked_up") || st("arriving"); return { t: p.status === "ready" ? "Send your runner off with the bag." : "Your runner is on the way.", go: "#pool-" + p.id, b: "Go to order" }; }
       if (st("ready")) return { t: "Food is packed. The rider is on the way to you.", go: "", b: "" };
       if (st("picked_up") || st("arriving")) return { t: "The rider has the food. Nothing to do.", go: "", b: "" };
@@ -5681,11 +5706,19 @@ async function viewKitchen(token) {
           ${termsNeed(k) ? `<button class="btn wide" id="acceptTerms">Accept terms and confirm I'm cooking ${dayLabel(d)}</button>` : `${Number(k.fee_rate) > 0 ? `<p class="small muted">${esc(termsLine(k))}</p>` : ""}<button class="btn wide" id="openDay">Yes, I'm cooking ${dayLabel(d)}</button>`}
           ${waiting.length ? `<button class="linkbtn" id="skipDay" style="justify-self:center;color:var(--danger)">Not cooking ${dayLabel(d)}? Let customers know</button>` : ""}</section>`}
       ${specials.length ? `<section class="card stack" id="specials"><div class="top"><h2>Custom orders</h2><span class="chip warn">Price by ${fmtTime(priceBy)}</span></div><p class="small muted">The customer pays after you price it. Requests not priced in time are cancelled.</p>${specials.map(quoteForm).join("")}</section>` : ""}
+      ${(() => { // Make today: what to plate across every building (paid meals), so nobody adds up by hand
+        const act = pools.filter(p => ["collecting", "accepted"].includes(p.status)); if (!act.length) return "";
+        const t = {}, wait = { n: 0 }; let packs = 0;
+        act.forEach(p => byCode(p.orders.filter(o => !["quote_requested", "quoted"].includes(o.status))).forEach(([, g]) => { if (g.every(o => o.paid)) { packs++; g.forEach(o => { const nm = dishShort(o.item_name); t[nm] = (t[nm] || 0) + o.qty; }); } else g.forEach(o => { wait.n += o.qty; }); }));
+        const meals = Object.values(t).reduce((a, b) => a + b, 0); if (!meals && !wait.n) return "";
+        return `<section class="card vmake"><div class="top"><h2>Make ${dayLabel(d)}</h2><span class="small muted">ready by <strong style="color:var(--accent)">${fmtTime(minus(S.settings.delivery_time, 30))}</strong></span></div>
+          <div class="vmk">${Object.entries(t).sort((a, b) => b[1] - a[1]).map(([nm, q]) => `<div><b class="num">${q}</b><span>${esc(nm)}</span></div>`).join("")}</div>
+          <p class="small muted">${meals} meal${meals === 1 ? "" : "s"} · ${act.length} building${act.length === 1 ? "" : "s"} · ${packs} pack${packs === 1 ? "" : "s"}${wait.n ? ` · ${wait.n} more waiting for payment` : ""}${act.some(p => p.status === "collecting") ? ` · more may come until ${fmtTime(S.settings.cutoff)}` : ""}</p></section>`; })()}
       ${pools.map(p => {
         const tally = {}; p.orders.filter(o => !o.special_request || o.status !== "quote_requested").forEach(o => { const key = o.item_name + (o.addons?.length ? " (" + addonText(o.addons) + ")" : "") + (o.special_request ? " · Custom: " + o.special_request : ""); tally[key] = (tally[key] || 0) + o.qty; });
         const n = p.orders.reduce((a, o) => a + o.qty, 0);
         const btns = p.status === "waiting" ? "" : p.status === "collecting" ? (afterCut ? `<button class="btn wide" data-k="accepted" data-pool="${esc(p.id)}">Confirm final batch</button>` : `<p class="small muted">Orders close at ${fmtTime(S.settings.cutoff)}. Then confirm the final batch.</p>`)
-          : p.status === "accepted" ? `<button class="btn wide" data-k="ready" data-pool="${esc(p.id)}">Food is ready</button>`
+          : p.status === "accepted" ? `<button class="btn wide" data-k="ready" data-pool="${esc(p.id)}">All packed · food ready</button>`
           : (k.delivery_mode === "runner" || p.free) && p.status === "ready" ? `<button class="btn wide" data-k="picked_up" data-pool="${esc(p.id)}">Runner has picked up</button>`
           : (k.delivery_mode === "runner" || p.free) && p.status === "picked_up" ? `<button class="btn wide" data-k="delivered" data-pool="${esc(p.id)}">Delivered</button>`
           : (k.delivery_mode === "runner" || p.free) && p.status === "arriving" ? `<button class="btn wide" data-k="delivered" data-pool="${esc(p.id)}">Delivered</button>`
@@ -5693,12 +5726,24 @@ async function viewKitchen(token) {
         const runnerHand = (k.delivery_mode === "runner" || p.free) && ["arriving", "delivered"].includes(p.status) && !handedOver(p.orders.filter(o => !["quote_requested", "quoted"].includes(o.status)))
           ? (p.handoff === "host" ? `<p>Hand the bag to <strong>${esc(p.host_label || p.drop_point)}</strong>.</p>` : `<p>At <strong>${esc(p.drop_point)}</strong>, hand each meal over against its code.</p>${codeBox("rc-" + p.id)}`) : "";
         const food = p.orders.filter(o => o.paid).reduce((t, o) => t + (Number(o.quote_price ?? o.unit_price) + Number(o.addons_total || 0)) * o.qty, 0);
-        return `<article class="card" id="pool-${esc(p.id)}"><div class="top"><h2>${esc(p.site)} · Pool ${p.seq}</h2><span class="chip">${n} meals</span></div>${stepsHtml(p.status, p.orders.filter(o => !["quote_requested", "quoted"].includes(o.status)))}${handInfo(p.status, p.orders)}
-          <p class="small muted">One sealed bag for ${esc(p.drop_point)}${p.free ? ` · <strong style="color:var(--ok)">free delivery: your runner takes it</strong>` : ""}</p>
+        const live = p.orders.filter(o => !["quote_requested", "quoted"].includes(o.status));
+        const groups = byCode(live).sort((x, y) => (x[1][0].created_at || "") < (y[1][0].created_at || "") ? -1 : 1);
+        const paidG = groups.filter(([, g]) => g.every(o => o.paid || o.collected)), unpaidG = groups.filter(([, g]) => !g.every(o => o.paid || o.collected));
+        const packing = ["collecting", "accepted"].includes(p.status), ticks = packTicks(p.id), doneN = paidG.filter(([c]) => ticks.has(c)).length;
+        const finished = p.status === "delivered" && handedOver(live);
+        const dishes = g => groupDishes(g.filter(o => !o.special_request)).map(x => `<span>${x.qty} × ${esc(dishShort(x.name))}${x.extra ? ` <span class="small muted">· ${esc(x.extra)}</span>` : ""}</span>`).join("")
+          + g.filter(o => o.special_request).map(o => `<span>${o.qty} × ${esc(dishShort(o.item_name))} <strong>· Custom: ${esc(o.special_request)}</strong></span>`).join("")
+          + (g.length > 1 ? `<span class="small muted">Pack together · ${g.reduce((t, o) => t + o.qty, 0)} meals</span>` : "");
+        const packRow = ([c, g]) => packing
+          ? `<button type="button" class="pkrow${ticks.has(c) ? " on" : ""}" data-pack="${esc(c)}" data-pp="${esc(p.id)}" aria-pressed="${ticks.has(c)}"><span class="pkbox" aria-hidden="true">${ticks.has(c) ? ICON.check : ""}</span><span class="lc num">${esc(c)}</span><span class="items">${dishes(g)}</span></button>`
+          : `<div class="pkrow ro${g.every(o => o.collected) ? " on" : ""}"><span class="lc num">${esc(c)}</span><span class="items">${dishes(g)}</span>${g.every(o => o.collected) ? `<span class="tick">Collected</span>` : ""}</div>`;
+        const list = `${packing && paidG.length ? `<div class="pkbar" role="progressbar" aria-valuemin="0" aria-valuemax="${paidG.length}" aria-valuenow="${doneN}"><i style="width:${Math.round(doneN / paidG.length * 100)}%"></i></div><p class="small muted">${doneN} of ${paidG.length} pack${paidG.length === 1 ? "" : "s"} done · label each with its code</p>` : ""}
+          <div class="labels">${paidG.map(packRow).join("") || (unpaidG.length ? "" : `<p class="small muted">No meals yet.</p>`)}</div>
+          ${unpaidG.length && p.status !== "delivered" ? `<div class="pkwait"><p class="small"><strong>Not paid yet, don't pack</strong></p>${unpaidG.map(([c, g]) => `<div class="pkrow ro wait"><span class="lc num">${esc(c)}</span><span class="items">${dishes(g)}</span></div>`).join("")}</div>` : ""}`;
+        return `<article class="card vpool${finished ? " vdone" : ""}" id="pool-${esc(p.id)}"><div class="top"><div><h2>${esc(p.site)}</h2><p class="small muted">${esc(p.drop_point)} · Pool ${p.seq} · ${n} meal${n === 1 ? "" : "s"}</p></div><span class="chip${finished ? " ok" : ""}">${finished ? "Done" : p.status === "waiting" ? "Waiting for you" : esc(VSTATUS[p.status] || STEP_LABEL[p.status] || "")}</span></div>${handInfo(p.status, p.orders)}
+          ${finished ? `<details class="vfold"><summary class="small">Show ${groups.length} pack${groups.length === 1 ? "" : "s"}</summary>${list}</details>` : list}
+          <p class="small muted">One sealed bag, labelled ${esc(p.site)}${p.free ? ` · <strong style="color:var(--ok)">free delivery: your runner takes it</strong>` : ""}</p>
           ${food > 0 ? `<div class="sumgrid small"><span>Food paid for</span><b class="num">${money(food)}</b>${Number(p.fee) > 0 ? `<span>ChopPool fee (${Math.round(Number(p.fee_rate) * 1000) / 10}% after ${p.fee_free} meals)</span><b class="num">−${money(p.fee)}</b>` : ""}<span>Due to you</span><b class="num">${money(food - Number(p.fee || 0))}</b></div>` : ""}
-          ${Object.keys(tally).length ? `<ul style="margin:0;padding-left:20px">${Object.entries(tally).map(([nm, q]) => `<li class="num"><strong>${q} ×</strong> ${esc(nm)}</li>`).join("")}</ul>` : ""}
-          <p class="small muted">Label each pack with its code:</p>
-          <div class="labels">${byCode(p.orders.filter(o => !["quote_requested", "quoted"].includes(o.status))).sort((x, y) => (x[1][0].created_at || "") < (y[1][0].created_at || "") ? -1 : 1).map(([c, g]) => `<div><span class="lc num">${esc(c)}</span><span class="items">${groupDishes(g.filter(o => !o.special_request)).map(x => `<span>${x.qty} × ${esc(x.name)}${x.extra ? ` <span class="small muted">· ${esc(x.extra)}</span>` : ""}</span>`).join("")}${g.filter(o => o.special_request).map(o => `<span>${o.qty} × ${esc(o.item_name)}<br><strong>Custom: ${esc(o.special_request)}</strong></span>`).join("")}${g.length > 1 ? `<span class="small muted">Pack together · ${g.reduce((t, o) => t + o.qty, 0)} meals</span>` : ""}</span>${g.every(o => o.collected) ? `<span class="tick">Collected</span>` : g.every(o => o.paid) ? "" : `<span class="chip warn">Payment pending</span>`}</div>`).join("") || `<p class="small muted">No paid orders yet.</p>`}</div>
           ${runnerHand}${btns}</article>`;
       }).join("")}
       <details class="card settingsfold"${S.kset ? " open" : ""}><summary><h2>Your settings</h2><span class="small muted">Cooking days, free delivery, menu, photos, alerts</span></summary>
@@ -5757,7 +5802,15 @@ async function viewKitchen(token) {
       $("#decYes").addEventListener("click", async () => { try { await api.kitchenDecline(token, dec.dataset.decline, $("#decWhy").value.trim()); notifyServer({ order_id: dec.dataset.decline }); closeSheet(); toast("Request declined. The customer has been told."); draw(); } catch (err) { toast(cleanErr(err)); } });
       return;
     }
+    const pk = e.target.closest("[data-pack]");
+    if (pk) { const on = !pk.classList.contains("on"); setPackTick(pk.dataset.pp, pk.dataset.pack, on); if (navigator.vibrate) navigator.vibrate(8); draw(); return; }
     const b = e.target.closest("button[data-k]"); if (!b) return;
+    if (b.dataset.k === "ready" && !b.dataset.sure) {
+      const card = b.closest("article"), left = [...card.querySelectorAll("[data-pack]:not(.on)")].map(x => x.dataset.pack);
+      if (left.length) { openSheet(`${sheetHead(left.length + " pack" + (left.length === 1 ? "" : "s") + " not ticked", "")}<p>${left.map(c => `<strong class="num">${esc(c)}</strong>`).join(", ")} ${left.length === 1 ? "isn't" : "aren't"} ticked yet. Check ${left.length === 1 ? "it's" : "they're"} in the bag before the rider comes.</p>
+          <div class="row" style="justify-content:flex-start;gap:8px"><button class="btn" id="rdyYes">Mark food ready anyway</button><button class="ghost" data-close>Go back</button></div>`);
+        $("#rdyYes").addEventListener("click", () => { closeSheet(); b.dataset.sure = "1"; b.click(); }); return; }
+    }
     b.disabled = true;
     try { await api.kitchenUpdate(token, b.dataset.pool, b.dataset.k); notifyServer({ pool_id: b.dataset.pool }); toast({ accepted: "Batch confirmed. Thank you.", ready: "Marked packed.", picked_up: "On the way.", arriving: "Customers have been told you're 5 minutes away.", delivered: "Delivered. Customers have been told their lunch is here." }[b.dataset.k]); draw(); }
     catch (err) { b.disabled = false; toast(cleanErr(err)); }
@@ -5863,6 +5916,11 @@ function wireCodes(token, d, redraw) {
   });
 }
 // Orders grouped by code (a code can hold added plates), sorted A→Z
+// Vendor packing list: ticks live on this phone, per pool
+const packTicks = pid => new Set(local.get("cp_pk:" + pid) || []);
+const setPackTick = (pid, code, on) => { const t = packTicks(pid); on ? t.add(code) : t.delete(code); local.set("cp_pk:" + pid, [...t]); };
+const dishShort = n => String(n || "").replace(/\s+with\s+/i, " + ");
+const VSTATUS = { collecting: "Taking orders", accepted: "Packing", ready: "Waiting for rider", picked_up: "Rider has it", arriving: "Nearly there", delivered: "Delivered" };
 const byCode = os => { const m = new Map(); os.forEach(o => { if (!m.has(o.code)) m.set(o.code, []); m.get(o.code).push(o); }); return [...m.entries()].sort((a, b) => a[0] < b[0] ? -1 : 1); };
 const handList = os => `<div class="labels">${byCode(os).map(([c, g]) => `<div><span class="lc num">${esc(c)}</span><span>${esc(g[0].name)} · ${groupDishes(g).map(x => x.qty + " × " + esc(x.name)).join(" + ")}</span>${g.every(o => o.collected) ? `<span class="tick">Collected</span>` : `<span class="muted small">Waiting</span>`}</div>`).join("")}</div>`;
 async function viewRider(token) {

@@ -1,0 +1,17 @@
+const { chromium, phone, ok, txt } = require('./h');
+(async () => { const b = await chromium.launch();
+  const p = await phone(b, { time: '2026-11-09T09:00:00Z', me: { name: 'Albert', phone: '0244111222' } });
+  await p.evaluate(async () => { const a = await api.placeOrder({ site: 's1', item: 'i3', qty: 1, name: 'Albert', phone: '0244111222', ref: '5123456781' });
+    local.set('cp_orders', [{ id: a.id, order_date: a.order_date }]);
+    for (const o of (await api.adminData(a.order_date)).orders.filter(o => o.id === a.id)) await api.updateOrder(o.id, { status: 'paid' });
+    await refreshBoard(); await refreshMine(); renderPools(); renderHero(); });
+  await p.waitForTimeout(800);
+  const strip = await txt(p, '#hero'), row = (await p.$$eval('#pools .prow', x => x.map(e => e.innerText))).find(t => /Your pool/.test(t)) || '';
+  ok(/only one so far · share your pool/.test(strip), 's.1', 'strip says you are the only one', strip.replace(/\n/g, ' ').slice(0, 260));
+  ok(/only one so far · share it/.test(row), 's.2', 'pool row says you are the only one', row.replace(/\n/g, ' '));
+  await p.evaluate(async () => { await api.placeOrder({ site: 's1', item: 'i3', qty: 1, name: 'Kofi', phone: '0244111333', ref: '5123456782' }); await refreshBoard(); renderPools(); renderHero(); });
+  await p.waitForTimeout(800);
+  const row2 = (await p.$$eval('#pools .prow', x => x.map(e => e.innerText))).find(t => /Your pool/.test(t)) || '';
+  ok(!/only one/.test(row2) && !/only one/.test(await txt(p, '#hero')), 's.3', 'once someone joins, the line goes', row2.replace(/\n/g, ' '));
+  ok(p.errs.length === 0, 's.x', 'no page errors', p.errs.join(' | '));
+  await b.close(); })();
