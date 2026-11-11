@@ -117,6 +117,8 @@ p { margin: 0; }
 .setlinks { display: grid; gap: 8px; }
 .setlink { display: flex; justify-content: space-between; align-items: center; gap: 12px; text-align: left; width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); font: inherit; cursor: pointer; }
 .setlink small { display: block; font-size: 12.5px; margin-top: 2px; }
+@keyframes ocflash { 0%, 100% { box-shadow: 0 0 0 0 transparent; } 30% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 45%, transparent); } }
+.order-card.flash { animation: ocflash 1.4s ease 1; }
 .hero-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; position: relative; z-index: 1; }
 .hero-stat { background: rgba(255,255,255,.16); border: 1px solid rgba(255,255,255,.22); border-radius: 16px; padding: 10px 12px; display: grid; align-content: start; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
 .hero-stat.hurry { box-shadow: 0 0 0 2px #fff; animation: hurry 1.6s ease-in-out infinite; }
@@ -1764,7 +1766,7 @@ function makeSupabaseApi() {
       if (!ses) return null;
       try { const { data, error } = await sb.auth.getUser();
         if (data && data.user) return shape(data.user);
-        if (error && /(session|jwt|token).*(missing|expired|invalid|not found)|user.*not found|refresh token/i.test(error.message || "") && Number(error.status) >= 400 && Number(error.status) < 500) return null;
+        if (error && Number(error.status) >= 400 && Number(error.status) < 500) { try { await sb.auth.signOut({ scope: "local" }); } catch (e) {} return null; }   // the server says this sign-in is no longer valid
       } catch (e) {}
       return shape(ses.user);
     },
@@ -2469,8 +2471,7 @@ async function viewOrder() {
       return toast((k.public_name || "This vendor") + ((S.board.off || []).includes(k.id) ? " isn't cooking " : " is fully booked ") + dayLabel(S.date) + ". Pick another vendor to start a new pool."); }
     // A swipe that ends on a card is not a tap: only a clean tap opens the order
     if (e.target.closest(".mlswipe [data-gomine]") && (S.mlMoved || Date.now() - (S.mlScrollAt || 0) < 300)) { S.mlMoved = false; return; }
-    if (e.target.closest("[data-gomine]")) { const id = e.target.closest("[data-gomine]").dataset.gomine; setTab("orders");
-      if (id) setTimeout(() => { const c = document.querySelector(`#tabOrders [data-ocard="${CSS.escape(id)}"]`); c && c.scrollIntoView({ block: "center", behavior: "smooth" }); }, 120); return; }
+    if (e.target.closest("[data-gomine]")) { const id = e.target.closest("[data-gomine]").dataset.gomine; S.oseg = "up"; setTab("orders"); if (id) goToOrder(id); return; }
     const v = e.target.closest("[data-vendor]"); if (v) return openVendor(v.dataset.vendor);
     const b = e.target.closest("button[data-menu]"); if (b) openOrder(b.dataset.menu); const g = e.target.closest("[data-gokitchens]"); if (g) setTab("kitchens"); });
   $("#kitchensList").addEventListener("click", e => { if (mineClick(e)) return; const v = e.target.closest("[data-vendor]"); if (v) return openVendor(v.dataset.vendor); const b = e.target.closest("button[data-menu]"); if (b) openOrder(b.dataset.menu); });
@@ -2478,7 +2479,12 @@ async function viewOrder() {
     const vd = e.target.closest("[data-vendor]"); if (vd) return openVendor(vd.dataset.vendor);
     const fx = e.target.closest("[data-fixpay]"); if (fx) return openFixPayment((S.mine || []).find(o => o.id === fx.dataset.fixpay), fx.dataset.mode);
     if (soloClick(e)) return;
-    const gi = e.target.closest("[data-gotit]"); if (gi) return run0(async () => { await api.confirmReceived(gi.dataset.gotit); await refreshMine(); refreshUser();
+    const gi = e.target.closest("[data-gotit]"); if (gi) return run0(async () => {
+      try { await api.confirmReceived(gi.dataset.gotit); }
+      catch (er) { // the order belongs to your account but this phone's sign-in has lapsed: sign in again, then it works
+        if (/order not found/i.test(er.message || "")) { await refreshUser(); openAccount("Your sign-in on this phone has expired. Sign in again, then tap Got my food.", "signin"); return; }
+        throw er; }
+      await refreshMine(); refreshUser();
       const o = (S.mine || []).find(x => x.id === gi.dataset.gotit); markReviewAsked(gi.dataset.gotit); if (o && !o.my_rating) openReview(o, 0); else toast("Enjoy your lunch. Your cashback is on its way."); });
     const pr = e.target.closest("[data-problem]"); if (pr) return openProblem(pr.dataset.problem);
     const b = e.target.closest("button[data-pay]"); if (b) openPayQuote(b.dataset.pay); const ro = e.target.closest("[data-reorder]"); if (ro) openOrder(ro.dataset.reorder);
@@ -3396,6 +3402,14 @@ function vendorClick(e) {
 }
 
 /* ---------- Orders: Upcoming / Past ---------- */
+// Open one order: wait for the list to draw, find its card (by order, or by its code when plates share one card), bring it into view and flash it
+function goToOrder(id, tries = 0) {
+  const o = (S.mine || []).find(x => x.id === id), code = o && o.code;
+  const c = document.querySelector(`#tabOrders [data-ocard="${CSS.escape(id)}"]`) || (code && document.querySelector(`#tabOrders [data-ocode="${CSS.escape(code)}"][data-odate="${CSS.escape(o.order_date)}"]`));
+  if (!c) { if (tries < 20) setTimeout(() => goToOrder(id, tries + 1), 100); return; }
+  c.scrollIntoView({ block: "start", behavior: "smooth" }); c.classList.add("flash");
+  S.flashCard = c.dataset.ocard; clearTimeout(S.flashT); S.flashT = setTimeout(() => { S.flashCard = null; document.querySelectorAll(".order-card.flash").forEach(x => x.classList.remove("flash")); }, 1600);   // survives a redraw of the list
+}
 const STEP_LABELS = ["Paid", "Packing", "On the way", "Delivered", "Received"];
 // Priced special order: time left to pay
 async function run0(fn) { try { await fn(); } catch (e) { toast(cleanErr(e)); } }
@@ -3537,7 +3551,7 @@ function orderCard(o, all, next) {
   const step = progressOf(o), k = menuOf(o.kitchen_id), kids = all.filter(c => c.parent_id === o.id).sort((a, b) => a.created_at < b.created_at ? -1 : 1), liveKids = kids.filter(c => c.status !== "cancelled");
   const s4 = Math.min(5, step);
   const needsYou = canConfirm(o) || o.status === "quoted" || (o.status === "pending" && o.pay_issue);   // outline = something for you to do
-  return `<article class="order-card${needsYou ? " next" : ""}" data-ocard="${esc(o.id)}"><div class="head"><span class="tile" style="background:${tint(menuIndex(o.kitchen_id))}">${art(dishKind(S.items.find(i => i.kitchen_id === o.kitchen_id && i.name === o.item_name) || o.item_name))}</span>
+  return `<article class="order-card${needsYou ? " next" : ""}${S.flashCard === o.id ? " flash" : ""}" data-ocard="${esc(o.id)}" data-ocode="${esc(o.code || "")}" data-odate="${esc(o.order_date || "")}"><div class="head"><span class="tile" style="background:${tint(menuIndex(o.kitchen_id))}">${art(dishKind(S.items.find(i => i.kitchen_id === o.kitchen_id && i.name === o.item_name) || o.item_name))}</span>
       <div><strong>${esc(k.public_name || "")}</strong>${groupDishes([o, ...liveKids]).map(g => { const key = c => c.item_name + "|" + [addonText(c.addons), c.note].filter(Boolean).join(" · ");
         const can = removable(o, liveKids, g.key) > 0;   // plates of this dish you could take off now
         return `<p class="small odish" style="font-weight:600">${can ? `<button class="minus1" data-lessplates="${esc(o.id)}" data-key="${esc(g.key)}" aria-label="Remove ${esc(g.name)} plates">${GLYPH.minus}</button>` : ""}<span>${g.qty} × ${esc(g.name)}${g.extra ? ` <span class="muted" style="font-weight:500">· ${esc(g.extra)}</span>` : ""}</span></p>`; }).join("")}${liveKids.length ? `<p class="small muted">Same code, packed together</p>` : ""}</div>
