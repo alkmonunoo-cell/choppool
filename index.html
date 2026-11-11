@@ -5142,11 +5142,11 @@ async function renderAdmin(cached, quiet) {   // quiet = background/refresh-butt
         <div class="grid2"><div><label for="rlBy">Orders for a later day: vendor confirms by</label><input id="rlBy" name="next_day_confirm_by" type="time" value="${esc(String(s.next_day_confirm_by || "08:30").slice(0, 5))}"></div>
 </div>
         <p class="small muted">Same-day pools still give vendors ${esc(s.accept_timeout_min)} minutes.</p>
-      </section><section class="card stack"><h2>Pool size</h2>
+      </section>${s.pool_ceiling != null ? `<section class="card stack"><h2>Pool size</h2>
         <div class="grid2"><div><label for="rlPool">Default meals per pool</label><input id="rlPool" name="max_meals" inputmode="numeric" value="${esc(s.max_meals ?? 10)}"></div>
           <div><label for="rlCeil">Most a vendor can choose</label><input id="rlCeil" name="pool_ceiling" inputmode="numeric" value="${esc(s.pool_ceiling ?? 15)}"></div></div>
         <p class="small muted">One pool is one rider's load. Vendors start with the default and can choose between 5 and the most you allow. When a pool fills, the next one opens with the same vendor.</p>
-      </section>
+      </section>` : ""}
         ${isSuper ? `<section class="card stack"><h2>ChopPool fee on bigger pools <span class="small muted">(owner only)</span></h2>
         <div class="grid2"><div><label for="rlRate">Fee on each meal after the free ones (%)</label><input id="rlRate" name="vendor_fee_pct" inputmode="decimal" value="${esc(Math.round(Number(s.vendor_fee_rate || 0) * 1000) / 10)}"></div>
           <div><label for="rlFreeN">Free meals in every pool</label><input id="rlFreeN" name="vendor_fee_free" inputmode="numeric" value="${esc(s.vendor_fee_free ?? 5)}"></div></div>
@@ -5425,13 +5425,13 @@ async function adminSubmit(e) {
       if (vals.some(([, x]) => !isFinite(x) || x < 0) || !Number(v("trip_max")) || !Number(v("per_km"))) return fail("Enter numbers in every box.");
       const qm = Number(v("quote_pay_min")); if (qm < 10 || qm > 20) return fail("Give customers 10 to 20 minutes to pay for a custom order.");
       if (Number(v("auto_receive_min")) < 30) return fail("Allow at least 30 minutes before \"Got my food\" confirms itself.");
-      const near = Number(v("near_max_fee")), fkm = Number(v("free_max_km")), by = v("next_day_confirm_by"), pm = Number(v("max_meals")), pc2 = Number(v("pool_ceiling"));
+      const near = Number(v("near_max_fee")), fkm = Number(v("free_max_km")), by = v("next_day_confirm_by"), hasPool = !!f.querySelector("[name=pool_ceiling]"), pm = Number(v("max_meals")), pc2 = Number(v("pool_ceiling"));
       if (!(near > 0) || !(fkm >= 0) || fkm > 10) return fail("Enter a delivery limit above 0 and a free-delivery distance up to 10 km.");
       if (!/^\d{2}:\d{2}$/.test(by)) return fail("Enter the confirm-by time.");
-      if (!(Number.isInteger(pc2) && pc2 >= 5 && pc2 <= 50)) return fail("The most a vendor can choose must be a whole number from 5 to 50.");
-      if (!(Number.isInteger(pm) && pm >= 5 && pm <= pc2)) return fail("The default meals per pool must be from 5 to " + pc2 + ".");
+      if (hasPool && !(Number.isInteger(pc2) && pc2 >= 5 && pc2 <= 50)) return fail("The most a vendor can choose must be a whole number from 5 to 50.");
+      if (hasPool && !(Number.isInteger(pm) && pm >= 5 && pm <= pc2)) return fail("The default meals per pool must be from 5 to " + pc2 + ".");
       if (hm(by) >= hm(S.settings.cutoff)) return fail("The confirm-by time must be before orders close at " + fmtTime(S.settings.cutoff) + ".");
-      const patch = { ...Object.fromEntries(vals), near_max_fee: near, free_max_m: Math.round(fkm * 1000), next_day_confirm_by: by, max_meals: pm, pool_ceiling: pc2 };
+      const patch = { ...Object.fromEntries(vals), near_max_fee: near, free_max_m: Math.round(fkm * 1000), next_day_confirm_by: by, ...(hasPool ? { max_meals: pm, pool_ceiling: pc2 } : {}) };
       if (f.querySelector("[name=admin_idle_min]")) { const im = Number(v("admin_idle_min")); if (!(im >= 5 && im <= 60)) return fail("Choose 5 to 60 minutes for the team screen timeout."); patch.admin_idle_min = im; }
       if (f.querySelector("[name=vendor_fee_pct]")) { const pc = Number(v("vendor_fee_pct")), fr = Number(v("vendor_fee_free"));
         if (!(pc >= 0 && pc <= 50) || !(Number.isInteger(fr) && fr >= 0 && fr <= 100)) return fail("Enter a fee between 0 and 50% and a whole number of free meals.");
