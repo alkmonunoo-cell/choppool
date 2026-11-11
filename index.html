@@ -121,6 +121,8 @@ p { margin: 0; }
 .order-card.flash { animation: ocflash 1.4s ease 1; }
 .tripbox { background: var(--surface-2); border-radius: 12px; padding: 10px 12px; display: grid; gap: 2px; }
 .tripbox p { margin: 0; }
+.recover { min-height: 70vh; display: grid; place-items: center; padding: 24px 0; }
+.recover > .card { width: min(440px, 100%); }
 .hero-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; position: relative; z-index: 1; }
 .hero-stat { background: rgba(255,255,255,.16); border: 1px solid rgba(255,255,255,.22); border-radius: 16px; padding: 10px 12px; display: grid; align-content: start; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
 .hero-stat.hurry { box-shadow: 0 0 0 2px #fff; animation: hurry 1.6s ease-in-out infinite; }
@@ -1724,7 +1726,7 @@ function makeSupabaseApi() {
   const sbCustomer = mk(null, !teamLink), sbTeam = mk("cp-team-auth", teamLink);
   let sb = teamPage ? sbTeam : sbCustomer;
   // A password-reset email link signs the person in for one step: choose a new password
-  [sbCustomer, sbTeam].forEach(c => c.auth.onAuthStateChange(ev => { if (ev === "PASSWORD_RECOVERY") { S.recovery = true; if (S.appReady) showRecovery(); } }));
+  [sbCustomer, sbTeam].forEach(c => c.auth.onAuthStateChange(ev => { if (ev === "PASSWORD_RECOVERY") { S.recovery = true; S.recoveryTeam = c === sbTeam; if (S.appReady) showRecovery(); } }));
   const must = r => { if (r.error) throw new Error(r.error.message); return r.data; };
   const rpc = async (fn, args) => must(await sb.rpc(fn, args || {}));
   const stamp = { accepted: "accepted_at", ready: "ready_at", picked_up: "picked_up_at", arriving: "arriving_at", delivered: "delivered_at" };
@@ -2259,20 +2261,30 @@ function openForgot(prefill, to) {
   });
 }
 // A reset link: wait for the app to finish loading, then ask for the new password (nothing can close it on the way)
-function showRecovery() { if (!S.recovery || S.recoveryOpen) return; S.recoveryOpen = true; setTimeout(() => { openNewPassword(); S.recoveryOpen = false; }, 150); }
-function openNewPassword() {
-  openSheet(`${sheetHead("Choose a new password", "You opened a reset link. Set your new password to finish.")}
-    <form id="npForm" class="stack" novalidate><div><label for="npPw">New password</label><input id="npPw" type="password" autocomplete="new-password" placeholder="At least 6 characters"></div>
-    <p class="err" id="npErr"></p><button class="btn wide">Save password</button></form>`);
+// A reset link signs you in only to choose a new password: a page of its own, nothing else reachable until it's saved
+function showRecovery() { if (!S.recovery) return; route(); }
+function viewRecovery() {
+  if (api.useTeam) api.useTeam(!!S.recoveryTeam);
+  document.title = "New password · ChopPool";
+  $("#view").innerHTML = `<section class="recover"><div class="card stack" style="gap:14px">
+      <div class="pagebrand">${LOGO(30)}<p class="brand" style="font-size:18px">ChopPool</p></div>
+      <div><h1 style="margin:0">Choose a new password</h1><p class="muted" style="margin:6px 0 0">You opened a reset link. Set your new password to finish signing in.</p></div>
+      <form id="npForm" class="stack" novalidate><div><label for="npPw">New password</label><input id="npPw" type="password" autocomplete="new-password" placeholder="At least 6 characters"></div>
+        <div><label for="npPw2">Type it again</label><input id="npPw2" type="password" autocomplete="new-password"></div>
+        <p class="err" id="npErr"></p><button class="btn wide">Save password</button></form>
+      <button type="button" class="linkbtn" id="npCancel" style="justify-self:center">Cancel and sign out</button></div></section>`;
+  setTimeout(() => $("#npPw")?.focus(), 200);
   $("#npForm").addEventListener("submit", async ev => {
     ev.preventDefault(); const pw = $("#npPw").value, nb = $("#npForm .btn"); if (nb.disabled) return;
     if (pw.length < 6) return ($("#npErr").textContent = "Use at least 6 characters.");
+    if (pw !== $("#npPw2").value) return ($("#npErr").textContent = "The two passwords don't match.");
     const done = busyBtn(nb, "Saving…");
-    try { await api.setNewPassword(pw); S.recovery = false; closeSheet(); toast("Password saved. You're signed in.");
-      if (S.resetTo === "admin") { if (location.hash !== "#admin") location.hash = "#admin"; else route(); }
+    try { await api.setNewPassword(pw); S.recovery = false; toast("Password saved. You're signed in.");
+      if (S.recoveryTeam || S.resetTo === "admin") { if (location.hash !== "#admin") location.hash = "#admin"; else route(); }
       else { if (location.hash !== "#order") history.replaceState(null, "", location.pathname + "#order"); S.tab = "wallet"; route(); } }
     catch (e) { done(); $("#npErr").textContent = cleanErr(e); }
   });
+  $("#npCancel").addEventListener("click", async () => { try { await api.signOut(); } catch (e) {} S.recovery = false; S.user = null; route(); });
 }
 function openAccount(reason, startMode) {
   // Phones that have signed in before open on Sign in; "I already have an account" always does
@@ -6215,6 +6227,7 @@ async function route() {
   // The browser tab says which page this is
   document.title = h === "rider-signup" ? "Rider sign-up · ChopPool" : h.startsWith("kitchen-") ? "Vendor · ChopPool" : h.startsWith("rider-") ? "Rider · ChopPool"
     : h.startsWith("host-") ? "Drop point · ChopPool" : h === "admin" ? "Admin · ChopPool" : "ChopPool · " + TAGLINE;
+  if (S.recovery) return viewRecovery();   // nothing else until the new password is set
   if (h === "rider-signup") return viewRiderSignup();
   if (h === "privacy" || h === "terms") return viewLegal(h);
   const view = h.startsWith("kitchen-") ? "kitchen" : h.startsWith("rider-") ? "rider" : h.startsWith("host-") ? "host" : h === "admin" ? "admin" : "order";
