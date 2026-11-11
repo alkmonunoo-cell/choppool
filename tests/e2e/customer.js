@@ -86,7 +86,7 @@ const { chromium, results, setArea, ok, note, phone, txt, hideToast } = require(
   const p2 = await phone(b, { time: T, me: { name: 'Kofi Boateng', phone: '0201234567' } });
   await p2.click('.tabbar [data-tab=kitchens]'); await p2.waitForTimeout(400); await p2.locator('#kitchensList [data-vendor]').first().click(); await p2.waitForTimeout(700);
   await p2.locator('#vpage [data-dish]:not([disabled])').first().click(); await p2.waitForTimeout(300); await p2.click('#dAdd'); await p2.waitForTimeout(300); await p2.locator('#vfoot [data-vcheckout]').click(); await p2.waitForTimeout(500);
-  ok(/Join pool|Create pool/.test(await txt(p2, '#submitBtn')), '3.10', 'button text: ' + await txt(p2, '#submitBtn'));
+  ok(/Join pool|Start pool/.test(await txt(p2, '#submitBtn')), '3.10', 'button text: ' + await txt(p2, '#submitBtn'));
   note('Separate phones in the demo have separate data, so "Join pool" across phones is checked against the live database in the DB tests, not here.');
   const pf2 = await p2.evaluate(() => document.querySelector('#pfNet')?.value); ok(pf2 === 'Telecel', '3.06c', 'Telecel guessed for 020', pf2);
   await p2.context().close();

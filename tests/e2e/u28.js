@@ -27,6 +27,11 @@ const go = async (p, h, w = 1500) => { await p.evaluate(h => { location.hash = h
   const lf = rows.filter(r => /Local favourites/.test(r));
   ok(lf.length === 2 && /6 of 6 meals/.test(lf[0]) && /Pool full/.test(lf[0]), '28.05', 'your full pool shows as full', lf[0]);
   ok(/0 of 6 meals/.test(lf[1] || '') && /pool 2/i.test(lf[1] || '') && /Start pool/.test(lf[1] || ''), '28.06', 'next pool with the same vendor, Start pool', lf[1]);
+  await p.locator('#pools .prow', { hasText: 'Pool 1 is full' }).locator('[data-vendor].btn').click(); await p.waitForTimeout(800);
+  await p.locator('#vpage [data-dish]:not([disabled])').first().click(); await p.waitForTimeout(400); await p.click('#dAdd'); await p.waitForTimeout(300);
+  await p.locator('#vfoot [data-vcheckout]').click(); await p.waitForTimeout(600);
+  ok(/Start pool/.test(await txt(p, '#submitBtn')), '28.06b', 'checkout for the next pool says Start pool', await txt(p, '#submitBtn'));
+  await p.evaluate(() => { closeSheet(); closeVendor(); }); await p.waitForTimeout(500);
   const r3 = await p.evaluate(async () => { const x = await api.placeOrder({ site: 's1', item: 'i1', qty: 3, name: 'Esi', phone: '0244111444', ref: '5123456783' }); return x.pool_seq; });
   ok(r3 === 2, '28.07', 'next order lands in pool 2', r3);
   // order bigger than the pool is refused

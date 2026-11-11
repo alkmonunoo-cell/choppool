@@ -2282,6 +2282,8 @@ function openWallet() { setTab("wallet"); }
 const poolSize = k => Math.max(5, Math.min(Number((k && (k.pool_size_own ?? k.pool_size)) || S.settings.max_meals || 10), Number(S.settings.pool_ceiling || 15)));
 // The vendor has no more room today (or isn't cooking)
 const dayFull = k => !k.no_daily_limit && (S.board.load[k.id] || 0) >= Number(k.capacity || 0);
+// Is there a pool here with people in it and room for this many meals? If not, this order starts a new pool
+const roomyPool = (k, n) => S.board.pools.some(p => p.site_id === S.siteId && p.kitchen_id === k.id && ["waiting", "collecting"].includes(p.status) && p.meals > 0 && p.meals + (n || 1) <= poolSize(k));
 function currentPool(siteId, kid) {
   const ps = S.board.pools.filter(p => p.site_id === siteId && p.kitchen_id === kid && ["collecting", "waiting"].includes(p.status)).sort((a, b) => a.seq - b.seq);
   const size = poolSize(menuOf(kid));
@@ -4249,8 +4251,8 @@ function openOrder(menuId, opt = {}) {
       $("#payPart").classList.toggle("hidden", due <= 0); drawPay(due);
       $("#totTxt").textContent = due <= 0 ? money(useW) : money(due);
       $("#totSub").textContent = due <= 0 ? money(useW) + " from your wallet" : useW ? money(useW) + " from wallet, rest by mobile money" : "Pay by mobile money";
-      const startsPool = !S.board.pools.some(p => p.site_id === S.siteId && p.kitchen_id === k.id && ["waiting", "collecting"].includes(p.status) && p.meals > 0);
-      $("#submitBtn").textContent = join ? "Add to my order" : startsPool ? "Create pool" : "Join pool"; return;
+      const startsPool = !roomyPool(k, meals);
+      $("#submitBtn").textContent = join ? "Add to my order" : startsPool ? "Start pool" : "Join pool"; return;
     }
     if (special) {
       $("#sum").innerHTML = `<div><span>${qty} × custom order</span><span>Priced by the vendor</span></div>`;
@@ -4271,8 +4273,8 @@ function openOrder(menuId, opt = {}) {
     $("#payPart").classList.toggle("hidden", due <= 0); drawPay(due);
     $("#totTxt").textContent = due <= 0 ? money(useW) : money(due);
     $("#totSub").textContent = due <= 0 ? money(useW) + " from your wallet" : useW ? money(useW) + " from wallet, rest by mobile money" : "Pay by mobile money";
-    const startsPool = !join && !S.board.pools.some(p => p.site_id === S.siteId && p.kitchen_id === k.id && ["waiting", "collecting"].includes(p.status) && p.meals > 0);
-    $("#submitBtn").textContent = join ? "Add to pool" : startsPool ? "Create pool" : "Join pool";
+    const startsPool = !join && !roomyPool(k, qty);
+    $("#submitBtn").textContent = join ? "Add to pool" : startsPool ? "Start pool" : "Join pool";
   };
   drawExtras(); draw(); if (!join && !opt.fromPage) loadReviews(k);
   if (opt.special) setTimeout(() => $("#specialToggle")?.click(), 0);   // after the toggle's own handler is attached below
