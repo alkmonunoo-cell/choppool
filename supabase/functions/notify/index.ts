@@ -7,7 +7,7 @@ import webpush from "npm:web-push@3.6.7";
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS" };
 const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 webpush.setVapidDetails(Deno.env.get("VAPID_SUBJECT") || "mailto:hello@choppool.app", Deno.env.get("VAPID_PUBLIC_KEY")!, Deno.env.get("VAPID_PRIVATE_KEY")!);
-const APP = (Deno.env.get("APP_URL") || "https://alkmonunoo-cell.github.io/choppool").replace(/\/$/, "");
+const APP = (Deno.env.get("APP_URL") || "https://choppool.com").replace(/\/$/, "");
 const money = (n: number) => "GHS " + Number(n).toFixed(2);
 
 async function once(key: string) {   // true the first time a key is seen
