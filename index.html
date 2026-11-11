@@ -2417,7 +2417,9 @@ async function viewOrder() {
     if (e.target.closest("[data-seeall]")) { S.vf = "near"; S.vq = ""; return setTab("kitchens"); }
     if (e.target.closest("[data-gopools]")) return $("#secPools")?.scrollIntoView({ behavior: "smooth", block: "start" });
     // This vendor is fully booked (or not cooking): start a pool with another one
-    const np = e.target.closest("[data-newpool]"); if (np) { const k = menuOf(np.dataset.newpool); S.vf = "near"; S.vq = ""; setTab("kitchens");
+    const np = e.target.closest("[data-newpool]"); if (np) { const k = menuOf(np.dataset.newpool);
+      if (!menuState(k).full) return openVendor(k.id);   // the vendor can still take orders: start the next pool on their page
+      S.vf = "near"; S.vq = ""; setTab("kitchens");
       return toast((k.public_name || "This vendor") + ((S.board.off || []).includes(k.id) ? " isn't cooking " : " is fully booked ") + dayLabel(S.date) + ". Pick another vendor to start a new pool."); }
     // A swipe that ends on a card is not a tap: only a clean tap opens the order
     if (e.target.closest(".mlswipe [data-gomine]") && (S.mlMoved || Date.now() - (S.mlScrollAt || 0) < 300)) { S.mlMoved = false; return; }
