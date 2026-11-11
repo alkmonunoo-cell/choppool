@@ -1119,8 +1119,9 @@ const ROAD_FACTOR = 1.3;   // road distance is roughly 1.3 x the straight line
 // Trip price for a vendor -> building; never above the safety ceiling on a whole trip
 const tripMax = s => Number(s.trip_max ?? 80);
 function tripFor(k, site, s) {
-  if (!hasPin(k) || !hasPin(site) || s.per_km == null || s.base_fare == null) return Math.min(Number(s.trip_cost), tripMax(s));
-  return Math.min(tripMax(s), Math.round(Number(s.base_fare) + Number(s.per_km) * distM(k, site) / 1000 * ROAD_FACTOR));
+  const lo = Number(s.trip_min ?? 0);   // lowest trip price (minimum fare)
+  if (!hasPin(k) || !hasPin(site) || s.per_km == null || s.base_fare == null) return Math.max(lo, Math.min(Number(s.trip_cost), tripMax(s)));
+  return Math.max(lo, Math.min(tripMax(s), Math.round(Number(s.base_fare) + Number(s.per_km) * distM(k, site) / 1000 * ROAD_FACTOR)));
 }
 const roadKm = (k, site) => distM(k, site) / 1000 * ROAD_FACTOR;
 // Everyone pays the full trip at checkout; cashback returns the shared part. A meal's share = trip / meals (rounded up to 50 pesewas).
@@ -1172,7 +1173,7 @@ const isoDow = d => { const w = new Date(d + "T00:00:00Z").getUTCDay(); return w
    DEMO DATA LAYER: in-memory copy of the database logic, with simulated customers
    ===================================================================================== */
 function makeDemoApi() {
-  const settings = { cutoff: "10:30", special_cutoff: "10:00", delivery_time: "12:30", trip_cost: 60, base_fare: 20, per_km: 6, max_fee: 10, cap_km: 8, trip_max: 80, quote_pay_min: 15, auto_receive_min: 120, admin_idle_min: 15, service_fee: 2, min_pool: 6, max_meals: 10, pool_ceiling: 15,
+  const settings = { cutoff: "10:30", special_cutoff: "10:00", delivery_time: "12:30", trip_cost: 60, base_fare: 20, per_km: 6, trip_min: 10, max_fee: 10, cap_km: 8, trip_max: 80, quote_pay_min: 15, auto_receive_min: 120, admin_idle_min: 15, service_fee: 2, min_pool: 6, max_meals: 10, pool_ceiling: 15,
     commission_rate: 0.15, vendor_fee_rate: 0, vendor_fee_free: 5, next_day_confirm_by: "08:30", countdown_start: "06:00", near_max_fee: 50, free_max_m: 1500, accept_timeout_min: 20, arrival_window_min: 10, notify_daily_cap: 5, momo_number: "024 000 0000", momo_name: "ChopPool Pilot", momo_network: "MTN" };
   const sites = [
     { id: "s1", name: "Heritage Tower, Ridge", drop_point: "Lobby security desk", handoff: "host", host_label: "the security desk in the lobby", host_token: "demoh1", lat: 5.5640, lng: -0.2010, status: "active", active: true },
@@ -5242,18 +5243,23 @@ async function renderAdmin(cached, quiet) {   // quiet = background/refresh-butt
 
   /* ---------- Settings: every rule on one page, one Save ---------- */
   /* ---------- Settings live with what they control; Settings keeps only the general ones ---------- */
-  const ex = (km) => Math.round(Number(s.base_fare ?? 0) + Number(s.per_km ?? 0) * km);
+  const ex = (km, x = s) => Math.max(Number(x.trip_min ?? 0), Math.min(Number(x.trip_max ?? 80), Math.round(Number(x.base_fare ?? 0) + Number(x.per_km ?? 0) * km)));
+  const exLine = x => `Examples: 1 km trip ${money(ex(1, x))} · 2 km ${money(ex(2, x))} · 5 km ${money(ex(5, x))} · 10 km ${money(ex(10, x))}`;
   const setForm = inner => `<form class="stack setform" data-form="settings">${inner}<div class="savebar"><p class="err" data-err></p><button class="btn wide">Save</button></div></form>`;
   if (sub === "rules" && tab === "riders") body.innerHTML = setForm(`<section class="card stack"><h2>Delivery pricing</h2>
         <p class="small muted">Each trip is priced by distance, like Bolt and Yango: base fare + rate per km of road from the kitchen to the building. The trip is then shared across the meals in the pool. Check a few real Bolt or Yango quotes and match them.</p>
         <div class="grid2"><div><label for="pfBase">Base fare (GHS)</label><input id="pfBase" name="base_fare" inputmode="decimal" value="${esc(s.base_fare ?? "")}"></div>
           <div><label for="pfKm">Rate per km (GHS)</label><input id="pfKm" name="per_km" inputmode="decimal" value="${esc(s.per_km ?? "")}"></div>
+          ${s.trip_min != null ? `<div><label for="pfMin">Lowest trip price (GHS)</label><input id="pfMin" name="trip_min" inputmode="decimal" value="${esc(s.trip_min)}"></div>` : ""}
           <div><label for="pfMax">Highest trip price (GHS)</label><input id="pfMax" name="trip_max" inputmode="decimal" value="${esc(s.trip_max ?? 80)}"></div>
           <div><label for="pfFlat">Flat trip cost if a pin is missing (GHS)</label><input id="pfFlat" name="trip_cost" inputmode="decimal" value="${esc(s.trip_cost)}"></div>
 </div>
-        <p class="small muted">Customers pay the full trip at checkout. Once lunch is received, each person's share is worked out and the rest comes back as cashback. No trip is charged above the highest trip price. Changes only affect new orders.</p>
-        ${s.base_fare != null ? `<p class="small" style="color:var(--hint)">Examples: 2 km trip ${money(ex(2))} · 5 km ${money(ex(5))} · 10 km ${money(ex(10))}</p>` : ""}
+        <p class="small muted">Customers pay the full trip at checkout. Once lunch is received, each person's share is worked out and the rest comes back as cashback. No trip is charged below the lowest or above the highest trip price, like a minimum fare on Bolt or Yango. Changes only affect new orders.</p>
+        ${s.base_fare != null ? `<p class="small" id="pfEx" style="color:var(--hint)">${exLine(s)}</p>` : ""}
       </section>`);
+  if (sub === "rules" && tab === "riders") body.querySelector("form").addEventListener("input", e => {   // examples follow what you type
+    const f = e.currentTarget, g = n => { const v = f.querySelector(`[name=${n}]`); return v ? v.value : s[n]; };
+    const x = { base_fare: g("base_fare"), per_km: g("per_km"), trip_min: g("trip_min"), trip_max: g("trip_max") }; if ($("#pfEx")) $("#pfEx").textContent = exLine(x); });
   if (sub === "rules" && tab === "menus") body.innerHTML = setForm(`${s.pool_ceiling != null ? `<section class="card stack"><h2>Pool size</h2>
         <div class="grid2"><div><label for="rlPool">Default meals per pool</label><input id="rlPool" name="max_meals" inputmode="numeric" value="${esc(s.max_meals ?? 10)}"></div>
           <div><label for="rlCeil">Most a vendor can choose</label><input id="rlCeil" name="pool_ceiling" inputmode="numeric" value="${esc(s.pool_ceiling ?? 15)}"></div></div>
@@ -5562,7 +5568,8 @@ async function adminSubmit(e) {
     if (f.dataset.form === "settings") {
       const has = n => !!f.querySelector(`[name=${n}]`), num = n => Number(v(n)), patch = {};
       if (has("base_fare")) {
-        const vals = ["base_fare", "per_km", "trip_max", "trip_cost"].map(n => [n, num(n)]);
+        const vals = ["base_fare", "per_km", "trip_max", "trip_cost"].concat(has("trip_min") ? ["trip_min"] : []).map(n => [n, num(n)]);
+        if (has("trip_min") && num("trip_min") > num("trip_max")) return fail("The lowest trip price can't be above the highest.");
         if (vals.some(([, x]) => !isFinite(x) || x < 0) || !num("trip_max") || !num("per_km")) return fail("Enter numbers in every box.");
         Object.assign(patch, Object.fromEntries(vals)); }
       if (has("quote_pay_min")) { const qm = num("quote_pay_min"); if (!(qm >= 10 && qm <= 20)) return fail("Give customers 10 to 20 minutes to pay for a custom order."); patch.quote_pay_min = qm; }
