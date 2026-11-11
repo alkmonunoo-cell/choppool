@@ -49,7 +49,8 @@ async function poolEvents(poolId: string, opened = false) {
     await send(await kitchenSubs(k.id), "New pool at " + site.name, meals + " meal" + (meals > 1 ? "s" : "") + " so far. Orders close at " + String(s.cutoff).slice(0, 5) + "; you'll get the final count then.", APP + "/#kitchen-" + k.token, "pool-" + p.id);
   if (opened && p.status === "collecting" && meals && await once("pool_open:" + p.id))
     await send(await cust(), k.public_name + " is cooking", "Your pool at " + site.name + " is open. Share it so delivery gets cheaper.", url, "pool-" + p.id, "confirm");
-  if (p.status === "collecting" && meals === s.max_meals - 1 && await once("seat1:" + p.id))
+  const poolSize = Math.max(5, Math.min(Number(k.pool_size || s.max_meals), Number(s.pool_ceiling || 15)));   // the vendor's pool size (update 28)
+  if (p.status === "collecting" && meals === poolSize - 1 && await once("seat1:" + p.id))
     await send(await cust(), "1 seat left", "Your pool at " + site.name + " is almost full. Delivery is at its lowest.", url, "pool-" + p.id, "almost");
   if (p.status === "arriving" && await once("arriving:" + p.id))
     await send(await cust(), "Lunch is about 5 minutes away", site.handoff === "host" ? "It's coming to " + site.drop_point + "." : "Meet the rider at " + site.drop_point + " with your code.", url, "pool-" + p.id, "arriving");

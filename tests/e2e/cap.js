@@ -9,7 +9,7 @@ const { chromium, phone, ok, txt } = require('./h');
   const w = await p.evaluate(() => document.querySelector('#pools .prow .pbar i').style.width); ok(w === '30%', 'cap.2', 'bar measured against 10', w);
   await p.evaluate(async () => { await api.placeOrder({ site: 's1', item: 'i1', qty: 5, name: 'Kofi', phone: '0244111333', ref: '5123456782' }); await api.placeOrder({ site: 's1', item: 'i1', qty: 2, name: 'Esi', phone: '0244111444', ref: '5123456783' }); await refreshBoard(); S.menus.find(m => m.id === 'k1').capacity = 10; renderPools(); });
   await p.waitForTimeout(500);
-  const t2 = await txt(p, '#pools .prow'); ok(/10 of 10 meals/.test(t2) && /Fully booked/.test(t2) && /New pool/.test(t2), 'cap.3', 'full pool reads 10 of 10', t2.slice(0, 140));
+  const t2 = await txt(p, '#pools .prow'); ok(/10 of 10 meals/.test(t2) && /Pool full/.test(t2) && /New pool/.test(t2), 'cap.3', 'full pool reads 10 of 10', t2.slice(0, 140));
   const w2 = await p.evaluate(() => document.querySelector('#pools .prow .pbar i').style.width); ok(w2 === '100%', 'cap.4', 'bar full', w2);
   await p.click('#pools .prow [data-newpool]'); await p.waitForTimeout(600);
   ok(await p.evaluate(() => S.tab) === 'kitchens' && /Pick another vendor/.test(await txt(p, '.toast')), 'cap.5', 'New pool opens vendors with a hint', await txt(p, '.toast'));

@@ -114,7 +114,7 @@ p { margin: 0; }
 .hero h1 { color: inherit; position: relative; z-index: 1; }
 .hero p { opacity: .92; position: relative; z-index: 1; }
 .cdu { font-size: max(12px, .62em); font-weight: 700; margin-left: 1px; opacity: .8; letter-spacing: 0; }
-.hero-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; position: relative; z-index: 1; }
+.hero-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; position: relative; z-index: 1; }
 .hero-stat { background: rgba(255,255,255,.16); border: 1px solid rgba(255,255,255,.22); border-radius: 16px; padding: 10px 12px; display: grid; align-content: start; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
 .hero-stat.hurry { box-shadow: 0 0 0 2px #fff; animation: hurry 1.6s ease-in-out infinite; }
 @keyframes hurry { 50% { box-shadow: 0 0 0 2px rgba(255,255,255,.35); } }
@@ -773,12 +773,15 @@ body:not(.on-home) #bell, body:not(.on-home) #theme { display: none; }
 .prow .l2 { font-size: 12.5px; font-weight: 600; color: var(--ink); line-height: 1.35; }
 .prow .l2 b { color: var(--ok); font-weight: 800; }   /* green = pool progress / saving; orange = prices and actions */
 .prow .l2.warn { color: var(--hint); }
+.prow .l2.okl { color: var(--ok); }
+#capDay:disabled { opacity: .45; }
 .prow .pbar { height: 4px; border-radius: 9px; background: var(--surface-2); overflow: hidden; margin-top: 6px; }
 .prow .pbar i { display: block; height: 100%; border-radius: 9px; background: var(--ok); }
 .prow .acts { display: flex; gap: 6px; align-items: center; flex: none; }
 /* Narrow phones (360 px and below): nothing squeezed or cut off */
 @media (max-width: 360px) {
   .hero-stats { grid-template-columns: 1fr 1fr; }
+  .hero-stats > :nth-child(3) { grid-column: 1 / -1; }
   .prow { gap: 10px; padding: 10px; }
   .prow .ptile { width: 46px; height: 46px; } .prow .ptile svg { width: 38px; height: 38px; }
   .prow .acts .iconround { display: none; }
@@ -1139,7 +1142,7 @@ const isoDow = d => { const w = new Date(d + "T00:00:00Z").getUTCDay(); return w
    DEMO DATA LAYER: in-memory copy of the database logic, with simulated customers
    ===================================================================================== */
 function makeDemoApi() {
-  const settings = { cutoff: "10:30", special_cutoff: "10:00", delivery_time: "12:30", trip_cost: 60, base_fare: 20, per_km: 6, max_fee: 10, cap_km: 8, trip_max: 80, quote_pay_min: 15, auto_receive_min: 120, admin_idle_min: 15, service_fee: 2, min_pool: 6, max_meals: 15,
+  const settings = { cutoff: "10:30", special_cutoff: "10:00", delivery_time: "12:30", trip_cost: 60, base_fare: 20, per_km: 6, max_fee: 10, cap_km: 8, trip_max: 80, quote_pay_min: 15, auto_receive_min: 120, admin_idle_min: 15, service_fee: 2, min_pool: 6, max_meals: 10, pool_ceiling: 15,
     commission_rate: 0.15, vendor_fee_rate: 0, vendor_fee_free: 5, next_day_confirm_by: "08:30", countdown_start: "06:00", near_max_fee: 50, free_max_m: 1500, accept_timeout_min: 20, arrival_window_min: 10, notify_daily_cap: 5, momo_number: "024 000 0000", momo_name: "ChopPool Pilot", momo_network: "MTN" };
   const sites = [
     { id: "s1", name: "Heritage Tower, Ridge", drop_point: "Lobby security desk", handoff: "host", host_label: "the security desk in the lobby", host_token: "demoh1", lat: 5.5640, lng: -0.2010, status: "active", active: true },
@@ -1172,6 +1175,7 @@ function makeDemoApi() {
   const pick = a => a[Math.floor(Math.random() * a.length)];
   const uid = () => Math.random().toString(36).slice(2, 10);
   const meals = pid => orders.filter(o => o.pool_id === pid && o.status !== "cancelled").reduce((t, o) => t + o.qty, 0);
+  const kSize = k => Math.max(5, Math.min(Number((k && k.pool_size) || settings.max_meals), Number(settings.pool_ceiling || 15)));   // the vendor's pool size
   // Free delivery by the vendor (same rule as the database's pool_free)
   const pfree = pid => { const pl = pools.find(p => p.id === pid) || {}, k = kitchens.find(x => x.id === pl.kitchen_id) || {}, st = sites.find(x => x.id === pl.site_id) || {};
     return Number(k.free_m) > 0 && hasPin(k) && hasPin(st) && distM(k, st) * ROAD_FACTOR <= Math.min(Number(k.free_m), Number(settings.free_max_m)) && meals(pid) >= Number(k.free_min || 0); };
@@ -1247,9 +1251,9 @@ function makeDemoApi() {
   function place(r, sim) {
     housekeeping();
     if (r.join) return addPlate(r);
-    const m = items.find(i => i.id === r.item), k = kitchens.find(x => x.id === m.kitchen_id), si = sites.find(x => x.id === r.site);
+    const m = items.find(i => i.id === r.item), k = kitchens.find(x => x.id === m.kitchen_id), si = sites.find(x => x.id === r.site), ps = kSize(k);
     if (k.site_id && k.site_id !== si.id) throw new Error("That vendor only delivers to another drop point.");
-    if (!(r.qty >= 1 && r.qty <= 5)) throw new Error("Choose between 1 and 5 meals.");
+    if (!(r.qty >= 1 && r.qty <= Math.min(5, ps))) throw new Error("Choose between 1 and " + Math.min(5, ps) + " meals.");
     const ph = String(r.phone || "").replace(/\D/g, "");
     if (orders.filter(o => !o.parent_id && o.status === "pending" && String(o.phone || "").replace(/\D/g, "") === ph && Date.now() - new Date(o.created_at) < 864e5).length >= 3) throw new Error("You have 3 orders waiting for their payment to be checked. Wait for those before placing another.");
     const d = orderDate(settings), special = (r.special || "").trim() || null;
@@ -1257,11 +1261,11 @@ function makeDemoApi() {
     if (special && d === today() && new Date() >= at(d, settings.special_cutoff)) throw new Error("Custom orders close at " + settings.special_cutoff + ". You can still order from the menu.");
     const add = (m.addons || []).filter(a => (r.addons || []).includes(a.name)), addT = add.reduce((t, a) => t + a.price, 0);
     const load = orders.filter(o => o.kitchen_id === k.id && o.order_date === d && o.status !== "cancelled").reduce((t, o) => t + o.qty, 0);
-    if (load + r.qty > k.capacity) throw new Error("This menu is fully booked for today. Try another one.");
+    if (!k.no_daily_limit && load + r.qty > k.capacity) throw new Error("This menu is fully booked for today. Try another one.");
     const nextSeq = () => Math.max(0, ...pools.filter(p => p.order_date === d && p.site_id === si.id && p.kitchen_id === k.id && p.status !== "cancelled").map(p => p.seq)) + 1;
     // While the vendor hasn't confirmed, everyone at the building joins the same waiting pool
     const st = isOpen(k.id, d) ? "collecting" : "waiting";
-    let pl = pools.filter(p => p.order_date === d && p.site_id === si.id && p.kitchen_id === k.id && p.status === st && meals(p.id) + r.qty <= settings.max_meals).sort((a, b) => a.seq - b.seq)[0];
+    let pl = pools.filter(p => p.order_date === d && p.site_id === si.id && p.kitchen_id === k.id && p.status === st && meals(p.id) + Math.max(r.qty, r.need || 0) <= ps).sort((a, b) => a.seq - b.seq)[0];
     if (!pl) { pl = { id: "p" + uid(), created_at: nowIso(), order_date: d, site_id: si.id, kitchen_id: k.id, seq: nextSeq(), status: st, rider_id: null, trip_ref: "", trip_cost: null,
       fee_rate: Math.min(Number(k.fee_ack || 0), Number(settings.vendor_fee_rate)), fee_free: Math.max(Number(k.fee_free_ack ?? 5), Number(settings.vendor_fee_free)) }; pools.push(pl); }
     const code = newCode(si.id, d, pl.id);
@@ -1284,7 +1288,7 @@ function makeDemoApi() {
     if (!(r.qty >= 1 && r.qty <= 5)) throw new Error("Choose between 1 and 5 meals.");
     const pl = pools.find(p => p.id === par.pool_id);
     if (!["waiting", "collecting"].includes(pl.status)) throw new Error("This pool has closed. Start a new order instead.");
-    if (meals(pl.id) + r.qty > settings.max_meals) throw new Error("This pool is full. Start a new order for more plates.");
+    if (meals(pl.id) + r.qty > kSize(kitchens.find(x => x.id === par.kitchen_id))) throw new Error("This pool is full. Start a new order for more plates.");
     const add = (m.addons || []).filter(a => (r.addons || []).includes(a.name)), addT = add.reduce((t, a) => t + a.price, 0);
     const o = { ...par, id: "o" + uid(), created_at: nowIso(), item_id: m.id, item_name: m.name, unit_price: m.price, qty: r.qty, addons: add, addons_total: addT, note: (r.note || "").trim() || null,
       special_request: null, quote_price: null, momo_ref: null, wallet_used: 0, max_fee: 0, service_fee: settings.service_fee, fee_per_meal: true, parent_id: par.id, status: "pending", cancel_reason: null, refund_needed: false, collected_at: null };
@@ -1308,7 +1312,7 @@ function makeDemoApi() {
     if (document.hidden) return;
     const s = pick(sites).id, k = pick(["k1", "k2"]);
     const p = pools.find(x => x.site_id === s && x.kitchen_id === k && x.order_date === orderDate(settings) && x.status === "collecting");
-    if (!p || meals(p.id) < settings.max_meals - 1) fake(s, k);
+    if (!p || meals(p.id) < kSize(kitchens.find(x => x.id === k)) - 1) fake(s, k);
   }, 9000);
 
   const pub = p => ({ id: p.id, order_date: p.order_date, site_id: p.site_id, kitchen_id: p.kitchen_id, seq: p.seq, status: p.status, created_at: p.created_at, meals: meals(p.id),
@@ -1322,7 +1326,7 @@ function makeDemoApi() {
     async load() { const pop = {}, siteCounts = {}; orders.filter(o => o.status !== "cancelled").forEach(o => { pop[o.item_id] = (pop[o.item_id] || 0) + o.qty; (siteCounts[o.site_id] = siteCounts[o.site_id] || {})[o.kitchen_id] = ((siteCounts[o.site_id] || {})[o.kitchen_id] || 0) + o.qty; });
       const scores = { k1: { orders: 140, on_time: 98, reliable: 100, come_back: 64, rating: 4.7, ratings: 38 }, k2: { orders: 36, on_time: 91, reliable: 95, come_back: 41, rating: 4.4, ratings: 9 } };
       kitchens.forEach(k => { const rs = reviews.filter(r => r.kitchen_id === k.id && !r.hidden); if (rs.length) { scores[k.id] = scores[k.id] || { orders: 0 }; scores[k.id].rating = Math.round(rs.reduce((t, r) => t + r.rating, 0) / rs.length * 10) / 10; scores[k.id].ratings = rs.length; } });
-      return { pop, siteCounts, scores, payMethods: payMethods.filter(p => p.active), settings, sites: sites.filter(x => x.status === "active" && x.active), menus: kitchens.filter(k => k.active).map(k => ({ id: k.id, public_name: k.public_name, tagline: k.tagline, capacity: k.capacity, site_id: k.site_id, added_by_customer: k.added_by_customer, lat: k.lat ?? null, lng: k.lng ?? null })), items: items.filter(i => i.active !== false) }; },
+      return { pop, siteCounts, scores, payMethods: payMethods.filter(p => p.active), settings, sites: sites.filter(x => x.status === "active" && x.active), menus: kitchens.filter(k => k.active).map(k => ({ id: k.id, public_name: k.public_name, tagline: k.tagline, capacity: k.capacity, site_id: k.site_id, added_by_customer: k.added_by_customer, lat: k.lat ?? null, lng: k.lng ?? null, pool_size: kSize(k), pool_size_own: k.pool_size || null, no_daily_limit: !!k.no_daily_limit })), items: items.filter(i => i.active !== false) }; },
     async board(date) {
       housekeeping();
       const load = {}; orders.filter(o => o.order_date === date && o.status !== "cancelled").forEach(o => { load[o.kitchen_id] = (load[o.kitchen_id] || 0) + o.qty; });
@@ -1334,13 +1338,14 @@ function makeDemoApi() {
     async placeBasket(r) {
       const lines = r.lines || []; if (!lines.length) throw new Error("Your tray is empty.");
       if (lines.length > 8) throw new Error("Up to 8 different dishes in one order.");
-      const mealsN = lines.reduce((t, l) => t + (l.qty || 1), 0); if (mealsN > Math.min(10, settings.max_meals)) throw new Error("Up to " + Math.min(10, settings.max_meals) + " meals in one order.");
+      const mealsN = lines.reduce((t, l) => t + (l.qty || 1), 0), bk = kitchens.find(x => x.id === (items.find(i => i.id === lines[0].item) || {}).kitchen_id), bmax = Math.min(10, bk ? kSize(bk) : settings.max_meals);
+      if (mealsN > bmax) throw new Error("Up to " + bmax + " meals in one order from this vendor.");
       if (new Set(lines.map(l => (items.find(i => i.id === l.item) || {}).kitchen_id)).size > 1) throw new Error("Order from one vendor at a time.");
       const pp = String(r.payerPhone || "").replace(/\D/g, ""); if (pp && !/^0\d{9}$/.test(pp)) throw new Error("Enter the 10-digit mobile money number you paid from.");
       const made = [], snapshot = ledger.length;
       try {
         if (r.join) { const par = orders.find(o => o.id === r.join); if (!par || lines.some(l => (items.find(i => i.id === l.item) || {}).kitchen_id !== par.kitchen_id)) throw new Error("Order from one vendor at a time."); }
-        for (const l of lines) { const x = place({ site: r.site, item: l.item, qty: l.qty || 1, name: r.name, phone: r.phone, ref: "BASKET", addons: l.addons || [], note: l.note, join: r.join || (made[0] ? made[0].id : null) }, false); made.push(orders.find(o => o.id === x.id)); }
+        for (const l of lines) { const x = place({ site: r.site, item: l.item, qty: l.qty || 1, name: r.name, phone: r.phone, ref: "BASKET", addons: l.addons || [], note: l.note, join: r.join || (made[0] ? made[0].id : null), need: r.join ? 0 : mealsN }, false); made.push(orders.find(o => o.id === x.id)); }
         made.forEach((o, n) => { o.momo_ref = null; o.status = "pending"; o.basket = n > 0; o.payer_phone = pp || null; o.payer_network = r.payerNetwork || null; });
         const total = made.reduce((t, o) => t + dueOf(o), 0); let use = 0;
         if (r.useWallet && me && made[0].user_id === me.id) { use = Math.max(0, Math.min(balance(me.id), total)); if (use > 0) ledger.push({ user_id: me.id, amount: -use, reason: "Paid for order " + made[0].code, order_id: made[0].id, created_at: nowIso() }); }
@@ -1427,7 +1432,7 @@ function makeDemoApi() {
     async kitchenView(token, date) {
       housekeeping();
       const k = byToken(kitchens, "token", token);
-      return { kitchen: { name: k.name, public_name: k.public_name, capacity: k.capacity, delivery_mode: k.delivery_mode, added_by_customer: k.added_by_customer, open: isOpen(k.id, date), listing_status: k.listing_status || "none", listing: k.listing || null,
+      return { kitchen: { name: k.name, public_name: k.public_name, capacity: k.capacity, pool_size: kSize(k), pool_size_own: k.pool_size || null, no_daily_limit: !!k.no_daily_limit, pool_default: settings.max_meals, pool_ceiling: settings.pool_ceiling, delivery_mode: k.delivery_mode, added_by_customer: k.added_by_customer, open: isOpen(k.id, date), listing_status: k.listing_status || "none", listing: k.listing || null,
           auto_days: k.auto_days || [], paused: (k.paused_dates || []).includes(date), confirmed: days.some(x => x.kitchen_id === k.id && x.order_date === date),
           has_pin: hasPin(k), free_m: k.free_m || null, free_min: k.free_min || 0, free_max_m: settings.free_max_m, fee_ack: Number(k.fee_ack || 0), fee_free_ack: Number(k.fee_free_ack ?? 5),
           fee_rate: Number(settings.vendor_fee_rate), fee_free: Number(settings.vendor_fee_free), next_day_confirm_by: settings.next_day_confirm_by },
@@ -1448,7 +1453,7 @@ function makeDemoApi() {
         const phones = [...new Set(L.map(o => o.phone))];
         return { meals: L.reduce((t, o) => t + o.qty, 0), orders: L.filter(o => !o.parent_id).length, customers: phones.length, new_customers: phones.filter(ph => firsts[ph] >= from).length,
           repeat_rate: phones.length ? Math.round(100 * phones.filter(ph => new Set(live.filter(o => o.phone === ph && o.order_date >= add(from, -7) && o.order_date <= to).map(o => o.order_date)).size >= 2).length / phones.length) : null,
-          avg_meals: ps.length ? Math.round(ps.reduce((t, p) => t + meals(p.id), 0) / ps.length * 10) / 10 : null, pools: ps.length, filled: ps.filter(p => meals(p.id) >= settings.max_meals).length,
+          avg_meals: ps.length ? Math.round(ps.reduce((t, p) => t + meals(p.id), 0) / ps.length * 10) / 10 : null, pools: ps.length, filled: ps.filter(p => meals(p.id) >= kSize(kitchens.find(x => x.id === p.kitchen_id) || {})).length,
           cancelled: orders.filter(o => o.status === "cancelled" && o.order_date >= from && o.order_date <= to).length }; };
       const food = cur.reduce((t, o) => t + (Number(o.quote_price ?? o.unit_price) + o.addons_total) * o.qty, 0);
       const grp = (L, key) => { const m = {}; L.forEach(o => { (m[o[key]] = m[o[key]] || []).push(o); }); return m; };
@@ -1502,6 +1507,11 @@ function makeDemoApi() {
     async uploadPhoto(folder, blob) { return await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(blob); }); },
     async kitchenAcceptTerms(token) { const k = byToken(kitchens, "token", token); k.fee_ack = Number(settings.vendor_fee_rate); k.fee_free_ack = Number(settings.vendor_fee_free);
       pools.filter(p => p.kitchen_id === k.id && p.status === "waiting").forEach(p => { p.fee_rate = k.fee_ack; p.fee_free = k.fee_free_ack; }); return { rate: k.fee_ack, free: k.fee_free_ack }; },
+    async vendorSetCapacity(token, pool, daily, noLimit) { const k = byToken(kitchens, "token", token);
+      if (pool != null && (pool < 5 || pool > settings.pool_ceiling)) throw new Error("Meals per pool must be between 5 and " + settings.pool_ceiling + ".");
+      if (!noLimit && !(daily >= 5 && daily <= 1000)) throw new Error("Enter how many meals you can make in a day (5 or more), or tick No daily limit.");
+      k.pool_size = pool === settings.max_meals ? null : pool; k.no_daily_limit = !!noLimit; if (!noLimit) k.capacity = daily;
+      return { pool_size: kSize(k), pool_size_own: k.pool_size, capacity: k.capacity, no_daily_limit: k.no_daily_limit }; },
     async vendorSetFree(token, m, min) { const k = byToken(kitchens, "token", token); if (!hasPin(k)) throw new Error("Ask ChopPool to pin your kitchen on the map first.");
       k.free_m = Number(m) > 0 ? Math.min(Math.round(Number(m)), Number(settings.free_max_m)) : null; k.free_min = Math.max(0, Math.min(Number(min) || 0, 50)); return { free_m: k.free_m, free_min: k.free_min }; },
     async kitchenOpenDay(token, date) { const k = byToken(kitchens, "token", token);
@@ -1859,6 +1869,7 @@ function makeSupabaseApi() {
       try { return await rpc("request_site", { ...base, p_endpoint: ep }); } catch (e) { if (/function|p_endpoint/i.test(String(e.message || e))) return rpc("request_site", base); throw e; } },
     kitchenAcceptTerms: t => rpc("kitchen_accept_terms", { p_token: t }),
     vendorSetFree: (t, m, min) => rpc("vendor_set_free", { p_token: t, p_m: m, p_min: min }),
+    vendorSetCapacity: (t, pool, daily, noLimit) => rpc("vendor_set_capacity", { p_token: t, p_pool: pool, p_daily: daily, p_no_limit: !!noLimit }),
     mergeSites: (from, into) => rpc("admin_merge_sites", { p_from: from, p_into: into }),
     async addKitchen(k) { return must(await sb.from("kitchens").insert(k).select().single()); },
     async saveItem(it) { if (it.id) { const { id, ...p } = it; must(await sb.from("menu_items").update(p).eq("id", id)); } else must(await sb.from("menu_items").insert(it)); },
@@ -2264,9 +2275,14 @@ function openWallet() { setTab("wallet"); }
 /* =====================================================================================
    CUSTOMER VIEW: app bar, Home (pools), Orders, Wallet
    ===================================================================================== */
+// Meals per pool: the vendor's choice or ChopPool's default, never above the ceiling or below 5
+const poolSize = k => Math.max(5, Math.min(Number((k && (k.pool_size_own ?? k.pool_size)) || S.settings.max_meals || 10), Number(S.settings.pool_ceiling || 15)));
+// The vendor has no more room today (or isn't cooking)
+const dayFull = k => !k.no_daily_limit && (S.board.load[k.id] || 0) >= Number(k.capacity || 0);
 function currentPool(siteId, kid) {
   const ps = S.board.pools.filter(p => p.site_id === siteId && p.kitchen_id === kid && ["collecting", "waiting"].includes(p.status)).sort((a, b) => a.seq - b.seq);
-  const open = ps.find(p => p.status === "waiting" || p.meals < S.settings.max_meals);
+  const size = poolSize(menuOf(kid));
+  const open = ps.find(p => p.meals < size);
   return open || { seq: (ps.at(-1)?.seq || 0) + 1, meals: 0, status: "new" };
 }
 const menusHere = () => S.menus.filter(k => !k.site_id || k.site_id === S.siteId);
@@ -2279,16 +2295,16 @@ const tripTo = (k, site, meals = 1) => isFreeFor(k, site, meals) ? 0 : tripFor(k
 const poolTrip = (p, meals = p.meals) => p.free ? 0 : tripTo(S.menus.find(k => k.id === p.kitchen_id) || {}, siteOf(p.site_id), meals);
 // What a new order pays for delivery now: the server looks at the pool as it stands before this order
 const tripNow = (k, site) => tripTo(k, site, (S.board.pools.find(p => p.site_id === S.siteId && p.kitchen_id === k.id && ["waiting", "collecting"].includes(p.status)) || {}).meals || 0);
-// Seats in a pool: the app's limit, or fewer when the vendor's daily capacity (shared across buildings) runs out first
+// Seats in a pool: the vendor's pool size, or fewer when their daily limit (shared across buildings) runs out first
 function poolCap(kid, meals) {
-  const k = menuOf(kid) || {}, max = Number(S.settings.max_meals) || 15, cap = Number(k.capacity);
-  if (!cap) return max;
+  const k = menuOf(kid) || {}, max = poolSize(k), cap = Number(k.capacity);
+  if (!cap || k.no_daily_limit) return max;
   const left = Math.max(0, cap - ((S.board && S.board.load && S.board.load[kid]) || 0));
   return Math.max(Number(meals) || 0, Math.min(max, (Number(meals) || 0) + left));
 }
 function menuState(k) {
   const off = (S.board.off || []).includes(k.id);   // the vendor said they're not cooking this day
-  return { off, full: off || (S.board.load[k.id] || 0) >= k.capacity, open: !off && S.board.open.includes(k.id), waiting: S.board.pools.some(p => p.kitchen_id === k.id && p.site_id === S.siteId && p.status === "waiting" && p.meals > 0) };
+  return { off, full: off || dayFull(k), open: !off && S.board.open.includes(k.id), waiting: S.board.pools.some(p => p.kitchen_id === k.id && p.site_id === S.siteId && p.status === "waiting" && p.meals > 0) };
 }
 function collectLine(site) {
   return site.handoff === "host" ? "Collect from " + (site.host_label || site.drop_point) + " with your code." : "Meet the rider at " + site.drop_point + " with your code when you get the arrival alert.";
@@ -2396,6 +2412,7 @@ async function viewOrder() {
   $("#tabHome").addEventListener("click", e => { if (mineClick(e)) return; if (e.target.closest("[data-findb]")) { openSitePicker(); $("#fbQ")?.focus(); return; } const ws = e.target.closest("[data-site]"); if (ws) return setSite(ws.dataset.site);
     if (e.target.closest(".locchip")) return openSitePicker();
     if (e.target.closest("[data-seeall]")) { S.vf = "near"; S.vq = ""; return setTab("kitchens"); }
+    if (e.target.closest("[data-gopools]")) return $("#secPools")?.scrollIntoView({ behavior: "smooth", block: "start" });
     // This vendor is fully booked (or not cooking): start a pool with another one
     const np = e.target.closest("[data-newpool]"); if (np) { const k = menuOf(np.dataset.newpool); S.vf = "near"; S.vq = ""; setTab("kitchens");
       return toast((k.public_name || "This vendor") + ((S.board.off || []).includes(k.id) ? " isn't cooking " : " is fully booked ") + dayLabel(S.date) + ". Pick another vendor to start a new pool."); }
@@ -2762,6 +2779,7 @@ function renderHero() {
       <p class="small">Order by ${fmtTime(s.cutoff)}${dl === "today" ? "" : " " + (dl === "tomorrow" ? "tomorrow" : fmtDate(S.date))} · lunch at ${fmtTime(s.delivery_time)}</p>
 </div>
     <div class="hero-stats"><div class="hero-stat" id="cdBox"><b class="num" id="countdown">--</b><span id="cdLabel">until orders close</span></div>
+      ${S.noSite ? "" : (n => `<button class="hero-stat hlink" data-gopools aria-label="${n} active pool${n === 1 ? "" : "s"} in your building. See them"><b class="num">${n}</b><span>active pool${n === 1 ? "" : "s"}</span></button>`)(here.filter(p => ["collecting", "waiting"].includes(p.status) && p.meals > 0).length)}
       ${S.noSite ? `<div class="hero-stat"><b class="num">${here.filter(p => p.status === "collecting" && p.meals > 0).length}</b><span>pools open</span></div>` : (dlv ? `<button class="hero-stat hlink" data-vendor="${esc(dlv.kid)}">${(v => `<b class="num${v.length > 7 ? " long" : ""}">${v}</b>`)(dlv.fee === 0 ? "Free" : Number.isInteger(dlv.fee) ? "GHS " + dlv.fee : money(dlv.fee))}<span>${esc(dlv.label)}</span></button>` : `<div class="hero-stat"><b class="num">${menusHere().length}</b><span>vendors cooking</span></div>`)}</div>`;
   // Top part (greeting + figures) is only rebuilt when it changed; the strip lives in its own box and is patched in place
   let host = $("#mlHost");
@@ -2855,6 +2873,9 @@ function photoHead(k, i, inner, small) {
 // Your own live order in this vendor's pool here (then the card offers "Add to my order" instead of joining again)
 const myOrderIn = k => (S.mine || []).find(o => !o.parent_id && o.kitchen_id === k.id && o.site_id === S.siteId && o.order_date === S.date
   && ["pending", "paid"].includes(o.status) && ["waiting", "collecting"].includes(o.pool_status));
+// Your order whose pool still has room to add dishes (a full pool means the next order starts a new pool)
+const poolRoom = o => { const p = o && (S.board.pools || []).find(x => x.id === o.pool_id); return !p || p.meals < poolSize(menuOf(o.kitchen_id)); };
+const myAddable = k => { const o = myOrderIn(k); return o && poolRoom(o) ? o : null; };
 const SHARE = SV('<path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M12 3v13"/><path d="m7 8 5-5 5 5"/>', 20);
 const mineBtns = (o, k) => `<div class="minebtns"><button class="btn wide" data-addplate="${esc(o.id)}">${SV('<path d="M12 5v14M5 12h14"/>', 18)} Add to my order</button><button class="ghost sharebtn" data-share="${esc(o.site_id)},${esc(k.id)}" aria-label="Share this pool">${SHARE}</button></div>`;
 // When a waiting pool's vendor must confirm by: same-day pools get minutes; pools for a later day get until the "confirm by" time that morning
@@ -3006,20 +3027,39 @@ function nearRows() {
   return { far: rows.filter(r => !inArea(r)).length, rows: near, further };
 }
 function poolRow(k) {
-  const s = S.settings, st = menuState(k), p = currentPool(S.siteId, k.id), max = poolCap(k.id, p.meals), trip = poolTrip(p), mo = myOrderIn(k), i = menuIndex(k.id);
-  const now = feeFor(Math.max(p.meals, 1), s, trip), j = feeFor(p.meals + 1, s, poolTrip(p, p.meals + 1));
+  const s = S.settings, st = menuState(k), mo = myOrderIn(k), i = menuIndex(k.id), size = poolSize(k);
+  const mine = mo && S.board.pools.find(x => x.id === mo.pool_id);
+  // Your pool is full: show it as done, then the next pool with the same vendor (unless the vendor has no room left today)
+  if (mine && mine.meals >= size) return rowHtml(k, i, mine, mo, size, { l2: "Pool full · delivery at its lowest", ok: true, act: st.full ? `<button class="btn" data-newpool="${esc(k.id)}">New pool</button>` : "" }) + (st.full ? "" : nextRow(k, i, st));
+  if (mo) return rowHtml(k, i, mine || currentPool(S.siteId, k.id), mo, null, rowInfo(k, mine || currentPool(S.siteId, k.id), st, mo));
+  return nextRow(k, i, st);
+}
+// The pool a new customer would join: the open one, or the next one once earlier pools are full
+function nextRow(k, i, st) {
+  const p = currentPool(S.siteId, k.id), info = rowInfo(k, p, st, null);
+  return rowHtml(k, i, p, null, null, info);
+}
+function rowInfo(k, p, st, mo) {
+  const s = S.settings, trip = poolTrip(p), now = feeFor(Math.max(p.meals, 1), s, trip), j = feeFor(p.meals + 1, s, poolTrip(p, p.meals + 1));
+  const fullBefore = !mo && p.meals === 0 && p.seq > 1;   // earlier pools with this vendor filled up today
   let l2, warn = false;
   if (st.full) { l2 = (st.off ? "Not cooking " : "Fully booked ") + dayLabel(S.date); warn = true; }
-  else if (st.waiting) {
-    const wp = S.board.pools.find(x => x.site_id === S.siteId && x.kitchen_id === k.id && x.status === "waiting");
-    l2 = mo ? "Waiting for the vendor · " + leftText(wp) : "Waiting for the vendor · " + leftText(wp) + ". Full refund if they don't confirm"; warn = true;
+  else if (st.waiting && p.status === "waiting") {
+    l2 = mo ? "Waiting for the vendor · " + leftText(p) : "Waiting for the vendor · " + leftText(p) + ". Full refund if they don't confirm"; warn = true;
   } else if (mo) l2 = j < now ? "Add and delivery drops to " + money(j) + " a meal" : "Your share " + money(now) + " a meal";
+  else if (fullBefore) l2 = "Pool " + (p.seq - 1) + " is full. Start pool " + p.seq;
   else l2 = j < now ? "Join and delivery drops to " + money(j) + " a meal" : money(j) + " a meal in this pool";
-  const act = mo && !st.full ? `<button class="btn" data-addplate="${esc(mo.id)}">Add</button>` : st.full ? `<button class="btn" data-newpool="${esc(k.id)}">New pool</button>` : `<button class="btn" data-vendor="${esc(k.id)}">Join</button>`;
-  return `<article class="prow${mo ? " mine" : ""}"><span class="ptile" data-vendor="${esc(k.id)}" style="background:${tint(i)}">${plate(topDish(k.id), k.id)}</span>
+  const act = st.full ? `<button class="btn" data-newpool="${esc(k.id)}">New pool</button>`
+    : mo ? `<button class="btn" data-addplate="${esc(mo.id)}">Add</button>`
+    : `<button class="btn" data-vendor="${esc(k.id)}">${p.meals === 0 ? "Start pool" : "Join"}</button>`;
+  return { l2, warn, act, share: !st.full && p.meals > 0 };   // nothing to share in a pool nobody has joined yet
+}
+function rowHtml(k, i, p, mo, size, x) {
+  const max = size || poolCap(k.id, p.meals);
+  return `<article class="prow${mo ? " mine" : ""}${x.ok ? " done" : ""}"><span class="ptile" data-vendor="${esc(k.id)}" style="background:${tint(i)}">${plate(topDish(k.id), k.id)}</span>
     <span class="ptx" data-vendor="${esc(k.id)}"><strong>${esc(k.public_name)}${mo ? ` <span class="ytag">Your pool</span>` : ""}</strong><span class="l1"><span class="num">${p.meals} of ${max} meals</span>${mo ? ` · <span class="num">code ${esc(mo.code)}</span>` : ""}</span>
-      <span class="l2${warn ? " warn" : ""}">${esc(l2).replace(/GHS [\d,.]+/, m => "<b>" + m + "</b>")}</span><span class="pbar"><i style="width:${Math.min(100, Math.round(p.meals / max * 100))}%"></i></span></span>
-    <span class="acts">${act}${st.full ? "" : `<button class="iconround" data-share="${esc(S.siteId)},${esc(k.id)}" aria-label="Share this pool">${ICON.share}</button>`}</span></article>`;
+      <span class="l2${x.warn ? " warn" : ""}${x.ok ? " okl" : ""}">${esc(x.l2).replace(/GHS [\d,.]+/, m => "<b>" + m + "</b>")}</span><span class="pbar"><i style="width:${Math.min(100, Math.round(p.meals / max * 100))}%"></i></span></span>
+    <span class="acts">${x.act || ""}${x.share ? `<button class="iconround" data-share="${esc(S.siteId)},${esc(k.id)}" aria-label="Share this pool">${ICON.share}</button>` : ""}</span></article>`;
 }
 function renderPools() {
   document.querySelectorAll(".locname").forEach(x => { x.textContent = siteOf(S.siteId).name || ""; });
@@ -3141,6 +3181,7 @@ window.addEventListener("popstate", () => { if ($("#vpage")) closeVendor(true); 
 function vendorBanner(k) {
   const s = S.settings, v = vInfo(k), mo = S.noSite ? null : myOrderIn(k), site = siteOf(S.siteId), day = dayLabel(S.date);
   if (S.noSite) return `<div class="vbanner o vbrow"><span>Choose your building to order from <b>${esc(k.public_name)}</b> and see delivery prices.</span><button class="btn" data-vgo>Choose</button></div>`;
+  if (mo && !poolRoom(mo)) return `<div class="vbanner"><span><b>Your pool is full</b> · code <b class="num">${esc(mo.code)}</b>. Delivery is at its lowest. Anything you order now starts the next pool${v.st.full ? "" : " with " + esc(k.public_name)}.</span></div>`;
   if (mo) return `<div class="vbanner"><span><b>You're in this pool</b> · code <b class="num">${esc(mo.code)}</b>. ${v.active ? "Your share now " + money(feeFor(Math.max(v.p.meals, 1), s, poolTrip(v.p))) + " a meal. " : ""}Tap + to add a dish to your order: same code, packed together.</span></div>`;
   if (v.st.off) return `<div class="vbanner bad"><span><b>Not cooking ${esc(day)}.</b> ${esc(k.public_name)} is taking a break. Try another vendor near you.</span></div>`;
   if (v.st.full) return `<div class="vbanner bad"><span><b>Fully booked ${esc(day)}.</b> Try another vendor near you.</span></div>`;
@@ -3190,6 +3231,7 @@ function pickPayFrom(cur, done) {
 /* ---------- Tray: several dishes from one vendor, one checkout, one payment, one code ---------- */
 // "Add" on your order: open the vendor's menu so you can pick several dishes, then pay once; they join your code
 function addToOrder(o) {
+  if (!poolRoom(o)) { closeSheet(); openVendor(o.kitchen_id); return toast("Your pool is full. Dishes you order now start the next pool."); }
   if (o.site_id === S.siteId && o.order_date === S.date && myOrderIn(menuOf(o.kitchen_id))) { closeSheet(); openVendor(o.kitchen_id); return; }
   openOrder(o.kitchen_id, { join: o });   // order for another day or building: one dish at a time
 }
@@ -3215,12 +3257,12 @@ function openDish(k, dishId) {
   const draw = () => { $("#dQ").textContent = qty; const a = (d.addons || []).filter(x => extras.has(x.name)).reduce((t, x) => t + Number(x.price), 0); $("#dTot").textContent = money((Number(d.price) + a) * qty); };
   draw();
   $("#dMinus").addEventListener("click", () => { qty = Math.max(1, qty - 1); draw(); });
-  $("#dPlus").addEventListener("click", () => { qty = Math.min(5, qty + 1); draw(); });
+  $("#dPlus").addEventListener("click", () => { qty = Math.min(5, poolSize(k), qty + 1); draw(); });
   $("#dExtras")?.addEventListener("click", e => { const b = e.target.closest("[data-addon]"); if (!b) return; const n = b.dataset.addon; extras.has(n) ? extras.delete(n) : extras.add(n); b.setAttribute("aria-pressed", String(extras.has(n))); draw(); });
   $("#dSpecial")?.addEventListener("click", () => openOrder(k.id, { preset: { item_id: d.id, qty: 1 }, fromPage: true, special: true }));
   $("#dAdd").addEventListener("click", () => {
     const t = trayFor(k.id), line = { item: d.id, qty, addons: [...extras], note: $("#dNote").value.trim() || null };
-    const meals = t.lines.reduce((a, l) => a + l.qty, 0) + qty, cap = Math.min(10, Number(S.settings.max_meals) || 10);
+    const meals = t.lines.reduce((a, l) => a + l.qty, 0) + qty, cap = Math.min(10, poolSize(k));
     if (meals > cap) return toast("Up to " + cap + " meals in one order.");
     const same = t.lines.find(l => sameLine(l, line)); if (same) same.qty = Math.min(5, same.qty + qty); else t.lines.push(line);
     traySave(t); closeSheet(); toast("Added " + qty + " × " + d.name);
@@ -3274,14 +3316,14 @@ async function loadVendorReviews(k) {
     lb.addEventListener("click", () => lb.remove()); document.body.appendChild(lb); };
 }
 function vendorClick(e) {
-  if (!S.vp) return; const k = menuOf(S.vp.id), mo = S.noSite ? null : myOrderIn(k);
+  if (!S.vp) return; const k = menuOf(S.vp.id), mo = S.noSite ? null : myAddable(k);
   if (e.target.closest("[data-vback]")) return closeVendor();
   const fb = e.target.closest("[data-vfav]"); if (fb) { const on = toggleFav(k.id); fb.classList.toggle("fav", on); fb.setAttribute("aria-pressed", String(on)); toast(on ? "Added to your favourites" : "Removed from your favourites"); if (S.tab === "kitchens") renderKitchens(); return; }
   const sh = e.target.closest("[data-share]"); if (sh) { const [a, c] = sh.dataset.share.split(","); return sharePool(a, c); }
   const tb = e.target.closest("[data-vtab]"); if (tb) { S.vp.tab = tb.dataset.vtab; const y = $("#vpage").scrollTop; drawVendor(); $("#vpage").scrollTop = Math.min(y, $(".vtabs").offsetTop - 8); return; }
   const d = e.target.closest("[data-dish]");
   if (d) return openDish(k, d.dataset.dish);   // in your pool already: dishes go to the tray, then join your code in one payment
-  if (e.target.closest("[data-vcheckout]")) return openOrder(k.id, { tray: true, fromPage: true, join: S.noSite ? null : myOrderIn(k) || null });   // in your pool already: the dishes join your code
+  if (e.target.closest("[data-vcheckout]")) return openOrder(k.id, { tray: true, fromPage: true, join: S.noSite ? null : myAddable(k) || null });   // in your pool already: the dishes join your code
   if (e.target.closest("[data-vgo]")) return S.noSite ? openSitePicker() : mo ? openOrder(k.id, { join: mo, fromPage: true }) : openOrder(k.id, { fromPage: true });
 }
 
@@ -3326,7 +3368,7 @@ function soloBanner(o) {
 // Pools still open that a solo order could move to: other vendors at the same building first, then buildings within a short walk (~300 m)
 function switchTargets(o) {
   const home = siteOf(o.site_id), out = [];
-  (S.board.pools || []).filter(p => ["collecting", "waiting"].includes(p.status) && p.meals > 0 && p.id !== o.pool_id && p.kitchen_id !== o.kitchen_id && p.meals + o.qty <= Number(S.settings.max_meals)).forEach(p => {
+  (S.board.pools || []).filter(p => ["collecting", "waiting"].includes(p.status) && p.meals > 0 && p.id !== o.pool_id && p.kitchen_id !== o.kitchen_id && p.meals + o.qty <= poolSize(menuOf(p.kitchen_id))).forEach(p => {
     const si = siteOf(p.site_id), d = p.site_id === o.site_id ? 0 : hasPin(home) && hasPin(si) ? distM(home, si) : Infinity;
     if (d > 300) return; const k = menuOf(p.kitchen_id); if (!k.id) return;
     out.push({ p, k, si, d, share: feeFor(p.meals + o.qty, S.settings, poolTrip(p, p.meals + o.qty)) });
@@ -4113,7 +4155,7 @@ async function loadReviews(k) {
     lb.addEventListener("click", () => lb.remove()); document.body.appendChild(lb); };
 }
 // Can another plate join this order's code? Only the main order, while its pool is open and before the cut-off
-const canAddPlate = o => !o.parent_id && ["pending", "paid"].includes(o.status) && ["waiting", "collecting"].includes(o.pool_status)
+const canAddPlate = o => !o.parent_id && ["pending", "paid"].includes(o.status) && ["waiting", "collecting"].includes(o.pool_status) && poolRoom(o)
   && new Date() < at(o.order_date, S.settings.cutoff) && S.items.some(i => i.kitchen_id === o.kitchen_id);
 const canOrderAgain = o => o.status === "cancelled" && !o.parent_id && S.menus.some(m => m.id === o.kitchen_id) && o.order_date === S.date && new Date() < at(o.order_date, S.settings.cutoff)
   && !/^The seller can't/.test(o.cancel_reason || "");
@@ -4236,7 +4278,7 @@ function openOrder(menuId, opt = {}) {
   $("#orderForm").addEventListener("change", e => { if (e.target.name === "dish") { item = dishes.find(d => d.id === e.target.value); extras = new Set(); drawExtras(); } draw(); });
   $("#extrasGroup").addEventListener("click", e => { const b = e.target.closest("[data-addon]"); if (!b) return; const n = b.dataset.addon; extras.has(n) ? extras.delete(n) : extras.add(n); b.setAttribute("aria-pressed", String(extras.has(n))); draw(); });
   $("#minus").addEventListener("click", () => { qty = Math.max(1, qty - 1); draw(); });
-  $("#plus").addEventListener("click", () => { qty = Math.min(5, qty + 1); draw(); });
+  $("#plus").addEventListener("click", () => { qty = Math.min(5, poolSize(k), qty + 1); draw(); });
   $("#noteToggle").addEventListener("click", () => { $("#noteBox").classList.toggle("hidden"); $("#noteToggle").classList.add("hidden"); $("#fNote").focus(); });
   $("#meEdit")?.addEventListener("click", () => { $("#meRow").classList.add("hidden"); $("#meFields").classList.remove("hidden"); $("#fName").focus(); });
   $("#specialToggle")?.addEventListener("click", () => {
@@ -4807,7 +4849,7 @@ async function renderAdmin(cached, quiet) {   // quiet = background/refresh-butt
       <section class="stack" style="gap:10px"><h2>${d === today() ? "Today" : fmtDate(d)} at a glance</h2>
         <div class="dash-grid">
           ${tile("Meals ordered", meals, "today:orders")}${tile("Orders", live.length, "today:orders")}
-          ${tile("Live pools", livePools.length, "today:pools", "", livePools.length ? "Average " + Math.round(livePools.reduce((t, p) => t + p.meals, 0) / livePools.length) + " of " + s.max_meals + " seats" : "")}
+          ${tile("Live pools", livePools.length, "today:pools", "", livePools.length ? "Average " + Math.round(livePools.reduce((t, p) => t + p.meals, 0) / livePools.length) + " meals a pool" : "")}
           <div class="dtile wide"><span>Deliveries by stage</span>${byStage.length ? `<div class="stagebar">${byStage.map(([l, n]) => `<span><b class="num">${n}</b> ${esc(l)}</span>`).join("")}</div>` : `<small>No pools yet</small>`}</div>
           <div class="dtile wide"><span>Vendor capacity used</span>${kUse.length ? kUse.map(({ k, m }) => `<div class="capline"><span>${esc(k.public_name)}</span><span class="num small">${m}/${k.capacity}</span><i style="--w:${Math.min(100, Math.round(m / Math.max(1, k.capacity) * 100))}%"></i></div>`).join("") : `<small>No vendor has orders yet</small>`}</div>
         </div></section>
@@ -4837,7 +4879,7 @@ async function renderAdmin(cached, quiet) {   // quiet = background/refresh-butt
       <h2>Pools for ${fmtDate(d)}</h2>
       <div class="cards2">${pools.map(p => { const k = K(p.kitchen_id), fl = poolFlags(p, s, d);
         return `<article class="card" data-pool="${esc(p.id)}">
-          <div class="poolhead"><div class="ph-t"><h3>${esc(sName(p.site_id))} · Pool ${p.seq}</h3><span class="chip num">${p.meals}/${s.max_meals} meals</span></div>
+          <div class="poolhead"><div class="ph-t"><h3>${esc(sName(p.site_id))} · Pool ${p.seq}</h3><span class="chip num">${p.meals}/${poolSize(A.kitchens.find(k => k.id === p.kitchen_id) || {})} meals</span></div>
             <p class="small muted">${esc(k.public_name)}${k.added_by_customer ? " (added by a customer)" : k.name !== k.public_name ? " · " + esc(k.name) : ""}${p.runner ? " · own runner" : ""} · ${money(feeFor(p.meals, s, aTrip(p)))} a meal · trip est. ${money(aTrip(p))}</p></div>
           ${stepsHtml(p.status, A.orders.filter(o => o.pool_id === p.id && !o.parent_id && ["paid", "collected"].includes(o.status)))}${handInfo(p.status, A.orders.filter(o => o.pool_id === p.id && !o.parent_id && ["paid", "collected"].includes(o.status)))}${fl.length ? `<p class="small" style="color:var(--danger)">${fl.map(esc).join(" · ")}</p>` : ""}
           ${p.runner ? "" : `<div class="inline poolrider"><div class="full"><label for="rd-${p.id}">Rider</label><select id="rd-${p.id}" data-f="rider_id"><option value="">Bolt Send / Yango</option>${ridersOk.filter(r => r.active).map(r => `<option value="${esc(r.id)}"${r.id === p.rider_id ? " selected" : ""}>${esc(r.name)}</option>`).join("")}</select></div>
@@ -4988,7 +5030,9 @@ async function renderAdmin(cached, quiet) {   // quiet = background/refresh-butt
         <div class="inline" style="grid-template-columns:1fr 1fr .6fr auto"><div><label>WhatsApp</label><input data-f="whatsapp" inputmode="tel" value="${esc(k.whatsapp || "")}"></div>
           <div><label>Delivery</label><select data-f="delivery_mode"><option value="rider"${k.delivery_mode === "rider" ? " selected" : ""}>ChopPool rider</option><option value="runner"${k.delivery_mode === "runner" ? " selected" : ""}>Own runner</option></select></div>
           <div><label>Free delivery by their runner within (m, 0 = off)</label><input data-f="free_m" inputmode="numeric" value="${esc(k.free_m || 0)}"></div>
-          <div><label>Meals</label><input data-f="capacity" inputmode="numeric" value="${esc(k.capacity)}"></div>
+          <div><label>Meals per day</label><input data-f="capacity" inputmode="numeric" value="${esc(k.capacity)}"></div>
+          ${S.settings.pool_ceiling != null ? `<div><label>Meals per pool (empty = default ${esc(S.settings.max_meals)})</label><input data-f="pool_size" inputmode="numeric" value="${esc(k.pool_size || "")}" placeholder="${esc(S.settings.max_meals)}"></div>
+          <label class="choice" style="padding:8px 10px"><input type="checkbox" data-f="no_daily_limit"${k.no_daily_limit ? " checked" : ""}><span>No daily limit</span></label>` : ""}
           <label class="choice" style="padding:8px 10px"><input type="checkbox" data-f="active"${k.active ? " checked" : ""}><span>Active</span></label></div>
         <div class="group"><p class="group-title">Days they cook (pools open without the vendor confirming)</p>${autoPicker(k.auto_days)}
           <p class="small muted" style="margin-top:4px">${(k.auto_days || []).length ? "On: " + daysText(k.auto_days) + ". Untick every day to switch it off for a vendor who lets pools down." : "Off: the vendor confirms each day."}${(k.paused_dates || []).filter(x => x >= today()).length ? " Paused: " + k.paused_dates.filter(x => x >= today()).map(fmtDate).join(", ") + "." : ""}</p></div>
@@ -5096,8 +5140,12 @@ async function renderAdmin(cached, quiet) {   // quiet = background/refresh-butt
         <p class="small muted">Vendors with a higher delivery cost still show on the Vendors tab under "Further away". Each vendor picks their own free-delivery distance on their page, up to this limit.</p>
       </section><section class="card stack"><h2>Timing</h2>
         <div class="grid2"><div><label for="rlBy">Orders for a later day: vendor confirms by</label><input id="rlBy" name="next_day_confirm_by" type="time" value="${esc(String(s.next_day_confirm_by || "08:30").slice(0, 5))}"></div>
-          <div><label for="rlCd">Home countdown starts at</label><input id="rlCd" name="countdown_start" type="time" value="${esc(String(s.countdown_start || "06:00").slice(0, 5))}"></div></div>
-        <p class="small muted">Same-day pools still give vendors ${esc(s.accept_timeout_min)} minutes. Before the countdown starts, Home shows "Tomorrow ${fmtTime(s.cutoff)}" instead.</p>
+</div>
+        <p class="small muted">Same-day pools still give vendors ${esc(s.accept_timeout_min)} minutes.</p>
+      </section><section class="card stack"><h2>Pool size</h2>
+        <div class="grid2"><div><label for="rlPool">Default meals per pool</label><input id="rlPool" name="max_meals" inputmode="numeric" value="${esc(s.max_meals ?? 10)}"></div>
+          <div><label for="rlCeil">Most a vendor can choose</label><input id="rlCeil" name="pool_ceiling" inputmode="numeric" value="${esc(s.pool_ceiling ?? 15)}"></div></div>
+        <p class="small muted">One pool is one rider's load. Vendors start with the default and can choose between 5 and the most you allow. When a pool fills, the next one opens with the same vendor.</p>
       </section>
         ${isSuper ? `<section class="card stack"><h2>ChopPool fee on bigger pools <span class="small muted">(owner only)</span></h2>
         <div class="grid2"><div><label for="rlRate">Fee on each meal after the free ones (%)</label><input id="rlRate" name="vendor_fee_pct" inputmode="decimal" value="${esc(Math.round(Number(s.vendor_fee_rate || 0) * 1000) / 10)}"></div>
@@ -5274,7 +5322,10 @@ async function adminClick(e) {
       const w = (fval(kc, "whatsapp") || "").replace(/\D/g, "");
       if (w && !/^0\d{9}$/.test(w)) return toast("Enter a 10-digit WhatsApp number starting with 0.");
       if ((fval(kc, "name") || "").length < 2 || (fval(kc, "public_name") || "").length < 2) return toast("Add both the real name and the menu name.");
-      return run(() => api.updateKitchen(k.id, { name: fval(kc, "name"), public_name: fval(kc, "public_name"), tagline: fval(kc, "tagline") || null, address: fval(kc, "address") || null,
+      const psz = fval(kc, "pool_size"), ceil = Number(S.settings.pool_ceiling || 15);
+      if (psz && !(Number.isInteger(+psz) && +psz >= 5 && +psz <= ceil)) return toast("Meals per pool must be from 5 to " + ceil + ", or empty for the default.");
+      const poolPatch = psz === undefined ? {} : { pool_size: psz && +psz !== Number(S.settings.max_meals) ? +psz : null, no_daily_limit: !!fval(kc, "no_daily_limit") };
+      return run(() => api.updateKitchen(k.id, { ...poolPatch, name: fval(kc, "name"), public_name: fval(kc, "public_name"), tagline: fval(kc, "tagline") || null, address: fval(kc, "address") || null,
         whatsapp: w || null, delivery_mode: fval(kc, "delivery_mode"), capacity: Number(fval(kc, "capacity")) || k.capacity, active: fval(kc, "active"), free_m: Number(fval(kc, "free_m")) > 0 ? Math.min(Math.round(Number(fval(kc, "free_m"))), Number(S.settings.free_max_m || 1500)) : null,
         ...(kc.querySelector("[data-autopick]") ? { auto_days: pickedDays(kc.querySelector("[data-autopick]")) } : {}) }).then(async () => Object.assign(S, await api.load())), "Saved");
     }
@@ -5374,11 +5425,13 @@ async function adminSubmit(e) {
       if (vals.some(([, x]) => !isFinite(x) || x < 0) || !Number(v("trip_max")) || !Number(v("per_km"))) return fail("Enter numbers in every box.");
       const qm = Number(v("quote_pay_min")); if (qm < 10 || qm > 20) return fail("Give customers 10 to 20 minutes to pay for a custom order.");
       if (Number(v("auto_receive_min")) < 30) return fail("Allow at least 30 minutes before \"Got my food\" confirms itself.");
-      const near = Number(v("near_max_fee")), fkm = Number(v("free_max_km")), by = v("next_day_confirm_by"), cd = v("countdown_start");
+      const near = Number(v("near_max_fee")), fkm = Number(v("free_max_km")), by = v("next_day_confirm_by"), pm = Number(v("max_meals")), pc2 = Number(v("pool_ceiling"));
       if (!(near > 0) || !(fkm >= 0) || fkm > 10) return fail("Enter a delivery limit above 0 and a free-delivery distance up to 10 km.");
-      if (!/^\d{2}:\d{2}$/.test(by) || !/^\d{2}:\d{2}$/.test(cd)) return fail("Enter both times.");
+      if (!/^\d{2}:\d{2}$/.test(by)) return fail("Enter the confirm-by time.");
+      if (!(Number.isInteger(pc2) && pc2 >= 5 && pc2 <= 50)) return fail("The most a vendor can choose must be a whole number from 5 to 50.");
+      if (!(Number.isInteger(pm) && pm >= 5 && pm <= pc2)) return fail("The default meals per pool must be from 5 to " + pc2 + ".");
       if (hm(by) >= hm(S.settings.cutoff)) return fail("The confirm-by time must be before orders close at " + fmtTime(S.settings.cutoff) + ".");
-      const patch = { ...Object.fromEntries(vals), near_max_fee: near, free_max_m: Math.round(fkm * 1000), next_day_confirm_by: by, countdown_start: cd };
+      const patch = { ...Object.fromEntries(vals), near_max_fee: near, free_max_m: Math.round(fkm * 1000), next_day_confirm_by: by, max_meals: pm, pool_ceiling: pc2 };
       if (f.querySelector("[name=admin_idle_min]")) { const im = Number(v("admin_idle_min")); if (!(im >= 5 && im <= 60)) return fail("Choose 5 to 60 minutes for the team screen timeout."); patch.admin_idle_min = im; }
       if (f.querySelector("[name=vendor_fee_pct]")) { const pc = Number(v("vendor_fee_pct")), fr = Number(v("vendor_fee_free"));
         if (!(pc >= 0 && pc <= 50) || !(Number.isInteger(fr) && fr >= 0 && fr <= 100)) return fail("Enter a fee between 0 and 50% and a whole number of free meals.");
@@ -5536,10 +5589,10 @@ async function viewKitchen(token) {
             <div class="qbtns"><button class="btn">${o.status === "quoted" ? "Update price" : "Send price"}</button><button class="ghost" type="button" data-decline="${esc(o.id)}">Can't do this</button></div></form>`;
     // New fee terms to accept while already cooking: shown up top, not inside the settings fold
     const termsTop = termsNeed(k) && (k.open || k.paused) ? `<section class="card stack" style="border-color:var(--accent)">${termsBox(k, K.menu)}${(k.auto_days || []).length ? `<p class="small" style="font-weight:600">Your automatic cooking days are paused until you accept the new fee.</p>` : ""}<button class="btn wide" id="acceptTermsOnly">Accept the new terms</button></section>` : "";
-    const settingsHtml = `${autoCard(k, d)}${freeCard(k)}`;
+    const settingsHtml = `${autoCard(k, d)}${poolCard(k)}${freeCard(k)}`;
     $("#view").innerHTML = `
       <header class="topzone pagetop"><div class="pagehead"><div class="pagebrand">${LOGO(30)}<p class="brand" style="font-size:18px">ChopPool vendor</p></div>${themeBtn()}</div><h1>${esc(k.name)}</h1>
-        <p class="muted">${fmtDate(d)} · ready by ${minus(S.settings.delivery_time, 30)} · ${used} of ${k.capacity} meals · ${k.delivery_mode === "runner" ? "you deliver with your own runner" : "a ChopPool rider collects"}</p></header>
+        <p class="muted">${fmtDate(d)} · ready by ${minus(S.settings.delivery_time, 30)} · ${k.no_daily_limit ? used + " meal" + (used === 1 ? "" : "s") + " so far" : used + " of " + k.capacity + " meals"} · ${k.delivery_mode === "runner" ? "you deliver with your own runner" : "a ChopPool rider collects"}</p></header>
       ${dayTabs}
       ${termsTop}
       ${nextUp.go === "#cookCard" || (k.paused && !k.open) ? "" : `<section class="card nextup" aria-live="polite"><p>${esc(nextUp.t)}</p>${nextUp.b ? `<button class="btn wide" data-jump="${esc(nextUp.go)}">${esc(nextUp.b)}</button>` : ""}</section>`}
@@ -5598,6 +5651,9 @@ async function viewKitchen(token) {
     $("#unpause")?.addEventListener("click", async () => { try { await api.kitchenPause(token, d, false); if (!(k.auto_days || []).includes(isoDow(d))) await api.kitchenOpenDay(token, d); notifyServer({ kitchen_token: token, date: d }); toast("You're taking orders for " + dayLabel(d) + "."); draw(); } catch (e) { toast(cleanErr(e)); } });
     $("#acceptTerms")?.addEventListener("click", async () => { try { await api.kitchenAcceptTerms(token); await api.kitchenOpenDay(token, d); notifyServer({ kitchen_token: token, date: d }); toast("Terms accepted. Customers can now order from you for " + dayLabel(d) + "."); draw(); } catch (e) { toast(cleanErr(e)); } });
     $("#acceptTermsOnly")?.addEventListener("click", async () => { try { await api.kitchenAcceptTerms(token); toast("Terms accepted"); draw(); } catch (e) { toast(cleanErr(e)); } });
+    $("#capNoLimit")?.addEventListener("change", e => { $("#capDay").disabled = e.target.checked; });
+    $("#capSave")?.addEventListener("click", async () => { const nl = $("#capNoLimit").checked;
+      try { await api.vendorSetCapacity(token, Number($("#capPool").value), nl ? null : Number($("#capDay").value), nl); toast("Saved. Pools of " + $("#capPool").value + (nl ? ", no daily limit." : ", up to " + $("#capDay").value + " meals a day.")); S.kset = true; draw(); } catch (e) { toast(cleanErr(e)); } });
     $("#freeForm")?.addEventListener("change", async () => { try { await api.vendorSetFree(token, Number($("#freeM").value), Number($("#freeMin").value)); toast(Number($("#freeM").value) > 0 ? "Free delivery saved" : "Free delivery is off"); draw(); } catch (e) { toast(cleanErr(e)); draw(); } });
     $("#openDay")?.addEventListener("click", async () => { try { await api.kitchenOpenDay(token, d); notifyServer({ kitchen_token: token, date: d }); toast("Thank you. Customers can now order from you for " + dayLabel(d) + "."); draw(); } catch (e) { toast(cleanErr(e)); } });
     document.querySelectorAll(".photogrid").forEach(g => g.setAttribute("data-medit", "vendor:" + token));
@@ -5674,6 +5730,18 @@ function termsBox(k, menu) {
 }
 const ordinal = n => n + (n % 100 >= 11 && n % 100 <= 13 ? "th" : ({ 1: "st", 2: "nd", 3: "rd" })[n % 10] || "th");
 // Free delivery by the vendor's own runner, up to a distance the vendor picks (the admin sets the furthest allowed)
+// Meals per pool (one delivery) and per day, or no daily limit
+function poolCard(k) {
+  if (k.pool_ceiling == null) return "";   // before database update 28
+  const def = Number(k.pool_default || 10), ceil = Number(k.pool_ceiling || 15), cur = Number(k.pool_size || def), opts = [];
+  for (let n = 5; n <= ceil; n++) opts.push(n);
+  return `<section class="card stack" style="gap:10px"><div style="display:grid;gap:2px"><strong>Meals per pool and per day</strong><span class="small muted">A pool is one delivery. When a pool fills, the next one opens with you straight away.</span></div>
+    <form id="capForm" class="stack" style="gap:10px" onsubmit="return false"><div class="grid2"><div><label for="capPool">Meals per pool</label><select id="capPool">${opts.map(n => `<option value="${n}"${n === cur ? " selected" : ""}>${n}${n === def ? " (ChopPool default)" : ""}</option>`).join("")}</select></div>
+      <div><label for="capDay">Meals per day</label><input id="capDay" inputmode="numeric" value="${esc(k.capacity || "")}"${k.no_daily_limit ? " disabled" : ""}></div></div>
+      <label class="switch"><span>No daily limit<small class="muted" style="display:block;font-weight:400">Take as many pools as come in.</small></span><input type="checkbox" id="capNoLimit"${k.no_daily_limit ? " checked" : ""}></label>
+      <p class="small muted">Smaller pools make each customer's share of delivery a little higher.</p>
+      <button class="ghost wide" id="capSave" type="button">Save</button></form></section>`;
+}
 function freeCard(k) {
   if (!k.has_pin) return "";
   const max = Number(k.free_max_m || 1500), opts = [0, 300, 500, 800, 1000, 1500, 2000, 3000].filter(m => m <= max), cur = Number(k.free_m || 0);
