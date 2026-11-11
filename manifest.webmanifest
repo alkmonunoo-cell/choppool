@@ -1,7 +1,7 @@
 {
   "name": "ChopPool",
   "short_name": "ChopPool",
-  "description": "Order together, pay less.",
+  "description": "Order together, pay less",
   "start_url": "./?app=1",
   "scope": "./",
   "display": "standalone",
