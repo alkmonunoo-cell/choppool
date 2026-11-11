@@ -31,7 +31,7 @@ const check = p => p.evaluate(() => {
       ['rider sign-up', async () => p.evaluate(() => { location.hash = '#rider-signup'; })],
       ['terms', async () => p.evaluate(() => { location.hash = '#terms'; })],
     ];
-    for (const [name, fn] of screens) { try { await fn(); } catch (e) { ok(false, '22.' + name, name + ' could not open', e.message.slice(0, 120)); continue; } await p.waitForTimeout(900);
+    for (const [name, fn] of screens) { try { await fn(); } catch (e) { ok(false, '22.' + name, name + ' could not open', e.message.slice(0, 120)); continue; } await p.waitForTimeout(900); await p.evaluate(() => Promise.all(document.getAnimations().filter(a => a.effect && a.effect.getTiming().iterations !== Infinity).map(a => a.finished.catch(() => {}))));
       const r = await check(p); ok(!r.off.length && !r.tiny.length, '22.' + name, name, [r.off.join(' '), r.tiny.join(' ')].filter(Boolean).join(' | '));
       if (w === 360 && scheme === 'dark') await p.screenshot({ path: `/tmp/e2e/shots/${name.replace(/ /g, '_')}.png` }); }
     ok(p.errs.length === 0, '22.x', 'no page errors', p.errs.join(' | ')); await p.context().close();
