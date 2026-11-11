@@ -597,6 +597,10 @@ button.dtile:not([disabled]):hover { outline: 2px solid var(--accent-soft); }
 .poolhead { display: grid; gap: 2px; }
 #aRefresh.spin svg { animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+.bspin { display: inline-block; width: 16px; height: 16px; margin-right: 9px; vertical-align: -3px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin .7s linear infinite; }
+.btn.isbusy, .btn.isbusy:disabled { cursor: progress; background: var(--accent); color: var(--on-accent); opacity: .88; box-shadow: none; }
+.ghost.isbusy, .ghost.isbusy:disabled { cursor: progress; opacity: .88; }
+@media (prefers-reduced-motion: reduce) { .bspin { animation-duration: 1.6s; } }
 /* Pull to refresh (Home and Orders) */
 .ptr { position: fixed; left: 50%; top: 0; z-index: 25; width: 40px; height: 40px; margin-left: -20px; border-radius: 50%;
   background: var(--surface); box-shadow: var(--shadow); display: grid; place-items: center; opacity: 0; transform: translateY(-48px) scale(.6); pointer-events: none; color: var(--accent); }
@@ -2206,15 +2210,23 @@ function openChangeName() {
   });
 }
 // Forgot password: email a link; the link opens the app on "Choose a new password"
+// A button that's working: spinner + what's happening, and no second tap or Enter while it runs. Returns "put it back".
+function busyBtn(btn, label) {
+  if (!btn) return () => {};
+  const html = btn.innerHTML; btn.disabled = true; btn.setAttribute("aria-busy", "true"); btn.classList.add("isbusy");
+  btn.innerHTML = `<span class="bspin" aria-hidden="true"></span>${esc(label)}`;
+  return () => { btn.disabled = false; btn.removeAttribute("aria-busy"); btn.classList.remove("isbusy"); btn.innerHTML = html; };
+}
 function openForgot(prefill, to) {
   openSheet(`${sheetHead("Reset your password", "We'll email you a link to choose a new password.")}
     <form id="fgForm" class="stack" novalidate><div><label for="fgEmail">Email</label><input id="fgEmail" type="email" autocomplete="email" value="${esc(prefill || "")}" placeholder="Email address"></div>
     <p class="err" id="fgErr"></p><button class="btn wide">Send reset link</button></form>`);
   $("#fgForm").addEventListener("submit", async ev => {
-    ev.preventDefault(); const em = $("#fgEmail").value.trim().toLowerCase();
+    ev.preventDefault(); const em = $("#fgEmail").value.trim().toLowerCase(), fb = $("#fgForm .btn"); if (fb.disabled) return;
     if (!/^\S+@\S+\.\S+$/.test(em)) return ($("#fgErr").textContent = "Enter a valid email address.");
+    const done = busyBtn(fb, "Sending link…");
     try { await api.sendReset(em, to); openSheet(`${sheetHead("Check your email", "")}<p>If <strong>${esc(em)}</strong> has a ChopPool account, a reset link is on its way. Open it on this phone to choose a new password.</p><p class="small muted">Nothing after a few minutes? Check spam, or try again.</p><button class="btn wide" data-close>OK</button>`); }
-    catch (e) { $("#fgErr").textContent = cleanErr(e); }
+    catch (e) { done(); $("#fgErr").textContent = cleanErr(e); }
   });
 }
 // A reset link: wait for the app to finish loading, then ask for the new password (nothing can close it on the way)
@@ -2224,12 +2236,13 @@ function openNewPassword() {
     <form id="npForm" class="stack" novalidate><div><label for="npPw">New password</label><input id="npPw" type="password" autocomplete="new-password" placeholder="At least 6 characters"></div>
     <p class="err" id="npErr"></p><button class="btn wide">Save password</button></form>`);
   $("#npForm").addEventListener("submit", async ev => {
-    ev.preventDefault(); const pw = $("#npPw").value;
+    ev.preventDefault(); const pw = $("#npPw").value, nb = $("#npForm .btn"); if (nb.disabled) return;
     if (pw.length < 6) return ($("#npErr").textContent = "Use at least 6 characters.");
+    const done = busyBtn(nb, "Saving…");
     try { await api.setNewPassword(pw); S.recovery = false; closeSheet(); toast("Password saved. You're signed in.");
       if (S.resetTo === "admin") { if (location.hash !== "#admin") location.hash = "#admin"; else route(); }
       else { if (location.hash !== "#order") history.replaceState(null, "", location.pathname + "#order"); S.tab = "wallet"; route(); } }
-    catch (e) { $("#npErr").textContent = cleanErr(e); }
+    catch (e) { done(); $("#npErr").textContent = cleanErr(e); }
   });
 }
 function openAccount(reason, startMode) {
@@ -2251,19 +2264,21 @@ function openAccount(reason, startMode) {
   const wire = () => {
     $("#swap").addEventListener("click", () => { mode = mode === "signup" ? "signin" : "signup"; draw(); wire(); });
     $("#forgot")?.addEventListener("click", () => openForgot($("#aEmail").value.trim()));
-    $("#google")?.addEventListener("click", async () => { try { await api.signInGoogle(); } catch (e) { $("#aErr").textContent = cleanErr(e); } });
+    $("#google")?.addEventListener("click", async e => { if (e.currentTarget.disabled) return; const done = busyBtn(e.currentTarget, "Opening Google…"); try { await api.signInGoogle(); } catch (er) { done(); $("#aErr").textContent = cleanErr(er); } });
     $("#authForm").addEventListener("submit", async ev => {
       ev.preventDefault();
+      const sb = $("#authForm [type=submit]"); if (sb.disabled) return;
       const email = $("#aEmail").value.trim(), pw = $("#aPw").value;
       if (!/^\S+@\S+\.\S+$/.test(email)) return ($("#aErr").textContent = "Enter a valid email address.");
       if (pw.length < 6) return ($("#aErr").textContent = "Use at least 6 characters for the password.");
       const nm = mode === "signup" ? $("#aName").value.trim() : "";
       if (mode === "signup" && nm.length < 2) return ($("#aErr").textContent = "Add your name.");
+      $("#aErr").textContent = ""; const done = busyBtn(sb, mode === "signup" ? "Creating your account…" : "Signing in…");
       try {
         mode === "signup" ? await api.signUp(email, pw, nm) : await api.signIn(email, pw); local.set("cp_had_account", true);
         await afterSignIn();
         closeSheet(); toast("You're signed in. Cashback from your orders now goes to your wallet.");
-      } catch (e) { $("#aErr").textContent = cleanErr(e); }
+      } catch (e) { done(); $("#aErr").textContent = cleanErr(e); }
     });
   };
   draw(); wire();
@@ -4576,8 +4591,10 @@ async function viewAdmin() {
       $("#forgotT")?.addEventListener("click", () => openForgot($("#email").value.trim(), "admin"));
       ["#email", "#pw", "#aname"].forEach(sel => $(sel)?.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); $("#loginBtn").click(); } }));
       $("#loginBtn").addEventListener("click", async () => {
+        if ($("#loginBtn").disabled) return;
         const email = $("#email").value.trim().toLowerCase(), pw = $("#pw").value;
-        try { mode === "signin" ? await api.signIn(email, pw) : await api.signUp(email, pw, ($("#aname")?.value || "").trim()); local.set("cp_admin_since", Date.now()); viewAdmin(); } catch (e) { $("#loginErr").textContent = cleanErr(e); }
+        $("#loginErr").textContent = ""; const done = busyBtn($("#loginBtn"), mode === "signin" ? "Signing in…" : "Creating account…");
+        try { mode === "signin" ? await api.signIn(email, pw) : await api.signUp(email, pw, ($("#aname")?.value || "").trim()); local.set("cp_admin_since", Date.now()); viewAdmin(); } catch (e) { done(); $("#loginErr").textContent = cleanErr(e); }
       });
     };
     draw(); return;
@@ -4587,7 +4604,7 @@ async function viewAdmin() {
     $("#view").innerHTML = `<section class="card"><div class="pagehead"><div class="pagebrand">${LOGO(30)}<p class="brand" style="font-size:18px">ChopPool team</p></div>${themeBtn()}</div><h1>Set up your ChopPool</h1>
       <p class="muted">Nobody runs this ChopPool yet. Make <strong>${esc(S.user.email)}</strong> the owner. As owner you can add coordinators, kitchens, riders and buildings. This only works once.</p>
       <p class="err" id="ownErr"></p><button class="btn wide" id="claim">Make me the owner</button></section>`;
-    $("#claim").addEventListener("click", async () => { try { await api.claimOwner(); toast("You're the owner of this ChopPool."); viewAdmin(); } catch (e) { $("#ownErr").textContent = cleanErr(e); } });
+    $("#claim").addEventListener("click", async () => { if ($("#claim").disabled) return; const done = busyBtn($("#claim"), "Setting up…"); try { await api.claimOwner(); toast("You're the owner of this ChopPool."); viewAdmin(); } catch (e) { done(); $("#ownErr").textContent = cleanErr(e); } });
     return;
   }
   if (role === "none") {
@@ -5968,11 +5985,11 @@ function viewRiderSignup() {
       <p class="small muted">We use these details to check and pay you. See our <a href="#privacy" target="_blank" rel="noopener">privacy notice</a>.</p>
       <p class="err" id="rsErr"></p><button class="btn wide">Send application</button></form>`;
   $("#rsForm").addEventListener("submit", async e => {
-    e.preventDefault();
+    e.preventDefault(); const rb = $("#rsForm .btn"); if (rb.disabled) return; $("#rsErr").textContent = ""; const done = busyBtn(rb, "Sending application…");
     try { await api.riderApply({ name: $("#rsName").value.trim(), phone: $("#rsPhone").value.trim(), bike: $("#rsBike").value.trim(), area: $("#rsArea").value.trim(), momo: $("#rsMomo").value.trim(),
         card: $("#rsCard").value.trim(), licence: $("#rsLic").value.trim(), expiry: $("#rsExp").value || null });
       $("#view").innerHTML = `<section class="card center stack"><span class="success">${ICON.check}</span><h1>Application sent</h1><p class="muted">Thank you. The ChopPool team will call you on the number you gave. Once approved, you'll get your own rider link and app.</p></section>`;
-    } catch (err) { $("#rsErr").textContent = cleanErr(err); }
+    } catch (err) { done(); $("#rsErr").textContent = cleanErr(err); }
   });
 }
 
