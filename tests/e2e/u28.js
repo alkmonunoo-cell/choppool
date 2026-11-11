@@ -39,8 +39,17 @@ const go = async (p, h, w = 1500) => { await p.evaluate(h => { location.hash = h
   await p.click('[data-gopools]'); await p.waitForTimeout(700);
   ok(await p.evaluate(() => { const r = document.querySelector('#secPools').getBoundingClientRect(); return r.top < 300; }), '28.10', 'tapping it goes to the pools');
   // team settings: default and ceiling
-  await go(p, '#admin', 1800); await p.evaluate(() => document.querySelector('[data-atab="settings"]')?.click()); await p.waitForTimeout(600);
-  ok(await p.locator('[name=max_meals]').count() === 1 && await p.locator('[name=pool_ceiling]').count() === 1, '28.11', 'team sets default pool size and ceiling');
+  const tab = async (t, sb) => { await p.evaluate(t => document.querySelector(`[data-atab="${t}"]`)?.click(), t); await p.waitForTimeout(500); if (sb) { await p.evaluate(sb => document.querySelector(`[data-asub="${sb}"]`)?.click(), sb); await p.waitForTimeout(500); } };
+  await go(p, '#admin', 1800); await tab('menus', 'rules');
+  ok(await p.locator('[name=max_meals]').count() === 1 && await p.locator('[name=pool_ceiling]').count() === 1 && await p.locator('[name=vendor_fee_pct]').count() === 1, '28.11', 'pool size and ChopPool fee under Vendors & menus');
+  await tab('riders', 'rules'); ok(await p.locator('[name=base_fare]').count() === 1 && await p.locator('[name=max_meals]').count() === 0, '28.12', 'delivery pricing under Riders');
+  await p.fill('[name=base_fare]', '22'); await p.click('form[data-form="settings"] .savebar .btn'); await p.waitForTimeout(700);
+  ok(await p.evaluate(() => Number(S.settings.base_fare) === 22 && Number(S.settings.max_meals) === 10), '28.13', 'saving pricing changes only pricing');
+  await tab('today', 'rules'); ok(await p.locator('[name=auto_receive_min]').count() === 1, '28.14', 'Got my food timing under Today');
+  await tab('settings'); const st = await txt(p, '#aBody');
+  ok(/Team screens/.test(st) && !/Base fare/.test(st) && await p.locator('[data-goset]').count() >= 3, '28.15', 'Settings keeps only general settings, with links', st.slice(0, 160));
+  await p.locator('[data-goset="riders,rules"]').click(); await p.waitForTimeout(600);
+  ok(await p.locator('[name=base_fare]').count() === 1, '28.16', 'link opens Riders › Settings');
   ok(p.errs.length === 0, '28.x', 'no page errors', p.errs.join(' | '));
   await b.close();
   fs.writeFileSync('/tmp/e2e/res-u28.json', JSON.stringify(results, null, 1));

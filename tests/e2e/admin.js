@@ -53,7 +53,7 @@ const overflow = p => p.evaluate(() => { const W = document.documentElement.clie
   const pend = p.locator('[data-act="rider-approve"]'); ok(await pend.count() > 0, '19.07', 'rider application waiting for approval', v.slice(0, 200));
   if (await pend.count()) { await p.locator('[data-rider]', { has: pend }).first().locator('summary').click().catch(() => {}); await pend.first().click(); await p.waitForTimeout(900); ok(/Rider approved/.test(await txt(p, '#sheet')), '19.08', 'approve gives the rider link'); await p.evaluate(() => closeSheet()); }
   // settings validation
-  await tab(p, 'settings'); const sfm = p.locator('form[data-form="settings"]');
+  await tab(p, 'menus', 'rules'); const sfm = p.locator('form[data-form="settings"]');
   if (await sfm.count()) { await sfm.locator('[name=quote_pay_min]').fill('5'); await sfm.locator('button.btn').last().click(); await p.waitForTimeout(400); ok(/10 to 20 minutes/.test(await sfm.innerText()), '19.09', 'settings refuse silly values');
     await sfm.locator('[name=quote_pay_min]').fill('15'); await sfm.locator('button.btn').last().click(); await p.waitForTimeout(700); }
   // team
@@ -74,7 +74,7 @@ const overflow = p => p.evaluate(() => { const W = document.documentElement.clie
   await tab(p, 'today', 'wallets'); ok(await p.locator('form[data-form="credit"]').count() === 0, '20.01', 'coordinator can\'t adjust wallets (owner had it: ' + own.wallet + ')');
   await tab(p, 'today', 'owed'); await p.waitForTimeout(800); ok(await p.locator('form[data-form="payout"]').count() === 0, '20.02', 'coordinator can\'t record payouts');
   const tt = await p.$$eval('[data-atab]', x => x.map(b => b.dataset.atab)); note('Coordinator tabs: ' + tt.join(', '));
-  await tab(p, 'settings'); const vf = await p.locator('[name=vendor_fee_pct]').count(); ok(vf === 0, '20.03', 'coordinator can\'t change vendor fee');
+  await tab(p, 'menus', 'rules'); const vf = await p.locator('[name=vendor_fee_pct]').count(); ok(vf === 0, '20.03', 'coordinator can\'t change vendor fee');
   await tab(p, 'today', 'orders'); ok(await p.locator('select[data-order]').count() > 0 || await p.locator('[data-act="pay-issue"]').count() > 0, '20.04', 'coordinator can still check payments');
   ok(p.errs.length === 0, '20.x', 'no page errors', p.errs.join(' | ')); await p.context().close();
 

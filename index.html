@@ -114,6 +114,9 @@ p { margin: 0; }
 .hero h1 { color: inherit; position: relative; z-index: 1; }
 .hero p { opacity: .92; position: relative; z-index: 1; }
 .cdu { font-size: max(12px, .62em); font-weight: 700; margin-left: 1px; opacity: .8; letter-spacing: 0; }
+.setlinks { display: grid; gap: 8px; }
+.setlink { display: flex; justify-content: space-between; align-items: center; gap: 12px; text-align: left; width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); font: inherit; cursor: pointer; }
+.setlink small { display: block; font-size: 12.5px; margin-top: 2px; }
 .hero-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; position: relative; z-index: 1; }
 .hero-stat { background: rgba(255,255,255,.16); border: 1px solid rgba(255,255,255,.22); border-radius: 16px; padding: 10px 12px; display: grid; align-content: start; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
 .hero-stat.hurry { box-shadow: 0 0 0 2px #fff; animation: hurry 1.6s ease-in-out infinite; }
@@ -4481,10 +4484,10 @@ function openAddVendor() {
 const ADMIN_TABS = [["dash", "Dashboard"], ["today", "Today"], ["menus", "Vendors & menus"], ["buildings", "Buildings"], ["riders", "Riders"], ["reports", "Reports"], ["settings", "Settings"], ["team", "Team"]];
 // Sub-sections per tab; a third value marks owner-only sections
 const ADMIN_SUBS = {
-  today: [["pools", "Pools"], ["orders", "Orders & payments"], ["wallets", "Refunds & problems"], ["owed", "Money owed"]],
-  menus: [["list", "Vendors"], ["reviews", "Ratings & photos"], ["requests", "Listing requests"]],
+  today: [["pools", "Pools"], ["orders", "Orders & payments"], ["wallets", "Refunds & problems"], ["owed", "Money owed"], ["rules", "Settings"]],
+  menus: [["list", "Vendors"], ["reviews", "Ratings & photos"], ["requests", "Listing requests"], ["rules", "Settings"]],
   buildings: [["list", "Active"], ["requests", "New & duplicates"]],
-  riders: [["list", "Riders"], ["apply", "Applications"]],
+  riders: [["list", "Riders"], ["apply", "Applications"], ["rules", "Settings"]],
   team: [["members", "Team members"], ["payments", "Payment options", true], ["accounts", "Customer accounts", true], ["activity", "Activity log", true]]
 };
 const NETWORKS = ["MTN", "Telecel", "AirtelTigo"];
@@ -4577,7 +4580,7 @@ async function viewAdmin() {
   $("#aDate").addEventListener("change", e => { S.adminDate = e.target.value; renderAdmin(); });
   $("#aRefresh").addEventListener("click", () => adminRefresh(true));
   $("#aSignOut").addEventListener("click", async () => { await api.signOut(); S.user = null; S.role = null; S.admin = null; try { await refreshUser(); } catch (e) {} toast("Signed out"); viewAdmin(); });
-  $("#aBody").addEventListener("click", adminClick);
+  $("#aBody").addEventListener("click", e => { const g = e.target.closest("[data-goset]"); if (g) { const [t, sb] = g.dataset.goset.split(","); S.adminTab = t; S.adminSub[t] = sb; return renderAdmin(); } adminClick(e); });
   $("#aSub").addEventListener("click", e => { const b = e.target.closest("[data-asub]"); if (!b) return; S.adminSub[S.adminTab] = b.dataset.asub; renderAdmin(true); });
   // Search and sort redraw from what's loaded; open items stay open
   $("#aBody").addEventListener("input", e => { const q = e.target.closest("[data-lq]"); if (!q) return; (S.lq = S.lq || {})[q.dataset.lq] = q.value; const pos = q.selectionStart; renderAdmin(true); const n = document.querySelector(`[data-lq="${q.dataset.lq}"]`); if (n) { n.focus(); try { n.setSelectionRange(pos, pos); } catch (x) {} } });
@@ -5121,38 +5124,45 @@ async function renderAdmin(cached, quiet) {   // quiet = background/refresh-butt
   }
 
   /* ---------- Settings: every rule on one page, one Save ---------- */
-  if (tab === "settings") { const ex = (km) => Math.round(Number(s.base_fare ?? 0) + Number(s.per_km ?? 0) * km);
-      body.innerHTML = `
-      <form class="stack setform" data-form="settings"><section class="card stack"><h2>Delivery pricing</h2>
+  /* ---------- Settings live with what they control; Settings keeps only the general ones ---------- */
+  const ex = (km) => Math.round(Number(s.base_fare ?? 0) + Number(s.per_km ?? 0) * km);
+  const setForm = inner => `<form class="stack setform" data-form="settings">${inner}<div class="savebar"><p class="err" data-err></p><button class="btn wide">Save</button></div></form>`;
+  if (sub === "rules" && tab === "riders") body.innerHTML = setForm(`<section class="card stack"><h2>Delivery pricing</h2>
         <p class="small muted">Each trip is priced by distance, like Bolt and Yango: base fare + rate per km of road from the kitchen to the building. The trip is then shared across the meals in the pool. Check a few real Bolt or Yango quotes and match them.</p>
         <div class="grid2"><div><label for="pfBase">Base fare (GHS)</label><input id="pfBase" name="base_fare" inputmode="decimal" value="${esc(s.base_fare ?? "")}"></div>
           <div><label for="pfKm">Rate per km (GHS)</label><input id="pfKm" name="per_km" inputmode="decimal" value="${esc(s.per_km ?? "")}"></div>
           <div><label for="pfMax">Highest trip price (GHS)</label><input id="pfMax" name="trip_max" inputmode="decimal" value="${esc(s.trip_max ?? 80)}"></div>
           <div><label for="pfFlat">Flat trip cost if a pin is missing (GHS)</label><input id="pfFlat" name="trip_cost" inputmode="decimal" value="${esc(s.trip_cost)}"></div>
-          <div><label for="pfPay">Minutes to pay a priced custom order</label><input id="pfPay" name="quote_pay_min" inputmode="numeric" value="${esc(s.quote_pay_min ?? 15)}"></div>
-          <div><label for="pfRecv">"Got my food" confirms itself after (minutes)</label><input id="pfRecv" name="auto_receive_min" inputmode="numeric" value="${esc(s.auto_receive_min ?? 120)}"></div></div>
+</div>
         <p class="small muted">Customers pay the full trip at checkout. Once lunch is received, each person's share is worked out and the rest comes back as cashback. No trip is charged above the highest trip price. Changes only affect new orders.</p>
         ${s.base_fare != null ? `<p class="small" style="color:var(--hint)">Examples: 2 km trip ${money(ex(2))} · 5 km ${money(ex(5))} · 10 km ${money(ex(10))}</p>` : ""}
-      </section>
-      <section class="card stack"><h2>Vendors near you and free delivery</h2>
-        <div class="grid2"><div><label for="rlNear">"Vendors near you": delivery up to (GHS)</label><input id="rlNear" name="near_max_fee" inputmode="decimal" value="${esc(s.near_max_fee ?? 50)}"></div>
-          <div><label for="rlFree">Vendors may deliver free up to (km by road)</label><input id="rlFree" name="free_max_km" inputmode="decimal" value="${esc((Number(s.free_max_m ?? 1500) / 1000))}"></div></div>
-        <p class="small muted">Vendors with a higher delivery cost still show on the Vendors tab under "Further away". Each vendor picks their own free-delivery distance on their page, up to this limit.</p>
-      </section><section class="card stack"><h2>Timing</h2>
-        <div class="grid2"><div><label for="rlBy">Orders for a later day: vendor confirms by</label><input id="rlBy" name="next_day_confirm_by" type="time" value="${esc(String(s.next_day_confirm_by || "08:30").slice(0, 5))}"></div>
-</div>
-        <p class="small muted">Same-day pools still give vendors ${esc(s.accept_timeout_min)} minutes.</p>
-      </section>${s.pool_ceiling != null ? `<section class="card stack"><h2>Pool size</h2>
+      </section>`);
+  if (sub === "rules" && tab === "menus") body.innerHTML = setForm(`${s.pool_ceiling != null ? `<section class="card stack"><h2>Pool size</h2>
         <div class="grid2"><div><label for="rlPool">Default meals per pool</label><input id="rlPool" name="max_meals" inputmode="numeric" value="${esc(s.max_meals ?? 10)}"></div>
           <div><label for="rlCeil">Most a vendor can choose</label><input id="rlCeil" name="pool_ceiling" inputmode="numeric" value="${esc(s.pool_ceiling ?? 15)}"></div></div>
         <p class="small muted">One pool is one rider's load. Vendors start with the default and can choose between 5 and the most you allow. When a pool fills, the next one opens with the same vendor.</p>
-      </section>` : ""}
-        ${isSuper ? `<section class="card stack"><h2>ChopPool fee on bigger pools <span class="small muted">(owner only)</span></h2>
+      </section>` : ""}<section class="card stack"><h2>Vendors near you and free delivery</h2>
+        <div class="grid2"><div><label for="rlNear">"Vendors near you": delivery up to (GHS)</label><input id="rlNear" name="near_max_fee" inputmode="decimal" value="${esc(s.near_max_fee ?? 50)}"></div>
+          <div><label for="rlFree">Vendors may deliver free up to (km by road)</label><input id="rlFree" name="free_max_km" inputmode="decimal" value="${esc((Number(s.free_max_m ?? 1500) / 1000))}"></div></div>
+        <p class="small muted">Vendors with a higher delivery cost still show on the Vendors tab under "Further away". Each vendor picks their own free-delivery distance on their page, up to this limit.</p>
+      </section><section class="card stack"><h2>Vendor confirmations and custom orders</h2>
+        <div class="grid2"><div><label for="rlBy">Orders for a later day: vendor confirms by</label><input id="rlBy" name="next_day_confirm_by" type="time" value="${esc(String(s.next_day_confirm_by || "08:30").slice(0, 5))}"></div>
+          <div><label for="pfPay">Minutes to pay a priced custom order</label><input id="pfPay" name="quote_pay_min" inputmode="numeric" value="${esc(s.quote_pay_min ?? 15)}"></div></div>
+        <p class="small muted">Same-day pools still give vendors ${esc(s.accept_timeout_min)} minutes to confirm.</p></section>
+      ${isSuper ? `<section class="card stack"><h2>ChopPool fee on bigger pools <span class="small muted">(owner only)</span></h2>
         <div class="grid2"><div><label for="rlRate">Fee on each meal after the free ones (%)</label><input id="rlRate" name="vendor_fee_pct" inputmode="decimal" value="${esc(Math.round(Number(s.vendor_fee_rate || 0) * 1000) / 10)}"></div>
           <div><label for="rlFreeN">Free meals in every pool</label><input id="rlFreeN" name="vendor_fee_free" inputmode="numeric" value="${esc(s.vendor_fee_free ?? 5)}"></div></div>
-        <p class="small muted">0% switches it off. Vendors see new terms before they confirm their next pool; pools they've already confirmed keep the old terms.</p>
-        <h3>Team screen timeout</h3><div><label for="rlIdle">Sign out after this many quiet minutes (5-60)</label><input id="rlIdle" name="admin_idle_min" inputmode="numeric" value="${esc(s.admin_idle_min ?? 15)}"></div></section>` : ""}
-        <div class="savebar"><p class="err" data-err></p><button class="btn wide">Save settings</button></div></form>`; }
+        <p class="small muted">0% switches it off. Vendors see new terms before they confirm their next pool; pools they've already confirmed keep the old terms.</p></section>` : ""}`);
+  if (sub === "rules" && tab === "today") body.innerHTML = setForm(`<section class="card stack"><h2>Collecting lunch</h2>
+        <div><label for="pfRecv">"Got my food" confirms itself after (minutes)</label><input id="pfRecv" name="auto_receive_min" inputmode="numeric" value="${esc(s.auto_receive_min ?? 120)}"></div>
+        <p class="small muted">If a customer forgets to tap Got my food, the order is marked received after this time. At least 30 minutes.</p></section>`);
+  if (tab === "settings") {
+    const go = (t, sb, l, d) => `<button type="button" class="setlink" data-goset="${t},${sb}"><span><strong>${l}</strong><small class="muted">${d}</small></span><span aria-hidden="true" class="muted" style="font-size:20px">›</span></button>`;
+    body.innerHTML = `${isSuper ? setForm(`<section class="card stack"><h2>Team screens</h2><div><label for="rlIdle">Sign out after this many quiet minutes (5-60)</label><input id="rlIdle" name="admin_idle_min" inputmode="numeric" value="${esc(s.admin_idle_min ?? 15)}"></div>
+        <p class="small muted">Everyone on the team is also signed out after 12 hours.</p></section>`) : ""}
+      <section class="card stack"><h2>Other settings</h2><p class="small muted">Each setting now sits with what it controls.</p>
+        <div class="setlinks">${go("riders", "rules", "Delivery pricing", "Riders › Settings")}${go("menus", "rules", "Pool size, vendors near you, ChopPool fee", "Vendors & menus › Settings")}${go("today", "rules", "Got my food timing", "Today › Settings")}${isSuper ? go("team", "payments", "Mobile money accounts", "Team › Payment options") : ""}</div></section>`;
+  }
   /* ---------- Riders ---------- */
   if (tab === "riders") {
 
@@ -5421,22 +5431,29 @@ async function adminSubmit(e) {
       Object.assign(S, await api.load()); toast("Payment option added");
     }
     if (f.dataset.form === "settings") {
-      const vals = ["base_fare", "per_km", "trip_max", "trip_cost", "quote_pay_min", "auto_receive_min"].map(n => [n, Number(v(n))]);
-      if (vals.some(([, x]) => !isFinite(x) || x < 0) || !Number(v("trip_max")) || !Number(v("per_km"))) return fail("Enter numbers in every box.");
-      const qm = Number(v("quote_pay_min")); if (qm < 10 || qm > 20) return fail("Give customers 10 to 20 minutes to pay for a custom order.");
-      if (Number(v("auto_receive_min")) < 30) return fail("Allow at least 30 minutes before \"Got my food\" confirms itself.");
-      const near = Number(v("near_max_fee")), fkm = Number(v("free_max_km")), by = v("next_day_confirm_by"), hasPool = !!f.querySelector("[name=pool_ceiling]"), pm = Number(v("max_meals")), pc2 = Number(v("pool_ceiling"));
-      if (!(near > 0) || !(fkm >= 0) || fkm > 10) return fail("Enter a delivery limit above 0 and a free-delivery distance up to 10 km.");
-      if (!/^\d{2}:\d{2}$/.test(by)) return fail("Enter the confirm-by time.");
-      if (hasPool && !(Number.isInteger(pc2) && pc2 >= 5 && pc2 <= 50)) return fail("The most a vendor can choose must be a whole number from 5 to 50.");
-      if (hasPool && !(Number.isInteger(pm) && pm >= 5 && pm <= pc2)) return fail("The default meals per pool must be from 5 to " + pc2 + ".");
-      if (hm(by) >= hm(S.settings.cutoff)) return fail("The confirm-by time must be before orders close at " + fmtTime(S.settings.cutoff) + ".");
-      const patch = { ...Object.fromEntries(vals), near_max_fee: near, free_max_m: Math.round(fkm * 1000), next_day_confirm_by: by, ...(hasPool ? { max_meals: pm, pool_ceiling: pc2 } : {}) };
-      if (f.querySelector("[name=admin_idle_min]")) { const im = Number(v("admin_idle_min")); if (!(im >= 5 && im <= 60)) return fail("Choose 5 to 60 minutes for the team screen timeout."); patch.admin_idle_min = im; }
-      if (f.querySelector("[name=vendor_fee_pct]")) { const pc = Number(v("vendor_fee_pct")), fr = Number(v("vendor_fee_free"));
+      const has = n => !!f.querySelector(`[name=${n}]`), num = n => Number(v(n)), patch = {};
+      if (has("base_fare")) {
+        const vals = ["base_fare", "per_km", "trip_max", "trip_cost"].map(n => [n, num(n)]);
+        if (vals.some(([, x]) => !isFinite(x) || x < 0) || !num("trip_max") || !num("per_km")) return fail("Enter numbers in every box.");
+        Object.assign(patch, Object.fromEntries(vals)); }
+      if (has("quote_pay_min")) { const qm = num("quote_pay_min"); if (!(qm >= 10 && qm <= 20)) return fail("Give customers 10 to 20 minutes to pay for a custom order."); patch.quote_pay_min = qm; }
+      if (has("auto_receive_min")) { const ar = num("auto_receive_min"); if (!(ar >= 30)) return fail("Allow at least 30 minutes before \"Got my food\" confirms itself."); patch.auto_receive_min = ar; }
+      if (has("near_max_fee")) { const near = num("near_max_fee"), fkm = num("free_max_km");
+        if (!(near > 0) || !(fkm >= 0) || fkm > 10) return fail("Enter a delivery limit above 0 and a free-delivery distance up to 10 km.");
+        patch.near_max_fee = near; patch.free_max_m = Math.round(fkm * 1000); }
+      if (has("next_day_confirm_by")) { const by = v("next_day_confirm_by");
+        if (!/^\d{2}:\d{2}$/.test(by)) return fail("Enter the confirm-by time.");
+        if (hm(by) >= hm(S.settings.cutoff)) return fail("The confirm-by time must be before orders close at " + fmtTime(S.settings.cutoff) + ".");
+        patch.next_day_confirm_by = by; }
+      if (has("pool_ceiling")) { const pm = num("max_meals"), pc2 = num("pool_ceiling");
+        if (!(Number.isInteger(pc2) && pc2 >= 5 && pc2 <= 50)) return fail("The most a vendor can choose must be a whole number from 5 to 50.");
+        if (!(Number.isInteger(pm) && pm >= 5 && pm <= pc2)) return fail("The default meals per pool must be from 5 to " + pc2 + ".");
+        patch.max_meals = pm; patch.pool_ceiling = pc2; }
+      if (has("admin_idle_min")) { const im = num("admin_idle_min"); if (!(im >= 5 && im <= 60)) return fail("Choose 5 to 60 minutes for the team screen timeout."); patch.admin_idle_min = im; }
+      if (has("vendor_fee_pct")) { const pc = num("vendor_fee_pct"), fr = num("vendor_fee_free");
         if (!(pc >= 0 && pc <= 50) || !(Number.isInteger(fr) && fr >= 0 && fr <= 100)) return fail("Enter a fee between 0 and 50% and a whole number of free meals.");
         patch.vendor_fee_rate = Math.round(pc * 10) / 1000; patch.vendor_fee_free = fr; }
-      await api.updateSettings(patch); Object.assign(S, await api.load()); toast("Settings saved");
+      await api.updateSettings(patch); Object.assign(S, await api.load()); toast("Saved");
     }
     if (f.dataset.form === "refund") {
       const ref = v("ref"); if (ref.length < 4) return fail("Enter the mobile money reference of the refund you sent.");
