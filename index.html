@@ -520,6 +520,11 @@ td select { padding: 6px 8px; width: auto; }
 .settingsfold:not([open]) { display: block; }
 .settingsfold[open] { display: grid; gap: 18px; }
 .settingsfold .card { box-shadow: none; padding: 0; background: none; border: 0; }
+.tog.xon { display: inline-flex; align-items: center; gap: 10px; padding: 4px 4px 4px 14px; }
+.xstep { display: inline-flex; align-items: center; gap: 2px; background: rgba(0,0,0,.18); border-radius: 999px; padding: 2px; }
+.xstep button { width: 28px; height: 28px; border-radius: 50%; border: none; background: transparent; color: inherit; font-size: 18px; font-weight: 700; line-height: 1; padding: 0; cursor: pointer; }
+.xstep button:disabled { opacity: .4; }
+.xstep b { min-width: 16px; text-align: center; font-size: 14px; }
 .tog .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); margin-left: 4px; vertical-align: middle; }
 .admintabs button { white-space: nowrap; background: var(--surface); box-shadow: var(--shadow); border: none; color: var(--ink); border-radius: 999px; padding: 8px 14px; font-size: 14px; }
 .admintabs button[aria-current="page"] { background: var(--ink); color: var(--bg); }
@@ -1186,7 +1191,7 @@ const fmtTime = t => { const m = /^(\d{1,2}):(\d{2})/.exec(String(t || "")); if 
 const minus = (t, mins) => { const m = (hm(t) - mins + 1440) % 1440; return String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0"); };
 const clock = iso => new Date(iso).toISOString().slice(11, 16);
 const minsAgo = iso => Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 6e4));
-const addonText = list => (list || []).map(a => a.name).join(", ");
+const addonText = list => (list || []).map(a => (Number(a.qty) > 1 ? a.qty + " × " : "") + a.name).join(", ");   // "2 × Fried eggs, Shito"
 // Full order total: service fee is per meal on new orders (older orders kept a per-order fee)
 const orderTotal = o => (Number(o.quote_price ?? o.unit_price) + Number(o.addons_total || 0)) * o.qty + Number(o.max_fee) * o.qty + Number(o.service_fee) * (o.fee_per_meal ? o.qty : 1);
 // Codes: one letter + 2 digits (K-27); typed in any case, with or without the dash. Old 4-digit codes still work.
@@ -1322,7 +1327,7 @@ function makeDemoApi() {
     const d = orderDate(settings), special = (r.special || "").trim() || null;
     if ((k.paused_dates || []).includes(d) && !days.some(x => x.kitchen_id === k.id && x.order_date === d)) throw new Error(k.public_name + " isn't cooking " + (d === today() ? "today" : "on that day") + ". Choose another vendor.");
     if (special && d === today() && new Date() >= at(d, settings.special_cutoff)) throw new Error("Custom orders close at " + settings.special_cutoff + ". You can still order from the menu.");
-    const add = addonPicked(m.addons, r.addons || []), addT = add.reduce((t, a) => t + a.price, 0);
+    const add = addonPicked(m.addons, r.addons || []), addT = add.reduce((t, a) => t + Number(a.price) * a.qty, 0);
     const load = orders.filter(o => o.kitchen_id === k.id && o.order_date === d && o.status !== "cancelled").reduce((t, o) => t + o.qty, 0);
     if (!k.no_daily_limit && load + r.qty > k.capacity) throw new Error("This menu is fully booked for today. Try another one.");
     const nextSeq = () => Math.max(0, ...pools.filter(p => p.order_date === d && p.site_id === si.id && p.kitchen_id === k.id && p.status !== "cancelled").map(p => p.seq)) + 1;
@@ -1352,7 +1357,7 @@ function makeDemoApi() {
     const pl = pools.find(p => p.id === par.pool_id);
     if (!["waiting", "collecting"].includes(pl.status)) throw new Error("This pool has closed. Start a new order instead.");
     if (meals(pl.id) + r.qty > kSize(kitchens.find(x => x.id === par.kitchen_id))) throw new Error("This pool is full. Start a new order for more plates.");
-    const add = addonPicked(m.addons, r.addons || []), addT = add.reduce((t, a) => t + a.price, 0);
+    const add = addonPicked(m.addons, r.addons || []), addT = add.reduce((t, a) => t + Number(a.price) * a.qty, 0);
     const o = { ...par, id: "o" + uid(), created_at: nowIso(), item_id: m.id, item_name: m.name, unit_price: m.price, qty: r.qty, addons: add, addons_total: addT, note: (r.note || "").trim() || null,
       special_request: null, quote_price: null, momo_ref: null, wallet_used: 0, max_fee: 0, service_fee: settings.service_fee, fee_per_meal: true, parent_id: par.id, status: "pending", cancel_reason: null, refund_needed: false, collected_at: null };
     orders.push(o);
@@ -3453,9 +3458,23 @@ const lineItem = l => S.items.find(i => i.id === l.item) || {};
 // Extras: a dish can list the same name more than once (Fish at 15, 20, 30). Those are picked as "Fish#20" so only that one is charged;
 // a bare name that appears more than once counts once (the first), matching the server
 const addonKey = (list, a) => (list || []).filter(x => x.name === a.name).length > 1 ? a.name + "#" + Number(a.price) : a.name;
-const addonPicked = (list, keys) => (list || []).filter((a, i) => keys.includes(addonKey(list, a)) || (keys.includes(a.name) && list.findIndex(x => x.name === a.name) === i));
+// A key sent twice means two of that extra (2 eggs on each plate), up to 5
+const addonPicked = (list, keys) => (list || []).map((a, i) => ({ ...a, qty: Math.min(5, keys.filter(k => k === addonKey(list, a) || (k === a.name && list.findIndex(x => x.name === a.name) === i)).length) })).filter(a => a.qty > 0);
+const addonSum = (list, keys) => addonPicked(list, keys).reduce((t, a) => t + Number(a.price) * a.qty, 0);
 const addonLabel = k => String(k).replace(/#(\d+(?:\.\d+)?)$/, (m, p) => " (" + money(Number(p)) + ")");
-const lineAdd = l => addonPicked(lineItem(l).addons, l.addons || []).reduce((t, a) => t + Number(a.price), 0);
+const addonsShort = keys => { const m = new Map(); (keys || []).forEach(k => m.set(k, (m.get(k) || 0) + 1)); return [...m].map(([k, c]) => (c > 1 ? c + " × " : "") + addonLabel(k)).join(", "); };
+const lineAdd = l => addonSum(lineItem(l).addons, l.addons || []);
+// Extras chips: tap to add one; then − count + (up to 5 of each per plate)
+const xKeys = ex => [...ex].flatMap(([k, c]) => Array(c).fill(k));
+const xChips = (list, ex) => (list || []).map(a => { const k = addonKey(list, a), c = ex.get(k) || 0, lab = esc(a.name) + (a.price ? " +" + money(a.price) : "");
+  return c ? `<span class="tog xon" aria-pressed="true"><span>${lab}</span><span class="xstep"><button type="button" data-xm="${esc(k)}" aria-label="One less ${esc(a.name)}">−</button><b class="num">${c}</b><button type="button" data-xp="${esc(k)}" aria-label="One more ${esc(a.name)}"${c >= 5 ? " disabled" : ""}>+</button></span></span>`
+    : `<button type="button" class="tog" data-addon="${esc(k)}" aria-pressed="false">${lab}</button>`; }).join("");
+function xClick(e, ex) {
+  const a = e.target.closest("[data-addon]"), m = e.target.closest("[data-xm]"), p = e.target.closest("[data-xp]");
+  if (a) ex.set(a.dataset.addon, 1); else if (p) ex.set(p.dataset.xp, Math.min(5, (ex.get(p.dataset.xp) || 0) + 1));
+  else if (m) { const c = (ex.get(m.dataset.xm) || 0) - 1; if (c > 0) ex.set(m.dataset.xm, c); else ex.delete(m.dataset.xm); } else return false;
+  return true;
+}
 const trayFood = t => t.lines.reduce((a, l) => a + (Number(lineItem(l).price || 0) + lineAdd(l)) * l.qty, 0);
 const sameLine = (a, b) => a.item === b.item && (a.note || "") === (b.note || "") && [...(a.addons || [])].sort().join("|") === [...(b.addons || [])].sort().join("|");
 // One dish: how many, extras, a note, then into the tray
@@ -3463,22 +3482,22 @@ function openDish(k, dishId) {
   const d = S.items.find(i => i.id === dishId); if (!d) return;
   if (S.noSite) return openSitePicker({ then: () => openDish(k, dishId) });
   const st = menuState(k); if (st.full) return toast(k.public_name + (st.off ? " isn't cooking " : " is fully booked ") + dayLabel(S.date) + ".");
-  let qty = 1; const extras = new Set(), i0 = menuIndex(k.id);
+  let qty = 1; const extras = new Map(), i0 = menuIndex(k.id);
   const specialOpen = !(S.date === today() && new Date() >= at(S.date, S.settings.special_cutoff));
   openSheet(`<div class="dishhead"><span class="tile" style="background:${tint(i0)}">${plate(d, k.id)}</span><div><h2>${esc(d.name)}</h2><p class="small muted">${esc(k.public_name)} · <span class="num">${money(d.price)}</span></p></div><button class="closex" data-close aria-label="Close">${ICON.close}</button></div>
     <div class="row"><p class="group-title">How many</p><div class="qty"><button type="button" id="dMinus" aria-label="One less">${GLYPH.minus}</button><output id="dQ">1</output><button type="button" id="dPlus" aria-label="One more">${GLYPH.plus}</button></div></div>
-    ${(d.addons || []).length ? `<div class="group"><p class="group-title">Extras <span class="muted" style="font-weight:500">(optional, added to each plate)</span></p><div class="chips" id="dExtras">${d.addons.map(a => `<button type="button" class="tog" data-addon="${esc(addonKey(d.addons, a))}" aria-pressed="false">${esc(a.name)}${a.price ? " +" + money(a.price) : ""}</button>`).join("")}</div></div>` : ""}
+    ${(d.addons || []).length ? `<div class="group"><p class="group-title">Extras <span class="muted" style="font-weight:500">(optional, added to each plate)</span></p><div class="chips" id="dExtras">${xChips(d.addons, extras)}</div></div>` : ""}
     <div class="group"><label for="dNote">Note for the kitchen <span class="muted" style="font-weight:500">(optional)</span></label><input id="dNote" maxlength="140" placeholder="Less oil, extra napkins"></div>
     ${specialOpen ? `<button type="button" class="linkbtn" id="dSpecial" style="justify-self:start">Want something not on the menu? Make a custom order</button>` : ""}
     <div class="sheet-foot"><button class="btn wide" id="dAdd">Add to order · <span class="num" id="dTot"></span></button></div>`);
-  const draw = () => { $("#dQ").textContent = qty; const a = addonPicked(d.addons, [...extras]).reduce((t, x) => t + Number(x.price), 0); $("#dTot").textContent = money((Number(d.price) + a) * qty); };
+  const draw = () => { $("#dQ").textContent = qty; const a = addonSum(d.addons, xKeys(extras)); $("#dTot").textContent = money((Number(d.price) + a) * qty); };
   draw();
   $("#dMinus").addEventListener("click", () => { qty = Math.max(1, qty - 1); draw(); });
   $("#dPlus").addEventListener("click", () => { qty = Math.min(5, poolSize(k), qty + 1); draw(); });
-  $("#dExtras")?.addEventListener("click", e => { const b = e.target.closest("[data-addon]"); if (!b) return; const n = b.dataset.addon; extras.has(n) ? extras.delete(n) : extras.add(n); b.setAttribute("aria-pressed", String(extras.has(n))); draw(); });
+  $("#dExtras")?.addEventListener("click", e => { if (!xClick(e, extras)) return; $("#dExtras").innerHTML = xChips(d.addons, extras); draw(); });
   $("#dSpecial")?.addEventListener("click", () => openOrder(k.id, { preset: { item_id: d.id, qty: 1 }, fromPage: true, special: true }));
   $("#dAdd").addEventListener("click", () => {
-    const t = trayFor(k.id), line = { item: d.id, qty, addons: [...extras], note: $("#dNote").value.trim() || null };
+    const t = trayFor(k.id), line = { item: d.id, qty, addons: xKeys(extras), note: $("#dNote").value.trim() || null };
     const meals = t.lines.reduce((a, l) => a + l.qty, 0) + qty, cap = Math.min(10, poolSize(k));
     if (meals > cap) return toast("Up to " + cap + " meals in one order.");
     const same = t.lines.find(l => sameLine(l, line)); if (same) same.qty = Math.min(5, same.qty + qty); else t.lines.push(line);
@@ -4431,7 +4450,10 @@ function openOrder(menuId, opt = {}) {
   const trayMode = !!opt.tray, tray = trayMode ? trayFor(k.id) : null;   // several dishes: a new order, or added to your code
   if (trayMode && !tray.lines.length) return toast("Your order is empty. Tap + on a dish to add it.");
   let payFrom = defaultPM();
-  let extras = new Set(preset ? (preset.addons || []).map(a => typeof a === "string" ? a : addonKey(item.addons, a)).filter(n => (item.addons || []).some(a => addonKey(item.addons, a) === n || a.name === n)) : []);
+  // Extras as key -> count; "Order again" brings back the same extras and counts
+  const presetX = () => { const m = new Map(); (preset && preset.addons || []).forEach(a => { const k = typeof a === "string" ? a : addonKey(item.addons, a), n = typeof a === "string" ? 1 : Math.max(1, Number(a.qty) || 1);
+    if ((item.addons || []).some(x => addonKey(item.addons, x) === k || x.name === k)) m.set(k, Math.min(5, (m.get(k) || 0) + n)); }); return m; };
+  let extras = presetX();
   const specialOpen = !join && !(S.date === today() && new Date() >= at(S.date, s.special_cutoff));
   const known = me.name && me.phone;
   const waitingHere = S.board.pools.some(p => p.site_id === site.id && p.kitchen_id === k.id && p.status === "waiting" && p.meals > 0);
@@ -4471,8 +4493,7 @@ function openOrder(menuId, opt = {}) {
       <div class="sheet-foot"><div class="tot"><b class="num" id="totTxt"></b><span id="totSub"></span></div><button class="btn" type="submit" id="submitBtn">Join the pool</button></div>
     </form>`);
   const drawExtras = () => {
-    $("#extrasGroup").innerHTML = (item.addons || []).length ? `<p class="group-title">Extras <span class="muted" style="font-weight:500">(optional, added to each plate)</span></p><div class="chips">${item.addons.map(a =>
-      `<button type="button" class="tog" data-addon="${esc(addonKey(item.addons, a))}" aria-pressed="${extras.has(addonKey(item.addons, a))}">${esc(a.name)}${a.price ? " +" + money(a.price) : ""}</button>`).join("")}</div>` : "";
+    $("#extrasGroup").innerHTML = (item.addons || []).length ? `<p class="group-title">Extras <span class="muted" style="font-weight:500">(optional, added to each plate)</span></p><div class="chips">${xChips(item.addons, extras)}</div>` : "";
   };
   // Pay from (your saved numbers) and pay to (ChopPool's number on the same network where we have one)
   const drawPay = due => {
@@ -4487,7 +4508,7 @@ function openOrder(menuId, opt = {}) {
       $("#pfNet")?.addEventListener("change", () => drawPay(due)); }
   };
   const drawTray = () => {
-    $("#tLines").innerHTML = tray.lines.map((l, n) => { const it = lineItem(l), ad = lineAdd(l); return `<div class="tline"><span class="tx"><b>${l.qty} × ${esc(it.name || "Dish")}</b><small>${[(l.addons || []).map(addonLabel).join(", "), l.note].filter(Boolean).map(esc).join(" · ")}${(l.addons || []).length || l.note ? " · " : ""}<span class="num">${money((Number(it.price || 0) + ad) * l.qty)}</span></small></span>
+    $("#tLines").innerHTML = tray.lines.map((l, n) => { const it = lineItem(l), ad = lineAdd(l); return `<div class="tline"><span class="tx"><b>${l.qty} × ${esc(it.name || "Dish")}</b><small>${[addonsShort(l.addons), l.note].filter(Boolean).map(esc).join(" · ")}${(l.addons || []).length || l.note ? " · " : ""}<span class="num">${money((Number(it.price || 0) + ad) * l.qty)}</span></small></span>
       <div class="qty"><button type="button" data-tl="${n}" data-d="-1" aria-label="${l.qty === 1 ? "Remove" : "One less"}">${l.qty === 1 ? GLYPH.x : GLYPH.minus}</button><output>${l.qty}</output><button type="button" data-tl="${n}" data-d="1" aria-label="One more">${GLYPH.plus}</button></div></div>`; }).join("");
   };
   const draw = () => {
@@ -4512,7 +4533,7 @@ function openOrder(menuId, opt = {}) {
       $("#totTxt").textContent = "Request"; $("#totSub").textContent = "You pay after it's priced"; $("#submitBtn").textContent = "Send request"; return;
     }
     $("#saveTxt").classList.remove("hidden");
-    const addT = addonPicked(item.addons, [...extras]).reduce((t, a) => t + Number(a.price), 0);
+    const addT = addonSum(item.addons, xKeys(extras));
     // Full delivery at checkout: the lower of the max per meal and the whole trip by distance. What the pool saves comes back as cashback after the cut-off.
     const tripN = tripNow(k, site), dFee = join ? 0 : upfrontPerMeal(tripN, qty, s), sFee = Number(s.service_fee);
     const total = (Number(item.price) + addT) * qty + dFee * qty + sFee * qty;
@@ -4534,8 +4555,8 @@ function openOrder(menuId, opt = {}) {
   $("#tLines")?.addEventListener("click", e => { const b = e.target.closest("[data-tl]"); if (!b) return; const l = tray.lines[+b.dataset.tl];
     l.qty += +b.dataset.d; if (l.qty < 1) tray.lines.splice(+b.dataset.tl, 1); else l.qty = Math.min(5, l.qty);
     traySave(tray); if (!tray.lines.length) { closeSheet(); return toast("Your order is empty."); } draw(); });
-  $("#orderForm").addEventListener("change", e => { if (e.target.name === "dish") { item = dishes.find(d => d.id === e.target.value); extras = new Set(); drawExtras(); } draw(); });
-  $("#extrasGroup").addEventListener("click", e => { const b = e.target.closest("[data-addon]"); if (!b) return; const n = b.dataset.addon; extras.has(n) ? extras.delete(n) : extras.add(n); b.setAttribute("aria-pressed", String(extras.has(n))); draw(); });
+  $("#orderForm").addEventListener("change", e => { if (e.target.name === "dish") { item = dishes.find(d => d.id === e.target.value); extras = new Map(); drawExtras(); } draw(); });
+  $("#extrasGroup").addEventListener("click", e => { if (!xClick(e, extras)) return; drawExtras(); draw(); });
   $("#minus").addEventListener("click", () => { qty = Math.max(1, qty - 1); draw(); });
   $("#plus").addEventListener("click", () => { qty = Math.min(5, poolSize(k), qty + 1); draw(); });
   $("#noteToggle").addEventListener("click", () => { $("#noteBox").classList.toggle("hidden"); $("#noteToggle").classList.add("hidden"); $("#fNote").focus(); });
@@ -4573,8 +4594,8 @@ function openOrder(menuId, opt = {}) {
       const r = trayMode
         ? await api.placeBasket({ site: site.id, lines: tray.lines, name, phone, ref, useWallet: !!$("#fWallet")?.checked, payerPhone: from && from.number, payerNetwork: from && from.network, join: join ? join.id : null })
         : (!special && !join && api.placeBasket)
-          ? await api.placeBasket({ site: site.id, lines: [{ item: item.id, qty, addons: [...extras], note: $("#fNote").value }], name, phone, ref, useWallet: !!$("#fWallet")?.checked, payerPhone: from && from.number, payerNetwork: from && from.network })
-          : await api.placeOrder({ site: site.id, item: item.id, qty, name, phone, ref, addons: [...extras], note: $("#fNote").value, special: sp || null, useWallet: !!$("#fWallet")?.checked, join: join ? join.id : null });
+          ? await api.placeBasket({ site: site.id, lines: [{ item: item.id, qty, addons: xKeys(extras), note: $("#fNote").value }], name, phone, ref, useWallet: !!$("#fWallet")?.checked, payerPhone: from && from.number, payerNetwork: from && from.network })
+          : await api.placeOrder({ site: site.id, item: item.id, qty, name, phone, ref, addons: xKeys(extras), note: $("#fNote").value, special: sp || null, useWallet: !!$("#fWallet")?.checked, join: join ? join.id : null });
       if (trayMode) { tray.lines = []; traySave(tray); }
       // Remember the number paid from (once the order went through, and only once per number)
       if (from && from.save) { const L = payMethods(); if (!L.some(m => m.number === from.number) && L.length < 3) { L.push({ id: from.id, number: from.number, network: from.network, nick: "", def: !L.length }); savePayMethods(L); } }
