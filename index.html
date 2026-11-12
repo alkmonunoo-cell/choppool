@@ -140,7 +140,7 @@ p { margin: 0; }
 .ttfull p { margin: 0 0 8px; }
 .ttok { align-items: flex-start; }
 .opaid { display: flex; align-items: baseline; gap: 8px; margin: 2px 0 0; } .opaid b { font-size: 15px; }
-.pkrow .pamt { font-weight: 700; font-size: 14px; white-space: nowrap; justify-self: end; }
+.pkrow .pamt { font-weight: 700; font-size: 14px; white-space: nowrap; justify-self: end; padding-top: 6px; border-top: 1px dashed var(--line); width: 100%; text-align: right; }
 .mtable td, .mtable th { white-space: nowrap; } .mtable td.neg { color: var(--danger); }
 tr.tsum td { border-top: 2px solid var(--line); background: var(--surface-2); }
 .fbpics { display: flex; gap: 10px; flex-wrap: wrap; } .fbpics:empty { display: none; }
@@ -470,9 +470,18 @@ th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--li
 th { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 700; }
 td select { padding: 6px 8px; width: auto; }
 .labels { display: grid; gap: 8px; }
-.pkrow { display: grid; grid-template-columns: auto auto 1fr auto; gap: 12px; align-items: center; width: 100%; text-align: left; background: var(--surface-2); border: 0; border-radius: 14px; padding: 12px; color: var(--ink); font: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
-.pkrow.ro { grid-template-columns: auto 1fr auto auto; cursor: default; }
-.pkrow .items { display: grid; gap: 2px; line-height: 1.35; }
+.pkrow { display: grid; grid-template-columns: auto auto 1fr; gap: 12px; align-items: center; width: 100%; text-align: left; background: var(--surface-2); border: 0; border-radius: 14px; padding: 12px; color: var(--ink); font: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.pkrow.ro { grid-template-columns: auto 1fr auto; cursor: default; }
+.pkrow .items { display: grid; gap: 8px; line-height: 1.35; }
+.pkd { display: grid; gap: 3px; }
+.pkx { display: grid; gap: 1px; font-size: 13px; color: var(--muted); padding-left: 2px; }
+.pkx b { font-weight: 600; color: var(--ink); opacity: .8; margin-left: 2px; }
+.pknote { font-style: italic; }
+.pkx b { white-space: nowrap; }
+.vmx { display: grid; gap: 6px; padding-top: 10px; border-top: 1px solid var(--line); }
+.vmx > div { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 14px; }
+.vmx > div > span { white-space: nowrap; }
+
 .pkbox { width: 26px; height: 26px; border-radius: 8px; border: 2px solid var(--line-strong, var(--muted)); display: grid; place-items: center; color: var(--surface-2); }
 .pkbox svg { width: 16px; height: 16px; }
 .pkrow.on .pkbox { background: var(--ok); border-color: var(--ok); }
@@ -1208,6 +1217,9 @@ const minus = (t, mins) => { const m = (hm(t) - mins + 1440) % 1440; return Stri
 const clock = iso => new Date(iso).toISOString().slice(11, 16);
 const minsAgo = iso => Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 6e4));
 const addonText = list => (list || []).map(a => (Number(a.qty) > 1 ? a.qty + " × " : "") + a.name).join(", ");   // "2 × Fried eggs, Shito"
+// Vendor and team: each extra with what it costs on one plate ("Fish · GHS 15", "2 × Fried eggs · GHS 8"), so Fish at 15 and Fish at 20 are told apart
+const moneyS = v => "GHS " + (Number(v) % 1 ? Number(v).toFixed(2) : String(Number(v)));
+const addonPriced = list => (list || []).map(a => { const n = Math.max(1, Number(a.qty) || 1); return (n > 1 ? n + " × " : "") + a.name + (Number(a.price) ? " · " + moneyS(Number(a.price) * n) : ""); }).join(", ");
 // Full order total: service fee is per meal on new orders (older orders kept a per-order fee)
 const orderTotal = o => (Number(o.quote_price ?? o.unit_price) + Number(o.addons_total || 0)) * o.qty + Number(o.max_fee) * o.qty + Number(o.service_fee) * (o.fee_per_meal ? o.qty : 1);
 // Codes: one letter + 2 digits (K-27); typed in any case, with or without the dash. Old 4-digit codes still work.
@@ -3487,7 +3499,7 @@ const netBadge = n => { const x = NET_STYLE[n]; return x ? `<span class="logo ne
 // Same dish, same extras and note: one line ("3 × TZ") instead of a list
 function groupDishes(list) {
   const out = [];
-  list.forEach(o => { const ex = [addonText(o.addons), o.note].filter(Boolean).join(" · "), key = o.item_name + "|" + ex; const g = out.find(x => x.key === key); if (g) g.qty += Number(o.qty || 1); else out.push({ key, name: o.item_name, extra: ex, qty: Number(o.qty || 1) }); });
+  list.forEach(o => { const ex = [addonText(o.addons), o.note].filter(Boolean).join(" · "), key = o.item_name + "|" + addonPriced(o.addons) + "|" + (o.note || ""); const g = out.find(x => x.key === key); if (g) g.qty += Number(o.qty || 1); else out.push({ key, name: o.item_name, extra: ex, addons: o.addons || [], note: o.note || "", qty: Number(o.qty || 1) }); });
   return out;
 }
 // Dishes added in the same checkout are paid with the first one (no separate payment of their own)
@@ -5361,7 +5373,7 @@ async function renderAdmin(cached, quiet) {   // quiet = background/refresh-butt
         vendor: (a, b) => String(K(a.kitchen_id).public_name || "").localeCompare(String(K(b.kitchen_id).public_name || "")) || (a.created_at < b.created_at ? 1 : -1) }[sortBy] || ((a, b) => a.created_at < b.created_at ? 1 : -1);
       rest.sort(cmp); toCheckL.sort((a, b) => a.created_at < b.created_at ? -1 : 1);
       const row = (o, flag) => { const p = A.pools.find(x => x.id === o.pool_id) || {}, k = K(o.kitchen_id);
-        const extras = [addonText(o.addons), o.note ? "Note: " + o.note : "", o.special_request ? "Custom: " + o.special_request + (o.quote_price ? " (" + money(o.quote_price) + ")" : " (not priced)") : ""].filter(Boolean).join(" · ");
+        const extras = [addonPriced(o.addons), o.note ? "Note: " + o.note : "", o.special_request ? "Custom: " + o.special_request + (o.quote_price ? " (" + money(o.quote_price) + ")" : " (not priced)") : ""].filter(Boolean).join(" · ");
         const paid = [o.wallet_used > 0 ? "Wallet " + money(o.wallet_used) : "", o.momo_ref ? "Ref " + o.momo_ref : ""].filter(Boolean).join(" + ");
         // A tray order is paid once, on its first dish: expect the whole amount there
         const own = o2 => Math.max(0, orderTotal(o2) - Number(o2.wallet_used || 0) - Number(o2.carried_amount || 0));
@@ -5870,7 +5882,7 @@ async function adminClick(e) {
       if (!via && !rid && !ref && !fval(poolCard, "trip_cost")) return toast("Choose who's delivering this pool.");
       return run(() => api.updatePool(id, { rider_id: via === "rider" ? rid : null, trip_ref: via === "rider" ? null : via ? via + (ref ? " · " + ref : "") : ref || null, trip_cost: fval(poolCard, "trip_cost") ? Number(fval(poolCard, "trip_cost")) : null }).then(() => notifyServer({ pool_id: id })), "Pool saved"); }
     if (act === "ticket") {
-      const tally = {}; os.forEach(o => { const key = o.item_name + (o.addons?.length ? " (" + addonText(o.addons) + ")" : ""); tally[key] = (tally[key] || 0) + o.qty; });
+      const tally = {}; os.forEach(o => { const key = o.item_name + (o.addons?.length ? " (" + addonPriced(o.addons) + ")" : ""); tally[key] = (tally[key] || 0) + o.qty; });
       const text = "ChopPool order for " + fmtDate(d) + ". Ready by " + fmtTime(minus(s.delivery_time, 30)) + ".\n" + site.name + ", Pool " + p.seq + " (" + p.meals + " meals):\n" +
         Object.entries(tally).map(([n, q]) => "- " + q + " × " + n).join("\n") + "\nLabel codes: " + os.map(o => o.code + (o.qty > 1 ? " (×" + o.qty + ")" : "")).join(", ") +
         "\nOpen your page to confirm: " + baseUrl() + "/#kitchen-" + k.token;
@@ -6158,7 +6170,7 @@ function ordersCsv() {
   const cols = ["created_at", "order_date", "customer_name", "phone", "site", "kitchen", "pool", "item_name", "qty", "unit_price", "addons", "note", "special_request", "quote_price", "food", "delivery", "service", "amount", "wallet_used", "momo_amount", "momo_ref", "code", "status", "refund_needed", "collected_at"];
   const q = x => '"' + String(x ?? "").replace(/"/g, '""') + '"';
   const val = (o, c) => c === "site" ? (A.sites.find(x => x.id === o.site_id) || {}).name : c === "kitchen" ? (A.kitchens.find(x => x.id === o.kitchen_id) || {}).name
-    : c === "pool" ? (A.pools.find(x => x.id === o.pool_id) || {}).seq : c === "addons" ? addonText(o.addons)
+    : c === "pool" ? (A.pools.find(x => x.id === o.pool_id) || {}).seq : c === "addons" ? addonPriced(o.addons)
     : c === "food" ? ((Number(o.quote_price ?? o.unit_price) + Number(o.addons_total || 0)) * o.qty).toFixed(2) : c === "delivery" ? (Number(o.max_fee || 0) * o.qty).toFixed(2)
     : c === "service" ? (Number(o.service_fee || 0) * (o.fee_per_meal ? o.qty : 1)).toFixed(2) : c === "amount" ? orderTotal(o).toFixed(2)
     : c === "momo_amount" ? Math.max(0, orderTotal(o) - Number(o.wallet_used || 0) - Number(o.carried_amount || 0)).toFixed(2) : o[c];
@@ -6218,7 +6230,7 @@ async function viewKitchen(token) {
     })();
     const quoteForm = o => `<form class="quote" data-quote="${esc(o.id)}"><p><strong>${esc(o.site)}, code ${esc(o.code)}</strong>${o.status === "quoted" ? ` <span class="chip warn">Priced ${money(o.quote_price)}, waiting for payment</span>` : ""}</p>
             <div class="stack small" style="gap:2px"><span><strong>${o.qty} × ${esc(o.item_name)}</strong>${o.unit_price != null ? ` <span class="muted">(menu price ${money(o.unit_price)})</span>` : ""}</span>
-              ${o.addons?.length ? `<span>Add-ons: ${esc(addonText(o.addons))}${Number(o.addons_total) ? ` <span class="muted">(${money(o.addons_total)} a meal, charged separately)</span>` : ""}</span>` : ""}
+              ${o.addons?.length ? `<span>Add-ons: ${esc(addonPriced(o.addons))}${Number(o.addons_total) ? ` <span class="muted">(${money(o.addons_total)} a meal, charged separately)</span>` : ""}</span>` : ""}
               <span>Request: <strong>${esc(o.special_request)}</strong></span>${o.note ? `<span class="muted">Note: ${esc(o.note)}</span>` : ""}</div>
             <div><label for="qp-${o.id}">Full price per meal, including the extra (GHS)</label><input id="qp-${o.id}" inputmode="decimal" value="${esc(o.quote_price ?? o.unit_price ?? "")}">
               <p class="small muted" style="margin-top:4px">Start from the menu price and add what the extra costs.${o.addons?.length ? " Don't include add-ons; they're added on top." : ""}</p></div>
@@ -6241,14 +6253,18 @@ async function viewKitchen(token) {
       ${specials.length ? `<section class="card stack" id="specials"><div class="top"><h2>Custom orders</h2><span class="chip warn">Price by ${fmtTime(priceBy)}</span></div><p class="small muted">The customer pays after you price it. Requests not priced in time are cancelled.</p>${specials.map(quoteForm).join("")}</section>` : ""}
       ${(() => { // Make today: what to plate across every building (paid meals), so nobody adds up by hand
         const act = pools.filter(p => ["collecting", "accepted"].includes(p.status)); if (!act.length) return "";
-        const t = {}, wait = { n: 0 }; let packs = 0;
-        act.forEach(p => byCode(p.orders.filter(o => !["quote_requested", "quoted"].includes(o.status))).forEach(([, g]) => { if (g.every(o => o.paid)) { packs++; g.forEach(o => { const nm = dishShort(o.item_name); t[nm] = (t[nm] || 0) + o.qty; }); } else g.forEach(o => { wait.n += o.qty; }); }));
+        const t = {}, xt = {}, wait = { n: 0 }; let packs = 0;
+        act.forEach(p => byCode(p.orders.filter(o => !["quote_requested", "quoted"].includes(o.status))).forEach(([, g]) => { if (g.every(o => o.paid)) { packs++; g.forEach(o => { const nm = dishShort(o.item_name); t[nm] = (t[nm] || 0) + o.qty;
+          (o.addons || []).forEach(a => { const k2 = a.name + "|" + Number(a.price || 0); xt[k2] = (xt[k2] || 0) + o.qty * Math.max(1, Number(a.qty) || 1); }); }); } else g.forEach(o => { wait.n += o.qty; }); }));
+        // Extras to prepare in total; the price is shown only where the same extra comes at more than one price (Fish at 15 and 20)
+        const xNames = Object.keys(xt).map(k2 => k2.split("|")[0]), xList = Object.entries(xt).sort((a, b) => b[1] - a[1]).map(([k2, q]) => { const [nm, pr] = k2.split("|"); return `<span><b class="num">${q}</b> ${esc(nm)}${xNames.filter(x => x === nm).length > 1 ? ` <span class="muted">${esc(moneyS(pr))}</span>` : ""}</span>`; });
         const meals = Object.values(t).reduce((a, b) => a + b, 0); if (!meals && !wait.n) return "";
         return `<section class="card vmake"><div class="top"><h2>Make ${dayLabel(d)}</h2><span class="small muted">ready by <strong style="color:var(--accent)">${fmtTime(minus(S.settings.delivery_time, 30))}</strong></span></div>
           <div class="vmk">${Object.entries(t).sort((a, b) => b[1] - a[1]).map(([nm, q]) => `<div><b class="num">${q}</b><span>${esc(nm)}</span></div>`).join("")}</div>
+          ${xList.length ? `<div class="vmx"><span class="small muted">Extras</span><div>${xList.join("")}</div></div>` : ""}
           <p class="small muted">${meals} meal${meals === 1 ? "" : "s"} · ${act.length} building${act.length === 1 ? "" : "s"} · ${packs} pack${packs === 1 ? "" : "s"}${wait.n ? ` · ${wait.n} more waiting for payment` : ""}${act.some(p => p.status === "collecting") ? ` · more may come until ${fmtTime(S.settings.cutoff)}` : ""}</p></section>`; })()}
       ${pools.map(p => {
-        const tally = {}; p.orders.filter(o => !o.special_request || o.status !== "quote_requested").forEach(o => { const key = o.item_name + (o.addons?.length ? " (" + addonText(o.addons) + ")" : "") + (o.special_request ? " · Custom: " + o.special_request : ""); tally[key] = (tally[key] || 0) + o.qty; });
+        const tally = {}; p.orders.filter(o => !o.special_request || o.status !== "quote_requested").forEach(o => { const key = o.item_name + (o.addons?.length ? " (" + addonPriced(o.addons) + ")" : "") + (o.special_request ? " · Custom: " + o.special_request : ""); tally[key] = (tally[key] || 0) + o.qty; });
         const n = p.orders.reduce((a, o) => a + o.qty, 0);
         const btns = p.status === "waiting" ? "" : p.status === "collecting" ? (afterCut ? `<button class="btn wide" data-k="accepted" data-pool="${esc(p.id)}">Confirm final batch</button>` : `<p class="small muted">Orders close at ${fmtTime(S.settings.cutoff)}. Then confirm the final batch.</p>`)
           : p.status === "accepted" ? `<button class="btn wide" data-k="ready" data-pool="${esc(p.id)}">All packed · food ready</button>`
@@ -6264,13 +6280,13 @@ async function viewKitchen(token) {
         const paidG = groups.filter(([, g]) => g.every(o => o.paid || o.collected)), unpaidG = groups.filter(([, g]) => !g.every(o => o.paid || o.collected));
         const packing = ["collecting", "accepted"].includes(p.status), ticks = packTicks(p.id), doneN = paidG.filter(([c]) => ticks.has(c)).length;
         const finished = p.status === "delivered" && handedOver(live);
-        const dishes = g => groupDishes(g.filter(o => !o.special_request)).map(x => `<span>${x.qty} × ${esc(dishShort(x.name))}${x.extra ? ` <span class="small muted">· ${esc(x.extra)}</span>` : ""}</span>`).join("")
+        const dishes = g => groupDishes(g.filter(o => !o.special_request)).map(x => `<span class="pkd"><span>${x.qty} × ${esc(dishShort(x.name))}</span>${x.addons.length || x.note ? `<span class="pkx">${x.addons.map(a => { const n = Math.max(1, Number(a.qty) || 1); return `<span>+ ${n > 1 ? n + " × " : ""}${esc(a.name)}${Number(a.price) ? ` <b class="num">${esc(moneyS(Number(a.price) * n))}</b>` : ""}</span>`; }).join("")}${x.note ? `<span class="pknote">Note: ${esc(x.note)}</span>` : ""}</span>` : ""}</span>`).join("")
           + g.filter(o => o.special_request).map(o => `<span>${o.qty} × ${esc(dishShort(o.item_name))} <strong>· Custom: ${esc(o.special_request)}</strong></span>`).join("")
           + (g.length > 1 ? `<span class="small muted">Pack together · ${g.reduce((t, o) => t + o.qty, 0)} meals</span>` : "");
         const amt = g => `<span class="pamt num">${money(g.reduce((t, o) => t + (Number(o.quote_price ?? o.unit_price) + Number(o.addons_total || 0)) * o.qty, 0))}</span>`;   // this order's food (dish + extras × plates)
         const packRow = ([c, g]) => packing
-          ? `<button type="button" class="pkrow${ticks.has(c) ? " on" : ""}" data-pack="${esc(c)}" data-pp="${esc(p.id)}" aria-pressed="${ticks.has(c)}"><span class="pkbox" aria-hidden="true">${ticks.has(c) ? ICON.check : ""}</span><span class="lc num">${esc(c)}</span><span class="items">${dishes(g)}</span>${amt(g)}</button>`
-          : `<div class="pkrow ro${g.every(o => o.collected) ? " on" : ""}"><span class="lc num">${esc(c)}</span><span class="items">${dishes(g)}</span>${amt(g)}${g.every(o => o.collected) ? `<span class="tick">Collected</span>` : ""}</div>`;
+          ? `<button type="button" class="pkrow${ticks.has(c) ? " on" : ""}" data-pack="${esc(c)}" data-pp="${esc(p.id)}" aria-pressed="${ticks.has(c)}"><span class="pkbox" aria-hidden="true">${ticks.has(c) ? ICON.check : ""}</span><span class="lc num">${esc(c)}</span><span class="items">${dishes(g)}${amt(g)}</span></button>`
+          : `<div class="pkrow ro${g.every(o => o.collected) ? " on" : ""}"><span class="lc num">${esc(c)}</span><span class="items">${dishes(g)}${amt(g)}</span>${g.every(o => o.collected) ? `<span class="tick">Collected</span>` : ""}</div>`;
         const list = `${packing && paidG.length ? `<div class="pkbar" role="progressbar" aria-valuemin="0" aria-valuemax="${paidG.length}" aria-valuenow="${doneN}"><i style="width:${Math.round(doneN / paidG.length * 100)}%"></i></div><p class="small muted">${doneN} of ${paidG.length} pack${paidG.length === 1 ? "" : "s"} done · label each with its code</p>` : ""}
           <div class="labels">${paidG.map(packRow).join("") || (unpaidG.length ? "" : `<p class="small muted">No meals yet.</p>`)}</div>
           ${unpaidG.length && p.status !== "delivered" ? `<div class="pkwait"><p class="small"><strong>Not paid yet, don't pack</strong></p>${unpaidG.map(([c, g]) => `<div class="pkrow ro wait"><span class="lc num">${esc(c)}</span><span class="items">${dishes(g)}</span></div>`).join("")}</div>` : ""}`;
