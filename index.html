@@ -550,7 +550,13 @@ form[data-form="kitchen"] [data-msave] { display: none; }
 .mmeta { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .mmeta select { width: auto; }
 .mextras { display: grid; gap: 6px; padding-left: 60px; }
-.mextra { display: grid; grid-template-columns: minmax(0, 1fr) 84px 32px; gap: 8px; align-items: center; }
+.mextra { display: grid; grid-template-columns: 28px minmax(0, 1fr) 84px 32px; gap: 8px; align-items: center; position: relative; }
+.xgrip { width: 28px; height: 40px; border: none; background: none; color: var(--muted); padding: 0; cursor: grab; touch-action: none; display: grid; place-items: center; border-radius: 8px; }
+.xgrip:active, .mextra.xdrag .xgrip { cursor: grabbing; color: var(--accent); }
+.xgrip:focus-visible { outline: 2px solid var(--accent); }
+.mextra.xdrag { z-index: 5; background: var(--surface); border-radius: 12px; box-shadow: 0 10px 24px -8px rgba(0,0,0,.35); }
+.mextra.xslide { transition: transform .15s ease; }
+body.xdragging { user-select: none; -webkit-user-select: none; }
 .mextra input, .mtop input { padding-top: 10px; padding-bottom: 10px; }
 .xbtn { width: 32px; height: 32px; border-radius: 10px; border: none; background: transparent; color: var(--muted); display: grid; place-items: center; padding: 0; cursor: pointer; }
 .xbtn svg { width: 16px; height: 16px; }
@@ -4968,7 +4974,8 @@ function poolFlags(p, s, d, now = new Date()) {
 }
 /* ---------- Menu editor (Admin › vendor, and the vendor's own "Your menu"): dish rows, extras rows, photos, one Save ---------- */
 const CAM = SV('<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>', 14);
-const extraRow = a => `<div class="mextra"><input data-x="name" value="${esc(a ? a.name : "")}" placeholder="Extra chicken" aria-label="Extra"><input data-x="price" inputmode="decimal" value="${a ? esc(a.price) : ""}" placeholder="GHS 0" aria-label="Extra price"><button type="button" class="xbtn" data-xdel aria-label="Remove extra">${ICON.close}</button></div>`;
+const GRIP = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="9" cy="6" r="1.7"/><circle cx="15" cy="6" r="1.7"/><circle cx="9" cy="12" r="1.7"/><circle cx="15" cy="12" r="1.7"/><circle cx="9" cy="18" r="1.7"/><circle cx="15" cy="18" r="1.7"/></svg>`;
+const extraRow = a => `<div class="mextra"><button type="button" class="xgrip" data-xgrip aria-label="Hold and drag to move this extra (or use the arrow keys)" title="Hold and drag to reorder">${GRIP}</button><input data-x="name" value="${esc(a ? a.name : "")}" placeholder="Extra chicken" aria-label="Extra"><input data-x="price" inputmode="decimal" value="${a ? esc(a.price) : ""}" placeholder="GHS 0" aria-label="Extra price"><button type="button" class="xbtn" data-xdel aria-label="Remove extra">${ICON.close}</button></div>`;
 function dishRow(i, admin) {
   i = i || {};
   return `<div class="mdish" data-item="${esc(i.id || "")}">
@@ -4983,6 +4990,28 @@ const menuEditor = (items, ctx, admin) => `<div class="medit" data-medit="${esc(
   <div class="row" style="justify-content:space-between;gap:8px;flex-wrap:wrap"><button type="button" class="ghost" data-madd>+ Add dish</button><button type="button" class="btn" data-msave>Save menu</button></div>
   <p class="small muted">Extras: e.g. Extra chicken GHS 15, No shito GHS 0. Tap a picture to add a photo of the dish (saved dishes only).</p></div>`;
 // Everything in the editor, ready to save; removed saved dishes go off the menu
+// Extras: hold the grip and drag to reorder (finger or mouse); arrow keys on the grip move it one place. Save menu keeps the order.
+(function extrasDrag() {
+  let row = null, startY = 0, startTop = 0, raf = 0, lastY = 0;
+  const changed = r => r.querySelector("input")?.dispatchEvent(new Event("input", { bubbles: true }));
+  const place = y => {
+    if (!row) return; const want = startTop + (y - startY), prev = row.previousElementSibling, next = row.nextElementSibling;
+    if (prev && want < prev.offsetTop + prev.offsetHeight / 2) row.parentElement.insertBefore(row, prev);
+    else if (next && want + row.offsetHeight > next.offsetTop + next.offsetHeight / 2) row.parentElement.insertBefore(next, row);
+    row.style.transform = `translateY(${want - row.offsetTop}px)`;
+  };
+  const edge = () => { if (!row) return; const vy = lastY - scrollY; const d = vy < 70 ? -10 : vy > innerHeight - 70 ? 10 : 0; if (d) { scrollBy(0, d); lastY += d; place(lastY); } raf = requestAnimationFrame(edge); };
+  document.addEventListener("pointerdown", e => { const g = e.target.closest("[data-xgrip]"); if (!g || e.button > 0) return;
+    e.preventDefault(); row = g.closest(".mextra"); startY = lastY = e.pageY; startTop = row.offsetTop;
+    row.classList.add("xdrag"); document.body.classList.add("xdragging"); try { g.setPointerCapture(e.pointerId); } catch (er) {} raf = requestAnimationFrame(edge); });
+  document.addEventListener("pointermove", e => { if (!row) return; e.preventDefault(); lastY = e.pageY; place(e.pageY); }, { passive: false });
+  const end = () => { if (!row) return; cancelAnimationFrame(raf); const r = row; row = null; r.classList.add("xslide"); r.style.transform = "";
+    setTimeout(() => r.classList.remove("xdrag", "xslide"), 160); document.body.classList.remove("xdragging"); changed(r); };
+  document.addEventListener("pointerup", end); document.addEventListener("pointercancel", end);
+  document.addEventListener("keydown", e => { const g = e.target.closest && e.target.closest("[data-xgrip]"); if (!g || !["ArrowUp", "ArrowDown"].includes(e.key)) return;
+    e.preventDefault(); const r = g.closest(".mextra"), sib = e.key === "ArrowUp" ? r.previousElementSibling : r.nextElementSibling; if (!sib) return;
+    e.key === "ArrowUp" ? r.parentElement.insertBefore(r, sib) : r.parentElement.insertBefore(sib, r); g.focus(); changed(r); });
+})();
 function readMenu(root) {
   return [...root.querySelectorAll(".mdish")].map(r => {
     const g = f => (r.querySelector(`[data-f="${f}"]`) || {}).value, act = r.querySelector('[data-f="active"]');
