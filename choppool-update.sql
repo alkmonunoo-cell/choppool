@@ -4968,4 +4968,17 @@ end $$;
 revoke all on function admin_money_days(date, date) from public, anon;
 grant execute on function admin_money_days(date, date) to authenticated;
 
-select 'ChopPool database is up to date (version 38)' as result;
+-- ---------- from update39 ----------
+-- ChopPool update 39: a quick check for the team that the bell history is being saved (Settings > Alerts check). Read-only.
+
+create or replace function bell_status() returns json
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if not is_admin() then raise exception 'Team members only.'; end if;
+  return json_build_object('last_at', (select max(created_at) from notifications),
+                           'today', (select count(*) from notifications where created_at > now() - interval '24 hours'));
+end $$;
+revoke all on function bell_status() from public, anon;
+grant execute on function bell_status() to authenticated;
+
+select 'ChopPool database is up to date (version 39)' as result;

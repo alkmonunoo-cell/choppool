@@ -530,6 +530,7 @@ td select { padding: 6px 8px; width: auto; }
 .settingsfold[open] { display: grid; gap: 18px; }
 .settingsfold .card { box-shadow: none; padding: 0; background: none; border: 0; }
 .tog.xon { display: inline-flex; align-items: center; gap: 10px; padding: 4px 4px 4px 14px; }
+.xname { background: none; border: 0; padding: 6px 0; margin: 0; color: inherit; font: inherit; cursor: pointer; text-align: left; }
 .xstep { display: inline-flex; align-items: center; gap: 2px; background: rgba(0,0,0,.18); border-radius: 999px; padding: 2px; }
 .xstep button { width: 28px; height: 28px; border-radius: 50%; border: none; background: transparent; color: inherit; font-size: 18px; font-weight: 700; line-height: 1; padding: 0; cursor: pointer; }
 .xstep button:disabled { opacity: .4; }
@@ -1592,6 +1593,7 @@ function makeDemoApi() {
     // Feedback: photos kept on this page as data links in the demo
     async uploadFeedbackPhoto(batch, n, blob) { return await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(blob); }); },
     async notifications(ids) { return []; },
+    async bellStatus() { return { last_at: nowIso(), today: 3 }; },
     async moneyDays(from, to) {   // same sums as admin_money_days on the server
       const r2 = x => Math.round(x * 100) / 100, food0 = o => (Number(o.quote_price ?? o.unit_price) + Number(o.addons_total || 0)) * o.qty;
       const paid = orders.filter(o => o.order_date >= from && o.order_date <= to && ["paid", "collected"].includes(o.status));
@@ -1962,6 +1964,7 @@ function makeSupabaseApi() {
     async moneyDays(from, to) { const r = await sb.rpc("admin_money_days", { p_from: from, p_to: to });
       if (r.error && /admin_money_days|schema cache/i.test(r.error.message)) throw new Error("Run the latest choppool-update.sql (version 38) in Supabase once to see the daily money report."); return must(r); },
     // Mobile money payments for Activity (update 37); empty before the update is run
+    async bellStatus() { const r = await sb.rpc("bell_status"); return r.error ? null : r.data; },
     async payments() { const r = await sb.rpc("my_payments"); return r.error ? [] : r.data || []; },
     // The bell's saved alerts (last 7 days, update 35); empty before the update is run
     async notifications(ids) { const r = await sb.rpc("my_notifications", { p_order_ids: ids || [] }); return r.error ? [] : r.data || []; },
@@ -2497,6 +2500,8 @@ function codeStep(render, email, sent, done, back) {
     catch (e) { d(); $("#cErr").textContent = /expired|invalid|token/i.test(e.message || "") ? "That code is wrong or has expired. Check it, or send a new code." : cleanErr(e); }
   });
 }
+// A sign-in kept on this phone by Supabase (it may still be restoring when the app opens)
+const hasSavedSignIn = () => { try { return Object.keys(localStorage).some(k => /^sb-.+-auth-token$/.test(k) && !/admin|team/i.test(k)); } catch (e) { return false; } };
 async function afterSignIn() {
   const me = local.get("cp_me") || {};
   if (S.user === null || S.user === undefined) { try { S.user = await api.user(); } catch (e) {} }
@@ -3530,11 +3535,12 @@ const lineAdd = l => addonSum(lineItem(l).addons, l.addons || []);
 // Extras chips: tap to add one; then − count + (up to 5 of each per plate)
 const xKeys = ex => [...ex].flatMap(([k, c]) => Array(c).fill(k));
 const xChips = (list, ex) => (list || []).map(a => { const k = addonKey(list, a), c = ex.get(k) || 0, lab = esc(a.name) + (a.price ? " +" + money(a.price) : "");
-  return c ? `<span class="tog xon" aria-pressed="true"><span>${lab}</span><span class="xstep"><button type="button" data-xm="${esc(k)}" aria-label="One less ${esc(a.name)}">−</button><b class="num">${c}</b><button type="button" data-xp="${esc(k)}" aria-label="One more ${esc(a.name)}"${c >= 5 ? " disabled" : ""}>+</button></span></span>`
+  return c ? `<span class="tog xon" aria-pressed="true"><button type="button" class="xname" data-xoff="${esc(k)}" aria-label="Remove ${esc(a.name)}">${lab}</button><span class="xstep"><button type="button" data-xm="${esc(k)}" aria-label="One less ${esc(a.name)}">−</button><b class="num">${c}</b><button type="button" data-xp="${esc(k)}" aria-label="One more ${esc(a.name)}"${c >= 5 ? " disabled" : ""}>+</button></span></span>`
     : `<button type="button" class="tog" data-addon="${esc(k)}" aria-pressed="false">${lab}</button>`; }).join("");
 function xClick(e, ex) {
-  const a = e.target.closest("[data-addon]"), m = e.target.closest("[data-xm]"), p = e.target.closest("[data-xp]");
-  if (a) ex.set(a.dataset.addon, 1); else if (p) ex.set(p.dataset.xp, Math.min(5, (ex.get(p.dataset.xp) || 0) + 1));
+  const a = e.target.closest("[data-addon]"), m = e.target.closest("[data-xm]"), p = e.target.closest("[data-xp]"), off = e.target.closest("[data-xoff]");
+  if (off) ex.delete(off.dataset.xoff);   // tap the name: remove it, whatever the count
+  else if (a) ex.set(a.dataset.addon, 1); else if (p) ex.set(p.dataset.xp, Math.min(5, (ex.get(p.dataset.xp) || 0) + 1));
   else if (m) { const c = (ex.get(m.dataset.xm) || 0) - 1; if (c > 0) ex.set(m.dataset.xm, c); else ex.delete(m.dataset.xm); } else return false;
   return true;
 }
@@ -5637,8 +5643,13 @@ async function renderAdmin(cached, quiet) {   // quiet = background/refresh-butt
         <p class="small muted">Customers see "Order by ${fmtTime(s.cutoff)} · lunch at ${fmtTime(s.delivery_time)}". Vendors have lunch ready 30 minutes before it arrives. Changes apply from the next order.</p></section>`) : ""}
       ${isSuper ? setForm(`<section class="card stack"><h2>Team screens</h2><div><label for="rlIdle">Sign out after this many quiet minutes (5-60)</label><input id="rlIdle" name="admin_idle_min" inputmode="numeric" value="${esc(s.admin_idle_min ?? 15)}"></div>
         <p class="small muted">Everyone on the team is also signed out after 12 hours.</p></section>`) : ""}
+      <section class="card stack"><h2>Alerts check</h2><p class="small" id="bellChk">Checking…</p><p class="small muted" style="margin:0">Every alert the app sends is saved for 7 days so customers see it in the bell on any phone. This needs choppool-update.sql version 35 or later and the latest notify function deployed.</p></section>
       <section class="card stack"><h2>Other settings</h2><p class="small muted">Each setting now sits with what it controls.</p>
         <div class="setlinks">${go("riders", "rules", "Delivery pricing", "Riders › Settings")}${go("menus", "rules", "Pool size, vendors near you, ChopPool fee", "Vendors & menus › Settings")}${go("today", "rules", "Got my food timing", "Today › Settings")}${isSuper ? go("team", "payments", "Mobile money accounts", "Team › Payment options") : ""}</div></section>`;
+      api.bellStatus().then(b => { const el = $("#bellChk"); if (!el) return;
+        el.innerHTML = !b ? `<span class="chip warn">Not set up</span> Run the latest choppool-update.sql in Supabase, then redeploy the notify function.`
+          : !b.last_at ? `<span class="chip warn">Nothing saved yet</span> If alerts have gone out since you ran the update, redeploy the notify function.`
+          : `<span class="chip">Working</span> Last alert saved ${esc(new Date(b.last_at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }))} · ${b.today} in the last 24 hours.`; }).catch(() => {});
   }
   /* ---------- Riders ---------- */
   if (tab === "riders") {
@@ -6786,7 +6797,13 @@ async function start() {
     if (e.target.closest("[data-theme-cycle]")) return cycleTheme();
     const al = e.target.closest("[data-alerts]"); if (al) { if (await pushSubscribe(JSON.parse(al.dataset.alerts || "{}"))) { toast("Alerts are on for this phone."); al.textContent = "Alerts are on"; } }
   });
-  if (!DEMO) { try { window.supabase && (await api.user()) && afterSignIn(); } catch (e) {} }
+  // Know who is signed in before the first screen draws, so the sign-in page never flashes up for someone already signed in.
+  // A saved sign-in that is still restoring gets a moment more (then the welcome page shows only if there really is none).
+  if (!DEMO) { try { if (window.supabase) {
+    let u = await api.user();
+    if (!u && hasSavedSignIn()) for (let i = 0; i < 6 && !u; i++) { await new Promise(r => setTimeout(r, 250)); u = await api.user().catch(() => null); }
+    if (u) { S.user = u; afterSignIn(); }
+  } } catch (e) {} }
   if (S.splashCalm) await S.splashCalm();
   await route();
   S.splashPainted && S.splashPainted();
