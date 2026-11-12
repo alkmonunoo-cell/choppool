@@ -134,6 +134,11 @@ p { margin: 0; }
 .order-card.flash { animation: ocflash 1.4s ease 1; }
 .tripbox { background: var(--surface-2); border-radius: 12px; padding: 10px 12px; display: grid; gap: 2px; }
 .tripbox p { margin: 0; }
+.ttlist { margin: 0; padding-left: 20px; display: grid; gap: 10px; line-height: 1.45; }
+.ttfull summary { cursor: pointer; font-weight: 700; color: var(--accent); }
+.ttfull > div { display: grid; gap: 4px; margin-top: 10px; max-height: 45vh; overflow: auto; padding-right: 4px; line-height: 1.5; }
+.ttfull p { margin: 0 0 8px; }
+.ttok { align-items: flex-start; }
 .fbpics { display: flex; gap: 10px; flex-wrap: wrap; } .fbpics:empty { display: none; }
 .fbpic { position: relative; width: 84px; height: 84px; border-radius: 14px; overflow: hidden; background: var(--surface-2); }
 .fbpic img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -1207,7 +1212,7 @@ const isoDow = d => { const w = new Date(d + "T00:00:00Z").getUTCDay(); return w
    DEMO DATA LAYER: in-memory copy of the database logic, with simulated customers
    ===================================================================================== */
 function makeDemoApi() {
-  const settings = { cutoff: "10:30", special_cutoff: "10:00", delivery_time: "12:30", trip_cost: 60, base_fare: 20, per_km: 6, trip_min: 10, max_fee: 10, cap_km: 8, trip_max: 80, quote_pay_min: 15, auto_receive_min: 120, admin_idle_min: 15, service_fee: 2, min_pool: 6, max_meals: 10, pool_ceiling: 15,
+  const settings = { tester_terms_on: true, tester_terms_version: 1, cutoff: "10:30", special_cutoff: "10:00", delivery_time: "12:30", trip_cost: 60, base_fare: 20, per_km: 6, trip_min: 10, max_fee: 10, cap_km: 8, trip_max: 80, quote_pay_min: 15, auto_receive_min: 120, admin_idle_min: 15, service_fee: 2, min_pool: 6, max_meals: 10, pool_ceiling: 15,
     commission_rate: 0.15, vendor_fee_rate: 0, vendor_fee_free: 5, next_day_confirm_by: "08:30", countdown_start: "06:00", near_max_fee: 50, free_max_m: 1500, accept_timeout_min: 20, arrival_window_min: 10, notify_daily_cap: 5, momo_number: "024 000 0000", momo_name: "ChopPool Pilot", momo_network: "MTN" };
   const sites = [
     { id: "s1", name: "Heritage Tower, Ridge", drop_point: "Lobby security desk", handoff: "host", host_label: "the security desk in the lobby", host_token: "demoh1", lat: 5.5640, lng: -0.2010, status: "active", active: true },
@@ -1232,7 +1237,7 @@ function makeDemoApi() {
   ];
   const riders = [{ id: "r1", name: "Kwame (example rider)", phone: "0240000003", token: "demor1", active: true }];
   [...sites, ...kitchens, ...riders].forEach((x, n) => { if (!x.created_at) x.created_at = new Date(Date.now() - (40 - n * 3) * 864e5).toISOString(); });
-  const pools = [], orders = [], days = [], ledger = [], users = [], profiles = [], reviews = [], waiters = [], feedback = [];
+  const pools = [], orders = [], days = [], ledger = [], users = [], profiles = [], reviews = [], waiters = [], feedback = [], accepts = [];
   const payMethods = [{ id: "pm1", network: "MTN", number: "024 000 0000", name: "ChopPool Pilot", is_main: true, active: true, sort: 1, created_at: new Date().toISOString() }];
   const team = [{ email: "you@choppool.demo", role: "super" }, { email: "ops@choppool.demo", role: "coordinator" }];
   let me = null;
@@ -1576,6 +1581,13 @@ function makeDemoApi() {
     async hideReview(id, hidden) { Object.assign(reviews.find(r => r.id === id), { hidden }); },
     // Feedback: photos kept on this page as data links in the demo
     async uploadFeedbackPhoto(batch, n, blob) { return await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(blob); }); },
+    async testerDue(as, token) { if (!settings.tester_terms_on) return null; const v = settings.tester_terms_version;
+      const who = as === "vendor" ? { kitchen_id: (byToken(kitchens, "token", token) || {}).id } : as === "rider" ? { rider_id: (riders.find(x => x.token === token) || {}).id } : me ? { user_id: me.id } : null;
+      if (!who || !Object.values(who)[0]) return null; return accepts.some(a => a.version === v && Object.entries(who).every(([k, x]) => a[k] === x)) ? null : v; },
+    async acceptTester(v, as, token, name, device) { if (v !== settings.tester_terms_version) throw new Error("The agreement was just updated. Please read it again.");
+      const k = as === "vendor" ? byToken(kitchens, "token", token) : null, rd = as === "rider" ? riders.find(x => x.token === token) : null; if (!as && !me) throw new Error("Sign in first.");
+      accepts.unshift({ id: "a" + uid(), created_at: nowIso(), role: as || "customer", user_id: !as && me ? me.id : null, kitchen_id: k ? k.id : null, rider_id: rd ? rd.id : null, email: !as && me ? me.email : null, name: name || (k && k.public_name) || (rd && rd.name) || null, version: v, device }); return true; },
+    async testerList() { return accepts.slice(); },
     async sendFeedback(r) { if (!["problem", "idea", "other"].includes(r.kind)) throw new Error("Choose what kind of feedback this is."); if ((r.message || "").trim().length < 2) throw new Error("Tell us a little more.");
       const k = r.as === "vendor" ? byToken(kitchens, "token", r.token) : null, rd = r.as === "rider" ? riders.find(x => x.token === r.token) : null;
       if (r.as === "vendor" && !k) throw new Error("This vendor link is not valid."); if (r.as === "rider" && !rd) throw new Error("This rider link is not valid.");
@@ -1908,6 +1920,10 @@ function makeSupabaseApi() {
         p_images: r.images || [], p_name: r.name || null, p_contact: r.contact || null, p_as: r.as || null, p_token: r.token || null });
       if (x.error && /function|schema cache/i.test(x.error.message)) throw new Error("ChopPool needs a quick update before feedback can be sent. Please tell the ChopPool team on WhatsApp.");
       return must(x); },
+    // Tester agreement: nothing blocks if the database update hasn't been run yet
+    async testerDue(as, token) { const r = await sb.rpc("tester_terms_due", { p_as: as || null, p_token: token || null }); return r.error ? null : r.data; },
+    async acceptTester(v, as, token, name, device) { return must(await sb.rpc("accept_tester_terms", { p_version: v, p_as: as || null, p_token: token || null, p_name: name || null, p_device: device || null })); },
+    async testerList() { const r = await sb.from("tester_acceptances").select("*, kitchens(public_name), riders(name)").order("created_at", { ascending: false }).limit(500); return r.error ? null : r.data; },
     async listFeedback() { const r = await sb.from("feedback").select("*, kitchens(public_name), riders(name)").order("created_at", { ascending: false }).limit(300);
       if (r.error && /feedback|schema cache|relation/i.test(r.error.message)) return null; return must(r); },
     async updateFeedback(id, patch) { must(await sb.from("feedback").update(patch).eq("id", id).select("id")); },
@@ -2369,7 +2385,7 @@ function openAccount(reason, startMode, page) {
   const head = (t, sub) => page ? `<div><h1 style="margin:0">${esc(t)}</h1><p class="muted" style="margin:6px 0 0">${esc(sub)}</p></div>` : sheetHead(t, sub);
   const finish = async () => {
     local.set("cp_had_account", true); await afterSignIn();
-    if (page) { await route(); if (S.noSite) setTimeout(() => openSitePicker(), 250); toast("Welcome to ChopPool"); }
+    if (page) { await route(); if (S.noSite && !$("#ttPage")) setTimeout(() => openSitePicker(), 250); toast("Welcome to ChopPool"); }
     else { closeSheet(); toast("You're signed in. Cashback from your orders now goes to your wallet."); }
   };
   const draw = () => put(`
@@ -2551,6 +2567,7 @@ const needAccount = () => !S.user && !(DEMO && local.get("cp_demo_guest"));
 async function viewOrder() {
   // No account on this phone yet: the welcome page asks to create one (or sign in) before anything else
   if (needAccount()) return openAccount(null, null, true);
+  if (S.user && await termsBlock()) return;
   S.tab = S.tab || "home";
   const theme = local.get("cp_theme") || "auto";
   $("#view").innerHTML = `
@@ -4359,6 +4376,48 @@ function quoteBreakdown(o) {
     <div><span><strong>Total to pay</strong></span><strong class="num">${money(o.amount_due)}</strong></div></div>
     <p class="small muted">What the pool saves on delivery comes back to your wallet as cashback after ${fmtTime(S.settings.cutoff)}.</p>`;
 }
+/* ---------- Tester agreement: accepted once (per version) by customers, vendors and riders while ChopPool is in testing ---------- */
+const TESTER_POINTS = [
+  ["It's a test version", "Things may not always work, and features, prices and vendors may change. We may contact you about your experience."],
+  ["Keep it to yourself", "Don't post or share screenshots, features, prices, vendor terms or anything else you see in ChopPool, and don't pass it to other businesses, until ChopPool launches publicly."],
+  ["Real payments are real", "Any mobile money you send is a real order and follows the normal cancellation and refund rules."],
+  ["Your feedback helps", "ChopPool may use any feedback or ideas you send to improve the service, without payment or credit."],
+  ["Your data", "We use your name, email, phone and how you use the app as set out in our privacy notice, in line with Ghana's Data Protection Act, 2012 (Act 843). You can ask us to delete it."],
+  ["Ending", "You can stop testing at any time. ChopPool can end testing or remove access at any time."]];
+const TESTER_FULL = `<p>This agreement is between you and ChopPool for taking part in testing the ChopPool app (the "Service") before its public launch. By tapping "Agree and continue" you accept it.</p>
+<p><strong>1. Test version.</strong> The Service is provided for testing, "as is". It may contain errors, be unavailable at times, or change without notice. ChopPool is not responsible for losses caused by using a test version, except where the law does not allow this to be limited.</p>
+<p><strong>2. Confidentiality.</strong> Everything you see or receive in the Service that has not been made public by ChopPool (including features, designs, screens, prices, fees, vendor and rider terms, and business information) is confidential. You agree not to publish, share, copy or disclose it to anyone, and not to use it for any purpose other than testing, until ChopPool makes it public or gives you written permission. This does not cover information that is already public through no fault of yours, or that you must disclose by law.</p>
+<p><strong>3. Orders and payments.</strong> Orders paid with real mobile money are real orders. They are delivered, cancelled and refunded under the ChopPool terms of use.</p>
+<p><strong>4. Feedback.</strong> If you send ideas, comments, photos or other feedback, ChopPool may use them freely to improve the Service, without payment or credit to you. Don't send anything you don't have the right to share.</p>
+<p><strong>5. Personal data.</strong> ChopPool handles your personal data as described in the privacy notice, in line with the Data Protection Act, 2012 (Act 843). You can ask to see, correct or delete your data by contacting ChopPool.</p>
+<p><strong>6. Ending.</strong> You may stop testing at any time. ChopPool may end the testing programme, or your access, at any time. Section 2 continues for 12 months after testing ends for you.</p>
+<p><strong>7. General.</strong> These terms are governed by the laws of Ghana. The ChopPool terms of use and privacy notice also apply. If this agreement changes, you'll be asked to accept the new version.</p>`;
+const termsSkip = () => DEMO && local.get("cp_demo_guest");   // test switch for the demo runs only
+// Shows the agreement page and returns true when this person still has to accept; remembers acceptance on this phone
+async function termsBlock(as, token) {
+  if (termsSkip() || S.settings.tester_terms_on === false) return false;
+  const who = as ? as + ":" + String(token).slice(0, 12) : S.user ? "u:" + S.user.id : null; if (!who) return false;
+  const done = local.get("cp_tt") || {}; if (S.settings.tester_terms_version && done[who] === S.settings.tester_terms_version) return false;
+  let v = null; try { v = await api.testerDue(as, token); } catch (e) {}
+  if (!v) { if (S.settings.tester_terms_version) local.set("cp_tt", { ...done, [who]: S.settings.tester_terms_version }); return false; }
+  $("#view").innerHTML = `<section class="recover gate" id="ttPage"><div class="card stack" style="gap:14px">
+      <div class="pagebrand">${LOGO(30)}<p class="brand" style="font-size:18px">ChopPool</p></div>
+      <div><h1 style="margin:0">Before you start</h1><p class="muted" style="margin:6px 0 0">ChopPool is in testing. Please read and accept this short tester agreement.</p></div>
+      <ol class="ttlist">${TESTER_POINTS.map(([t, b]) => `<li><strong>${esc(t)}.</strong> ${esc(b)}</li>`).join("")}</ol>
+      <details class="ttfull"><summary>Read the full agreement</summary><div class="small">${TESTER_FULL}</div></details>
+      <label class="choice ttok"><input type="checkbox" id="ttCheck"> <span>I've read and agree to the ChopPool tester agreement</span></label>
+      <p class="err" id="ttErr"></p><button class="btn wide" id="ttAgree" disabled>Agree and continue</button>
+      ${as ? "" : `<button class="linkbtn" id="ttOut" style="justify-self:center">Not now, sign out</button>`}
+      <p class="small muted center" style="margin:0"><a href="#terms" data-legal="terms">Terms of use</a> · <a href="#privacy" data-legal="privacy">Privacy notice</a></p></div></section>`;
+  window.scrollTo(0, 0);
+  $("#ttCheck").addEventListener("change", e => { $("#ttAgree").disabled = !e.target.checked; });
+  $("#ttOut")?.addEventListener("click", async () => { try { await api.signOut(); } catch (e) {} S.user = null; route(); });
+  $("#ttAgree").addEventListener("click", async () => { const b = $("#ttAgree"); if (b.disabled) return; const d = busyBtn(b, "Saving…");
+    try { await api.acceptTester(v, as, token, as ? null : (S.user && S.user.name) || (local.get("cp_me") || {}).name || null, (navigator.userAgent || "").slice(0, 160));
+      local.set("cp_tt", { ...(local.get("cp_tt") || {}), [who]: v }); S.settings.tester_terms_version = v; toast("Thank you. Enjoy testing ChopPool."); await route(); if (!as && S.noSite && !$("#ttPage")) setTimeout(() => openSitePicker(), 250);
+    } catch (e) { d(); $("#ttErr").textContent = cleanErr(e); try { Object.assign(S, await api.load()); } catch (e2) {} } });
+  return true;
+}
 /* ---------- Send feedback to the ChopPool team: from every screen, with up to 3 photos ---------- */
 // who: { as: "vendor"|"rider"|"team"|undefined, token, name }
 function openFeedback(who = {}) {
@@ -4772,7 +4831,7 @@ const ADMIN_SUBS = {
   menus: [["list", "Vendors"], ["reviews", "Ratings & photos"], ["requests", "Listing requests"], ["rules", "Settings"]],
   buildings: [["list", "Active"], ["requests", "New & duplicates"]],
   riders: [["list", "Riders"], ["apply", "Applications"], ["rules", "Settings"]],
-  team: [["members", "Team members"], ["payments", "Payment options", true], ["accounts", "Customer accounts", true], ["activity", "Activity log", true]]
+  team: [["members", "Team members"], ["terms", "Tester agreement"], ["payments", "Payment options", true], ["accounts", "Customer accounts", true], ["activity", "Activity log", true]]
 };
 const NETWORKS = ["MTN", "Telecel", "AirtelTigo"];
 // Team screens lock themselves: signed out after a quiet spell (owner sets 5-60 min, default 15) and after 12 hours in total
@@ -5553,6 +5612,28 @@ async function renderAdmin(cached, quiet) {   // quiet = background/refresh-butt
   }
   if (tab === "team") {
     const team = A.team || [], me = (S.user?.email || "").toLowerCase();
+    if (sub === "terms") {
+      const on = s.tester_terms_on !== false, ver = s.tester_terms_version;
+      body.innerHTML = ver == null ? `<section class="card stack"><h2>Tester agreement</h2><p class="muted">Run the latest choppool-update.sql (version 34) in Supabase once to ask testers to accept the agreement.</p></section>` : `
+        <section class="card stack"><h2>Tester agreement</h2>
+          <p class="small muted" style="margin:0">Customers (after signing in), vendors and riders accept it once before using ChopPool. Each acceptance is saved with the date and version.</p>
+          <p style="margin:0">Status: <strong>${on ? "On" : "Off"}</strong> · Version ${ver}</p>
+          ${isSuper ? `<div class="row" style="gap:8px;flex-wrap:wrap"><button class="${on ? "ghost" : "btn"}" data-ttset="${on ? "off" : "on"}">${on ? "Switch off (at launch)" : "Switch on"}</button>${on ? `<button class="ghost" data-ttset="bump">Ask everyone to accept again</button>` : ""}</div>` : `<p class="small muted" style="margin:0">Only the owner can switch it on or off.</p>`}
+          <details class="ttfull"><summary>Read the agreement</summary><div class="small"><ol class="ttlist">${TESTER_POINTS.map(([t, b]) => `<li><strong>${esc(t)}.</strong> ${esc(b)}</li>`).join("")}</ol>${TESTER_FULL}</div></details></section>
+        <section class="card stack"><h2>Who has accepted</h2><div id="ttList" class="small muted">Loading…</div></section>`;
+      if (ver != null) api.testerList().then(rows => { const el = $("#ttList"); if (!el) return;
+        if (!rows) { el.textContent = "Couldn't load the list."; return; }
+        const cur = rows.filter(r => r.version === ver), who = r => r.role === "vendor" ? (r.kitchens?.public_name || r.name || "Vendor") : r.role === "rider" ? (r.riders?.name || r.name || "Rider") : [r.name, r.email].filter(Boolean).join(" · ") || "Customer";
+        const n = role => cur.filter(r => r.role === role).length;
+        el.classList.remove("muted");
+        el.innerHTML = `<p class="muted" style="margin:0 0 8px">Version ${ver}: ${n("customer")} customer${n("customer") === 1 ? "" : "s"}, ${n("vendor")} vendor${n("vendor") === 1 ? "" : "s"}, ${n("rider")} rider${n("rider") === 1 ? "" : "s"}</p>`
+          + (cur.length ? `<div class="table-wrap"><table><tr><th>Who</th><th>As</th><th>When</th></tr>${cur.map(r => `<tr><td>${esc(who(r))}</td><td>${esc(r.role[0].toUpperCase() + r.role.slice(1))}</td><td>${esc(new Date(r.created_at).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }))}</td></tr>`).join("")}</table></div>` : `<p class="muted" style="margin:0">Nobody yet.</p>`);
+        cardTables(el); });
+      if (!body.dataset.ttwired) { body.dataset.ttwired = "1"; body.addEventListener("click", async e => { const b = e.target.closest("[data-ttset]"); if (!b || S.adminTab !== "team") return;
+        const act = b.dataset.ttset, patch = act === "on" ? { tester_terms_on: true } : act === "off" ? { tester_terms_on: false } : { tester_terms_version: (S.settings.tester_terms_version || 1) + 1 };
+        if (act === "bump" && !b.dataset.sure) { b.dataset.sure = "1"; b.textContent = "Tap again: everyone must accept again"; return; }
+        b.disabled = true; try { await api.updateSettings(patch); Object.assign(S.settings, patch); toast(act === "on" ? "Tester agreement is on" : act === "off" ? "Tester agreement is off" : "Everyone will be asked to accept again"); renderAdmin(true); } catch (er) { b.disabled = false; toast(cleanErr(er)); } }); }
+    }
     if (sub === "members") body.innerHTML = `
       <section class="card"><h2>Who does what</h2><div class="stack small">
         <p><strong>Owner</strong> · everything, including team members, payment options and money figures.</p>
@@ -6449,6 +6530,7 @@ async function route() {
   const view = h.startsWith("kitchen-") ? "kitchen" : h.startsWith("rider-") ? "rider" : h.startsWith("host-") ? "host" : h === "admin" ? "admin" : "order";
   document.querySelectorAll("#demoBar a").forEach(a => { if (a.getAttribute("href") === "#" + h || (view === "order" && a.dataset.view === "order")) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
   if (S.appReady && ["kitchen", "rider", "host"].includes(view)) introFor(h);
+  if ((view === "kitchen" || view === "rider") && await termsBlock(view === "kitchen" ? "vendor" : "rider", h.slice(view === "kitchen" ? 8 : 6))) return;
   if (view === "kitchen") return viewKitchen(h.slice(8));
   if (view === "rider") return viewRider(h.slice(6));
   if (view === "host") return viewHost(h.slice(5));
