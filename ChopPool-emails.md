@@ -39,16 +39,19 @@ Supabase → **Authentication → Emails → Templates**. For each one, set the 
 </div>
 ```
 
-### Confirm signup
+### Confirm signup (the 6-digit code)
 
-**Subject:** `Welcome to ChopPool: confirm your email`
+New accounts are only created once this code is typed into the app. Also check **Authentication → Sign In / Providers → Email**: **Confirm email** must be **on**, and the email code length should be **6**.
+
+**Subject:** `Your ChopPool code: {{ .Token }}`
 
 ```html
 <div style="font-family:Arial,Helvetica,sans-serif;max-width:480px;margin:0 auto;padding:24px;color:#1F1A17">
   <p style="font-size:20px;font-weight:bold;color:#D9480F;margin:0 0 16px">ChopPool</p>
   <h1 style="font-size:22px;margin:0 0 12px">Welcome to ChopPool</h1>
-  <p style="font-size:16px;line-height:1.5;margin:0 0 20px">Confirm your email to keep your delivery cashback and see your orders on any phone.</p>
-  <p style="margin:0 0 24px"><a href="{{ .ConfirmationURL }}" style="display:inline-block;background:#D9480F;color:#ffffff;text-decoration:none;font-weight:bold;padding:14px 24px;border-radius:12px">Confirm my email</a></p>
+  <p style="font-size:16px;line-height:1.5;margin:0 0 20px">Enter this code in the app to finish creating your account:</p>
+  <p style="font-size:34px;font-weight:bold;letter-spacing:8px;margin:0 0 20px;color:#1F1A17">{{ .Token }}</p>
+  <p style="font-size:14px;line-height:1.5;color:#6B625C;margin:0 0 8px">The code expires in 1 hour. Never share it with anyone, including people who say they are from ChopPool.</p>
   <p style="font-size:14px;line-height:1.5;color:#6B625C;margin:0">If you didn't sign up for ChopPool, ignore this email.</p>
   <p style="font-size:13px;color:#9A918A;margin:24px 0 0">ChopPool · Order together, pay less</p>
 </div>

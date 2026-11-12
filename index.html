@@ -134,6 +134,20 @@ p { margin: 0; }
 .order-card.flash { animation: ocflash 1.4s ease 1; }
 .tripbox { background: var(--surface-2); border-radius: 12px; padding: 10px 12px; display: grid; gap: 2px; }
 .tripbox p { margin: 0; }
+.fbpics { display: flex; gap: 10px; flex-wrap: wrap; } .fbpics:empty { display: none; }
+.fbpic { position: relative; width: 84px; height: 84px; border-radius: 14px; overflow: hidden; background: var(--surface-2); }
+.fbpic img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.fbpic button { position: absolute; top: 4px; right: 4px; width: 26px; height: 26px; border-radius: 50%; border: none; background: rgba(0,0,0,.6); color: #fff; display: grid; place-items: center; padding: 0; cursor: pointer; }
+.fbpic button svg { width: 14px; height: 14px; }
+.fbkind { flex-wrap: wrap; }
+.chip.fbok { background: color-mix(in srgb, var(--ok) 16%, transparent); color: var(--ok); }
+.fbitem summary { cursor: pointer; list-style: none; } .fbitem summary::-webkit-details-marker { display: none; }
+.hbtns { display: flex; gap: 8px; align-items: center; }
+.fbitem .fbmsg { white-space: pre-wrap; margin: 0; }
+.fbthumbs { display: flex; gap: 8px; flex-wrap: wrap; } .fbthumbs img { width: 96px; height: 96px; object-fit: cover; border-radius: 12px; cursor: zoom-in; background: var(--surface-2); }
+.codein { font-size: 24px; letter-spacing: .35em; text-align: center; font-variant-numeric: tabular-nums; }
+.codein::placeholder { letter-spacing: normal; font-size: 17px; }
+.gate a { color: var(--accent); font-weight: 600; text-decoration: none; }
 .recover { min-height: 70vh; display: grid; place-items: center; padding: 24px 0; }
 .recover > .card { width: min(440px, 100%); }
 .hero-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; position: relative; z-index: 1; }
@@ -1213,7 +1227,7 @@ function makeDemoApi() {
   ];
   const riders = [{ id: "r1", name: "Kwame (example rider)", phone: "0240000003", token: "demor1", active: true }];
   [...sites, ...kitchens, ...riders].forEach((x, n) => { if (!x.created_at) x.created_at = new Date(Date.now() - (40 - n * 3) * 864e5).toISOString(); });
-  const pools = [], orders = [], days = [], ledger = [], users = [], profiles = [], reviews = [], waiters = [];
+  const pools = [], orders = [], days = [], ledger = [], users = [], profiles = [], reviews = [], waiters = [], feedback = [];
   const payMethods = [{ id: "pm1", network: "MTN", number: "024 000 0000", name: "ChopPool Pilot", is_main: true, active: true, sort: 1, created_at: new Date().toISOString() }];
   const team = [{ email: "you@choppool.demo", role: "super" }, { email: "ops@choppool.demo", role: "coordinator" }];
   let me = null;
@@ -1458,8 +1472,12 @@ function makeDemoApi() {
       return { id: k.id, token: k.token, whatsapp: wa_, name: k.public_name };
     },
     async user() { return me; },
-    async signUp(email, pw, name) { if (users.some(u => u.email === email)) throw new Error("That email already has an account. Sign in instead."); if (String(pw).length < 6) throw new Error("Use at least 6 characters for the password."); me = { id: "u" + uid(), email, name: name || null }; users.push({ ...me, pw }); return me; },
-    async signIn(email, pw) { const u = users.find(x => x.email === email && x.pw === pw); if (!u) throw new Error("Wrong email or password."); me = { id: u.id, email, name: u.name }; return me; },
+    // Demo: new accounts wait for the emailed code like the live app (any 6 digits work here)
+    async signUp(email, pw, name) { if (users.some(u => u.email === email && !u.pending)) throw new Error("That email already has an account. Sign in instead."); if (String(pw).length < 6) throw new Error("Use at least 6 characters for the password.");
+      const old = users.findIndex(u => u.email === email); if (old >= 0) users.splice(old, 1); users.push({ id: "u" + uid(), email, name: name || null, pw, pending: true }); return { pending: true, email }; },
+    async verifyCode(email, code) { const u = users.find(x => x.email === email && x.pending); if (!u) throw new Error("Create your account first."); if (!/^\d{6}$/.test(code) || code === "000000") throw new Error("Token has expired or is invalid"); delete u.pending; me = { id: u.id, email, name: u.name }; return me; },
+    async resendCode(email) { return true; },
+    async signIn(email, pw) { const u = users.find(x => x.email === email && x.pw === pw); if (!u) throw new Error("Wrong email or password."); if (u.pending) { const e = new Error("Email not confirmed"); e.unconfirmed = true; throw e; } me = { id: u.id, email, name: u.name }; return me; },
     async signInGoogle() { throw new Error("Google sign-in works once the app is live. In the demo, use email and password."); },
     async sendReset(email, to) { if (!/^\S+@\S+\.\S+$/.test(email)) throw new Error("Enter a valid email address."); return true; },
     async setNewPassword(pw) { const u = users.find(x => me && x.id === me.id); if (u) u.pw = pw; return true; },
@@ -1551,6 +1569,17 @@ function makeDemoApi() {
     async kitchenReviews(kid) { return reviews.filter(r => r.kitchen_id === kid && !r.hidden).sort((a, b) => a.created_at < b.created_at ? 1 : -1).slice(0, 20); },
     async adminReviews() { return reviews.slice().sort((a, b) => a.created_at < b.created_at ? 1 : -1).map(r => ({ ...r })); },
     async hideReview(id, hidden) { Object.assign(reviews.find(r => r.id === id), { hidden }); },
+    // Feedback: photos kept on this page as data links in the demo
+    async uploadFeedbackPhoto(batch, n, blob) { return await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(blob); }); },
+    async sendFeedback(r) { if (!["problem", "idea", "other"].includes(r.kind)) throw new Error("Choose what kind of feedback this is."); if ((r.message || "").trim().length < 2) throw new Error("Tell us a little more.");
+      const k = r.as === "vendor" ? byToken(kitchens, "token", r.token) : null, rd = r.as === "rider" ? riders.find(x => x.token === r.token) : null;
+      if (r.as === "vendor" && !k) throw new Error("This vendor link is not valid."); if (r.as === "rider" && !rd) throw new Error("This rider link is not valid.");
+      const row = { id: "f" + uid(), created_at: nowIso(), role: r.as === "vendor" ? "vendor" : r.as === "rider" ? "rider" : r.as === "team" ? "team" : me ? "customer" : "guest", user_id: me ? me.id : null, kitchen_id: k ? k.id : null, rider_id: rd ? rd.id : null,
+        name: r.name || (k && k.public_name) || (rd && rd.name) || (me && me.name) || null, contact: r.contact || (me && me.email) || null, kind: r.kind, message: r.message.trim(), screen: r.screen, device: r.device, app_version: r.version, images: r.images || [], status: "new", team_note: null };
+      feedback.unshift(row); return row.id; },
+    async listFeedback() { return feedback.map(f => ({ ...f, kitchens: f.kitchen_id ? { public_name: (kitchens.find(k => k.id === f.kitchen_id) || {}).public_name } : null, riders: f.rider_id ? { name: (riders.find(x => x.id === f.rider_id) || {}).name } : null })); },
+    async updateFeedback(id, patch) { Object.assign(feedback.find(f => f.id === id) || {}, patch); },
+    async feedbackPhotoUrls(paths) { return paths.slice(); },
     async uploadReviewPhoto(orderId, blob) { return await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(blob); }); },
     async vendorSetPhoto(token, itemId, url) { const k = byToken(kitchens, "token", token); const i = items.find(x => x.id === itemId && x.kitchen_id === k.id); if (!i) throw new Error("That dish is not on your menu."); i.photo_url = url; i.photo_status = "pending"; },
     async uploadPhoto(folder, blob) { return await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(blob); }); },
@@ -1792,8 +1821,17 @@ function makeSupabaseApi() {
       return shape(ses.user);
     },
     onSignedIn(fn) { sbCustomer.auth.onAuthStateChange(ev => { if (ev === "SIGNED_IN" || ev === "TOKEN_REFRESHED" || ev === "INITIAL_SESSION") setTimeout(fn, 0); }); },
-    async signUp(email, password, name) { const d = must(await sb.auth.signUp({ email, password, options: { data: { name: name || null } } })); if (!d.session) throw new Error("Check your email to confirm your account, then sign in."); return { id: d.user.id, email, name: name || null }; },
-    async signIn(email, password) { const d = must(await sb.auth.signInWithPassword({ email, password })); return { id: d.user.id, email, name: (d.user.user_metadata && d.user.user_metadata.name) || null }; },
+    // With "Confirm email" on, Supabase emails a code and returns no session until it's entered
+    async signUp(email, password, name) { const d = must(await sb.auth.signUp({ email, password, options: { data: { name: name || null }, emailRedirectTo: baseUrl() } }));
+      if (d.user && Array.isArray(d.user.identities) && !d.user.identities.length) throw new Error("That email already has an account. Sign in instead.");
+      if (!d.session) return { pending: true, email }; return { id: d.user.id, email, name: name || null }; },
+    async verifyCode(email, token) { let r = await sb.auth.verifyOtp({ email, token, type: "signup" });
+      if (r.error && /expired|invalid/i.test(r.error.message)) { const r2 = await sb.auth.verifyOtp({ email, token, type: "email" }); if (!r2.error) r = r2; }
+      const d = must(r); return d.user ? { id: d.user.id, email, name: (d.user.user_metadata && d.user.user_metadata.name) || null } : null; },
+    async resendCode(email) { must(await sb.auth.resend({ type: "signup", email, options: { emailRedirectTo: baseUrl() } })); return true; },
+    async signIn(email, password) { const r = await sb.auth.signInWithPassword({ email, password });
+      if (r.error && /not confirmed/i.test(r.error.message)) { const e = new Error("Confirm your email first. We've sent you a new code."); e.unconfirmed = true; throw e; }
+      const d = must(r); return { id: d.user.id, email, name: (d.user.user_metadata && d.user.user_metadata.name) || null }; },
     async signInGoogle() { must(await sb.auth.signInWithOAuth({ provider: "google", options: { redirectTo: baseUrl() } })); },
     async fixPayment(id, phone, ref) { return rpc("fix_payment", { p_order: id, p_phone: phone || "", p_ref: ref }); },
     async setPayIssue(id, issue, amount) { const patch = issue === "found" ? { status: "paid", pay_issue: null, amount_received: null } : { pay_issue: issue, amount_received: issue === "short" ? Number(amount) || 0 : null };
@@ -1855,6 +1893,20 @@ function makeSupabaseApi() {
       if (r.error) throw new Error(/reviews|schema cache|relation/i.test(r.error.message) ? "Run the latest ChopPool update in Supabase once to see reviews." : r.error.message);
       return r.data.map(x => ({ ...x, name: ((x.orders || {}).customer_name || "").split(" ")[0], item_name: (x.orders || {}).item_name })); },
     async hideReview(id, hidden) { must(await sb.from("reviews").update({ hidden }).eq("id", id)); },
+    // Feedback photos go to the private "feedback" bucket; only the team can open them (short-lived links)
+    async uploadFeedbackPhoto(batch, n, blob) {
+      const path = "fb/" + batch + "/" + n + "-" + Date.now().toString(36) + (blob.type === "image/webp" ? ".webp" : ".jpg");
+      const r = await sb.storage.from("feedback").upload(path, blob, { contentType: blob.type, upsert: false });
+      if (r.error) throw new Error(/bucket|not found/i.test(r.error.message) ? "ChopPool needs a quick update before photos can be sent. Send it without photos for now." : r.error.message);
+      return path; },
+    async sendFeedback(r) { const x = await sb.rpc("send_feedback", { p_kind: r.kind, p_message: r.message, p_screen: r.screen || null, p_device: r.device || null, p_version: r.version || null,
+        p_images: r.images || [], p_name: r.name || null, p_contact: r.contact || null, p_as: r.as || null, p_token: r.token || null });
+      if (x.error && /function|schema cache/i.test(x.error.message)) throw new Error("ChopPool needs a quick update before feedback can be sent. Please tell the ChopPool team on WhatsApp.");
+      return must(x); },
+    async listFeedback() { const r = await sb.from("feedback").select("*, kitchens(public_name), riders(name)").order("created_at", { ascending: false }).limit(300);
+      if (r.error && /feedback|schema cache|relation/i.test(r.error.message)) return null; return must(r); },
+    async updateFeedback(id, patch) { must(await sb.from("feedback").update(patch).eq("id", id).select("id")); },
+    async feedbackPhotoUrls(paths) { if (!paths.length) return []; const r = await sb.storage.from("feedback").createSignedUrls(paths, 3600); return must(r).map(x => x.signedUrl || ""); },
     async uploadReviewPhoto(orderId, blob) {
       const path = "reviews/" + orderId + "/" + Date.now().toString(36) + (blob.type === "image/webp" ? ".webp" : ".jpg");
       const r = await sb.storage.from("dish-photos").upload(path, blob, { contentType: blob.type, cacheControl: "31536000", upsert: false });
@@ -2024,6 +2076,7 @@ const GLYPH = {
   x: '<svg class="gl" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg>',
 };
 const ICON = {
+  chat: SV(`<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20.5l1.4-4.6A8 8 0 1 1 21 12z"/><path d="M8.5 10.5h7M8.5 14h4.5"/>`),
   bell: SV(`<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>`),
   auto: SV(`<circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/>`),
   light: SV(`<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>`),
@@ -2214,6 +2267,7 @@ const ghanaNow = () => new Date().toISOString().slice(11, 16);
 const addDays = (iso, n) => new Date(Date.parse(iso + "T00:00:00Z") + n * 864e5).toISOString().slice(0, 10);
 const dayLabel = iso => { const t = today(), d = new Date(Date.now() + 864e5).toISOString().slice(0, 10); return iso === t ? "today" : iso === d ? "tomorrow" : fmtDate(iso); };
 const firstName = () => String((S.user && S.user.name) || (local.get("cp_me") || {}).name || "").trim().split(/\s+/)[0] || "";
+const fbBtn = as => `<button class="iconbtn" data-feedback="${as}" aria-label="Send feedback" title="Send feedback">${ICON.chat}</button>`;
 const sheetHead = (title, sub) => `<div class="top" style="align-items:flex-start"><div><h2 id="sheetTitle">${title}</h2>${sub ? `<p class="small muted">${sub}</p>` : ""}</div><button class="closex" data-close aria-label="Close">${ICON.close}</button></div>`;
 
 /* =====================================================================================
@@ -2226,6 +2280,7 @@ async function refreshUser() {
   if (S.user) { try { const w = await api.wallet(); S.balance = Number(w.balance) || 0; S.walletEntries = w.entries || []; } catch (e) {}
     // Saved payment methods follow the account to any phone
     try { const pr = api.getProfile && await api.getProfile(); if (pr && Array.isArray(pr.pay_methods) && pr.pay_methods.length) local.set("cp_paymethods", pr.pay_methods); else if (payMethods().length) api.saveProfile({ pay_methods: payMethods() }).catch(() => {}); } catch (e) {} }
+  if (S.user && $("#gate") && !$("#codeForm")) return route();
   renderHero(); updateBellDot();
   if (S.tab === "wallet") renderWallet();
 }
@@ -2299,11 +2354,21 @@ function viewRecovery() {
   });
   $("#npCancel").addEventListener("click", async () => { try { await api.signOut(); } catch (e) {} S.recovery = false; S.user = null; route(); });
 }
-function openAccount(reason, startMode) {
-  // Phones that have signed in before open on Sign in; "I already have an account" always does
+// Sign-in and sign-up, in a sheet (from inside the app) or as the full welcome page (no account yet on this phone).
+// A new account is only created once the 6-digit code sent to the email is entered, so nobody signs up with someone else's email.
+function openAccount(reason, startMode, page) {
   let mode = startMode || (local.get("cp_had_account") ? "signin" : "signup");
-  const draw = () => openSheet(`
-    ${sheetHead(mode === "signup" ? "Create your account" : "Welcome back", mode === "signup" ? "Keep your delivery cashback and order from any phone." : "Sign in to see your wallet and orders.")}
+  const put = html => page ? ($("#view").innerHTML = `<section class="recover gate" id="gate"><div class="card stack" style="gap:14px">
+      <div class="pagebrand">${LOGO(30)}<p class="brand" style="font-size:18px">ChopPool</p></div>${html}
+      <p class="small muted center" style="margin:0">By continuing you agree to the <a href="#terms" data-legal="terms">terms</a> and <a href="#privacy" data-legal="privacy">privacy notice</a>.</p></div></section>`) : openSheet(html);
+  const head = (t, sub) => page ? `<div><h1 style="margin:0">${esc(t)}</h1><p class="muted" style="margin:6px 0 0">${esc(sub)}</p></div>` : sheetHead(t, sub);
+  const finish = async () => {
+    local.set("cp_had_account", true); await afterSignIn();
+    if (page) { await route(); if (S.noSite) setTimeout(() => openSitePicker(), 250); toast("Welcome to ChopPool"); }
+    else { closeSheet(); toast("You're signed in. Cashback from your orders now goes to your wallet."); }
+  };
+  const draw = () => put(`
+    ${head(mode === "signup" ? "Create your account" : "Welcome back", mode === "signup" ? "Order with your building and get your delivery savings back in your wallet." : "Sign in to see your wallet and orders.")}
     ${reason ? `<p class="note">${esc(reason)}</p>` : ""}
     ${CONFIG.GOOGLE_SIGN_IN || DEMO ? `<button class="ghost wide" id="google">Continue with Google</button><p class="small muted center">or use your email</p>` : ""}
     <form id="authForm" class="stack" novalidate>
@@ -2315,6 +2380,7 @@ function openAccount(reason, startMode) {
       ${mode === "signin" ? `<button type="button" class="linkbtn" id="forgot" style="justify-self:center">Forgot password?</button>` : ""}
     </form>
     <p class="small center">${mode === "signup" ? "Already have an account?" : "New to ChopPool?"} <button class="linkbtn" id="swap">${mode === "signup" ? "Sign in" : "Create an account"}</button></p>`);
+  const askCode = (email, sent) => codeStep(html => put(head("Check your email", "Enter the code to finish creating your account.") + html), email, sent, finish, () => { draw(); wire(); });
   const wire = () => {
     $("#swap").addEventListener("click", () => { mode = mode === "signup" ? "signin" : "signup"; draw(); wire(); });
     $("#forgot")?.addEventListener("click", () => openForgot($("#aEmail").value.trim()));
@@ -2322,20 +2388,47 @@ function openAccount(reason, startMode) {
     $("#authForm").addEventListener("submit", async ev => {
       ev.preventDefault();
       const sb = $("#authForm [type=submit]"); if (sb.disabled) return;
-      const email = $("#aEmail").value.trim(), pw = $("#aPw").value;
+      const email = $("#aEmail").value.trim().toLowerCase(), pw = $("#aPw").value;
       if (!/^\S+@\S+\.\S+$/.test(email)) return ($("#aErr").textContent = "Enter a valid email address.");
       if (pw.length < 6) return ($("#aErr").textContent = "Use at least 6 characters for the password.");
       const nm = mode === "signup" ? $("#aName").value.trim() : "";
       if (mode === "signup" && nm.length < 2) return ($("#aErr").textContent = "Add your name.");
       $("#aErr").textContent = ""; const done = busyBtn(sb, mode === "signup" ? "Creating your account…" : "Signing in…");
       try {
-        mode === "signup" ? await api.signUp(email, pw, nm) : await api.signIn(email, pw); local.set("cp_had_account", true);
-        await afterSignIn();
-        closeSheet(); toast("You're signed in. Cashback from your orders now goes to your wallet.");
-      } catch (e) { done(); $("#aErr").textContent = cleanErr(e); }
+        if (mode === "signup") { const r = await api.signUp(email, pw, nm); if (r && r.pending) return askCode(email, true); }
+        else await api.signIn(email, pw);
+        await finish();
+      } catch (e) {
+        if (e && e.unconfirmed) { try { await api.resendCode(email); } catch (e2) {} return askCode(email, true); }   // signed up before but never entered the code
+        done(); $("#aErr").textContent = cleanErr(e); }
     });
   };
   draw(); wire();
+}
+// The 6-digit code step (customers and team). render(html) draws it; done() runs once the code is accepted.
+function codeStep(render, email, sent, done, back) {
+  render(`<form id="codeForm" class="stack" novalidate>
+      <p class="muted" style="margin:0">We sent a code to <strong>${esc(email)}</strong>. It can take a minute; check your spam folder too.</p>
+      <div><label for="cCode">Code</label><input id="cCode" class="codein" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="6-digit code"></div>
+      <p class="err" id="cErr"></p>
+      <button class="btn wide" type="submit">Confirm</button>
+      <p class="small center" style="margin:0"><button type="button" class="linkbtn" id="cResend"></button> · <button type="button" class="linkbtn" id="cBack">Use a different email</button></p></form>`);
+  const rb = $("#cResend"); let left = sent ? 60 : 0, tm = null;
+  const tick = () => { if (!$("#cResend")) return clearInterval(tm); rb.disabled = left > 0; rb.textContent = left > 0 ? `Send a new code in ${left}s` : "Send a new code"; if (left > 0) left--; else clearInterval(tm); };
+  tick(); tm = setInterval(tick, 1000);
+  setTimeout(() => $("#cCode")?.focus(), 200);
+  $("#cCode").addEventListener("input", e => { e.target.value = e.target.value.replace(/\D/g, "").slice(0, 8); });
+  $("#cBack").addEventListener("click", () => { clearInterval(tm); back(); });
+  rb.addEventListener("click", async () => { if (rb.disabled) return; rb.disabled = true;
+    try { await api.resendCode(email); left = 60; clearInterval(tm); tick(); tm = setInterval(tick, 1000); toast("New code sent"); } catch (e) { rb.disabled = false; $("#cErr").textContent = cleanErr(e); } });
+  $("#codeForm").addEventListener("submit", async ev => {
+    ev.preventDefault(); const b = $("#codeForm [type=submit]"); if (b.disabled) return;
+    const code = $("#cCode").value.trim();
+    if (!/^\d{6,8}$/.test(code)) return ($("#cErr").textContent = "Enter the 6-digit code from the email.");
+    $("#cErr").textContent = ""; const d = busyBtn(b, "Checking…");
+    try { await api.verifyCode(email, code); clearInterval(tm); await done(); }
+    catch (e) { d(); $("#cErr").textContent = /expired|invalid|token/i.test(e.message || "") ? "That code is wrong or has expired. Check it, or send a new code." : cleanErr(e); }
+  });
 }
 async function afterSignIn() {
   const me = local.get("cp_me") || {};
@@ -2448,7 +2541,11 @@ function movePill() {
   pill.style.width = b.offsetWidth + "px"; pill.style.height = b.offsetHeight + "px"; pill.style.transform = `translate(${b.offsetLeft}px, ${b.offsetTop}px)`;
 }
 window.addEventListener("resize", () => movePill());
+// Customers need an account (the demo can skip this with a test switch)
+const needAccount = () => !S.user && !(DEMO && local.get("cp_demo_guest"));
 async function viewOrder() {
+  // No account on this phone yet: the welcome page asks to create one (or sign in) before anything else
+  if (needAccount()) return openAccount(null, null, true);
   S.tab = S.tab || "home";
   const theme = local.get("cp_theme") || "auto";
   $("#view").innerHTML = `
@@ -3044,7 +3141,7 @@ const locChip = () => `<button class="locchip" aria-label="Change building">${IC
 const hasMineToday = () => (S.mine || []).some(o => o.order_date === S.date && o.status !== "cancelled");
 const favs = () => new Set(local.get("cp_favs") || []);
 function toggleFav(kid) { const f = favs(); f.has(kid) ? f.delete(kid) : f.add(kid); local.set("cp_favs", [...f]); return f.has(kid); }
-const VFILTERS = [["fav", "♥ Favourites"], ["near", "Nearest"], ["top", "Top rated"], ["pools", "Pools open"], ["local", "Local dishes"], ["healthy", "Salads and bowls"], ["far", "Further away"]];
+const VFILTERS = [["fav", "♥ Favourites"], ["near", "Near you"], ["top", "Top rated"], ["pools", "Pools open"], ["local", "Local dishes"], ["healthy", "Salads and bowls"], ["far", "Further away"]];
 const LOCAL_KINDS = new Set(["jollof", "waakye", "banku", "fufu", "kenkey", "tuo", "omotuo", "redred", "gob3", "kelewele", "ampesi", "ricestew", "soup", "koko", "yam"]);
 const HEALTHY_KINDS = new Set(["salad", "bowl", "wrap"]);
 const kindsOf = k => new Set(S.items.filter(i => i.kitchen_id === k.id).map(i => dishKind(i)));
@@ -3118,7 +3215,7 @@ function vendorRow(k) {
 // Vendors with a pin near this building, nearest first
 function nearRows() {
   const site = siteOf(S.siteId), base = hasPin(site) ? site : S.here || null, lim = Number(S.settings.near_max_fee || 50);
-  const rows = menusHere().map(k => ({ k, pin: kPin(k, site) })).filter(r => r.pin).map(r => ({ k: r.k, d: base ? distM(base, r.pin) : null, trip: tripTo(r.k, site) }));
+  const rows = menusHere().filter(k => !k.added_by_customer).map(k => ({ k, pin: kPin(k, site) })).filter(r => r.pin).map(r => ({ k: r.k, d: base ? distM(base, r.pin) : null, trip: tripTo(r.k, site) }));
   const inArea = r => r.k.site_id === S.siteId || r.d == null || r.d <= NEAR_KITCHEN_M;
   const byD = (a, b) => (a.d ?? 1e12) - (b.d ?? 1e12);
   // Near you: delivery at or under the limit (or free). Further away: still orderable, delivery above the limit.
@@ -3198,19 +3295,25 @@ function syncVChips() {
   document.querySelectorAll("#vchips [data-vf]").forEach(b => { b.setAttribute("aria-pressed", String(b.dataset.vf === S.vf)); if (b.dataset.vf === "far") b.classList.toggle("hidden", !hasFar); });
   if ($("#vq") && S.vq === "") $("#vq").value = "";
 }
-function vendorPool() { if (S.noSite) return S.menus.filter(k => !k.site_id); const nr = nearRows(); return nr.rows.concat(nr.further).map(r => r.k); }
+// Every vendor listed on ChopPool (the team's list; vendors added by customers are left out for now), nearest first
+function allRows() {
+  const site = siteOf(S.siteId), base = hasPin(site) ? site : S.here || null;
+  return S.menus.filter(k => !k.added_by_customer && (!k.site_id || k.site_id === S.siteId)).map(k => ({ k, d: base && hasPin(k) ? distM(base, k) : null })).sort((a, b) => (a.d ?? 1e12) - (b.d ?? 1e12));
+}
+function vendorPool() { return allRows().map(r => r.k); }
 function renderKitchens() {
   const el = $("#kitchensList"); if (!el) return;
   syncVChips();
   const view = local.get("cp_vview") || "grid", f = S.vf || "near", fv = favs(), site = siteOf(S.siteId);
   let rows, far = 0;
   let further = [];
-  if (S.noSite) rows = S.menus.filter(k => !k.site_id).map(k => ({ k, d: null }));
+  // "Near you" keeps to vendors close to your building; every other filter looks across all vendors on ChopPool
+  if (S.noSite || !["near", "far"].includes(f)) rows = allRows();
   else { const nr = nearRows(); rows = nr.rows; far = nr.far; further = nr.further; }
-  $("#kitchensSub").textContent = S.noSite ? "Top vendors across Accra. Choose your building to see delivery prices." : (far ? far + " more too far to deliver here." : "");
+  $("#kitchensSub").textContent = S.noSite ? "Top vendors across Accra. Choose your building to see delivery prices." : f === "near" ? (far ? "Close to " + (site.name || "your building") + ". See the other filters for all vendors." : "") : "All vendors on ChopPool";
   const pick = list => list.filter(r => (f !== "fav" || fv.has(r.k.id)) && (f !== "pools" || (!S.noSite && activeHere(r.k)))
     && (f !== "local" || [...kindsOf(r.k)].some(x => LOCAL_KINDS.has(x))) && (f !== "healthy" || [...kindsOf(r.k)].some(x => HEALTHY_KINDS.has(x))));
-  // Each filter shows nearby vendors only; vendors with a higher delivery cost have their own "Further away" tab
+  // Near you: vendors with a higher delivery cost have their own "Further away" tab
   if (f === "far") { rows = further; further = []; } else rows = pick(rows);
   const farCount = f === "near" ? further.length : 0;
   if (f === "top" || S.noSite) rows.sort((a, b) => (((S.scores || {})[b.k.id] || {}).rating || 0) - (((S.scores || {})[a.k.id] || {}).rating || 0) || rank(b.k) - rank(a.k));
@@ -3414,7 +3517,7 @@ async function loadVendorReviews(k) {
   const box = $("#vpBody"); if (!box || !S.vp || S.vp.id !== k.id || S.vp.tab !== "rev") return;
   const sc = (S.scores || {})[k.id] || {}, n = rs.length, dist = [5, 4, 3, 2, 1].map(x => [x, n ? Math.round(rs.filter(r => r.rating === x).length / n * 100) : 0]);
   const vendorPics = S.items.filter(i => i.kitchen_id === k.id && i.photo_url).map(i => ({ photo_url: i.photo_url, vendor: true, item_name: i.name }));
-  const pics = rs.filter(r => r.photo_url).concat(vendorPics), notes = rs.filter(r => r.comment || r.rating);
+  const pics = vendorPics, notes = rs.filter(r => r.comment || r.rating);
   const avg = sc.ratings ? Number(sc.rating) : n ? rs.reduce((t, r) => t + r.rating, 0) / n : 0;
   box.innerHTML = (avg ? `<div class="rsum"><div class="big"><b>${avg.toFixed(1)}</b><span>${sc.ratings || n} rating${(sc.ratings || n) > 1 ? "s" : ""}</span></div><div class="rbars">${dist.map(([x, pc]) => `<div>${x}<i><u style="width:${pc}%"></u></i></div>`).join("")}</div></div>` : "")
     + (pics.length ? `<h3 class="vcat">Photos</h3><div class="photostrip">${pics.map((r, m) => `<button type="button" class="pshot" data-shot="${m}"><img src="${esc(r.photo_url)}" alt="" loading="lazy"><span>${r.vendor ? "From the vendor" : starsOf(r.rating, 10)}</span></button>`).join("")}</div>` : "")
@@ -3763,6 +3866,7 @@ async function renderWallet() {
       <button class="grow" data-acc="building"><span class="gic">${ICON.pin.replace('width="13" height="13"', 'width="18" height="18"')}</span><span class="gtx">My buildings<small>${esc(recent.slice(0, 2).join(", ") || site.name || "Choose your building")}</small></span><span class="ch">›</span></button>
       <button class="grow" data-acc="theme"><span class="gic">${ICON.dark}</span><span class="gtx">Appearance<small>${esc(themeLabel())}</small></span><span class="ch">›</span></button>
       ${isStandalone() ? "" : `<button class="grow" data-install="#order"><span class="gic">${ICON.download}</span><span class="gtx">Get the app<small>One tap from your home screen${pushReady() ? ", with alerts" : ""}</small></span><span class="ch">›</span></button>`}
+      <button class="grow" data-acc="feedback"><span class="gic">${ICON.chat}</span><span class="gtx">Send feedback<small>Report a problem or share an idea, with photos</small></span><span class="ch">›</span></button>
       <button class="grow" data-acc="help"><span class="gic">${ICON.help}</span><span class="gtx">How ChopPool works</span><span class="ch">›</span></button>
       <button class="grow" data-acc="legal"><span class="gic">${ICON.list}</span><span class="gtx">Privacy and terms</span><span class="ch">›</span></button>
       ${S.user ? `<button class="grow" data-acc="signout"><span class="gic">${ICON.out}</span><span class="gtx">Sign out<small>${esc(S.user.email || "")}</small></span></button>` : ""}
@@ -3777,6 +3881,7 @@ async function accountClick(e) {
   const a = e.target.closest("[data-acc]"); if (!a) return;
   const t = a.dataset.acc;
   if (t === "notif") return openNotifSettings();
+  if (t === "feedback") return openFeedback();
   if (t === "profile") return openProfile(true);
   if (t === "payments") return openPayments();
   if (t === "building") return openSitePicker();
@@ -3784,7 +3889,7 @@ async function accountClick(e) {
   if (t === "help") return openHelp();
   if (t === "legal") return openLegal("privacy");
   if (t === "signin") return openAccount();
-  if (t === "signout") { await api.signOut(); S.user = null; await refreshUser(); refreshMine(); renderWallet(); toast("Signed out"); }
+  if (t === "signout") { await api.signOut(); S.user = null; await refreshUser(); S.tab = "home"; toast("Signed out"); return route(); }
 }
 // Payments: the mobile money number you pay with and its network; built to hold more methods later
 // Payment methods: wallet first, then up to 3 mobile money numbers with one default
@@ -3952,12 +4057,12 @@ function openIntro() {
     <div class="intro-foot"><div class="intro-dots">${cards.map((_, n) => `<i${n === 0 ? ' class="on"' : ""}></i>`).join("")}</div><button class="btn" data-inext>Next</button></div></div>`;
   document.body.appendChild(el); requestAnimationFrame(() => el.classList.add("on"));
   const track = el.querySelector(".intro-track"), at_ = () => Math.round(track.scrollLeft / track.clientWidth);
-  const sync = () => { const n = at_(); el.querySelectorAll(".intro-dots i").forEach((d, i) => d.classList.toggle("on", i === n)); el.querySelector("[data-inext]").textContent = n === cards.length - 1 ? (S.noSite ? "Choose your building" : "Start ordering") : "Next"; };
+  const sync = () => { const n = at_(); el.querySelectorAll(".intro-dots i").forEach((d, i) => d.classList.toggle("on", i === n)); el.querySelector("[data-inext]").textContent = n === cards.length - 1 ? (needAccount() ? "Get started" : S.noSite ? "Choose your building" : "Start ordering") : "Next"; };
   track.addEventListener("scroll", () => requestAnimationFrame(sync), { passive: true });
   const finish = () => { local.set("cp_intro_done", true); el.classList.remove("on"); setTimeout(() => el.remove(), 300); };
   el.addEventListener("click", e => {
     if (e.target.closest("[data-iskip]")) return finish();
-    if (e.target.closest("[data-inext]")) { const n = at_(); if (n < cards.length - 1) track.scrollTo({ left: (n + 1) * track.clientWidth, behavior: "smooth" }); else { finish(); if (S.noSite) setTimeout(() => openSitePicker(), 320); } }
+    if (e.target.closest("[data-inext]")) { const n = at_(); if (n < cards.length - 1) track.scrollTo({ left: (n + 1) * track.clientWidth, behavior: "smooth" }); else { finish(); if (!needAccount() && S.noSite) setTimeout(() => openSitePicker(), 320); else if (needAccount()) setTimeout(() => $("#aName, #aEmail")?.focus(), 320); } }
   });
 }
 // Seller, rider and drop-point links: one card the first time each is opened
@@ -4230,28 +4335,60 @@ function quoteBreakdown(o) {
     <div><span><strong>Total to pay</strong></span><strong class="num">${money(o.amount_due)}</strong></div></div>
     <p class="small muted">What the pool saves on delivery comes back to your wallet as cashback after ${fmtTime(S.settings.cutoff)}.</p>`;
 }
-/* ---------- Ratings and photos from customers (collected orders only) ---------- */
+/* ---------- Send feedback to the ChopPool team: from every screen, with up to 3 photos ---------- */
+// who: { as: "vendor"|"rider"|"team"|undefined, token, name }
+function openFeedback(who = {}) {
+  let kind = "problem"; const pics = [];   // { blob, url }
+  const guest = !who.as && (!S.user || who.screen);
+  const where = () => { const h = location.hash.slice(1); if (who.screen) return who.screen; return who.as ? who.as + (who.as === "team" ? ":" + (S.adminTab || "") : "") : "customer:" + (h.startsWith("join=") ? "join" : S.vp ? "vendor page" : ({ wallet: "account", kitchens: "vendors" })[S.tab] || S.tab || "home"); };
+  const KINDS = [["problem", "Something's wrong"], ["idea", "An idea"], ["other", "Something else"]];
+  openSheet(`${sheetHead("Send feedback", "Tell the ChopPool team what isn't working or what would make it better. We read every message.")}
+    <div class="fchips fbkind" role="group" aria-label="Kind">${KINDS.map(([k, l]) => `<button type="button" data-fk="${k}" aria-pressed="${k === kind}">${l}</button>`).join("")}</div>
+    <div><label for="fbText">Your message</label><textarea id="fbText" rows="5" maxlength="2000" placeholder="What happened, and where in the app?"></textarea></div>
+    <div class="fbpics" id="fbPics"></div>
+    <button type="button" class="ghost wide" id="fbAdd">${CAM} Add a photo or screenshot</button>
+    ${guest ? `<div class="grid2"><div><label for="fbName">Your name (optional)</label><input id="fbName" autocomplete="name"></div><div><label for="fbContact">Phone or email (optional)</label><input id="fbContact" autocomplete="email" placeholder="So we can reply"></div></div>` : ""}
+    <p class="small muted">We also send which screen you were on and your phone type, to help us fix things faster.</p>
+    <p class="err" id="fbErr"></p><div class="sheet-foot"><button class="btn wide" id="fbSend">Send feedback</button></div>`);
+  const drawPics = () => { $("#fbPics").innerHTML = pics.map((p, n) => `<span class="fbpic"><img src="${p.url}" alt="Photo ${n + 1}"><button type="button" data-fbx="${n}" aria-label="Remove photo">${ICON.close}</button></span>`).join("");
+    $("#fbAdd").classList.toggle("hidden", pics.length >= 3); };
+  $("#sheet").querySelector(".fbkind").addEventListener("click", e => { const b = e.target.closest("[data-fk]"); if (!b) return; kind = b.dataset.fk; $("#sheet").querySelectorAll("[data-fk]").forEach(x => x.setAttribute("aria-pressed", String(x === b))); });
+  $("#fbPics").addEventListener("click", e => { const b = e.target.closest("[data-fbx]"); if (!b) return; const [p] = pics.splice(+b.dataset.fbx, 1); URL.revokeObjectURL(p.url); drawPics(); });
+  $("#fbAdd").addEventListener("click", () => { const inp = document.createElement("input"); inp.type = "file"; inp.accept = "image/*"; inp.multiple = true;
+    inp.onchange = async () => { for (const f of [...(inp.files || [])].slice(0, 3 - pics.length)) { try { const blob = await compressImage(f); pics.push({ blob, url: URL.createObjectURL(blob) }); } catch (e) { toast(cleanErr(e)); } } drawPics(); }; inp.click(); });
+  $("#fbSend").addEventListener("click", async () => {
+    const btn = $("#fbSend"); if (btn.disabled) return;
+    const msg = $("#fbText").value.trim(); if (msg.length < 2) return ($("#fbErr").textContent = "Tell us a little more.");
+    $("#fbErr").textContent = ""; const done = busyBtn(btn, pics.length ? "Sending photos…" : "Sending…");
+    try {
+      const batch = (crypto.randomUUID ? crypto.randomUUID() : "10000000-1000-4000-8000-100000000000".replace(/[018]/g, c => (c ^ Math.random() * 16 >> c / 4).toString(16)));
+      const images = []; for (let n = 0; n < pics.length; n++) images.push(await api.uploadFeedbackPhoto(batch, n + 1, pics[n].blob));
+      const me = local.get("cp_me") || {};
+      await api.sendFeedback({ kind, message: msg, images, as: who.as, token: who.token, screen: where(),
+        device: (navigator.userAgent || "").replace(/Mozilla\/5\.0 /, "").slice(0, 160) + " · " + innerWidth + "×" + innerHeight + (isStandalone() ? " · app" : " · browser"), version: "web",
+        name: guest ? ($("#fbName").value || "").trim() : who.name || (S.user && S.user.name) || me.name || null, contact: guest ? ($("#fbContact").value || "").trim() : (S.user && S.user.email) || null });
+      pics.forEach(p => URL.revokeObjectURL(p.url)); closeSheet(); toast("Thank you. Your feedback is with the ChopPool team.");
+    } catch (e) { done(); $("#fbErr").textContent = cleanErr(e); }
+  });
+}
+/* ---------- Ratings from customers (collected orders only): stars and words, no photos ---------- */
 const STAR = (on, w = 16) => `<svg width="${w}" height="${w}" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.9 6.4.8-4.7 4.4 1.2 6.3L12 17.1l-5.7 3.1 1.2-6.3L2.8 9.5l6.4-.8z" fill="${on ? "#F5B04A" : "none"}" stroke="${on ? "#E39A1E" : "currentColor"}" stroke-width="1.6" stroke-linejoin="round"/></svg>`;
 const starsOf = (n, w) => [1, 2, 3, 4, 5].map(i => STAR(i <= Math.round(n), w)).join("");
 function openReview(o, start) {
-  let rating = start || o.my_rating || 0, blob = null;
+  let rating = start || o.my_rating || 0;
   const k = menuOf(o.kitchen_id);
   openSheet(`${sheetHead("How was lunch?", esc(o.qty + " × " + o.item_name) + " from " + esc(k.public_name || "the vendor"))}
     <div class="bigstars" id="rvStars" role="radiogroup" aria-label="Rating">${[1, 2, 3, 4, 5].map(i => `<button type="button" data-s="${i}" aria-label="${i} star${i > 1 ? "s" : ""}">${STAR(i <= rating, 38)}</button>`).join("")}</div>
     <div><label for="rvText">Tell others (optional)</label><textarea id="rvText" rows="3" maxlength="280" placeholder="Generous portion, still warm, great shito">${esc(o.my_comment || "")}</textarea></div>
-    <div class="rvphoto"><button type="button" class="ghost" id="rvPick">${CAM} ${o.my_photo ? "Change photo" : "Add a photo of your food"}</button><div id="rvPrev">${o.my_photo ? `<img src="${esc(o.my_photo)}" alt="">` : ""}</div></div>
-    <p class="small muted">Only customers who collected their lunch can rate it. Photos show on ${esc(k.public_name || "the vendor")}'s menu.</p>
+    <p class="small muted">Only customers who collected their lunch can rate it. Your rating shows on ${esc(k.public_name || "the vendor")}'s page.</p>
     <p class="err" id="rvErr"></p><div class="sheet-foot"><button class="btn wide" id="rvSend">Send rating</button></div>`);
   const draw = () => $("#rvStars").querySelectorAll("[data-s]").forEach(b => { b.innerHTML = STAR(+b.dataset.s <= rating, 38); b.setAttribute("aria-checked", String(+b.dataset.s === rating)); });
   $("#rvStars").addEventListener("click", e => { const b = e.target.closest("[data-s]"); if (b) { rating = +b.dataset.s; draw(); } });
-  $("#rvPick").addEventListener("click", () => { const inp = document.createElement("input"); inp.type = "file"; inp.accept = "image/*";
-    inp.onchange = async () => { const f = inp.files && inp.files[0]; if (!f) return; try { blob = await compressImage(f); $("#rvPrev").innerHTML = `<img src="${URL.createObjectURL(blob)}" alt="">`; } catch (e) { toast(cleanErr(e)); } }; inp.click(); });
   $("#rvSend").addEventListener("click", async () => {
     if (!rating) return ($("#rvErr").textContent = "Tap the stars to rate it.");
     const btn = $("#rvSend"); btn.disabled = true; btn.textContent = "Sending…";
     try {
-      const photo = blob ? await api.uploadReviewPhoto(o.id, blob) : null;
-      await api.submitReview(o.id, (local.get("cp_me") || {}).phone || "", rating, $("#rvText").value, photo);
+      await api.submitReview(o.id, (local.get("cp_me") || {}).phone || "", rating, $("#rvText").value, null);
       closeSheet(); toast("Thank you! Your rating helps others choose."); refreshMine();
     } catch (e) { btn.disabled = false; btn.textContent = "Send rating"; $("#rvErr").textContent = cleanErr(e); }
   });
@@ -4262,7 +4399,7 @@ async function loadReviews(k) {
   let rs = []; try { rs = await api.kitchenReviews(k.id); } catch (e) {}
   if (!$("#revStrip")) return;
   const sc = (S.scores || {})[k.id] || {}, vendorPics = S.items.filter(i => i.kitchen_id === k.id && i.photo_url).map(i => ({ photo_url: i.photo_url, vendor: true, item_name: i.name }));
-  const pics = rs.filter(r => r.photo_url).concat(vendorPics), notes = rs.filter(r => r.comment).slice(0, 2);
+  const pics = vendorPics, notes = rs.filter(r => r.comment).slice(0, 2);
   if (!pics.length && !notes.length && !(sc.ratings > 0)) { el.remove(); return; }
   el.innerHTML = `${sc.ratings ? `<p class="ratingline">${starsOf(sc.rating, 15)} <strong class="num">${Number(sc.rating).toFixed(1)}</strong> <span class="muted">· ${sc.ratings} rating${sc.ratings > 1 ? "s" : ""}</span></p>` : ""}
     ${pics.length ? `<div class="photostrip">${pics.map((r, n) => `<button type="button" class="pshot" data-shot="${n}"><img src="${esc(r.photo_url)}" alt="" loading="lazy"><span>${r.vendor ? "From the vendor" : starsOf(r.rating, 10)}</span></button>`).join("")}</div>` : ""}
@@ -4602,7 +4739,7 @@ function openAddVendor() {
 /* =====================================================================================
    COORDINATOR VIEW (#admin): Today, Menus, Buildings, Riders, Team
    ===================================================================================== */
-const ADMIN_TABS = [["dash", "Dashboard"], ["today", "Today"], ["menus", "Vendors & menus"], ["buildings", "Buildings"], ["riders", "Riders"], ["reports", "Reports"], ["settings", "Settings"], ["team", "Team"]];
+const ADMIN_TABS = [["dash", "Dashboard"], ["today", "Today"], ["menus", "Vendors & menus"], ["buildings", "Buildings"], ["riders", "Riders"], ["reports", "Reports"], ["feedback", "Feedback"], ["settings", "Settings"], ["team", "Team"]];
 // Sub-sections per tab; a third value marks owner-only sections
 const ADMIN_SUBS = {
   today: [["pools", "Pools"], ["orders", "Orders & payments"], ["wallets", "Refunds & problems"], ["owed", "Money owed"], ["rules", "Settings"]],
@@ -4668,7 +4805,10 @@ async function viewAdmin() {
         if ($("#loginBtn").disabled) return;
         const email = $("#email").value.trim().toLowerCase(), pw = $("#pw").value;
         $("#loginErr").textContent = ""; const done = busyBtn($("#loginBtn"), mode === "signin" ? "Signing in…" : "Creating account…");
-        try { mode === "signin" ? await api.signIn(email, pw) : await api.signUp(email, pw, ($("#aname")?.value || "").trim()); local.set("cp_admin_since", Date.now()); viewAdmin(); } catch (e) { done(); $("#loginErr").textContent = cleanErr(e); }
+        const ok = () => { local.set("cp_admin_since", Date.now()); viewAdmin(); };
+        const askCode = () => codeStep(html => { $("#view").innerHTML = `<section class="card"><div class="pagehead"><div class="pagebrand">${LOGO(30)}<p class="brand" style="font-size:18px">ChopPool team</p></div>${themeBtn()}</div><h1>Check your email</h1>${html}</section>`; }, email, true, ok, () => { mode = "signup"; draw(); });
+        try { if (mode === "signin") await api.signIn(email, pw); else { const r = await api.signUp(email, pw, ($("#aname")?.value || "").trim()); if (r && r.pending) return askCode(); } ok(); }
+        catch (e) { if (e && e.unconfirmed) { try { await api.resendCode(email); } catch (e2) {} return askCode(); } done(); $("#loginErr").textContent = cleanErr(e); }
       });
     };
     draw(); return;
@@ -4846,15 +4986,16 @@ async function renderAdmin(cached, quiet) {   // quiet = background/refresh-butt
     const guess = S.adminDate || dToday;
     if (!quiet && S.admin && S.admin.date === guess && !S.adminPainting) { S.adminPainting = true; try { await renderAdmin(true); } finally { S.adminPainting = false; } }
     const two = dNext !== dToday, seq = (S.adminSeq = (S.adminSeq || 0) + 1);
-    let wt = [], wn = [], data = null;
+    let wt = [], wn = [], data = null, fbRows = null;
     try {
-      [wt, wn, data] = await Promise.all([two ? api.waitingPools(dToday).catch(() => []) : [], two ? api.waitingPools(dNext).catch(() => []) : [], api.adminData(guess)]);
+      [wt, wn, data, fbRows] = await Promise.all([two ? api.waitingPools(dToday).catch(() => []) : [], two ? api.waitingPools(dNext).catch(() => []) : [], api.adminData(guess), api.listFeedback ? api.listFeedback().catch(() => null) : null]);
     } catch (e) { toast("Couldn't load: " + cleanErr(e)); return; }
     if (seq !== S.adminSeq) return;   // a newer refresh has started
     if (two && !S.adminDate && !S.adminDayPicked) { S.adminDayPicked = true; if (wn.length && !wt.length && !((data && data.pools) || []).some(p => !["cancelled", "delivered"].includes(p.status))) { S.adminDate = dNext; try { data = await api.adminData(dNext); } catch (e) {} } }
     const cur = S.adminDate || dToday;
     otherWait = two && [dToday, dNext].includes(cur) ? (cur === dToday ? wn : wt) : [];
     S.adminOtherWait = otherWait;
+    data.feedback = fbRows;
     data.date = cur; data.kitchens = data.kitchens.filter(k => !k.archived); data.sites = data.sites.filter(x => !x.archived);
     // Compare what's there, not the order rows came back in (rows with the same timestamp come back shuffled)
     const norm = v => Array.isArray(v) ? v.map(norm).sort((x, y) => { const a = (x && x.id) || JSON.stringify(x), b = (y && y.id) || JSON.stringify(y); return a < b ? -1 : a > b ? 1 : 0; })
@@ -4876,6 +5017,7 @@ async function renderAdmin(cached, quiet) {   // quiet = background/refresh-butt
   const aTrip = p => { const k = K(p.kitchen_id), st = A.sites.find(x => x.id === p.site_id) || {}; return tripFor(hasPin(k) ? k : k.added_by_customer ? st : {}, st, s); };
   const pending = A.sites.filter(x => x.status === "pending" && !x.archived);
   const badge = document.querySelector('[data-atab="buildings"]'); if (badge) badge.textContent = "Buildings" + (pending.length ? " (" + pending.length + " new)" : "");
+  const fbNew = (A.feedback || []).filter(f => f.status === "new").length, fbTab = document.querySelector('[data-atab="feedback"]'); if (fbTab) fbTab.textContent = "Feedback" + (fbNew ? " (" + fbNew + " new)" : "");
   const livePools = A.pools.filter(p => p.status !== "cancelled" && p.meals > 0);
   const listReq = A.kitchens.filter(k => k.listing_status === "pending"), riderApps = A.riders.filter(r => r.status === "pending");
   const ridersOk = A.riders.filter(r => !r.status || r.status === "approved");
@@ -5348,6 +5490,41 @@ async function renderAdmin(cached, quiet) {   // quiet = background/refresh-butt
   }
 
   /* ---------- Team ---------- */
+  if (tab === "feedback") {
+    const all = A.feedback, f = S.fbFilter || "open", who = S.fbWho || "all";
+    const WHO = { customer: "Customer", guest: "Guest", vendor: "Vendor", rider: "Rider", team: "Team" }, KIND = { problem: "Problem", idea: "Idea", other: "Other" };
+    const list = (all || []).filter(x => (f === "all" || (f === "open" ? x.status !== "done" : x.status === f)) && (who === "all" || x.role === who));
+    const from = x => [WHO[x.role] || x.role, x.kitchens?.public_name || x.riders?.name || x.name].filter(Boolean).join(" · ");
+    body.innerHTML = all == null ? `<section class="card stack"><h2>Feedback</h2><p class="muted">Run the latest choppool-update.sql (version 31) in Supabase once to collect feedback from customers, vendors and riders.</p></section>` : `
+      <section class="card stack" style="gap:10px"><div class="row" style="justify-content:space-between;align-items:center"><h2 style="margin:0">Feedback</h2><button class="ghost" data-feedback="team">${ICON.chat} Send feedback</button></div>
+        <p class="small muted" style="margin:0">From the "Send feedback" button on every screen. Photos are private to the team.</p>
+        <div class="chips" role="group" aria-label="Status">${[["open", "Open"], ["new", "New"], ["done", "Done"], ["all", "All"]].map(([k, l]) => `<button data-fbf="${k}" aria-pressed="${k === f}">${l}${k === "new" && fbNew ? " (" + fbNew + ")" : ""}</button>`).join("")}</div>
+        <select data-fbwho aria-label="From">${[["all", "Everyone"], ...Object.entries(WHO)].map(([k, l]) => `<option value="${k}"${k === who ? " selected" : ""}>${k === "all" ? l : l + "s"}</option>`).join("")}</select></section>
+      ${list.length ? `<div class="stack" style="gap:10px">${list.map(x => `<details class="card fbitem" data-key="fb:${esc(x.id)}" data-fbid="${esc(x.id)}"${(S.openItems || new Set()).has("fb:" + x.id) ? " open" : ""}>
+        <summary><div class="stack" style="gap:4px"><span class="small muted">${x.status === "new" ? '<span class="chip">New</span> ' : x.status === "done" ? '<span class="chip fbok">Done</span> ' : ""}<strong>${esc(KIND[x.kind] || x.kind)}</strong> · ${esc(from(x))} · ${esc(new Date(x.created_at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }))}${x.images && x.images.length ? " · " + x.images.length + " photo" + (x.images.length > 1 ? "s" : "") : ""}</span>
+          <span>${esc(String(x.message).slice(0, 110))}${String(x.message).length > 110 ? "…" : ""}</span></div></summary>
+        <div class="stack" style="gap:10px;margin-top:10px"><p class="fbmsg">${esc(x.message)}</p>
+          ${x.images && x.images.length ? `<div class="fbthumbs" data-fbimgs="${esc(x.id)}">${x.images.map(() => `<img alt="" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=">`).join("")}</div>` : ""}
+          <p class="small muted" style="margin:0">${[x.contact ? "Reply to: " + esc(x.contact) : "", x.screen ? "Screen: " + esc(x.screen) : "", x.device ? esc(x.device) : ""].filter(Boolean).join("<br>")}</p>
+          <div><label>Team note</label><textarea rows="2" data-fbnote maxlength="1000" placeholder="What was done, who is on it">${esc(x.team_note || "")}</textarea></div>
+          <div class="row" style="gap:8px;flex-wrap:wrap"><button class="ghost" data-fbsave="${esc(x.id)}">Save note</button>${x.status !== "done" ? `<button class="btn" data-fbdone="${esc(x.id)}">Mark done</button>` : `<button class="ghost" data-fbopen="${esc(x.id)}">Reopen</button>`}</div></div></details>`).join("")}</div>`
+        : `<div class="emptyrow"><span class="eic">${ICON.chat}</span><div><strong>${f === "open" || f === "new" ? "Nothing waiting" : "No feedback here"}</strong><p>New feedback shows here with a count on the tab.</p></div></div>`}`;
+    if (!body.dataset.fbwired) { body.dataset.fbwired = "1";
+      body.addEventListener("toggle", async e => { const d = e.target; if (!d.matches || !d.matches("details[data-fbid]") || !d.open) return;
+        const x = (S.admin.feedback || []).find(y => y.id === d.dataset.fbid); if (!x) return;
+        const box = d.querySelector("[data-fbimgs]"); if (box && !box.dataset.done) { box.dataset.done = "1"; try { const urls = await api.feedbackPhotoUrls(x.images); box.querySelectorAll("img").forEach((im, n) => { if (urls[n]) im.src = urls[n]; }); } catch (er) { box.insertAdjacentHTML("beforeend", `<p class="small err">${esc(cleanErr(er))}</p>`); } }
+        if (x.status === "new") { try { await api.updateFeedback(x.id, { status: "seen" }); x.status = "seen"; const n = S.admin.feedback.filter(y => y.status === "new").length, t = document.querySelector('[data-atab="feedback"]'); if (t) t.textContent = "Feedback" + (n ? " (" + n + " new)" : ""); const pill = d.querySelector(".chip:not(.fbok)"); if (pill) pill.remove(); } catch (er) {} }
+      }, true);
+      body.addEventListener("change", e => { if (S.adminTab !== "feedback" || !e.target.matches("[data-fbwho]")) return; S.fbWho = e.target.value; renderAdmin(true); });
+      body.addEventListener("click", async e => { if (S.adminTab !== "feedback") return;
+        const im = e.target.closest("[data-fbimgs] img"); if (im && !im.src.startsWith("data:image/gif")) { const lb = document.createElement("div"); lb.className = "lightbox"; lb.innerHTML = `<img src="${esc(im.src)}" alt="">`; lb.addEventListener("click", () => lb.remove()); document.body.appendChild(lb); return; }
+        const fl = e.target.closest("[data-fbf]"); if (fl) { S.fbFilter = fl.dataset.fbf; return renderAdmin(true); }
+        const b = e.target.closest("[data-fbsave],[data-fbdone],[data-fbopen]"); if (!b) return;
+        const id = b.dataset.fbsave || b.dataset.fbdone || b.dataset.fbopen, card = b.closest("[data-fbid]"), x = (S.admin.feedback || []).find(y => y.id === id); if (!x) return;
+        const patch = { team_note: card.querySelector("[data-fbnote]").value.trim() || null }; if (b.dataset.fbdone) patch.status = "done"; if (b.dataset.fbopen) patch.status = "seen";
+        b.disabled = true; try { await api.updateFeedback(id, patch); Object.assign(x, patch); toast(patch.status === "done" ? "Marked done" : patch.status ? "Reopened" : "Note saved"); renderAdmin(true); } catch (er) { b.disabled = false; toast(cleanErr(er)); } });
+    }
+  }
   if (tab === "team") {
     const team = A.team || [], me = (S.user?.email || "").toLowerCase();
     if (sub === "members") body.innerHTML = `
@@ -5355,7 +5532,7 @@ async function renderAdmin(cached, quiet) {   // quiet = background/refresh-butt
         <p><strong>Owner</strong> · everything, including team members, payment options and money figures.</p>
         <p><strong>Coordinator</strong> · runs each day: payments, pools, kitchens, buildings, riders, wallets.</p>
         <p><strong>Vendors, riders and building hosts</strong> · no login. They use their own private link, sent from Vendors & menus, Riders or Buildings.</p>
-        <p><strong>Customers</strong> · order from the main link; an account is optional.</p></div></section>
+        <p><strong>Customers</strong> · order from the main link with their own account (email and password).</p></div></section>
       ${isSuper ? `<form class="card" data-form="team"><h2>Add a team member</h2><div class="grid2"><div><label for="ntEmail">Email</label><input id="ntEmail" name="email" type="email" placeholder="Their email address"></div>
         <div><label for="ntRole">Role</label><select id="ntRole" name="role"><option value="coordinator">Coordinator</option><option value="super">Owner</option></select></div></div>
         <p class="small muted">They then open ${esc(baseUrl())}/#admin, choose "Create an account" with this email, and sign in.</p><p class="err" data-err></p><button class="btn">Add to team</button></form>` : `<p class="note">Only the owner can add or remove team members.</p>`}
@@ -5775,7 +5952,7 @@ async function viewKitchen(token) {
     const termsTop = termsNeed(k) && (k.open || k.paused) ? `<section class="card stack" style="border-color:var(--accent)">${termsBox(k, K.menu)}${(k.auto_days || []).length ? `<p class="small" style="font-weight:600">Your automatic cooking days are paused until you accept the new fee.</p>` : ""}<button class="btn wide" id="acceptTermsOnly">Accept the new terms</button></section>` : "";
     const settingsHtml = `${autoCard(k, d)}${poolCard(k)}${freeCard(k)}`;
     $("#view").innerHTML = `
-      <header class="topzone pagetop"><div class="pagehead"><div class="pagebrand">${LOGO(30)}<p class="brand" style="font-size:18px">ChopPool vendor</p></div>${themeBtn()}</div><h1>${esc(k.name)}</h1>
+      <header class="topzone pagetop"><div class="pagehead"><div class="pagebrand">${LOGO(30)}<p class="brand" style="font-size:18px">ChopPool vendor</p></div><span class="hbtns">${fbBtn("vendor")}${themeBtn()}</span></div><h1>${esc(k.name)}</h1>
         <p class="muted">${fmtDate(d)} · ready by ${fmtTime(minus(S.settings.delivery_time, 30))} · ${k.no_daily_limit ? used + " meal" + (used === 1 ? "" : "s") + " so far" : used + " of " + k.capacity + " meals"} · ${k.delivery_mode === "runner" ? "you deliver with your own runner" : "a ChopPool rider collects"}</p></header>
       ${dayTabs}
       ${termsTop}
@@ -6010,7 +6187,7 @@ async function viewRider(token) {
   const NEXT = { ready: ["picked_up", "Picked up"], picked_up: ["delivered", "Delivered"], arriving: ["delivered", "Delivered"] };
   const draw = async () => {
     let R; try { R = await api.riderView(token, d); } catch (e) { $("#view").innerHTML = `<p class="card err">${esc(cleanErr(e))}</p>`; return; }
-    $("#view").innerHTML = `<header class="topzone pagetop"><div class="pagehead"><div class="pagebrand">${LOGO(30)}<p class="brand" style="font-size:18px">ChopPool rider</p></div>${themeBtn()}</div><h1>${esc(R.rider.name)}</h1><p class="muted">${fmtDate(d)} · deliver by ${fmtTime(S.settings.delivery_time)}</p></header>` +
+    $("#view").innerHTML = `<header class="topzone pagetop"><div class="pagehead"><div class="pagebrand">${LOGO(30)}<p class="brand" style="font-size:18px">ChopPool rider</p></div><span class="hbtns">${fbBtn("rider")}${themeBtn()}</span></div><h1>${esc(R.rider.name)}</h1><p class="muted">${fmtDate(d)} · deliver by ${fmtTime(S.settings.delivery_time)}</p></header>` +
       (R.pools.length && R.pools.every(p => p.status === "delivered") ? `<section class="card nextup"><p>${R.pools.every(p => p.handoff === "host" || handedOver(p.orders)) ? "All deliveries done for today. Thank you." : "Delivered. Hand over the meals still waiting below."}</p></section>` : "") +
       (R.pools.map((p, i) => {
         const nx = NEXT[p.status];
@@ -6049,7 +6226,7 @@ async function viewHost(token) {
   const draw = async () => {
     let H; try { H = await api.hostView(token, d); } catch (e) { $("#view").innerHTML = `<p class="card err">${esc(cleanErr(e))}</p>`; return; }
     const left = H.pools.flatMap(p => p.orders).filter(o => !o.collected).length;
-    $("#view").innerHTML = `<header class="topzone pagetop"><div class="pagehead"><div class="pagebrand">${LOGO(30)}<p class="brand" style="font-size:18px">ChopPool drop point</p></div>${themeBtn()}</div><h1>${esc(H.site.name)}</h1><p class="muted">${fmtDate(d)} · ${esc(H.site.drop_point)} · ${left} meal${left === 1 ? "" : "s"} waiting</p></header>
+    $("#view").innerHTML = `<header class="topzone pagetop"><div class="pagehead"><div class="pagebrand">${LOGO(30)}<p class="brand" style="font-size:18px">ChopPool drop point</p></div><span class="hbtns">${fbBtn("host")}${themeBtn()}</span></div><h1>${esc(H.site.name)}</h1><p class="muted">${fmtDate(d)} · ${esc(H.site.drop_point)} · ${left} meal${left === 1 ? "" : "s"} waiting</p></header>
       <section class="card"><h2>Hand over a meal</h2><p class="small muted">Ask for their code, like K-27, and check the first name.</p>${codeBox("hostcode")}</section>` +
       (H.pools.map(p => `<article class="card"><div class="top"><h3>${esc(p.menu)} · Pool ${p.seq}</h3><span class="chip ${p.status === "delivered" ? "ok" : "dim"}">${p.status === "delivered" ? (handedOver(p.orders) ? "All received" : "Bag arrived") : STEP_LABEL[p.status]}</span></div>${handInfo(p.status, p.orders)}${handList(p.orders)}</article>`).join("")
         || `<p class="card muted">No deliveries for today yet.</p>`);
@@ -6337,6 +6514,8 @@ async function start() {
   if (/[?&]app=1/.test(location.search) && (!location.hash || location.hash === "#") && local.get("cp_home")) history.replaceState(null, "", location.pathname + location.search + local.get("cp_home"));
   document.addEventListener("click", async e => {
     const ins = e.target.closest("[data-install]"); if (ins) return installApp(ins.dataset.install);
+    const fb = e.target.closest("[data-feedback]"); if (fb) { const h = location.hash.slice(1), as = fb.dataset.feedback;
+      return openFeedback(as === "vendor" ? { as, token: h.slice(8) } : as === "rider" ? { as, token: h.slice(6) } : as === "team" ? { as } : { screen: "drop point" }); }
     const lg = e.target.closest("[data-legal]"); if (lg) { e.preventDefault(); return openLegal(lg.dataset.legal); }
     if (e.target.closest("[data-theme-cycle]")) return cycleTheme();
     const al = e.target.closest("[data-alerts]"); if (al) { if (await pushSubscribe(JSON.parse(al.dataset.alerts || "{}"))) { toast("Alerts are on for this phone."); al.textContent = "Alerts are on"; } }
