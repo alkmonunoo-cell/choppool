@@ -1322,7 +1322,7 @@ function makeDemoApi() {
     const d = orderDate(settings), special = (r.special || "").trim() || null;
     if ((k.paused_dates || []).includes(d) && !days.some(x => x.kitchen_id === k.id && x.order_date === d)) throw new Error(k.public_name + " isn't cooking " + (d === today() ? "today" : "on that day") + ". Choose another vendor.");
     if (special && d === today() && new Date() >= at(d, settings.special_cutoff)) throw new Error("Custom orders close at " + settings.special_cutoff + ". You can still order from the menu.");
-    const add = (m.addons || []).filter(a => (r.addons || []).includes(a.name)), addT = add.reduce((t, a) => t + a.price, 0);
+    const add = addonPicked(m.addons, r.addons || []), addT = add.reduce((t, a) => t + a.price, 0);
     const load = orders.filter(o => o.kitchen_id === k.id && o.order_date === d && o.status !== "cancelled").reduce((t, o) => t + o.qty, 0);
     if (!k.no_daily_limit && load + r.qty > k.capacity) throw new Error("This menu is fully booked for today. Try another one.");
     const nextSeq = () => Math.max(0, ...pools.filter(p => p.order_date === d && p.site_id === si.id && p.kitchen_id === k.id && p.status !== "cancelled").map(p => p.seq)) + 1;
@@ -1352,7 +1352,7 @@ function makeDemoApi() {
     const pl = pools.find(p => p.id === par.pool_id);
     if (!["waiting", "collecting"].includes(pl.status)) throw new Error("This pool has closed. Start a new order instead.");
     if (meals(pl.id) + r.qty > kSize(kitchens.find(x => x.id === par.kitchen_id))) throw new Error("This pool is full. Start a new order for more plates.");
-    const add = (m.addons || []).filter(a => (r.addons || []).includes(a.name)), addT = add.reduce((t, a) => t + a.price, 0);
+    const add = addonPicked(m.addons, r.addons || []), addT = add.reduce((t, a) => t + a.price, 0);
     const o = { ...par, id: "o" + uid(), created_at: nowIso(), item_id: m.id, item_name: m.name, unit_price: m.price, qty: r.qty, addons: add, addons_total: addT, note: (r.note || "").trim() || null,
       special_request: null, quote_price: null, momo_ref: null, wallet_used: 0, max_fee: 0, service_fee: settings.service_fee, fee_per_meal: true, parent_id: par.id, status: "pending", cancel_reason: null, refund_needed: false, collected_at: null };
     orders.push(o);
@@ -2622,7 +2622,7 @@ async function viewOrder() {
     const b = e.target.closest("button[data-pay]"); if (b) openPayQuote(b.dataset.pay); const ro = e.target.closest("[data-reorder]"); if (ro) openOrder(ro.dataset.reorder);
     const ap = e.target.closest("[data-addplate]"); if (ap) { const o = (S.mine || []).find(x => x.id === ap.dataset.addplate); if (o) addToOrder(o); }
     const rt = e.target.closest("[data-rate]"); if (rt) { const o = (S.mine || []).find(x => x.id === rt.dataset.rate); if (o) openReview(o, +rt.dataset.n || 0); return; }
-    const ag = e.target.closest("[data-again]"); if (ag) { const o = (S.mine || []).find(x => x.id === ag.dataset.again); if (o) openOrder(o.kitchen_id, { preset: { item_id: o.item_id, qty: o.qty, addons: (o.addons || []).map(a => a.name), site_id: o.site_id } }); } const cx = e.target.closest("[data-cancel]"); if (cx) openCancel(cx.dataset.cancel); const lp = e.target.closest("[data-lessplates]"); if (lp) openLessPlates(lp.dataset.lessplates, lp.dataset.key); const sh = e.target.closest("[data-share]"); if (sh) { const [a, c] = sh.dataset.share.split(","); sharePool(a, c); } if (e.target.closest("[data-keepcb]")) openAccount("Your cashback moves into your new wallet."); const h = e.target.closest("[data-gohome]"); if (h) setTab("home"); });
+    const ag = e.target.closest("[data-again]"); if (ag) { const o = (S.mine || []).find(x => x.id === ag.dataset.again); if (o) openOrder(o.kitchen_id, { preset: { item_id: o.item_id, qty: o.qty, addons: o.addons || [], site_id: o.site_id } }); } const cx = e.target.closest("[data-cancel]"); if (cx) openCancel(cx.dataset.cancel); const lp = e.target.closest("[data-lessplates]"); if (lp) openLessPlates(lp.dataset.lessplates, lp.dataset.key); const sh = e.target.closest("[data-share]"); if (sh) { const [a, c] = sh.dataset.share.split(","); sharePool(a, c); } if (e.target.closest("[data-keepcb]")) openAccount("Your cashback moves into your new wallet."); const h = e.target.closest("[data-gohome]"); if (h) setTab("home"); });
   setKTop();
   renderWhen(); refreshUser(); if (S.board.pools.length) renderPools(); await refreshBoard(); await refreshMine();
   setTab(S.tab);
@@ -3450,7 +3450,12 @@ function addToOrder(o) {
 function trayFor(kid) { const t = local.get("cp_tray"); return t && t.kid === kid && t.site === S.siteId && t.date === S.date ? t : { kid, site: S.siteId, date: S.date, lines: [] }; }
 function traySave(t) { local.set("cp_tray", t.lines.length ? t : null); if ($("#vfoot") && S.vp) { $("#vfoot").innerHTML = vendorFoot(menuOf(S.vp.id)); $("#vfoot").classList.toggle("on", !!t.lines.length); } }
 const lineItem = l => S.items.find(i => i.id === l.item) || {};
-const lineAdd = l => (lineItem(l).addons || []).filter(a => (l.addons || []).includes(a.name)).reduce((t, a) => t + Number(a.price), 0);
+// Extras: a dish can list the same name more than once (Fish at 15, 20, 30). Those are picked as "Fish#20" so only that one is charged;
+// a bare name that appears more than once counts once (the first), matching the server
+const addonKey = (list, a) => (list || []).filter(x => x.name === a.name).length > 1 ? a.name + "#" + Number(a.price) : a.name;
+const addonPicked = (list, keys) => (list || []).filter((a, i) => keys.includes(addonKey(list, a)) || (keys.includes(a.name) && list.findIndex(x => x.name === a.name) === i));
+const addonLabel = k => String(k).replace(/#(\d+(?:\.\d+)?)$/, (m, p) => " (" + money(Number(p)) + ")");
+const lineAdd = l => addonPicked(lineItem(l).addons, l.addons || []).reduce((t, a) => t + Number(a.price), 0);
 const trayFood = t => t.lines.reduce((a, l) => a + (Number(lineItem(l).price || 0) + lineAdd(l)) * l.qty, 0);
 const sameLine = (a, b) => a.item === b.item && (a.note || "") === (b.note || "") && [...(a.addons || [])].sort().join("|") === [...(b.addons || [])].sort().join("|");
 // One dish: how many, extras, a note, then into the tray
@@ -3462,11 +3467,11 @@ function openDish(k, dishId) {
   const specialOpen = !(S.date === today() && new Date() >= at(S.date, S.settings.special_cutoff));
   openSheet(`<div class="dishhead"><span class="tile" style="background:${tint(i0)}">${plate(d, k.id)}</span><div><h2>${esc(d.name)}</h2><p class="small muted">${esc(k.public_name)} · <span class="num">${money(d.price)}</span></p></div><button class="closex" data-close aria-label="Close">${ICON.close}</button></div>
     <div class="row"><p class="group-title">How many</p><div class="qty"><button type="button" id="dMinus" aria-label="One less">${GLYPH.minus}</button><output id="dQ">1</output><button type="button" id="dPlus" aria-label="One more">${GLYPH.plus}</button></div></div>
-    ${(d.addons || []).length ? `<div class="group"><p class="group-title">Extras <span class="muted" style="font-weight:500">(optional, added to each plate)</span></p><div class="chips" id="dExtras">${d.addons.map(a => `<button type="button" class="tog" data-addon="${esc(a.name)}" aria-pressed="false">${esc(a.name)}${a.price ? " +" + money(a.price) : ""}</button>`).join("")}</div></div>` : ""}
+    ${(d.addons || []).length ? `<div class="group"><p class="group-title">Extras <span class="muted" style="font-weight:500">(optional, added to each plate)</span></p><div class="chips" id="dExtras">${d.addons.map(a => `<button type="button" class="tog" data-addon="${esc(addonKey(d.addons, a))}" aria-pressed="false">${esc(a.name)}${a.price ? " +" + money(a.price) : ""}</button>`).join("")}</div></div>` : ""}
     <div class="group"><label for="dNote">Note for the kitchen <span class="muted" style="font-weight:500">(optional)</span></label><input id="dNote" maxlength="140" placeholder="Less oil, extra napkins"></div>
     ${specialOpen ? `<button type="button" class="linkbtn" id="dSpecial" style="justify-self:start">Want something not on the menu? Make a custom order</button>` : ""}
     <div class="sheet-foot"><button class="btn wide" id="dAdd">Add to order · <span class="num" id="dTot"></span></button></div>`);
-  const draw = () => { $("#dQ").textContent = qty; const a = (d.addons || []).filter(x => extras.has(x.name)).reduce((t, x) => t + Number(x.price), 0); $("#dTot").textContent = money((Number(d.price) + a) * qty); };
+  const draw = () => { $("#dQ").textContent = qty; const a = addonPicked(d.addons, [...extras]).reduce((t, x) => t + Number(x.price), 0); $("#dTot").textContent = money((Number(d.price) + a) * qty); };
   draw();
   $("#dMinus").addEventListener("click", () => { qty = Math.max(1, qty - 1); draw(); });
   $("#dPlus").addEventListener("click", () => { qty = Math.min(5, poolSize(k), qty + 1); draw(); });
@@ -4426,7 +4431,7 @@ function openOrder(menuId, opt = {}) {
   const trayMode = !!opt.tray, tray = trayMode ? trayFor(k.id) : null;   // several dishes: a new order, or added to your code
   if (trayMode && !tray.lines.length) return toast("Your order is empty. Tap + on a dish to add it.");
   let payFrom = defaultPM();
-  let extras = new Set(preset ? (preset.addons || []).filter(n => (item.addons || []).some(a => a.name === n)) : []);
+  let extras = new Set(preset ? (preset.addons || []).map(a => typeof a === "string" ? a : addonKey(item.addons, a)).filter(n => (item.addons || []).some(a => addonKey(item.addons, a) === n || a.name === n)) : []);
   const specialOpen = !join && !(S.date === today() && new Date() >= at(S.date, s.special_cutoff));
   const known = me.name && me.phone;
   const waitingHere = S.board.pools.some(p => p.site_id === site.id && p.kitchen_id === k.id && p.status === "waiting" && p.meals > 0);
@@ -4467,7 +4472,7 @@ function openOrder(menuId, opt = {}) {
     </form>`);
   const drawExtras = () => {
     $("#extrasGroup").innerHTML = (item.addons || []).length ? `<p class="group-title">Extras <span class="muted" style="font-weight:500">(optional, added to each plate)</span></p><div class="chips">${item.addons.map(a =>
-      `<button type="button" class="tog" data-addon="${esc(a.name)}" aria-pressed="${extras.has(a.name)}">${esc(a.name)}${a.price ? " +" + money(a.price) : ""}</button>`).join("")}</div>` : "";
+      `<button type="button" class="tog" data-addon="${esc(addonKey(item.addons, a))}" aria-pressed="${extras.has(addonKey(item.addons, a))}">${esc(a.name)}${a.price ? " +" + money(a.price) : ""}</button>`).join("")}</div>` : "";
   };
   // Pay from (your saved numbers) and pay to (ChopPool's number on the same network where we have one)
   const drawPay = due => {
@@ -4482,7 +4487,7 @@ function openOrder(menuId, opt = {}) {
       $("#pfNet")?.addEventListener("change", () => drawPay(due)); }
   };
   const drawTray = () => {
-    $("#tLines").innerHTML = tray.lines.map((l, n) => { const it = lineItem(l), ad = lineAdd(l); return `<div class="tline"><span class="tx"><b>${l.qty} × ${esc(it.name || "Dish")}</b><small>${[(l.addons || []).join(", "), l.note].filter(Boolean).map(esc).join(" · ")}${(l.addons || []).length || l.note ? " · " : ""}<span class="num">${money((Number(it.price || 0) + ad) * l.qty)}</span></small></span>
+    $("#tLines").innerHTML = tray.lines.map((l, n) => { const it = lineItem(l), ad = lineAdd(l); return `<div class="tline"><span class="tx"><b>${l.qty} × ${esc(it.name || "Dish")}</b><small>${[(l.addons || []).map(addonLabel).join(", "), l.note].filter(Boolean).map(esc).join(" · ")}${(l.addons || []).length || l.note ? " · " : ""}<span class="num">${money((Number(it.price || 0) + ad) * l.qty)}</span></small></span>
       <div class="qty"><button type="button" data-tl="${n}" data-d="-1" aria-label="${l.qty === 1 ? "Remove" : "One less"}">${l.qty === 1 ? GLYPH.x : GLYPH.minus}</button><output>${l.qty}</output><button type="button" data-tl="${n}" data-d="1" aria-label="One more">${GLYPH.plus}</button></div></div>`; }).join("");
   };
   const draw = () => {
@@ -4507,7 +4512,7 @@ function openOrder(menuId, opt = {}) {
       $("#totTxt").textContent = "Request"; $("#totSub").textContent = "You pay after it's priced"; $("#submitBtn").textContent = "Send request"; return;
     }
     $("#saveTxt").classList.remove("hidden");
-    const addT = (item.addons || []).filter(a => extras.has(a.name)).reduce((t, a) => t + Number(a.price), 0);
+    const addT = addonPicked(item.addons, [...extras]).reduce((t, a) => t + Number(a.price), 0);
     // Full delivery at checkout: the lower of the max per meal and the whole trip by distance. What the pool saves comes back as cashback after the cut-off.
     const tripN = tripNow(k, site), dFee = join ? 0 : upfrontPerMeal(tripN, qty, s), sFee = Number(s.service_fee);
     const total = (Number(item.price) + addT) * qty + dFee * qty + sFee * qty;
