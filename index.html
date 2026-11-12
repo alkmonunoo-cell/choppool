@@ -1588,6 +1588,8 @@ function makeDemoApi() {
     // Feedback: photos kept on this page as data links in the demo
     async uploadFeedbackPhoto(batch, n, blob) { return await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(blob); }); },
     async notifications(ids) { return []; },
+    async renameOrderAddons(item, renames) { let n = 0; orders.filter(o => o.item_id === item && o.order_date >= today() && !["cancelled", "collected"].includes(o.status)).forEach(o => { let hit = false;
+      o.addons = (o.addons || []).map(a => { const r = renames.find(x => x.from === a.name && Number(x.price) === Number(a.price)); if (r) { hit = true; return { ...a, name: r.to }; } return a; }); if (hit) n++; }); return n; },
     async readNotifications(ids) { return 0; },
     async testerDue(as, token) { if (!settings.tester_terms_on) return null; const v = settings.tester_terms_version;
       const who = as === "vendor" ? { kitchen_id: (byToken(kitchens, "token", token) || {}).id } : as === "rider" ? { rider_id: (riders.find(x => x.token === token) || {}).id } : me ? { user_id: me.id } : null;
@@ -1928,6 +1930,8 @@ function makeSupabaseApi() {
         p_images: r.images || [], p_name: r.name || null, p_contact: r.contact || null, p_as: r.as || null, p_token: r.token || null });
       if (x.error && /function|schema cache/i.test(x.error.message)) throw new Error("ChopPool needs a quick update before feedback can be sent. Please tell the ChopPool team on WhatsApp.");
       return must(x); },
+    async renameOrderAddons(item, renames) { const r = await sb.rpc("admin_rename_addons", { p_item: item, p_renames: renames });
+      if (r.error && /function|schema cache/i.test(r.error.message)) throw new Error("Run the latest choppool-update.sql (version 36) in Supabase once, then try again."); return must(r); },
     // The bell's saved alerts (last 7 days, update 35); empty before the update is run
     async notifications(ids) { const r = await sb.rpc("my_notifications", { p_order_ids: ids || [] }); return r.error ? [] : r.data || []; },
     async readNotifications(ids) { const r = await sb.rpc("read_notifications", { p_order_ids: ids || [] }); return r.error ? 0 : r.data; },
@@ -4975,7 +4979,7 @@ function poolFlags(p, s, d, now = new Date()) {
 /* ---------- Menu editor (Admin › vendor, and the vendor's own "Your menu"): dish rows, extras rows, photos, one Save ---------- */
 const CAM = SV('<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>', 14);
 const GRIP = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="9" cy="6" r="1.7"/><circle cx="15" cy="6" r="1.7"/><circle cx="9" cy="12" r="1.7"/><circle cx="15" cy="12" r="1.7"/><circle cx="9" cy="18" r="1.7"/><circle cx="15" cy="18" r="1.7"/></svg>`;
-const extraRow = a => `<div class="mextra"><button type="button" class="xgrip" data-xgrip aria-label="Hold and drag to move this extra (or use the arrow keys)" title="Hold and drag to reorder">${GRIP}</button><input data-x="name" value="${esc(a ? a.name : "")}" placeholder="Extra chicken" aria-label="Extra"><input data-x="price" inputmode="decimal" value="${a ? esc(a.price) : ""}" placeholder="GHS 0" aria-label="Extra price"><button type="button" class="xbtn" data-xdel aria-label="Remove extra">${ICON.close}</button></div>`;
+const extraRow = a => `<div class="mextra"${a && a.name ? ` data-orig="${esc(a.name)}" data-oprice="${esc(Number(a.price) || 0)}"` : ""}><button type="button" class="xgrip" data-xgrip aria-label="Hold and drag to move this extra (or use the arrow keys)" title="Hold and drag to reorder">${GRIP}</button><input data-x="name" value="${esc(a ? a.name : "")}" placeholder="Extra chicken" aria-label="Extra"><input data-x="price" inputmode="decimal" value="${a ? esc(a.price) : ""}" placeholder="GHS 0" aria-label="Extra price"><button type="button" class="xbtn" data-xdel aria-label="Remove extra">${ICON.close}</button></div>`;
 function dishRow(i, admin) {
   i = i || {};
   return `<div class="mdish" data-item="${esc(i.id || "")}">
@@ -5016,7 +5020,9 @@ function readMenu(root) {
   return [...root.querySelectorAll(".mdish")].map(r => {
     const g = f => (r.querySelector(`[data-f="${f}"]`) || {}).value, act = r.querySelector('[data-f="active"]');
     return { id: r.dataset.item || null, removed: r.dataset.removed === "1", name: (g("name") || "").trim(), price: (g("price") || "").trim(), icon: g("icon") || null, active: act ? act.checked : true,
-      addons: [...r.querySelectorAll(".mextra")].map(x => ({ name: x.querySelector("[data-x=name]").value.trim(), price: Number(x.querySelector("[data-x=price]").value) || 0 })).filter(a => a.name.length >= 2) };
+      addons: [...r.querySelectorAll(".mextra")].map(x => ({ name: x.querySelector("[data-x=name]").value.trim(), price: Number(x.querySelector("[data-x=price]").value) || 0 })).filter(a => a.name.length >= 2),
+      // Extras whose name was corrected (old name + old price), so open orders can show the new name
+      renames: [...r.querySelectorAll(".mextra[data-orig]")].map(x => ({ from: x.dataset.orig, to: x.querySelector("[data-x=name]").value.trim(), price: Number(x.dataset.oprice) || 0 })).filter(x => x.to.length >= 2 && x.to !== x.from) };
   }).filter(d => d.id || d.name || d.price);
 }
 function menuEditorClick(e) {
@@ -5736,6 +5742,19 @@ function confirmRemove(title, body, fn, verb) {   // verb: "Merge" etc. for a no
   });
 }
 const fval = (root, f) => { const el = root.querySelector(`[data-f="${f}"]`); return !el ? undefined : el.type === "checkbox" ? el.checked : el.value.trim(); };
+// After a saved menu renames extras: offer to show the new names on open orders (prices never change). Team only.
+function askRenameOrders(dishes) {
+  const lines = dishes.flatMap(d => d.renames.map(r => `<li><b>${esc(d.name)}</b>: ${esc(r.from)} → <b>${esc(r.to)}</b> <span class="muted">(${money(r.price)})</span></li>`)).join("");
+  openSheet(`${sheetHead("Also update open orders?", "Menu saved. You renamed some extras.")}
+    <ul class="stack small" style="padding-left:18px;margin:0">${lines}</ul>
+    <p class="small muted">Show the new names on today's open orders (and any for later days) so the vendor sees them. Prices and totals on those orders stay the same.</p>
+    <p class="err" id="rnErr"></p>
+    <div class="sheet-foot" style="display:grid;gap:8px"><button class="btn wide" id="rnYes">Yes, update open orders</button><button class="ghost wide" data-close>Only new orders</button></div>`);
+  $("#rnYes").addEventListener("click", async () => { const b = $("#rnYes"); if (b.disabled) return; const done = busyBtn(b, "Updating…");
+    try { let n = 0; for (const d of dishes) n += Number(await api.renameOrderAddons(d.id, d.renames)) || 0;
+      closeSheet(); toast(n ? "Updated " + n + " open order" + (n === 1 ? "" : "s") : "No open orders had those extras"); renderAdmin(); }
+    catch (er) { done(); $("#rnErr").textContent = cleanErr(er); } });
+}
 async function adminClick(e) {
   if (menuEditorClick(e)) return;
   const ms = e.target.closest("[data-msave]");
@@ -5745,7 +5764,9 @@ async function adminClick(e) {
     ms.disabled = true;
     try { for (const d of list) { const it = { name: d.name, price: Number(d.price), addons: d.addons, icon: d.icon, active: d.removed ? false : d.active };
         if (d.id) await api.saveItem({ id: d.id, ...it }); else if (!d.removed) await api.saveItem({ kitchen_id: kid, ...it }); }
-      Object.assign(S, await api.load()); toast("Menu saved"); renderAdmin(); } catch (err) { toast(cleanErr(err)); } finally { ms.disabled = false; }
+      Object.assign(S, await api.load()); renderAdmin();
+      const ren = list.filter(d => d.id && !d.removed && d.renames.length); if (ren.length) askRenameOrders(ren); else toast("Menu saved");
+    } catch (err) { toast(cleanErr(err)); } finally { ms.disabled = false; }
     return;
   }
   if (e.target.closest("[data-autopick]")) return;
