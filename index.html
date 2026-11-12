@@ -1581,6 +1581,8 @@ function makeDemoApi() {
     async hideReview(id, hidden) { Object.assign(reviews.find(r => r.id === id), { hidden }); },
     // Feedback: photos kept on this page as data links in the demo
     async uploadFeedbackPhoto(batch, n, blob) { return await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(blob); }); },
+    async notifications(ids) { return []; },
+    async readNotifications(ids) { return 0; },
     async testerDue(as, token) { if (!settings.tester_terms_on) return null; const v = settings.tester_terms_version;
       const who = as === "vendor" ? { kitchen_id: (byToken(kitchens, "token", token) || {}).id } : as === "rider" ? { rider_id: (riders.find(x => x.token === token) || {}).id } : me ? { user_id: me.id } : null;
       if (!who || !Object.values(who)[0]) return null; return accepts.some(a => a.version === v && Object.entries(who).every(([k, x]) => a[k] === x)) ? null : v; },
@@ -1920,6 +1922,9 @@ function makeSupabaseApi() {
         p_images: r.images || [], p_name: r.name || null, p_contact: r.contact || null, p_as: r.as || null, p_token: r.token || null });
       if (x.error && /function|schema cache/i.test(x.error.message)) throw new Error("ChopPool needs a quick update before feedback can be sent. Please tell the ChopPool team on WhatsApp.");
       return must(x); },
+    // The bell's saved alerts (last 7 days, update 35); empty before the update is run
+    async notifications(ids) { const r = await sb.rpc("my_notifications", { p_order_ids: ids || [] }); return r.error ? [] : r.data || []; },
+    async readNotifications(ids) { const r = await sb.rpc("read_notifications", { p_order_ids: ids || [] }); return r.error ? 0 : r.data; },
     // Tester agreement: nothing blocks if the database update hasn't been run yet
     async testerDue(as, token) { const r = await sb.rpc("tester_terms_due", { p_as: as || null, p_token: token || null }); return r.error ? null : r.data; },
     async acceptTester(v, as, token, name, device) { return must(await sb.rpc("accept_tester_terms", { p_version: v, p_as: as || null, p_token: token || null, p_name: name || null, p_device: device || null })); },
@@ -4151,11 +4156,15 @@ function openNotifSettings() {
 }
 // Alerts this phone received (saved by the service worker, plus ones the app showed itself): kept for the bell
 async function inboxLoad() {
+  // Saved on the server (same list on every phone, last 7 days) first, then alerts this phone got that the server doesn't have
+  const ids = (local.get("cp_orders") || []).map(o => o.id).filter(x => /^[0-9a-f-]{36}$/.test(x));
+  let srv = []; if (S.user || ids.length) { try { srv = (await api.notifications(ids)).map(r => ({ id: "n" + r.id, title: r.title, body: r.body || "", at: r.created_at, t: r.type || null, srv: true, read: !!r.read_at })); } catch (e) {} }
   let list = [];
   try { if ("caches" in window) { const r = await (await caches.open("cp-inbox")).match("/__inbox"); if (r) list = await r.json(); } } catch (e) {}
-  const mine = local.get("cp_inbox") || [];
-  const all = [...list, ...mine].filter(x => x && x.title).sort((a, b) => a.at < b.at ? 1 : -1);
-  const seenT = new Set(); S.inbox = all.filter(x => { const k = x.title + "|" + x.body + "|" + String(x.at).slice(0, 16); if (seenT.has(k)) return false; seenT.add(k); return true; }).slice(0, 40);
+  const mine = local.get("cp_inbox") || [], week = Date.now() - 7 * 864e5;
+  const key = x => x.title + "|" + x.body + "|" + String(x.at).slice(0, 15), seenT = new Set(srv.map(key));
+  const phone = [...list, ...mine].filter(x => x && x.title && Date.parse(x.at) > week && !seenT.has(key(x)) && (seenT.add(key(x)), true));
+  S.inbox = [...srv, ...phone].filter(x => !x.t || notifOn(x.t)).sort((a, b) => a.at < b.at ? 1 : -1).slice(0, 60);
   return S.inbox;
 }
 function inboxAdd(title, body) { const l = local.get("cp_inbox") || []; l.unshift({ id: "l" + Date.now(), title, body, at: new Date().toISOString() }); local.set("cp_inbox", l.slice(0, 30)); S.inbox = null; inboxLoad().then(updateBellDot); }
@@ -4179,18 +4188,19 @@ function updatesList() {
   (S.walletEntries || []).filter(e => e.amount > 0).slice(0, 3).forEach(e => out.push({ id: "w" + e.at + e.amount, t: "cashback", title: money(e.amount) + " in your wallet", body: e.reason, at: e.at }));
   return out.filter(x => notifOn(x.t));
 }
-function updateBellDot() { const seen = new Set(local.get("cp_seen_upd") || []), fresh = updatesList().some(x => x.act && !seen.has(x.id)) || (S.inbox || []).some(x => !seen.has(x.id)); $("#bellDot")?.classList.toggle("hidden", !fresh); }
+function updateBellDot() { const seen = new Set(local.get("cp_seen_upd") || []), fresh = updatesList().some(x => x.act && !seen.has(x.id)) || (S.inbox || []).some(x => x.srv ? !x.read && !seen.has(x.id) : !seen.has(x.id)); $("#bellDot")?.classList.toggle("hidden", !fresh); }
 async function openUpdates() {
   if (S.user && !S.walletEntries) { try { S.walletEntries = (await api.wallet()).entries || []; } catch (e) {} }
   const inbox = await inboxLoad(), seen = new Set(local.get("cp_seen_upd") || []);
   // Alerts you received (newest first), then what's happening right now with your orders
-  const list = [...inbox.map(x => ({ ...x, act: !seen.has(x.id), got: true })), ...updatesList()];
+  const list = [...inbox.map(x => ({ ...x, act: x.srv ? !x.read && !seen.has(x.id) : !seen.has(x.id), got: true })), ...updatesList()];
   const ago = t => { if (!t) return ""; const m = Math.max(0, Math.round((Date.now() - Date.parse(t)) / 6e4)); return m < 1 ? "Just now" : m < 60 ? m + " min ago" : m < 1440 ? Math.round(m / 60) + " hr ago" : fmtDate(String(t).slice(0, 10)); };
   openSheet(`${sheetHead("Notifications", "")}
     ${local.get("cp_alerts") ? "" : `<div class="vbanner o" style="justify-content:space-between"><span>Alerts are off on this phone.</span><button class="btn" id="updOn" style="padding:8px 14px">Turn on</button></div>`}
-    <div>${list.map(x => `<div class="nupd"><span class="dot${x.act && !seen.has(x.id) ? "" : " r"}"></span><div><b>${esc(x.title)}</b><p>${esc(x.body || "")}</p><small>${esc(ago(x.at))}</small></div></div>`).join("") || `<p class="small muted" style="padding:12px 2px">Nothing new. Updates about your orders and your building show here.</p>`}</div>
+    <div>${list.map(x => `<div class="nupd"><span class="dot${x.act ? "" : " r"}"></span><div><b>${esc(x.title)}</b><p>${esc(x.body || "")}</p><small>${esc(ago(x.at))}</small></div></div>`).join("") || `<p class="small muted" style="padding:12px 2px">Nothing new. Updates about your orders and your building show here.</p>`}</div>
     <button class="ghost wide" id="updSet">Choose alerts</button>`);
-  local.set("cp_seen_upd", list.map(x => x.id).concat([...seen]).slice(0, 80)); updateBellDot();
+  local.set("cp_seen_upd", list.map(x => x.id).concat([...seen]).slice(0, 150)); updateBellDot();
+  if (inbox.some(x => x.srv && !x.read)) { inbox.forEach(x => { if (x.srv) x.read = true; }); api.readNotifications((local.get("cp_orders") || []).map(o => o.id).filter(x => /^[0-9a-f-]{36}$/.test(x))).catch(() => {}); }   // read on every phone
   $("#updSet").addEventListener("click", () => { closeSheet(); setTimeout(openNotifSettings, 350); });
   $("#updOn")?.addEventListener("click", async () => { closeSheet(); setTimeout(toggleAlerts, 350); });
 }
@@ -6607,7 +6617,7 @@ async function start() {
   document.addEventListener("click", e => { const c = e.target.closest("[data-copy]"); if (c) return copy(c.dataset.copy, "Link copied"); const b = e.target.closest("[data-copynum]"); if (b) copy(b.dataset.copynum.replace(/\s/g, ""), "Mobile money number copied"); });
   window.addEventListener("hashchange", route);
   // Background refresh pauses while the app is hidden; catch up at once when it's opened again
-  document.addEventListener("visibilitychange", () => { if (document.hidden || !$("#tabHome")) return; refreshBoard(); refreshMine(); tickCountdown(); });
+  document.addEventListener("visibilitychange", () => { if (document.hidden || !$("#tabHome")) return; refreshBoard(); refreshMine(); tickCountdown(); inboxLoad().then(updateBellDot).catch(() => {}); });
   if (isStandalone()) document.documentElement.classList.add("standalone");
   healViewport();
   initMotion();

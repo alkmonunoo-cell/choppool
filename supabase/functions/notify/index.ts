@@ -14,8 +14,25 @@ async function once(key: string) {   // true the first time a key is seen
   const { data } = await db.from("push_log").upsert({ key }, { onConflict: "key", ignoreDuplicates: true }).select("key");
   return !!(data && data.length);
 }
+// Every alert is also saved for the bell (7 days), so it shows on every phone even if the push never arrived (update 35).
+// subs.to says who it's for: { orders } (customers: by account, or by order when they have no account), { users }, { kitchen }, { rider }.
+async function record(to: any, title: string, body: string, url: string, tag: string, type: string) {
+  if (!to) return;
+  const rows: any[] = [], base = { title, body, url, tag, type: type || null };
+  if (to.orders) {
+    const users = [...new Set((to.orders as any[]).map((o) => o.user_id).filter(Boolean))];
+    users.forEach((u) => rows.push({ ...base, user_id: u }));
+    (to.orders as any[]).filter((o) => !o.user_id).forEach((o) => rows.push({ ...base, order_id: o.id }));
+  }
+  (to.users || []).forEach((u: string) => rows.push({ ...base, user_id: u }));
+  if (to.kitchen) rows.push({ ...base, kitchen_id: to.kitchen });
+  if (to.rider) rows.push({ ...base, rider_id: to.rider });
+  if (rows.length) { try { await db.from("notifications").insert(rows); } catch (_) { /* before update 35 the table doesn't exist: pushes still go out */ } }
+}
+const forWho = (subs: any[], to: any) => Object.assign(subs, { to });
 // type: the alert kind a customer can switch off in Account > Notifications (vendor, rider and team alerts have none)
 async function send(subs: any[], title: string, body: string, url: string, tag: string, type = "") {
+  await record((subs as any).to, title, body, url, tag, type);
   const seen = new Set<string>();
   for (const s of subs || []) {
     if (seen.has(s.endpoint)) continue; seen.add(s.endpoint);
@@ -29,10 +46,10 @@ async function customerSubs(orders: any[]) {
   const out: any[] = [];
   if (users.length) { const { data } = await db.from("push_subs").select("*").in("user_id", users); out.push(...(data || [])); }
   if (ids.length) { const { data } = await db.from("push_subs").select("*").overlaps("order_ids", ids); out.push(...(data || [])); }
-  return out;
+  return forWho(out, { orders });
 }
-const kitchenSubs = async (kid: string) => (await db.from("push_subs").select("*").eq("kitchen_id", kid)).data || [];
-const riderSubs = async (rid: string) => (await db.from("push_subs").select("*").eq("rider_id", rid)).data || [];
+const kitchenSubs = async (kid: string) => forWho((await db.from("push_subs").select("*").eq("kitchen_id", kid)).data || [], { kitchen: kid });
+const riderSubs = async (rid: string) => forWho((await db.from("push_subs").select("*").eq("rider_id", rid)).data || [], { rider: rid });
 
 async function poolEvents(poolId: string, opened = false) {
   const { data: p } = await db.from("pools").select("*").eq("id", poolId).single(); if (!p) return;
@@ -126,7 +143,7 @@ async function tick() {
   // Cashback posted to a wallet in the last 15 minutes: tell the customer
   const { data: cb } = await db.from("wallet_entries").select("order_id,amount,user_id").like("reason", "Delivery cashback%").gte("created_at", new Date(now.getTime() - 15 * 6e4).toISOString());
   for (const e of cb || []) if (await once("cashback:" + e.order_id))
-    await send(((await db.from("push_subs").select("*").eq("user_id", e.user_id)).data || []), money(e.amount) + " cashback added", "Your share of the delivery is back in your ChopPool wallet.", APP + "/#order", "cashback-" + e.order_id, "cashback");
+    await send(forWho((await db.from("push_subs").select("*").eq("user_id", e.user_id)).data || [], { users: [e.user_id] }), money(e.amount) + " cashback added", "Your share of the delivery is back in your ChopPool wallet.", APP + "/#order", "cashback-" + e.order_id, "cashback");
 
   const cutToday = new Date(today + "T" + String(s.cutoff).slice(0, 5) + ":00Z"), payMin = Number(s.quote_pay_min || 15);
   // Sellers: reminder 15 minutes before pricing for custom orders closes
@@ -164,7 +181,7 @@ async function tick() {
     }
   }
   // Once a day: forget alert order IDs older than two days
-  if (await once("prune:" + today)) await db.rpc("prune_push_subs");
+  if (await once("prune:" + today)) { await db.rpc("prune_push_subs"); await db.rpc("prune_notifications").then(() => {}, () => {}); }   // bell keeps 7 days
   const { data: pools } = await db.from("pools").select("*").gte("order_date", since);
   for (const p of pools || []) {
     if (p.status === "waiting" && laterDay(p)) {
@@ -209,7 +226,7 @@ async function tick() {
       const subs: any[] = [];
       if (eps.length) subs.push(...((await db.from("push_subs").select("*").in("endpoint", eps)).data || []));
       if (us.length) subs.push(...((await db.from("push_subs").select("*").in("user_id", us)).data || []));
-      if (await once("site_live:" + si.id)) await send(subs, si.name + " is on ChopPool", "Your building is live. Start a pool and others there can join it.", APP + "/#order", "site-" + si.id);
+      if (await once("site_live:" + si.id)) await send(forWho(subs, { users: us }), si.name + " is on ChopPool", "Your building is live. Start a pool and others there can join it.", APP + "/#order", "site-" + si.id);
       await db.from("site_waiters").update({ notified_at: new Date().toISOString() }).eq("site_id", si.id).is("notified_at", null);
     }
   }
