@@ -5207,7 +5207,11 @@ async function renderAdmin(cached, quiet) {   // quiet = background/refresh-butt
   $("#aUpdated") && ($("#aUpdated").textContent = S.adminAt ? "Updated " + S.adminAt.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : "");
   adminMaps.forEach(m => { try { m.remove(); } catch (e) {} }); adminMaps = [];
   const K = id => A.kitchens.find(k => k.id === id) || {}, sName = id => (A.sites.find(x => x.id === id) || {}).name || "";
-  const aTrip = p => { const k = K(p.kitchen_id), st = A.sites.find(x => x.id === p.site_id) || {}; return tripFor(hasPin(k) ? k : k.added_by_customer ? st : {}, st, s); };
+  const aTripNow = p => { const k = K(p.kitchen_id), st = A.sites.find(x => x.id === p.site_id) || {}; return tripFor(hasPin(k) ? k : k.added_by_customer ? st : {}, st, s); };
+  // A pool's trip price: kept when its orders closed (update 40), else what its customers were charged, else today's pricing (open pools only).
+  // So changing delivery pricing never rewrites past days.
+  const tripCharged = p => { const xs = A.orders.filter(o => o.pool_id === p.id && !o.parent_id && o.status !== "cancelled" && Number(o.max_fee) > 0).map(o => Number(o.max_fee) * o.qty); return xs.length ? Math.max(...xs) : null; };
+  const aTrip = p => p.trip_price != null && p.trip_price !== "" ? Number(p.trip_price) : ["waiting", "collecting"].includes(p.status) && p.order_date >= today() ? aTripNow(p) : (tripCharged(p) ?? aTripNow(p));
   const pending = A.sites.filter(x => x.status === "pending" && !x.archived);
   const badge = document.querySelector('[data-atab="buildings"]'); if (badge) badge.textContent = "Buildings" + (pending.length ? " (" + pending.length + " new)" : "");
   const fbNew = (A.feedback || []).filter(f => f.status === "new").length, fbTab = document.querySelector('[data-atab="feedback"]'); if (fbTab) fbTab.textContent = "Feedback" + (fbNew ? " (" + fbNew + " new)" : "");
