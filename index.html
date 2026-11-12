@@ -141,6 +141,8 @@ p { margin: 0; }
 .ttok { align-items: flex-start; }
 .opaid { display: flex; align-items: baseline; gap: 8px; margin: 2px 0 0; } .opaid b { font-size: 15px; }
 .pkrow .pamt { font-weight: 700; font-size: 14px; white-space: nowrap; justify-self: end; }
+.mtable td, .mtable th { white-space: nowrap; } .mtable td.neg { color: var(--danger); }
+tr.tsum td { border-top: 2px solid var(--line); background: var(--surface-2); }
 .fbpics { display: flex; gap: 10px; flex-wrap: wrap; } .fbpics:empty { display: none; }
 .fbpic { position: relative; width: 84px; height: 84px; border-radius: 14px; overflow: hidden; background: var(--surface-2); }
 .fbpic img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -1590,6 +1592,26 @@ function makeDemoApi() {
     // Feedback: photos kept on this page as data links in the demo
     async uploadFeedbackPhoto(batch, n, blob) { return await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(blob); }); },
     async notifications(ids) { return []; },
+    async moneyDays(from, to) {   // same sums as admin_money_days on the server
+      const r2 = x => Math.round(x * 100) / 100, food0 = o => (Number(o.quote_price ?? o.unit_price) + Number(o.addons_total || 0)) * o.qty;
+      const paid = orders.filter(o => o.order_date >= from && o.order_date <= to && ["paid", "collected"].includes(o.status));
+      const pl = pools.filter(p => p.order_date >= from && p.order_date <= to && p.status !== "cancelled" && paid.some(o => o.pool_id === p.id))
+        .map(p => ({ ...p, noTrip: (kitchens.find(k => k.id === p.kitchen_id) || {}).delivery_mode === "runner" || pfree(p.id), trip: p.trip_cost ?? tripOf(p.id), fee: poolFee(p) }));
+      const days = []; for (let d = from; d <= to; d = addDays(d, 1)) {
+        const os = paid.filter(o => o.order_date === d), ps = pl.filter(p => p.order_date === d), ids = new Set(os.map(o => o.id)), py = t => payouts.filter(x => x.payee_type === t && String(x.created_at).slice(0, 10) === d).reduce((a, x) => a + Number(x.amount), 0);
+        const row = { day: d, orders: new Set(os.map(o => o.code)).size, meals: os.reduce((t, o) => t + o.qty, 0), received: r2(os.reduce((t, o) => t + orderTotal(o), 0)), wallet_used: r2(os.reduce((t, o) => t + Number(o.wallet_used || 0), 0)),
+          food: r2(os.reduce((t, o) => t + food0(o), 0)), vendor_fee: r2(ps.reduce((t, p) => t + p.fee, 0)), service: r2(os.reduce((t, o) => t + Number(o.service_fee || 0) * (o.fee_per_meal ? o.qty : 1), 0)),
+          delivery_in: r2(os.reduce((t, o) => t + Number(o.max_fee || 0) * o.qty, 0)), trips_riders: r2(ps.filter(p => !p.noTrip && p.rider_id).reduce((t, p) => t + Number(p.trip), 0)),
+          trips_apps: r2(ps.filter(p => !p.noTrip && !p.rider_id).reduce((t, p) => t + Number(p.trip), 0)), trips_estimated: ps.filter(p => !p.noTrip && p.trip_cost == null).length,
+          cashback: r2(ledger.filter(e => ids.has(e.order_id) && /^Delivery cashback/.test(e.reason)).reduce((t, e) => t + e.amount, 0)),
+          refunds: r2(ledger.filter(e => e.amount > 0 && /^(Refund|Money back)/.test(e.reason) && (orders.find(o => o.id === e.order_id) || {}).order_date === d).reduce((t, e) => t + e.amount, 0)),
+          paid_vendors: r2(py("seller")), paid_riders: r2(py("rider")) };
+        if (row.orders || row.paid_vendors || row.paid_riders || row.refunds) days.push(row); }
+      const vendors = kitchens.map(k => { const ps = pl.filter(p => p.kitchen_id === k.id), fd = paid.filter(o => ps.some(p => p.id === o.pool_id)).reduce((t, o) => t + food0(o), 0), fee = ps.reduce((t, p) => t + p.fee, 0);
+        return { id: k.id, name: k.name, food: r2(fd), fee: r2(fee), earned: r2(fd - fee), paid: r2(payouts.filter(x => x.kitchen_id === k.id && x.payee_type === "seller" && String(x.created_at).slice(0, 10) >= from && String(x.created_at).slice(0, 10) <= to).reduce((t, x) => t + Number(x.amount), 0)) }; }).filter(v => v.food > 0);
+      const rid = riders.map(r => { const ps = pl.filter(p => p.rider_id === r.id && p.status === "delivered"); return { id: r.id, name: r.name, deliveries: ps.length, trips: r2(ps.reduce((t, p) => t + Number(p.trip), 0)),
+        paid: r2(payouts.filter(x => x.rider_id === r.id && x.payee_type === "rider" && String(x.created_at).slice(0, 10) >= from && String(x.created_at).slice(0, 10) <= to).reduce((t, x) => t + Number(x.amount), 0)) }; }).filter(r => r.deliveries);
+      return { days, vendors, riders: rid }; },
     async payments() { if (!me) return []; const by = {}; orders.filter(o => o.user_id === me.id && ["paid", "collected"].includes(o.status)).forEach(o => { const k = o.order_date + o.code, m = Math.max(0, dueOf(o) - (o.wallet_used || 0) - Number(o.carried_amount || 0));
       const x = by[k] = by[k] || { at: o.created_at, order_date: o.order_date, code: o.code, items: [], paid: 0, refunded: 0, refunded_at: null }; x.items.push(o.qty + " × " + o.item_name); x.paid += m; });
       return Object.values(by).filter(x => x.paid > 0).map(x => ({ ...x, items: x.items.join(", ") })); },
@@ -1937,6 +1959,8 @@ function makeSupabaseApi() {
       return must(x); },
     async renameOrderAddons(item, renames) { const r = await sb.rpc("admin_rename_addons", { p_item: item, p_renames: renames });
       if (r.error && /function|schema cache/i.test(r.error.message)) throw new Error("Run the latest choppool-update.sql (version 36) in Supabase once, then try again."); return must(r); },
+    async moneyDays(from, to) { const r = await sb.rpc("admin_money_days", { p_from: from, p_to: to });
+      if (r.error && /admin_money_days|schema cache/i.test(r.error.message)) throw new Error("Run the latest choppool-update.sql (version 38) in Supabase once to see the daily money report."); return must(r); },
     // Mobile money payments for Activity (update 37); empty before the update is run
     async payments() { const r = await sb.rpc("my_payments"); return r.error ? [] : r.data || []; },
     // The bell's saved alerts (last 7 days, update 35); empty before the update is run
@@ -2537,7 +2561,7 @@ function cardTables(root) {
     const hs = [...t.querySelectorAll("tr:first-child th")].map(h => h.textContent.trim());
     if (!hs.length) return;
     t.classList.add("cardtable");
-    t.querySelectorAll("tr").forEach(r => r.querySelectorAll("td").forEach((c, i) => { if (hs[i] && !c.hasAttribute("colspan")) c.dataset.label = hs[i]; }));
+    t.querySelectorAll("tr").forEach(r => r.querySelectorAll("td").forEach((c, i) => { if (hs[i] && !c.hasAttribute("colspan") && !c.dataset.label) c.dataset.label = hs[i]; }));
   });
 }
 // Tapping the tab you're already on takes it back to its starting view
@@ -5200,10 +5224,11 @@ async function renderAdmin(cached, quiet) {   // quiet = background/refresh-butt
   const isOpen = key => (S.openItems || new Set()).has(key) ? " open" : "";
 
   /* ---------- Weekly reports ---------- */
-  if (tab === "reports") {
+  if (tab === "reports" && isSuper && S.repView === "money") { renderMoneyReport(body); }
+  else if (tab === "reports") {
     const weeks = Array.from({ length: 10 }, (_, n) => mondayOf(today(), -n));
     const wk = S.reportWeek && weeks.includes(S.reportWeek) ? S.reportWeek : weeks[0];
-    body.innerHTML = `<section class="stack" style="gap:12px"><div class="row" style="gap:8px;flex-wrap:wrap;justify-content:space-between"><h2>Weekly report</h2>
+    body.innerHTML = `${isSuper ? repTabs("week") : ""}<section class="stack" style="gap:12px"><div class="row" style="gap:8px;flex-wrap:wrap;justify-content:space-between"><h2>Weekly report</h2>
         <div class="row" style="gap:8px;flex-wrap:wrap"><select id="repWeek" aria-label="Week" style="width:auto;max-width:calc(100vw - 32px);min-width:0">${weeks.map((w, n) => `<option value="${w}"${w === wk ? " selected" : ""}>${n === 0 ? "This week" : n === 1 ? "Last week" : "Week of " + fmtDate(w)} (${fmtDate(w)}–${fmtDate(mondayOf(w, 0, 6))})</option>`).join("")}</select>
         <button class="ghost" data-act="report-copy">Copy for Excel</button><button class="ghost" data-act="report-csv">Download CSV</button></div></div>
       <div id="repBody"><div class="skeleton" style="height:180px"></div></div></section>`;
@@ -5343,19 +5368,24 @@ async function renderAdmin(cached, quiet) {   // quiet = background/refresh-butt
             ${o.pay_issue ? `<span class="chip warn">${o.pay_issue === "short" ? "Short: " + money(o.amount_received || 0) + " received" : "Not found"} · customer told</span>` : ""}
             <div class="row" style="gap:6px;flex-wrap:wrap;justify-content:flex-start"><button class="btn" data-act="pay-found" style="padding:7px 12px">Payment found</button><button class="ghost" data-act="pay-issue" style="padding:7px 12px">Not found / short</button></div></div>` : `<span class="num">${esc(paid || "—")}</span>`;
         return `<tr data-orow="${esc(o.id)}"><td class="num">${flag ? `<span class="pdotx" title="Payment to confirm"></span>` : ""}${clock(o.created_at)}</td><td>${esc(o.customer_name)}${bad ? `<br><span class="chip bad" title="Payments not received in the last 60 days">${bad} unpaid before</span>` : ""}</td><td class="num">${esc(o.phone)}</td><td>${esc(sName(o.site_id))}</td>
-          <td>${o.qty} × ${esc(o.item_name)}<br><span class="small muted">${esc(k.public_name || "")} Pool ${p.seq || ""}</span></td><td style="white-space:normal;min-width:180px">${esc(extras)}</td><td>${payCell}</td><td class="num">${esc(o.code)}</td>
+          <td>${o.qty} × ${esc(o.item_name)}<br><span class="small muted">${esc(k.public_name || "")} Pool ${p.seq || ""}</span></td><td style="white-space:normal;min-width:180px">${esc(extras)}</td>${amtCell(o)}<td>${payCell}</td><td class="num">${esc(o.code)}</td>
           <td><select data-order="${esc(o.id)}" aria-label="Order status">${ST.map(x => `<option${x === o.status ? " selected" : ""}>${x}</option>`).join("")}</select></td></tr>`; };
       // Which customers can get a phone alert about their payment (fetched quietly, then the cards update)
       const pend = A.orders.filter(o => o.status === "pending" && !o.basket).map(o => o.id);
       if (pend.length && api.alertReach && S.reachFor !== pend.join()) { S.reachFor = pend.join(); api.alertReach(pend).then(ids => { S.reach = new Set(ids || []); if (S.adminTab === "today") renderAdmin(true); }).catch(() => {}); }
-      const head = `<tr><th>Time</th><th>Customer</th><th>Phone</th><th>Building</th><th>Order</th><th>Extras and requests</th><th>Paid by</th><th>Code</th><th>Status</th></tr>`;
+      const head = `<tr><th>Time</th><th>Customer</th><th>Phone</th><th>Building</th><th>Order</th><th>Extras and requests</th><th>Amount</th><th>Paid by</th><th>Code</th><th>Status</th></tr>`;
+      // Order amount: food + extras + delivery + service; split shown when wallet credit was used
+      const amtCell = o => { const t = orderTotal(o), w = Number(o.wallet_used || 0), c = Number(o.carried_amount || 0), m = Math.max(0, t - w - c);
+        const lab = o.status === "pending" ? "To pay" : o.status === "cancelled" ? "Cancelled" : ["quote_requested", "quoted"].includes(o.status) ? "Not priced" : "";
+        return `<td class="num" style="white-space:nowrap">${lab ? `<span class="small muted">${lab}</span><br>` : ""}<b>${money(t)}</b>${w || c ? `<br><span class="small muted">${[w ? "Wallet " + money(w) : "", c ? "Moved " + money(c) : "", m ? "MoMo " + money(m) : ""].filter(Boolean).join(" · ")}</span>` : ""}</td>`; };
+      const sumRow = list => { const pd = list.filter(o => ["paid", "collected"].includes(o.status)); return list.length ? `<tr class="tsum"><td colspan="6"><b>Paid orders · ${pd.length}</b></td><td class="num" data-label="Total paid"><b>${money(pd.reduce((t, o) => t + orderTotal(o), 0))}</b></td><td colspan="3"></td></tr>` : ""; };
       body.innerHTML = `
       <div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:8px"><h2>Orders for ${fmtDate(d)}</h2><div class="row" style="gap:8px"><label class="small muted" for="oSort" style="margin:0">Sort</label><select id="oSort" data-ls="osort" style="width:auto">${[["new", "Newest first"], ["old", "Oldest first"], ["status", "Status"], ["building", "Building"], ["vendor", "Vendor"]].map(([v2, l]) => `<option value="${v2}"${v2 === sortBy ? " selected" : ""}>${l}</option>`).join("")}</select><button class="ghost" data-act="csv">Copy as CSV</button></div></div>
       ${toCheckL.length ? `<h3 class="row" style="gap:8px;justify-content:flex-start"><span class="pdotx"></span>Payments to confirm · ${toCheckL.length}</h3><p class="small muted">Find each reference on the mobile money statement. Found it: <strong>Payment found</strong>. Not there, or too little: <strong>Not found / short</strong>, and the customer is told how to fix it.</p>
         <div class="table-wrap"><table>${head}${toCheckL.map(o => row(o, true)).join("")}</table></div>` : ""}
       ${issueL.length ? `<h3>Waiting for the customer to fix · ${issueL.length}</h3><p class="small muted">Cancelled automatically at ${fmtTime(s.cutoff)} if nothing changes.</p><div class="table-wrap"><table>${head}${issueL.map(o => row(o, false)).join("")}</table></div>` : ""}
       <h3>${toCheckL.length || issueL.length ? "All other orders" : "Orders"}</h3>
-      <div class="table-wrap"><table>${head}${rest.map(o => row(o, false)).join("") || `<tr><td colspan="9" class="muted">No other orders yet.</td></tr>`}</table></div>`;
+      <div class="table-wrap"><table>${head}${rest.map(o => row(o, false)).join("") || `<tr><td colspan="10" class="muted">No other orders yet.</td></tr>`}${sumRow(rest)}</table></div>`;
       cardTables(body);
       const refs = [...new Set(A.orders.filter(o => o.status === "pending" && o.momo_ref).map(o => String(o.momo_ref).trim()))], rk = refs.join("|");
       if (refs.length && S.refsKey !== rk) { S.refsKey = rk; api.refsSeen(refs, d).then(m => { S.refsSeen = m || {}; if (Object.keys(S.refsSeen).length) renderAdmin(true); }).catch(() => {}); }
@@ -6041,6 +6071,49 @@ function trend(c, p, pct) {
   if (!Number(p) && Number(c) > 0) return `${v} <span class="up">New</span>`;
   return `${v} <span class="${c > p ? "up" : "down"}">${c > p ? "↑" : "↓"} ${pct ? Math.abs(c - p) + " pts" : Math.abs(Math.round((c - p) * 10) / 10)}</span>`;
 }
+// Reports: weekly report or (owner) the daily money report for any period
+const repTabs = cur => `<div class="fchips" style="margin:0 0 12px;padding:0">${[["week", "Weekly report"], ["money", "Daily money"]].map(([k, l]) => `<button data-repview="${k}" aria-pressed="${k === cur}">${l}</button>`).join("")}</div>`;
+document.addEventListener("click", e => { const b = e.target.closest("[data-repview]"); if (!b) return; S.repView = b.dataset.repview; renderAdmin(true); });
+const MONEY_COLS = [["day", "Date"], ["orders", "Orders"], ["meals", "Meals"], ["received", "Received"], ["food", "Food"], ["vendor_fee", "ChopPool vendor fee"], ["owed_vendors", "Owed to vendors"],
+  ["service", "Service fees"], ["delivery_in", "Delivery charged"], ["trips_riders", "Trips: ChopPool riders"], ["trips_apps", "Trips: Bolt/Yango/other"], ["cashback", "Cashback paid"], ["profit", "Profit"],
+  ["refunds", "Refunds"], ["paid_vendors", "Paid out to vendors"], ["paid_riders", "Paid out to riders"]];
+function moneyRows(R) {
+  const rows = (R.days || []).map(d => { const n = k => Number(d[k] || 0); return { ...d, owed_vendors: Math.round((n("food") - n("vendor_fee")) * 100) / 100,
+    profit: Math.round((n("service") + n("vendor_fee") + n("delivery_in") - n("trips_riders") - n("trips_apps") - n("cashback")) * 100) / 100 }; });
+  const tot = { day: "Total" }; MONEY_COLS.slice(1).forEach(([k]) => { tot[k] = Math.round(rows.reduce((t, r) => t + Number(r[k] || 0), 0) * 100) / 100; });
+  tot.trips_estimated = rows.reduce((t, r) => t + Number(r.trips_estimated || 0), 0); return { rows, tot };
+}
+function moneyCsv(R, from, to) {
+  const q = x => '"' + String(x ?? "").replace(/"/g, '""') + '"', { rows, tot } = moneyRows(R);
+  return ["ChopPool daily money " + from + " to " + to, MONEY_COLS.map(c => q(c[1])).join(","), ...rows.concat([tot]).map(r => MONEY_COLS.map(([k]) => q(k === "day" ? r[k] : Number(r[k] || 0).toFixed(k === "orders" || k === "meals" ? 0 : 2))).join(",")),
+    "", "Vendors", ["Vendor", "Food", "ChopPool fee", "Earned", "Paid out in period"].map(q).join(","), ...(R.vendors || []).map(v => [v.name, v.food, v.fee, v.earned, v.paid].map(q).join(",")),
+    "", "Riders", ["Rider", "Deliveries", "Trips", "Paid out in period"].map(q).join(","), ...(R.riders || []).map(r => [r.name, r.deliveries, r.trips, r.paid].map(q).join(","))].join("\n");
+}
+function renderMoneyReport(body) {
+  const t = today(), m0 = t.slice(0, 8) + "01", lm = addDays(m0, -1), P = {
+    week: [mondayOf(t, 0), t], lastweek: [mondayOf(t, -1), addDays(mondayOf(t, 0), -1)], month: [m0, t], lastmonth: [lm.slice(0, 8) + "01", lm] };
+  const per = S.moneyPer || "month", [from, to] = per === "custom" ? [S.moneyFrom || m0, S.moneyTo || t] : P[per];
+  body.innerHTML = `${repTabs("money")}<section class="stack" style="gap:12px"><div class="row" style="gap:8px;flex-wrap:wrap;justify-content:space-between"><h2>Daily money</h2>
+      <div class="row" style="gap:8px;flex-wrap:wrap"><select id="mPer" aria-label="Period" style="width:auto">${[["week", "This week"], ["lastweek", "Last week"], ["month", "This month"], ["lastmonth", "Last month"], ["custom", "Pick dates"]].map(([k, l]) => `<option value="${k}"${k === per ? " selected" : ""}>${l}</option>`).join("")}</select>
+      ${per === "custom" ? `<input type="date" id="mFrom" value="${from}" max="${t}" style="width:auto" aria-label="From"><input type="date" id="mTo" value="${to}" max="${t}" style="width:auto" aria-label="To">` : ""}
+      <button class="ghost" id="mCopy">Copy for Excel</button><button class="ghost" id="mCsv">Download CSV</button></div></div>
+    <p class="small muted" style="margin:0">${fmtDate(from)} to ${fmtDate(to)} · paid orders only, by order day. Profit = service fees + ChopPool vendor fee + delivery charged − trip costs − cashback. Paid out = payments you recorded under Money owed.</p>
+    <div id="mBody"><div class="skeleton" style="height:180px"></div></div></section>`;
+  $("#mPer").addEventListener("change", e => { S.moneyPer = e.target.value; renderAdmin(true); });
+  ["#mFrom", "#mTo"].forEach(id => $(id)?.addEventListener("change", () => { S.moneyFrom = $("#mFrom").value; S.moneyTo = $("#mTo").value; renderAdmin(true); }));
+  const key = from + "|" + to;
+  const draw = R => { const el = $("#mBody"); if (!el) return; const { rows, tot } = moneyRows(R), f = (k, v) => k === "day" ? (v === "Total" ? "<b>Total</b>" : esc(fmtDate(v))) : k === "orders" || k === "meals" ? v : money(v);
+    el.innerHTML = `${rows.length ? `<div class="dash-grid" style="margin-bottom:12px">${[["Received", tot.received], ["Owed to vendors", tot.owed_vendors], ["Trip costs", tot.trips_riders + tot.trips_apps], ["Cashback paid", tot.cashback], ["Profit", tot.profit]].map(([l, v]) => `<div class="dtile${l === "Profit" && v < 0 ? " bad" : ""}"><b class="num">${money(v)}</b><span>${l}</span></div>`).join("")}</div>
+      <div class="table-wrap"><table class="mtable"><tr>${MONEY_COLS.map(c => `<th>${esc(c[1])}</th>`).join("")}</tr>${rows.map(r => `<tr>${MONEY_COLS.map(([k]) => `<td class="num${k === "profit" && r[k] < 0 ? " neg" : ""}">${f(k, r[k])}${k === "trips_apps" && r.trips_estimated ? ' <span class="small muted" title="Trip not booked yet: estimated">est.</span>' : ""}</td>`).join("")}</tr>`).join("")}
+      <tr class="tsum">${MONEY_COLS.map(([k]) => `<td class="num">${k === "day" ? "<b>Total</b>" : `<b>${f(k, tot[k])}</b>`}</td>`).join("")}</tr></table></div>`
+      : `<p class="muted">No paid orders in this period.</p>`}
+      <div class="grid2" style="margin-top:14px;align-items:start"><section class="card stack" style="gap:8px"><h3>Vendors</h3>${(R.vendors || []).length ? `<div class="table-wrap"><table><tr><th>Vendor</th><th>Food</th><th>ChopPool fee</th><th>Earned</th><th>Paid out</th></tr>${R.vendors.map(v => `<tr><td>${esc(v.name)}</td><td class="num">${money(v.food)}</td><td class="num">${money(v.fee)}</td><td class="num"><b>${money(v.earned)}</b></td><td class="num">${money(v.paid)}</td></tr>`).join("")}</table></div>` : `<p class="small muted">None in this period.</p>`}</section>
+      <section class="card stack" style="gap:8px"><h3>ChopPool riders</h3>${(R.riders || []).length ? `<div class="table-wrap"><table><tr><th>Rider</th><th>Deliveries</th><th>Trips</th><th>Paid out</th></tr>${R.riders.map(r => `<tr><td>${esc(r.name)}</td><td class="num">${r.deliveries}</td><td class="num"><b>${money(r.trips)}</b></td><td class="num">${money(r.paid)}</td></tr>`).join("")}</table></div>` : `<p class="small muted">None in this period.</p>`}</section></div>`; };
+  const go = () => { $("#mCopy").onclick = () => copy(moneyCsv(S.money, from, to), "Copied. Paste it into Excel or Google Sheets.");
+    $("#mCsv").onclick = () => { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([moneyCsv(S.money, from, to)], { type: "text/csv" })); a.download = "choppool-money-" + from + "-to-" + to + ".csv"; document.body.appendChild(a); a.click(); a.remove(); }; };
+  if (S.money && S.moneyKey === key) { draw(S.money); go(); return; }
+  api.moneyDays(from, to).then(R => { S.money = R; S.moneyKey = key; draw(R); go(); }).catch(e => { const el = $("#mBody"); if (el) el.innerHTML = `<p class="note">${esc(cleanErr(e))}</p>`; });
+}
 function reportHtml(R, isSuper) {
   const c = (R.headline || {}).cur || {}, p = (R.headline || {}).prev || {}, M = R.money;
   const tile = (l, k, pct) => `<div class="dtile"><b class="num">${trend(c[k] ?? (k === "repeat_rate" || k === "avg_meals" ? null : 0), p[k] ?? null, pct)}</b><span>${esc(l)}</span></div>`;
@@ -6071,10 +6144,13 @@ function reportCsv(R, isSuper) {
 }
 function ordersCsv() {
   const A = S.admin || { orders: [], pools: [], sites: [], kitchens: [] };
-  const cols = ["created_at", "order_date", "customer_name", "phone", "site", "kitchen", "pool", "item_name", "qty", "unit_price", "addons", "note", "special_request", "quote_price", "wallet_used", "momo_ref", "code", "status", "refund_needed", "collected_at"];
+  const cols = ["created_at", "order_date", "customer_name", "phone", "site", "kitchen", "pool", "item_name", "qty", "unit_price", "addons", "note", "special_request", "quote_price", "food", "delivery", "service", "amount", "wallet_used", "momo_amount", "momo_ref", "code", "status", "refund_needed", "collected_at"];
   const q = x => '"' + String(x ?? "").replace(/"/g, '""') + '"';
   const val = (o, c) => c === "site" ? (A.sites.find(x => x.id === o.site_id) || {}).name : c === "kitchen" ? (A.kitchens.find(x => x.id === o.kitchen_id) || {}).name
-    : c === "pool" ? (A.pools.find(x => x.id === o.pool_id) || {}).seq : c === "addons" ? addonText(o.addons) : o[c];
+    : c === "pool" ? (A.pools.find(x => x.id === o.pool_id) || {}).seq : c === "addons" ? addonText(o.addons)
+    : c === "food" ? ((Number(o.quote_price ?? o.unit_price) + Number(o.addons_total || 0)) * o.qty).toFixed(2) : c === "delivery" ? (Number(o.max_fee || 0) * o.qty).toFixed(2)
+    : c === "service" ? (Number(o.service_fee || 0) * (o.fee_per_meal ? o.qty : 1)).toFixed(2) : c === "amount" ? orderTotal(o).toFixed(2)
+    : c === "momo_amount" ? Math.max(0, orderTotal(o) - Number(o.wallet_used || 0) - Number(o.carried_amount || 0)).toFixed(2) : o[c];
   return [cols.join(",")].concat(A.orders.map(o => cols.map(c => q(val(o, c))).join(","))).join("\n");
 }
 /* =====================================================================================
