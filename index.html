@@ -139,6 +139,8 @@ p { margin: 0; }
 .ttfull > div { display: grid; gap: 4px; margin-top: 10px; max-height: 45vh; overflow: auto; padding-right: 4px; line-height: 1.5; }
 .ttfull p { margin: 0 0 8px; }
 .ttok { align-items: flex-start; }
+.opaid { display: flex; align-items: baseline; gap: 8px; margin: 2px 0 0; } .opaid b { font-size: 15px; }
+.pkrow .pamt { font-weight: 700; font-size: 14px; white-space: nowrap; justify-self: end; }
 .fbpics { display: flex; gap: 10px; flex-wrap: wrap; } .fbpics:empty { display: none; }
 .fbpic { position: relative; width: 84px; height: 84px; border-radius: 14px; overflow: hidden; background: var(--surface-2); }
 .fbpic img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -466,8 +468,8 @@ th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--li
 th { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 700; }
 td select { padding: 6px 8px; width: auto; }
 .labels { display: grid; gap: 8px; }
-.pkrow { display: grid; grid-template-columns: auto auto 1fr; gap: 12px; align-items: center; width: 100%; text-align: left; background: var(--surface-2); border: 0; border-radius: 14px; padding: 12px; color: var(--ink); font: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
-.pkrow.ro { grid-template-columns: auto 1fr auto; cursor: default; }
+.pkrow { display: grid; grid-template-columns: auto auto 1fr auto; gap: 12px; align-items: center; width: 100%; text-align: left; background: var(--surface-2); border: 0; border-radius: 14px; padding: 12px; color: var(--ink); font: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.pkrow.ro { grid-template-columns: auto 1fr auto auto; cursor: default; }
 .pkrow .items { display: grid; gap: 2px; line-height: 1.35; }
 .pkbox { width: 26px; height: 26px; border-radius: 8px; border: 2px solid var(--line-strong, var(--muted)); display: grid; place-items: center; color: var(--surface-2); }
 .pkbox svg { width: 16px; height: 16px; }
@@ -1588,6 +1590,9 @@ function makeDemoApi() {
     // Feedback: photos kept on this page as data links in the demo
     async uploadFeedbackPhoto(batch, n, blob) { return await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(blob); }); },
     async notifications(ids) { return []; },
+    async payments() { if (!me) return []; const by = {}; orders.filter(o => o.user_id === me.id && ["paid", "collected"].includes(o.status)).forEach(o => { const k = o.order_date + o.code, m = Math.max(0, dueOf(o) - (o.wallet_used || 0) - Number(o.carried_amount || 0));
+      const x = by[k] = by[k] || { at: o.created_at, order_date: o.order_date, code: o.code, items: [], paid: 0, refunded: 0, refunded_at: null }; x.items.push(o.qty + " × " + o.item_name); x.paid += m; });
+      return Object.values(by).filter(x => x.paid > 0).map(x => ({ ...x, items: x.items.join(", ") })); },
     async renameOrderAddons(item, renames) { let n = 0; orders.filter(o => o.item_id === item && o.order_date >= today() && !["cancelled", "collected"].includes(o.status)).forEach(o => { let hit = false;
       o.addons = (o.addons || []).map(a => { const r = renames.find(x => x.from === a.name && Number(x.price) === Number(a.price)); if (r) { hit = true; return { ...a, name: r.to }; } return a; }); if (hit) n++; }); return n; },
     async readNotifications(ids) { return 0; },
@@ -1932,6 +1937,8 @@ function makeSupabaseApi() {
       return must(x); },
     async renameOrderAddons(item, renames) { const r = await sb.rpc("admin_rename_addons", { p_item: item, p_renames: renames });
       if (r.error && /function|schema cache/i.test(r.error.message)) throw new Error("Run the latest choppool-update.sql (version 36) in Supabase once, then try again."); return must(r); },
+    // Mobile money payments for Activity (update 37); empty before the update is run
+    async payments() { const r = await sb.rpc("my_payments"); return r.error ? [] : r.data || []; },
     // The bell's saved alerts (last 7 days, update 35); empty before the update is run
     async notifications(ids) { const r = await sb.rpc("my_notifications", { p_order_ids: ids || [] }); return r.error ? [] : r.data || []; },
     async readNotifications(ids) { const r = await sb.rpc("read_notifications", { p_order_ids: ids || [] }); return r.error ? 0 : r.data; },
@@ -3741,6 +3748,14 @@ function openLessPlates(mainId, key) {
     } catch (err) { $("#lpErr").textContent = cleanErr(err); $("#lpGo").disabled = false; await refreshMine(); }
   });
 }
+// What this order cost in total (dish, extras, delivery, service, all plates in the same checkout); paid = mobile money + wallet credit
+function paidLine(o, kids) {
+  if (["quote_requested", "quoted", "cancelled"].includes(o.status)) return "";
+  const xs = [o, ...kids], tot = x => Number(x.amount_due || 0) + Number(x.wallet_used || 0) + Number(x.carried_amount || 0);
+  const paid = xs.filter(x => ["paid", "collected"].includes(x.status)).reduce((t, x) => t + tot(x), 0), due = xs.filter(x => x.status === "pending").reduce((t, x) => t + tot(x), 0);
+  return (paid > 0 ? `<p class="small opaid"><span>Paid</span><b class="num">${money(paid)}</b><span class="muted">incl. delivery and service</span></p>` : "")
+    + (due > 0 ? `<p class="small opaid"><span>To pay</span><b class="num">${money(due)}</b><span class="muted">${o.pay_issue ? "" : "payment being checked"}</span></p>` : "");
+}
 function orderCard(o, all, next) {
   const step = progressOf(o), k = menuOf(o.kitchen_id), kids = all.filter(c => c.parent_id === o.id).sort((a, b) => a.created_at < b.created_at ? -1 : 1), liveKids = kids.filter(c => c.status !== "cancelled");
   const s4 = Math.min(5, step);
@@ -3752,6 +3767,7 @@ function orderCard(o, all, next) {
       <div class="c"><span>Code</span><b class="num">${esc(o.code)}</b></div></div>
       ${["quote_requested", "quoted"].includes(o.status) ? "" : `<div class="steps4" aria-label="Progress ${s4} of 5">${[1, 2, 3, 4, 5].map(n => `<i class="${n <= s4 ? "on" : ""}"></i>`).join("")}</div><div class="steps4l">${STEP_LABELS.map((l, n) => `<span class="${n < s4 ? "on" : ""}">${l}</span>`).join("")}</div>`}
       <p class="status-text">${esc(statusLine(o))}</p>
+      ${paidLine(o, liveKids)}
       ${o.status === "quoted" ? quoteBreakdown(o) + (o.quote_pay_by ? `<p class="small" style="font-weight:700;color:var(--warn-ink, var(--accent-2))" data-paywin="${esc(o.quote_pay_by)}">${payWindowText(o.quote_pay_by)}</p>` : "") + `<button class="btn wide" data-pay="${esc(o.id)}">Pay ${money(o.amount_due)}</button>` : ""}
       ${soloBanner(o)}
       ${canConfirm(o) ? `<div class="recv"><span>Got everything?</span><div class="row" style="gap:8px"><button class="btn" data-gotit="${esc(o.id)}">Got my food</button><button class="ghost" data-problem="${esc(o.id)}">Report a problem</button></div></div>` : ""}
@@ -3895,7 +3911,12 @@ function renderOrders() {
 const meNow = () => local.get("cp_me") || {};
 const avatarHtml = (name, big, pic = local.get("cp_avatar")) => { const ini = String(name || "").trim().split(/\s+/).map(w => w[0] || "").slice(0, 2).join("").toUpperCase();
   return `<span class="pavatar${big ? " big" : ""}">${pic ? `<img src="${esc(pic)}" alt="">` : ini ? esc(ini) : ICON.user}</span>`; };
-const txRow = e => `<div class="grow"><span class="gic">${ICON.wallet}</span><span class="gtx">${esc(e.reason)}<small>${esc(e.at ? fmtDate(String(e.at).slice(0, 10)) : "")}</small></span><span class="amt num${e.amount > 0 ? " pos" : ""}">${e.amount < 0 ? "−" : "+"}${money(Math.abs(e.amount))}</span></div>`;
+// Activity = wallet entries + mobile money payments (and refunds back to mobile money), newest first
+const activityList = () => [...(S.walletEntries || []), ...(S.payments || []).flatMap(p => [
+    { at: p.at, amount: -Number(p.paid), reason: "Lunch · code " + p.code + " · paid by mobile money", momo: true },
+    ...(Number(p.refunded) > 0 ? [{ at: p.refunded_at || p.at, amount: Number(p.refunded), reason: "Refund to mobile money · code " + p.code, momo: true }] : [])])]
+  .sort((a, b) => String(a.at || "") < String(b.at || "") ? 1 : -1);
+const txRow = e => `<div class="grow"><span class="gic">${e.momo ? ICON.phone : ICON.wallet}</span><span class="gtx">${esc(e.reason)}<small>${esc(e.at ? fmtDate(String(e.at).slice(0, 10)) : "")}</small></span><span class="amt num${e.amount > 0 ? " pos" : ""}">${e.amount < 0 ? "−" : "+"}${money(Math.abs(e.amount))}</span></div>`;
 const MUTE_TYPES = [["Your orders", [["confirm", "The vendor confirms or cancels your pool"], ["priced", "Your custom order is priced"], ["arriving", "Lunch is about 5 minutes away or here"], ["almost", "Your pool is almost full"], ["cashback", "Cashback and refunds"], ["solo", "You're alone in a pool before orders close"]]],
   ["Your building", [["building", "Someone orders at your building"]]]];
 const muted = () => new Set(local.get("cp_mute") || []);
@@ -3905,9 +3926,9 @@ const themeLabel = () => ({ auto: "Match my phone", light: "Light", dark: "Dark"
 async function renderWallet() {
   const el = $("#tabWallet"); if (!el) return;
   const me = meNow(), name = (S.user && S.user.name) || me.name || "", site = siteOf(S.siteId);
-  let w = null; if (S.user) { try { w = await api.wallet(); S.balance = Number(w.balance) || 0; S.walletEntries = w.entries || []; } catch (e) {} }
+  let w = null; if (S.user) { try { [w, S.payments] = await Promise.all([api.wallet(), api.payments().catch(() => [])]); S.balance = Number(w.balance) || 0; S.walletEntries = w.entries || []; } catch (e) {} }
   if (!$("#tabWallet")) return;
-  const entries = (w && w.entries) || [];
+  const entries = S.user ? activityList() : [];
   const recent = recentSites().map(id => siteOf(id).name).filter(Boolean);
   el.innerHTML = `
     <button class="prof" id="profBtn">${avatarHtml(name)}<span class="ptx"><b>${esc(name || "Add your name")}</b><small>${esc([fmtPhone(me.phone), site.name].filter(Boolean).join(" · ") || (S.user ? S.user.email : "Guest on this phone"))}</small></span><span class="ed">Edit</span></button>
@@ -4070,7 +4091,7 @@ function openProfile(focusPhone) {
   });
 }
 function openTransactions() {
-  const all = S.walletEntries || [];
+  const all = activityList();
   let f = "all";
   const draw = () => {
     const l = all.filter(e => f === "all" || (f === "in" ? e.amount > 0 : e.amount < 0)), byM = {};
@@ -4078,7 +4099,7 @@ function openTransactions() {
     $("#txBody").innerHTML = Object.keys(byM).map(m => `<p class="gtitle">${m === today().slice(0, 7) ? "This month" : /^\d{4}-\d{2}$/.test(m) ? new Date(m + "-01T00:00:00Z").toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" }) : m}</p><div class="glist">${byM[m].map(txRow).join("")}</div>`).join("") || `<p class="small muted">Nothing here yet.</p>`;
     document.querySelectorAll("#txF [data-tf]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.tf === f)));
   };
-  openSheet(`${sheetHead("Transactions", "Your ChopPool wallet")}<div class="fchips" id="txF" style="margin:0;padding:0"><button data-tf="all">All</button><button data-tf="in">Money in</button><button data-tf="out">Money out</button></div><div id="txBody" class="stack" style="gap:10px"></div>`);
+  openSheet(`${sheetHead("Transactions", "Your wallet and mobile money payments")}<div class="fchips" id="txF" style="margin:0;padding:0"><button data-tf="all">All</button><button data-tf="in">Money in</button><button data-tf="out">Money out</button></div><div id="txBody" class="stack" style="gap:10px"></div>`);
   $("#txF").addEventListener("click", e => { const b = e.target.closest("[data-tf]"); if (b) { f = b.dataset.tf; draw(); } });
   draw();
 }
@@ -6159,9 +6180,10 @@ async function viewKitchen(token) {
         const dishes = g => groupDishes(g.filter(o => !o.special_request)).map(x => `<span>${x.qty} × ${esc(dishShort(x.name))}${x.extra ? ` <span class="small muted">· ${esc(x.extra)}</span>` : ""}</span>`).join("")
           + g.filter(o => o.special_request).map(o => `<span>${o.qty} × ${esc(dishShort(o.item_name))} <strong>· Custom: ${esc(o.special_request)}</strong></span>`).join("")
           + (g.length > 1 ? `<span class="small muted">Pack together · ${g.reduce((t, o) => t + o.qty, 0)} meals</span>` : "");
+        const amt = g => `<span class="pamt num">${money(g.reduce((t, o) => t + (Number(o.quote_price ?? o.unit_price) + Number(o.addons_total || 0)) * o.qty, 0))}</span>`;   // this order's food (dish + extras × plates)
         const packRow = ([c, g]) => packing
-          ? `<button type="button" class="pkrow${ticks.has(c) ? " on" : ""}" data-pack="${esc(c)}" data-pp="${esc(p.id)}" aria-pressed="${ticks.has(c)}"><span class="pkbox" aria-hidden="true">${ticks.has(c) ? ICON.check : ""}</span><span class="lc num">${esc(c)}</span><span class="items">${dishes(g)}</span></button>`
-          : `<div class="pkrow ro${g.every(o => o.collected) ? " on" : ""}"><span class="lc num">${esc(c)}</span><span class="items">${dishes(g)}</span>${g.every(o => o.collected) ? `<span class="tick">Collected</span>` : ""}</div>`;
+          ? `<button type="button" class="pkrow${ticks.has(c) ? " on" : ""}" data-pack="${esc(c)}" data-pp="${esc(p.id)}" aria-pressed="${ticks.has(c)}"><span class="pkbox" aria-hidden="true">${ticks.has(c) ? ICON.check : ""}</span><span class="lc num">${esc(c)}</span><span class="items">${dishes(g)}</span>${amt(g)}</button>`
+          : `<div class="pkrow ro${g.every(o => o.collected) ? " on" : ""}"><span class="lc num">${esc(c)}</span><span class="items">${dishes(g)}</span>${amt(g)}${g.every(o => o.collected) ? `<span class="tick">Collected</span>` : ""}</div>`;
         const list = `${packing && paidG.length ? `<div class="pkbar" role="progressbar" aria-valuemin="0" aria-valuemax="${paidG.length}" aria-valuenow="${doneN}"><i style="width:${Math.round(doneN / paidG.length * 100)}%"></i></div><p class="small muted">${doneN} of ${paidG.length} pack${paidG.length === 1 ? "" : "s"} done · label each with its code</p>` : ""}
           <div class="labels">${paidG.map(packRow).join("") || (unpaidG.length ? "" : `<p class="small muted">No meals yet.</p>`)}</div>
           ${unpaidG.length && p.status !== "delivered" ? `<div class="pkwait"><p class="small"><strong>Not paid yet, don't pack</strong></p>${unpaidG.map(([c, g]) => `<div class="pkrow ro wait"><span class="lc num">${esc(c)}</span><span class="items">${dishes(g)}</span></div>`).join("")}</div>` : ""}`;
