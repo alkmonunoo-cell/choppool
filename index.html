@@ -152,6 +152,7 @@ tr.tsum td { border-top: 2px solid var(--line); background: var(--surface-2); }
 .chip.fbok { background: color-mix(in srgb, var(--ok) 16%, transparent); color: var(--ok); }
 .fbitem summary { cursor: pointer; list-style: none; } .fbitem summary::-webkit-details-marker { display: none; }
 .hbtns { display: flex; gap: 8px; align-items: center; }
+.alertbtn { position: relative; } .alertbtn .bdot { position: absolute; top: 7px; right: 8px; width: 8px; height: 8px; border-radius: 9px; background: var(--accent); border: 2px solid var(--surface); }
 .fbitem .fbmsg { white-space: pre-wrap; margin: 0; }
 .fbthumbs { display: flex; gap: 8px; flex-wrap: wrap; } .fbthumbs img { width: 96px; height: 96px; object-fit: cover; border-radius: 12px; cursor: zoom-in; background: var(--surface-2); }
 .codein { font-size: 24px; letter-spacing: .35em; text-align: center; font-variant-numeric: tabular-nums; }
@@ -569,7 +570,11 @@ form[data-form="kitchen"] [data-msave] { display: none; }
 .mmeta { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .mmeta select { width: auto; }
 .mextras { display: grid; gap: 6px; padding-left: 60px; }
-.mextra { display: grid; grid-template-columns: 28px minmax(0, 1fr) 84px 32px; gap: 8px; align-items: center; position: relative; }
+.mextra { display: grid; grid-template-columns: 28px 28px minmax(0, 1fr) 84px 32px; gap: 8px; align-items: center; position: relative; }
+@media (max-width: 480px) { .mextra { grid-template-columns: 22px 24px minmax(0, 1fr) 62px 26px; gap: 6px; } }
+.mextra .xlive { display: grid; place-items: center; margin: 0; cursor: pointer; } .mextra .xlive input { width: 20px; height: 20px; margin: 0; accent-color: var(--accent); }
+.mextra.xoff [data-x=name], .mextra.xoff [data-x=price] { opacity: .5; }
+.mextra .xwait { grid-column: 3 / -1; color: var(--warn, #B45309); margin-top: -4px; }
 .xgrip { width: 28px; height: 40px; border: none; background: none; color: var(--muted); padding: 0; cursor: grab; touch-action: none; display: grid; place-items: center; border-radius: 8px; }
 .xgrip:active, .mextra.xdrag .xgrip { cursor: grabbing; color: var(--accent); }
 .xgrip:focus-visible { outline: 2px solid var(--accent); }
@@ -1247,7 +1252,7 @@ const isoDow = d => { const w = new Date(d + "T00:00:00Z").getUTCDay(); return w
    DEMO DATA LAYER: in-memory copy of the database logic, with simulated customers
    ===================================================================================== */
 function makeDemoApi() {
-  const settings = { tester_terms_on: true, tester_terms_version: 1, cutoff: "10:30", special_cutoff: "10:00", delivery_time: "12:30", trip_cost: 60, base_fare: 20, per_km: 6, trip_min: 10, max_fee: 10, cap_km: 8, trip_max: 80, quote_pay_min: 15, auto_receive_min: 120, admin_idle_min: 15, service_fee: 2, min_pool: 6, max_meals: 10, pool_ceiling: 15,
+  const settings = { reminder_time: "09:00", tester_terms_on: true, tester_terms_version: 1, cutoff: "10:30", special_cutoff: "10:00", delivery_time: "12:30", trip_cost: 60, base_fare: 20, per_km: 6, trip_min: 10, max_fee: 10, cap_km: 8, trip_max: 80, quote_pay_min: 15, auto_receive_min: 120, admin_idle_min: 15, service_fee: 2, min_pool: 6, max_meals: 10, pool_ceiling: 15,
     commission_rate: 0.15, vendor_fee_rate: 0, vendor_fee_free: 5, next_day_confirm_by: "08:30", countdown_start: "06:00", near_max_fee: 50, free_max_m: 1500, accept_timeout_min: 20, arrival_window_min: 10, notify_daily_cap: 5, momo_number: "024 000 0000", momo_name: "ChopPool Pilot", momo_network: "MTN" };
   const sites = [
     { id: "s1", name: "Heritage Tower, Ridge", drop_point: "Lobby security desk", handoff: "host", host_label: "the security desk in the lobby", host_token: "demoh1", lat: 5.5640, lng: -0.2010, status: "active", active: true },
@@ -1272,7 +1277,7 @@ function makeDemoApi() {
   ];
   const riders = [{ id: "r1", name: "Kwame (example rider)", phone: "0240000003", token: "demor1", active: true }];
   [...sites, ...kitchens, ...riders].forEach((x, n) => { if (!x.created_at) x.created_at = new Date(Date.now() - (40 - n * 3) * 864e5).toISOString(); });
-  const pools = [], orders = [], days = [], ledger = [], users = [], profiles = [], reviews = [], waiters = [], feedback = [], accepts = [];
+  const pools = [], orders = [], days = [], ledger = [], users = [], profiles = [], reviews = [], waiters = [], feedback = [], accepts = [], priceReqs = [];
   const payMethods = [{ id: "pm1", network: "MTN", number: "024 000 0000", name: "ChopPool Pilot", is_main: true, active: true, sort: 1, created_at: new Date().toISOString() }];
   const team = [{ email: "you@choppool.demo", role: "super" }, { email: "ops@choppool.demo", role: "coordinator" }];
   let me = null;
@@ -1729,15 +1734,39 @@ function makeDemoApi() {
       return { refund: m > 0 ? "momo" : "wallet", wallet_credit: credit, momo: m, qty: o.qty };
     },
     async waitingPools(date) { return pools.filter(p => p.order_date === date && p.status === "waiting" && meals(p.id) > 0); },
+    // Same rules as vendor_set_menu (update 41): higher prices and new paid items wait for the owner
     async vendorSetMenu(token, list) {
-      const k = byToken(kitchens, "token", token);
-      if (!k.added_by_customer) throw new Error("ChopPool manages this menu. Contact the coordinator to change it.");
+      const k = byToken(kitchens, "token", token); if (!k) throw new Error("This vendor link is not valid.");
+      const req = (item, kind, name, oldP, newP) => { priceReqs.forEach(r => { if (r.kitchen_id === k.id && r.status === "pending" && r.item_id === item && r.kind === kind && (["dish", "new_dish"].includes(kind) || (r.name === name && r.old_price === oldP))) r.status = "replaced"; });
+        priceReqs.unshift({ id: "pr" + uid(), created_at: nowIso(), kitchen_id: k.id, item_id: item, kind, name, old_price: oldP, new_price: newP, status: "pending" }); };
       list.forEach(it => {
-        const add = Array.isArray(it.addons) ? it.addons.filter(a => (a.name || "").trim().length >= 2).map(a => ({ name: a.name.trim(), price: Math.max(0, Number(a.price) || 0) })) : null;
-        if (it.id) { const i = items.find(x => x.id === it.id && x.kitchen_id === k.id); if (i) { if (it.name) i.name = it.name; if (Number(it.price) > 0) i.price = Number(it.price); if (add) i.addons = add; i.active = it.active !== false; } }
-        else if ((it.name || "").trim().length >= 2 && Number(it.price) > 0) items.push({ id: "i" + uid(), kitchen_id: k.id, name: it.name.trim(), price: Number(it.price), addons: add || [] });
+        const o = it.id ? items.find(x => x.id === it.id && x.kitchen_id === k.id) : null, waitingDish = o && priceReqs.some(r => r.item_id === o.id && r.kind === "new_dish" && r.status === "pending");
+        let add = null;
+        if (Array.isArray(it.addons)) add = it.addons.filter(a => (a.name || "").trim().length >= 2).map(a => {
+          const n = { name: a.name.trim(), price: Math.max(0, Number(a.price) || 0) }; if (a.off) n.off = true;
+          const orig = o && a.orig_name != null ? (o.addons || []).find(e => e.name === a.orig_name && Number(e.price || 0) === Number(a.orig_price || 0)) : null;
+          if (orig) { if (orig.pending) n.pending = true; if (n.price > Number(orig.price) && !orig.pending) { if (!waitingDish) req(o.id, "extra", n.name, Number(orig.price), n.price); n.price = Number(orig.price); } }
+          else if (n.price > 0) { n.pending = true; if (o && !waitingDish) req(o.id, "new_extra", n.name, null, n.price); }
+          return n; });
+        if (o) {
+          let price = Number(it.price) > 0 ? Number(it.price) : o.price;
+          if (waitingDish) { priceReqs.filter(r => r.item_id === o.id && r.kind === "new_dish" && r.status === "pending").forEach(r => { r.new_price = price; r.name = it.name || r.name; });
+            Object.assign(o, { name: it.name || o.name, price, addons: add ? add.map(({ pending, ...x }) => x) : o.addons, active: false }); return; }
+          if (price > o.price) { req(o.id, "dish", it.name || o.name, o.price, price); price = o.price; }
+          Object.assign(o, { name: it.name || o.name, price, active: it.active !== false }); if (add) o.addons = add;
+        } else if ((it.name || "").trim().length >= 2 && Number(it.price) > 0) { const id = "i" + uid(); items.push({ id, kitchen_id: k.id, name: it.name.trim(), price: Number(it.price), addons: (add || []).map(({ pending, ...x }) => x), active: false }); req(id, "new_dish", it.name.trim(), null, Number(it.price)); }
       });
     },
+    async vendorPriceRequests(token) { const k = byToken(kitchens, "token", token); return k ? priceReqs.filter(r => r.kitchen_id === k.id && r.status !== "replaced") : []; },
+    async priceRequests() { return priceReqs.filter(r => r.status !== "replaced").map(r => ({ ...r, kitchens: { public_name: (kitchens.find(k => k.id === r.kitchen_id) || {}).public_name } })); },
+    async decidePrice(id, okd, note) { const r = priceReqs.find(x => x.id === id); if (!r || r.status !== "pending") throw new Error("This request was already handled."); const m = items.find(x => x.id === r.item_id);
+      if (okd && m) { if (r.kind === "dish") m.price = r.new_price; else if (r.kind === "new_dish") m.active = true;
+        else m.addons = m.addons.map(e => e.name === r.name && ((r.kind === "extra" && Number(e.price) === r.old_price && !e.pending) || (r.kind === "new_extra" && e.pending)) ? (({ pending, ...x }) => ({ ...x, price: r.new_price }))(e) : e); }
+      if (!okd && m && r.kind === "new_extra") m.addons = m.addons.filter(e => !(e.name === r.name && e.pending));
+      Object.assign(r, { status: okd ? "approved" : "declined", note: note || null, decided_at: nowIso() }); },
+    async myAlerts(as, token) { return []; },
+    async readAlerts(as, token) { return 0; },
+    async orderHistory(before) { if (!me) return []; const t0 = addDays(today(), -92); return orders.filter(o => o.user_id === me.id && o.order_date >= t0 && (!before || o.created_at < before)).sort((a, b) => a.created_at < b.created_at ? 1 : -1).slice(0, 20).map(o => ({ ...o, amount_due: dueOf(o) - (o.wallet_used || 0) - Number(o.carried_amount || 0) })); },
     async riderView(token, date) {
       const r = byToken(riders, "token", token);
       return { rider: { name: r.name }, pools: pools.filter(p => p.rider_id === r.id && p.order_date === date && !["cancelled", "waiting"].includes(p.status)).map(p => {
@@ -1951,6 +1980,13 @@ function makeSupabaseApi() {
       if (r.error && /function|schema cache/i.test(r.error.message)) throw new Error("Removing some plates isn't switched on yet. Cancel the plate instead, or contact ChopPool."); return must(r); },
     async waitingPools(date) { const ps = must(await sb.from("public_pools").select("*").eq("order_date", date).eq("status", "waiting")); return ps.filter(p => p.meals > 0); },
     vendorSetMenu: (t, items) => rpc("vendor_set_menu", { p_token: t, p_items: items }),
+    // update 41: price approvals, vendor/rider alerts, past orders (each quietly empty before the update is run)
+    async vendorPriceRequests(t) { const r = await sb.rpc("vendor_price_requests", { p_token: t }); return r.error ? [] : r.data || []; },
+    async priceRequests() { const r = await sb.from("price_requests").select("*, kitchens(public_name)").neq("status", "replaced").gte("created_at", new Date(Date.now() - 30 * 864e5).toISOString()).order("created_at", { ascending: false }).limit(200); return r.error ? null : r.data; },
+    async decidePrice(id, okd, note) { must(await sb.rpc("admin_price_decide", { p_id: id, p_ok: okd, p_note: note || null })); },
+    async myAlerts(as, token) { const r = await sb.rpc("my_notifications", { p_order_ids: [], p_as: as, p_token: token }); return r.error ? [] : r.data || []; },
+    async readAlerts(as, token) { const r = await sb.rpc("read_notifications", { p_order_ids: [], p_as: as, p_token: token }); return r.error ? 0 : r.data; },
+    async orderHistory(before) { const r = await sb.rpc("my_order_history", { p_before: before || null, p_limit: 20 }); return r.error ? null : r.data || []; },
     riderView: (t, d) => rpc("rider_view", { p_token: t, p_date: d }),
     async riderApply(r) { const x = await sb.rpc("rider_apply", { p_name: r.name, p_phone: r.phone, p_bike: r.bike, p_area: r.area, p_momo: r.momo, p_ghana_card: r.card || null, p_licence_no: r.licence || null, p_licence_expiry: r.expiry || null });
       if (x.error && /function|schema cache/i.test(x.error.message)) throw new Error("Rider sign-up isn't switched on yet. Please contact ChopPool."); return must(x); },
@@ -2361,6 +2397,16 @@ const ghanaNow = () => new Date().toISOString().slice(11, 16);
 const addDays = (iso, n) => new Date(Date.parse(iso + "T00:00:00Z") + n * 864e5).toISOString().slice(0, 10);
 const dayLabel = iso => { const t = today(), d = new Date(Date.now() + 864e5).toISOString().slice(0, 10); return iso === t ? "today" : iso === d ? "tomorrow" : fmtDate(iso); };
 const firstName = () => String((S.user && S.user.name) || (local.get("cp_me") || {}).name || "").trim().split(/\s+/)[0] || "";
+// Vendor and rider pages: their own alerts (saved 7 days), with a dot for unread
+const alertBtn = as => `<button class="iconbtn alertbtn" data-alerts="${as}" aria-label="Alerts" title="Alerts">${ICON.bell}<span class="bdot hidden"></span></button>`;
+const alertWho = () => { const h = location.hash.slice(1); return h.startsWith("kitchen-") ? ["vendor", h.slice(8)] : h.startsWith("rider-") ? ["rider", h.slice(6)] : [null, null]; };
+async function alertDot() { const [as, t] = alertWho(); if (!as) return; const xs = await api.myAlerts(as, t).catch(() => []); const d = document.querySelector("[data-alerts] .bdot"); if (d) d.classList.toggle("hidden", !xs.some(x => !x.read_at)); }
+async function openAlerts() { const [as, t] = alertWho(); if (!as) return;
+  const xs = await api.myAlerts(as, t).catch(() => []);
+  const ago = x => { const m = Math.max(0, Math.round((Date.now() - Date.parse(x.created_at)) / 6e4)); return m < 1 ? "Just now" : m < 60 ? m + " min ago" : m < 1440 ? Math.round(m / 60) + " hr ago" : fmtDate(String(x.created_at).slice(0, 10)); };
+  openSheet(`${sheetHead("Alerts", "The last 7 days")}<div>${xs.map(x => `<div class="nupd"><span class="dot${x.read_at ? " r" : ""}"></span><div><b>${esc(x.title)}</b><p>${esc(x.body || "")}</p><small>${esc(ago(x))}</small></div></div>`).join("") || `<p class="small muted" style="padding:12px 2px">No alerts in the last 7 days.</p>`}</div>`);
+  if (xs.some(x => !x.read_at)) { await api.readAlerts(as, t).catch(() => {}); document.querySelector("[data-alerts] .bdot")?.classList.add("hidden"); } }
+document.addEventListener("click", e => { if (e.target.closest("[data-alerts]")) openAlerts(); });
 const fbBtn = as => `<button class="iconbtn" data-feedback="${as}" aria-label="Send feedback" title="Send feedback">${ICON.chat}</button>`;
 const sheetHead = (title, sub) => `<div class="top" style="align-items:flex-start"><div><h2 id="sheetTitle">${title}</h2>${sub ? `<p class="small muted">${sub}</p>` : ""}</div><button class="closex" data-close aria-label="Close">${ICON.close}</button></div>`;
 
@@ -2368,7 +2414,9 @@ const sheetHead = (title, sub) => `<div class="top" style="align-items:flex-star
    ACCOUNTS AND WALLET
    ===================================================================================== */
 async function refreshUser() {
+  const was = S.user && S.user.id;
   try { S.user = await api.user(); } catch (e) { S.user = null; }
+  if ((S.user && S.user.id) !== was) { S.hist = null; S.histLoaded = false; S.histMore = false; }   // another account: its own past orders
   S.balance = 0;
   S.walletEntries = null;
   if (S.user) { try { const w = await api.wallet(); S.balance = Number(w.balance) || 0; S.walletEntries = w.entries || []; } catch (e) {}
@@ -2705,6 +2753,9 @@ async function viewOrder() {
     const b = e.target.closest("button[data-menu]"); if (b) openOrder(b.dataset.menu); const g = e.target.closest("[data-gokitchens]"); if (g) setTab("kitchens"); });
   $("#kitchensList").addEventListener("click", e => { if (mineClick(e)) return; const v = e.target.closest("[data-vendor]"); if (v) return openVendor(v.dataset.vendor); const b = e.target.closest("button[data-menu]"); if (b) openOrder(b.dataset.menu); });
   $("#tabOrders").addEventListener("click", e => { const sg = e.target.closest("[data-oseg]"); if (sg) { S.oseg = sg.dataset.oseg; S.osegPicked = true; renderOrders(); window.scrollTo(0, 0); return; }
+    const hm = e.target.closest("[data-histmore]"); if (hm) { if (hm.disabled) return; hm.disabled = true; hm.textContent = "Loading…";
+      const oldest = (S.hist || []).reduce((m, o) => !m || o.created_at < m ? o.created_at : m, null);
+      api.orderHistory(oldest).then(r => { const have = new Set((S.hist || []).map(o => o.id)); S.hist = (S.hist || []).concat((r || []).filter(o => !have.has(o.id))); S.histMore = (r || []).length >= 20; renderOrders(); }).catch(() => { hm.disabled = false; hm.textContent = "Load more"; }); return; }
     const vd = e.target.closest("[data-vendor]"); if (vd) return openVendor(vd.dataset.vendor);
     const fx = e.target.closest("[data-fixpay]"); if (fx) return openFixPayment((S.mine || []).find(o => o.id === fx.dataset.fixpay), fx.dataset.mode);
     if (soloClick(e)) return;
@@ -3566,7 +3617,8 @@ const addonsShort = keys => { const m = new Map(); (keys || []).forEach(k => m.s
 const lineAdd = l => addonSum(lineItem(l).addons, l.addons || []);
 // Extras chips: tap to add one; then − count + (up to 5 of each per plate)
 const xKeys = ex => [...ex].flatMap(([k, c]) => Array(c).fill(k));
-const xChips = (list, ex) => (list || []).map(a => { const k = addonKey(list, a), c = ex.get(k) || 0, lab = esc(a.name) + (a.price ? " +" + money(a.price) : "");
+const xLive = a => !a.off && !a.pending;
+const xChips = (list, ex) => (list || []).filter(xLive).map(a => { const k = addonKey(list, a), c = ex.get(k) || 0, lab = esc(a.name) + (a.price ? " +" + money(a.price) : "");
   return c ? `<span class="tog xon" aria-pressed="true"><button type="button" class="xname" data-xoff="${esc(k)}" aria-label="Remove ${esc(a.name)}">${lab}</button><span class="xstep"><button type="button" data-xm="${esc(k)}" aria-label="One less ${esc(a.name)}">−</button><b class="num">${c}</b><button type="button" data-xp="${esc(k)}" aria-label="One more ${esc(a.name)}"${c >= 5 ? " disabled" : ""}>+</button></span></span>`
     : `<button type="button" class="tog" data-addon="${esc(k)}" aria-pressed="false">${lab}</button>`; }).join("");
 function xClick(e, ex) {
@@ -3586,7 +3638,7 @@ function openDish(k, dishId) {
   let qty = 1; const extras = new Map(), i0 = menuIndex(k.id);
   const specialOpen = !(S.date === today() && new Date() >= at(S.date, S.settings.special_cutoff));
   openSheet(`<div class="dishhead"><span class="tile" style="background:${tint(i0)}">${plate(d, k.id)}</span><div><h2>${esc(d.name)}</h2><p class="small muted">${esc(k.public_name)} · <span class="num">${money(d.price)}</span></p></div><button class="closex" data-close aria-label="Close">${ICON.close}</button></div>
-    ${(d.addons || []).length ? `<div class="group"><p class="group-title">Extras <span class="muted" style="font-weight:500">(optional)</span></p><div class="chips" id="dExtras">${xChips(d.addons, extras)}</div></div>` : ""}
+    ${(d.addons || []).some(xLive) ? `<div class="group"><p class="group-title">Extras <span class="muted" style="font-weight:500">(optional)</span></p><div class="chips" id="dExtras">${xChips(d.addons, extras)}</div></div>` : ""}
     <div class="group"><label for="dNote">Note for the kitchen <span class="muted" style="font-weight:500">(optional)</span></label><input id="dNote" maxlength="140" placeholder="Less oil, extra napkins"></div>
     <div class="mealqty"><div class="row"><div><p class="group-title" style="margin:0">How many of this meal?</p><p class="small muted" id="dSum" style="margin:2px 0 0"></p></div><div class="qty"><button type="button" id="dMinus" aria-label="One less">${GLYPH.minus}</button><output id="dQ">1</output><button type="button" id="dPlus" aria-label="One more">${GLYPH.plus}</button></div></div></div>
     ${specialOpen ? `<button type="button" class="linkbtn" id="dSpecial" style="justify-self:start">Want something not on the menu? Make a custom order</button>` : ""}
@@ -3634,7 +3686,7 @@ function drawVendor() {
       <div id="vpBanner">${vendorBanner(k)}</div>
       <div class="vtabs" role="tablist"><button data-vtab="menu" aria-pressed="${S.vp.tab === "menu"}">Menu</button><button data-vtab="rev" aria-pressed="${S.vp.tab === "rev"}">Reviews${sc.ratings ? " · " + sc.ratings : ""}</button></div>
       <div id="vpBody" class="stack" style="gap:8px">${S.vp.tab === "menu" ? groups.map(([t, ds]) => `<h3 class="vcat">${esc(t)}</h3>` + ds.map(d => `<button class="vitem" data-dish="${esc(d.id)}"${v.st.full && !(S.noSite ? null : myOrderIn(k)) ? " disabled" : ""}>
-          <span class="vph" style="background:${tint(i0)}">${plate(d, k.id)}</span><span class="vtx"><strong>${esc(d.name)}</strong>${(d.addons || []).length ? `<span class="ds">Extras: ${esc(d.addons.map(a => a.name).join(", "))}</span>` : ""}<span class="pr num">${money(d.price)}</span></span><span class="plus" aria-hidden="true">${GLYPH.plus}</span></button>`).join("")).join("")
+          <span class="vph" style="background:${tint(i0)}">${plate(d, k.id)}</span><span class="vtx"><strong>${esc(d.name)}</strong>${(d.addons || []).some(xLive) ? `<span class="ds">Extras: ${esc(d.addons.filter(xLive).map(a => a.name).join(", "))}</span>` : ""}<span class="pr num">${money(d.price)}</span></span><span class="plus" aria-hidden="true">${GLYPH.plus}</span></button>`).join("")).join("")
         || `<p class="small muted">No dishes on the menu yet.</p>` : `<p class="small muted">Loading reviews…</p>`}</div>
     </div>`;
   if ($("#vfoot")) { $("#vfoot").innerHTML = vendorFoot(k); $("#vfoot").classList.toggle("on", !!$("#vfoot").innerHTML); }
@@ -3964,10 +4016,17 @@ function renderOrders() {
     up.forEach((o, n) => { if (o.order_date !== last) { body += `<p class="ohead">${esc(dateHead(o.order_date))}</p>`; last = o.order_date; } body += orderCard(o, all, n === 0); });
     body = body || `<div class="emptyrow"><span class="eic">${ICON.receipt}</span><div><strong>No upcoming orders</strong><p>Join an active pool or start one from a vendor near you.</p></div></div><button class="btn wide" data-gohome>See active pools</button>`;
   } else {
+    // Past: this phone's recent orders plus your account's orders from the last 3 months (loaded from the server, 20 at a time)
+    if (S.user && !S.histLoaded && !S.histBusy) { S.histBusy = true; api.orderHistory(null).then(r => { S.histBusy = false; S.histLoaded = true; if (r) { S.hist = r; S.histMore = r.length >= 20; } if (S.oseg === "past") renderOrders(); }).catch(() => { S.histBusy = false; }); }
+    const ids = new Set(all.map(o => o.id)), t0 = addDays(today(), -92);
+    const merged = all.concat((S.hist || []).filter(o => !ids.has(o.id))), pastAll = splitOrders(merged).past.filter(o => o.order_date >= t0);
+    past.length = 0; past.push(...pastAll);
     const byM = {}; past.forEach(o => { const m = o.order_date.slice(0, 7); (byM[m] = byM[m] || []).push(o); });
     const thisM = today().slice(0, 7);
     body = Object.keys(byM).map(m => `<p class="ohead">${m === thisM ? "This month" : new Date(m + "-01T00:00:00Z").toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" })}</p><div class="olist">${byM[m].map(pastRow).join("")}</div>`).join("")
-      || `<div class="emptyrow"><span class="eic">${ICON.receipt}</span><div><strong>No past orders${S.user ? "" : " on this phone"}</strong><p>${S.user ? "Orders you've collected show here." : "Create an account to keep your order history on any phone."}</p></div></div>`;
+      || `<div class="emptyrow"><span class="eic">${ICON.receipt}</span><div><strong>${S.histBusy ? "Loading your orders…" : "No past orders" + (S.user ? "" : " on this phone")}</strong><p>${S.user ? "Orders from the last 3 months show here." : "Create an account to keep your order history on any phone."}</p></div></div>`;
+    if (S.histMore && past.length) body += `<button class="ghost wide" data-histmore style="margin-top:10px">Load more</button>`;
+    else if (past.length && S.histLoaded) body += `<p class="small muted center" style="margin-top:10px">Showing the last 3 months</p>`;
   }
   el.innerHTML = `<div class="oseg" role="tablist"><button data-oseg="up" aria-pressed="${S.oseg === "up"}">Upcoming${up.length ? " · " + up.length : ""}</button><button data-oseg="past" aria-pressed="${S.oseg === "past"}">Past</button></div>${body}`;
 }
@@ -3983,7 +4042,8 @@ const activityList = () => [...(S.walletEntries || []), ...(S.payments || []).fl
   .sort((a, b) => String(a.at || "") < String(b.at || "") ? 1 : -1);
 const txRow = e => `<div class="grow"><span class="gic">${e.momo ? ICON.phone : ICON.wallet}</span><span class="gtx">${esc(e.reason)}<small>${esc(e.at ? fmtDate(String(e.at).slice(0, 10)) : "")}</small></span><span class="amt num${e.amount > 0 ? " pos" : ""}">${e.amount < 0 ? "−" : "+"}${money(Math.abs(e.amount))}</span></div>`;
 const MUTE_TYPES = [["Your orders", [["confirm", "The vendor confirms or cancels your pool"], ["priced", "Your custom order is priced"], ["arriving", "Lunch is about 5 minutes away or here"], ["almost", "Your pool is almost full"], ["cashback", "Cashback and refunds"], ["solo", "You're alone in a pool before orders close"]]],
-  ["Your building", [["building", "Someone orders at your building"]]]];
+  ["Your building", [["building", "Someone orders at your building"]]],
+  ["Reminders", [["reminder", "Daily lunch reminder before orders close"]]]];
 const muted = () => new Set(local.get("cp_mute") || []);
 const notifOn = type => !muted().has(type);
 const alertsSummary = () => { const all = MUTE_TYPES.flatMap(g => g[1]).length, on = all - muted().size; return local.get("cp_alerts") ? "On · " + on + " alert type" + (on === 1 ? "" : "s") : "Off"; };
@@ -4659,7 +4719,7 @@ function openOrder(menuId, opt = {}) {
       <div class="sheet-foot"><div class="tot"><b class="num" id="totTxt"></b><span id="totSub"></span></div><button class="btn" type="submit" id="submitBtn">Join the pool</button></div>
     </form>`);
   const drawExtras = () => {
-    $("#extrasGroup").innerHTML = (item.addons || []).length ? `<p class="group-title">Extras <span class="muted" style="font-weight:500">(optional, for each meal)</span></p><div class="chips">${xChips(item.addons, extras)}</div>` : "";
+    $("#extrasGroup").innerHTML = (item.addons || []).some(xLive) ? `<p class="group-title">Extras <span class="muted" style="font-weight:500">(optional, for each meal)</span></p><div class="chips">${xChips(item.addons, extras)}</div>` : "";
   };
   // Pay from (your saved numbers) and pay to (ChopPool's number on the same network where we have one)
   const drawPay = due => {
@@ -4935,7 +4995,7 @@ const ADMIN_TABS = [["dash", "Dashboard"], ["today", "Today"], ["menus", "Vendor
 // Sub-sections per tab; a third value marks owner-only sections
 const ADMIN_SUBS = {
   today: [["pools", "Pools"], ["orders", "Orders & payments"], ["wallets", "Refunds & problems"], ["owed", "Money owed"], ["rules", "Settings"]],
-  menus: [["list", "Vendors"], ["reviews", "Ratings & photos"], ["requests", "Listing requests"], ["rules", "Settings"]],
+  menus: [["list", "Vendors"], ["prices", "Price changes"], ["reviews", "Ratings & photos"], ["requests", "Listing requests"], ["rules", "Settings"]],
   buildings: [["list", "Active"], ["requests", "New & duplicates"]],
   riders: [["list", "Riders"], ["apply", "Applications"], ["rules", "Settings"]],
   team: [["members", "Team members"], ["terms", "Tester agreement"], ["payments", "Payment options", true], ["accounts", "Customer accounts", true], ["activity", "Activity log", true]]
@@ -5066,7 +5126,8 @@ function poolFlags(p, s, d, now = new Date()) {
 /* ---------- Menu editor (Admin › vendor, and the vendor's own "Your menu"): dish rows, extras rows, photos, one Save ---------- */
 const CAM = SV('<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>', 14);
 const GRIP = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="9" cy="6" r="1.7"/><circle cx="15" cy="6" r="1.7"/><circle cx="9" cy="12" r="1.7"/><circle cx="15" cy="12" r="1.7"/><circle cx="9" cy="18" r="1.7"/><circle cx="15" cy="18" r="1.7"/></svg>`;
-const extraRow = a => `<div class="mextra"${a && a.name ? ` data-orig="${esc(a.name)}" data-oprice="${esc(Number(a.price) || 0)}"` : ""}><button type="button" class="xgrip" data-xgrip aria-label="Hold and drag to move this extra (or use the arrow keys)" title="Hold and drag to reorder">${GRIP}</button><input data-x="name" value="${esc(a ? a.name : "")}" placeholder="Extra chicken" aria-label="Extra"><input data-x="price" inputmode="decimal" value="${a ? esc(a.price) : ""}" placeholder="GHS 0" aria-label="Extra price"><button type="button" class="xbtn" data-xdel aria-label="Remove extra">${ICON.close}</button></div>`;
+// Each extra: drag grip, a "live" tick (unticked = hidden from customers), name, price, remove. Extras waiting for ChopPool's approval say so.
+const extraRow = a => `<div class="mextra${a && a.off ? " xoff" : ""}"${a && a.name ? ` data-orig="${esc(a.name)}" data-oprice="${esc(Number(a.price) || 0)}"` : ""}${a && a.pending ? ' data-pending="1"' : ""}><button type="button" class="xgrip" data-xgrip aria-label="Hold and drag to move this extra (or use the arrow keys)" title="Hold and drag to reorder">${GRIP}</button><label class="xlive" title="Show this extra to customers"><input type="checkbox" data-x="live"${a && a.off ? "" : " checked"} aria-label="Show to customers"></label><input data-x="name" value="${esc(a ? a.name : "")}" placeholder="Extra chicken" aria-label="Extra"><input data-x="price" inputmode="decimal" value="${a ? esc(a.price) : ""}" placeholder="GHS 0" aria-label="Extra price"><button type="button" class="xbtn" data-xdel aria-label="Remove extra">${ICON.close}</button>${a && a.pending ? `<span class="xwait small">Waiting for ChopPool to approve</span>` : ""}</div>`;
 function dishRow(i, admin) {
   i = i || {};
   return `<div class="mdish" data-item="${esc(i.id || "")}">
@@ -5107,11 +5168,16 @@ function readMenu(root) {
   return [...root.querySelectorAll(".mdish")].map(r => {
     const g = f => (r.querySelector(`[data-f="${f}"]`) || {}).value, act = r.querySelector('[data-f="active"]');
     return { id: r.dataset.item || null, removed: r.dataset.removed === "1", name: (g("name") || "").trim(), price: (g("price") || "").trim(), icon: g("icon") || null, active: act ? act.checked : true,
-      addons: [...r.querySelectorAll(".mextra")].map(x => ({ name: x.querySelector("[data-x=name]").value.trim(), price: Number(x.querySelector("[data-x=price]").value) || 0 })).filter(a => a.name.length >= 2),
+      addons: [...r.querySelectorAll(".mextra")].map(x => { const a = { name: x.querySelector("[data-x=name]").value.trim(), price: Number(x.querySelector("[data-x=price]").value) || 0 };
+        if (x.querySelector("[data-x=live]") && !x.querySelector("[data-x=live]").checked) a.off = true;
+        if (x.dataset.pending) a.pending = true;
+        if (x.dataset.orig) { a.orig_name = x.dataset.orig; a.orig_price = Number(x.dataset.oprice) || 0; }   // vendor saves: what it was, so a higher price waits for approval
+        return a; }).filter(a => a.name.length >= 2),
       // Extras whose name was corrected (old name + old price), so open orders can show the new name
       renames: [...r.querySelectorAll(".mextra[data-orig]")].map(x => ({ from: x.dataset.orig, to: x.querySelector("[data-x=name]").value.trim(), price: Number(x.dataset.oprice) || 0 })).filter(x => x.to.length >= 2 && x.to !== x.from) };
   }).filter(d => d.id || d.name || d.price);
 }
+document.addEventListener("change", e => { if (e.target.matches && e.target.matches(".mextra [data-x=live]")) e.target.closest(".mextra").classList.toggle("xoff", !e.target.checked); });
 function menuEditorClick(e) {
   const t = e.target, root = t.closest("[data-medit]"); if (!root) return false;
   if (t.closest("[data-madd]")) { const isAdmin = root.dataset.medit.startsWith("admin"); root.querySelector(".mrows").insertAdjacentHTML("beforeend", dishRow(null, isAdmin)); root.querySelector(".mdish:last-child [data-f=name]").focus(); return true; }
@@ -5203,16 +5269,16 @@ async function renderAdmin(cached, quiet) {   // quiet = background/refresh-butt
     const guess = S.adminDate || dToday;
     if (!quiet && S.admin && S.admin.date === guess && !S.adminPainting) { S.adminPainting = true; try { await renderAdmin(true); } finally { S.adminPainting = false; } }
     const two = dNext !== dToday, seq = (S.adminSeq = (S.adminSeq || 0) + 1);
-    let wt = [], wn = [], data = null, fbRows = null;
+    let wt = [], wn = [], data = null, fbRows = null, prRows = null;
     try {
-      [wt, wn, data, fbRows] = await Promise.all([two ? api.waitingPools(dToday).catch(() => []) : [], two ? api.waitingPools(dNext).catch(() => []) : [], api.adminData(guess), api.listFeedback ? api.listFeedback().catch(() => null) : null]);
+      [wt, wn, data, fbRows, prRows] = await Promise.all([two ? api.waitingPools(dToday).catch(() => []) : [], two ? api.waitingPools(dNext).catch(() => []) : [], api.adminData(guess), api.listFeedback ? api.listFeedback().catch(() => null) : null, api.priceRequests ? api.priceRequests().catch(() => null) : null]);
     } catch (e) { toast("Couldn't load: " + cleanErr(e)); return; }
     if (seq !== S.adminSeq) return;   // a newer refresh has started
     if (two && !S.adminDate && !S.adminDayPicked) { S.adminDayPicked = true; if (wn.length && !wt.length && !((data && data.pools) || []).some(p => !["cancelled", "delivered"].includes(p.status))) { S.adminDate = dNext; try { data = await api.adminData(dNext); } catch (e) {} } }
     const cur = S.adminDate || dToday;
     otherWait = two && [dToday, dNext].includes(cur) ? (cur === dToday ? wn : wt) : [];
     S.adminOtherWait = otherWait;
-    data.feedback = fbRows;
+    data.feedback = fbRows; data.priceReqs = prRows;
     data.date = cur; data.kitchens = data.kitchens.filter(k => !k.archived); data.sites = data.sites.filter(x => !x.archived);
     // Compare what's there, not the order rows came back in (rows with the same timestamp come back shuffled)
     const norm = v => Array.isArray(v) ? v.map(norm).sort((x, y) => { const a = (x && x.id) || JSON.stringify(x), b = (y && y.id) || JSON.stringify(y); return a < b ? -1 : a > b ? 1 : 0; })
@@ -5238,6 +5304,8 @@ async function renderAdmin(cached, quiet) {   // quiet = background/refresh-butt
   const aTrip = p => p.trip_price != null && p.trip_price !== "" ? Number(p.trip_price) : ["waiting", "collecting"].includes(p.status) && p.order_date >= today() ? aTripNow(p) : (tripCharged(p) ?? aTripNow(p));
   const pending = A.sites.filter(x => x.status === "pending" && !x.archived);
   const badge = document.querySelector('[data-atab="buildings"]'); if (badge) badge.textContent = "Buildings" + (pending.length ? " (" + pending.length + " new)" : "");
+  const prN = (A.priceReqs || []).filter(r => r.status === "pending").length, mTab = document.querySelector('[data-atab="menus"]'); if (mTab) mTab.textContent = "Vendors & menus" + (prN ? " (" + prN + ")" : "");
+  const prSub = document.querySelector('[data-asub="prices"]'); if (prSub) prSub.textContent = "Price changes" + (prN ? " (" + prN + ")" : "");
   const fbNew = (A.feedback || []).filter(f => f.status === "new").length, fbTab = document.querySelector('[data-atab="feedback"]'); if (fbTab) fbTab.textContent = "Feedback" + (fbNew ? " (" + fbNew + " new)" : "");
   const livePools = A.pools.filter(p => p.status !== "cancelled" && p.meals > 0);
   const listReq = A.kitchens.filter(k => k.listing_status === "pending"), riderApps = A.riders.filter(r => r.status === "pending");
@@ -5501,7 +5569,24 @@ async function renderAdmin(cached, quiet) {   // quiet = background/refresh-butt
         : `<div class="note">No ratings yet. Customers can rate their lunch after they collect it.</div>`; })
       .catch(e => { const el = $("#revAdmin"); if (el) el.innerHTML = `<div class="note">${esc(cleanErr(e))}</div>`; });
   }
-  if (tab === "menus" && sub !== "reviews") {
+  if (tab === "menus" && sub === "prices") {
+    const rs = A.priceReqs, pend = (rs || []).filter(r => r.status === "pending"), done = (rs || []).filter(r => r.status !== "pending").slice(0, 30);
+    const lab = r => `<strong>${esc(r.name)}</strong>${r.kind === "new_dish" ? " · new dish" : r.kind === "new_extra" ? " · new extra" : r.kind === "extra" ? " · extra" : ""}`;
+    const price = r => r.old_price != null ? `<span class="num">${money(r.old_price)} → <b>${money(r.new_price)}</b></span>` : `<span class="num"><b>${money(r.new_price)}</b></span>`;
+    body.innerHTML = rs == null ? `<section class="card stack"><h2>Price changes</h2><p class="muted">Run the latest choppool-update.sql (version 41) in Supabase once. Vendors can then edit their menus, and price increases come here for you to approve.</p></section>` : `
+      <section class="stack" style="gap:10px"><h2>Waiting for approval${pend.length ? " · " + pend.length : ""}</h2>
+        <p class="small muted" style="margin:0">Vendors' higher prices, new dishes and new paid extras. Customers keep seeing the current price until you approve.${isSuper ? "" : " Only the owner can approve."}</p>
+        ${pend.length ? pend.map(r => `<article class="card stack" data-preq="${esc(r.id)}" style="gap:8px"><div class="row" style="justify-content:space-between;gap:8px;flex-wrap:wrap"><span>${lab(r)} <span class="small muted">· ${esc((r.kitchens || {}).public_name || "")}</span></span>${price(r)}</div>
+          <span class="small muted">${esc(new Date(r.created_at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }))}</span>
+          ${isSuper ? `<input data-prnote placeholder="Note for the vendor (optional)" maxlength="200"><div class="row" style="gap:8px"><button class="btn" data-prok>Approve</button><button class="ghost" data-prno>Decline</button></div>` : ""}</article>`).join("")
+          : `<div class="emptyrow"><span class="eic">${ICON.store}</span><div><strong>Nothing waiting</strong><p>New requests from vendors show here, with a count on the tab.</p></div></div>`}</section>
+      ${done.length ? `<section class="stack" style="gap:8px;margin-top:16px"><h2>Recent</h2><div class="table-wrap"><table><tr><th>Item</th><th>Vendor</th><th>Price</th><th>Outcome</th></tr>${done.map(r => `<tr><td>${lab(r)}</td><td>${esc((r.kitchens || {}).public_name || "")}</td><td>${price(r)}</td><td>${r.status === "approved" ? "Approved" : "Declined"}${r.note ? ` <span class="small muted">· ${esc(r.note)}</span>` : ""}</td></tr>`).join("")}</table></div></section>` : ""}`;
+    if (!body.dataset.prwired) { body.dataset.prwired = "1"; body.addEventListener("click", async e => { const b = e.target.closest("[data-prok],[data-prno]"); if (!b || S.adminTab !== "menus") return;
+      const card = b.closest("[data-preq]"), okd = b.hasAttribute("data-prok"); b.disabled = true;
+      try { await api.decidePrice(card.dataset.preq, okd, (card.querySelector("[data-prnote]") || {}).value || ""); toast(okd ? "Approved. Customers now see the new price." : "Declined. The vendor has been told."); S.admin = null; renderAdmin(); }
+      catch (er) { b.disabled = false; toast(cleanErr(er)); } }); }
+  }
+  if (tab === "menus" && sub !== "reviews" && sub !== "prices") {
     const items = A.items || [];
     if (sub === "requests") body.innerHTML = listReq.length ? `<div class="stack" style="gap:10px">${listReq.map(k => { const L = k.listing || {}, dishes = items.filter(i => i.kitchen_id === k.id && i.active !== false);
         return `<article class="card" data-kitchen="${esc(k.id)}" style="border:2px solid var(--hint)"><div class="top" style="align-items:flex-start"><div><h3>${esc(L.name || k.name)}</h3><p class="small muted">${esc(L.tagline || "")}${k.listing_requested_at ? " · asked " + fmtDate(String(k.listing_requested_at).slice(0, 10)) : ""} · first added by a customer at ${esc(sName(k.site_id))}</p></div>${pill("Wants to be listed", "warn")}</div>
@@ -5678,7 +5763,8 @@ async function renderAdmin(cached, quiet) {   // quiet = background/refresh-butt
     body.innerHTML = `${isSuper ? setForm(`<section class="card stack"><h2>Ordering times</h2>
         <div class="grid2"><div><label for="stCut">Orders close</label><input id="stCut" name="cutoff" type="time" value="${tv(s.cutoff)}"></div>
           <div><label for="stLunch">Lunch arrives</label><input id="stLunch" name="delivery_time" type="time" value="${tv(s.delivery_time)}"></div>
-          <div><label for="stSpec">Custom orders close</label><input id="stSpec" name="special_cutoff" type="time" value="${tv(s.special_cutoff)}"></div></div>
+          <div><label for="stSpec">Custom orders close</label><input id="stSpec" name="special_cutoff" type="time" value="${tv(s.special_cutoff)}"></div>
+          ${s.reminder_time !== undefined ? `<div><label for="stRem">Daily lunch reminder</label><input id="stRem" name="reminder_time" type="time" value="${tv(s.reminder_time)}"></div>` : ""}</div>
         <p class="small muted">Customers see "Order by ${fmtTime(s.cutoff)} · lunch at ${fmtTime(s.delivery_time)}". Vendors have lunch ready 30 minutes before it arrives. Changes apply from the next order.</p></section>`) : ""}
       ${isSuper ? setForm(`<section class="card stack"><h2>Team screens</h2><div><label for="rlIdle">Sign out after this many quiet minutes (5-60)</label><input id="rlIdle" name="admin_idle_min" inputmode="numeric" value="${esc(s.admin_idle_min ?? 15)}"></div>
         <p class="small muted">Everyone on the team is also signed out after 12 hours.</p></section>`) : ""}
@@ -5884,7 +5970,8 @@ async function adminClick(e) {
     const root = ms.closest("[data-medit]"), kid = root.dataset.medit.slice(6), list = readMenu(root);
     const bad = list.find(d => !d.removed && (d.name.length < 2 || !(Number(d.price) > 0))); if (bad) return toast("Each dish needs a name and a price above 0.");
     ms.disabled = true;
-    try { for (const d of list) { const it = { name: d.name, price: Number(d.price), addons: d.addons, icon: d.icon, active: d.removed ? false : d.active };
+    const clean = xs => xs.map(({ orig_name, orig_price, ...a }) => a);
+    try { for (const d of list) { const it = { name: d.name, price: Number(d.price), addons: clean(d.addons), icon: d.icon, active: d.removed ? false : d.active };
         if (d.id) await api.saveItem({ id: d.id, ...it }); else if (!d.removed) await api.saveItem({ kitchen_id: kid, ...it }); }
       Object.assign(S, await api.load()); renderAdmin();
       const ren = list.filter(d => d.id && !d.removed && d.renames.length); if (ren.length) askRenameOrders(ren); else toast("Menu saved");
@@ -6081,7 +6168,8 @@ async function adminSubmit(e) {
         if (hm(lunch) - hm(cut) < 60) return fail("Lunch should arrive at least an hour after orders close.");
         if (hm(spec) > hm(cut)) return fail("Custom orders must close at or before " + fmtTime(cut) + ".");
         if (hm(String(S.settings.next_day_confirm_by || "08:30").slice(0, 5)) >= hm(cut)) return fail("Orders must close after vendors confirm (" + fmtTime(S.settings.next_day_confirm_by || "08:30") + "). Change that under Vendors & menus › Settings first.");
-        Object.assign(patch, { cutoff: cut, delivery_time: lunch, special_cutoff: spec }); }
+        Object.assign(patch, { cutoff: cut, delivery_time: lunch, special_cutoff: spec });
+        if (has("reminder_time")) { const rt = v("reminder_time"); if (!ok5(rt)) return fail("Enter the reminder time."); if (hm(rt) >= hm(cut)) return fail("The reminder must go out before orders close (" + fmtTime(cut) + ")."); patch.reminder_time = rt; } }
       if (has("admin_idle_min")) { const im = num("admin_idle_min"); if (!(im >= 5 && im <= 60)) return fail("Choose 5 to 60 minutes for the team screen timeout."); patch.admin_idle_min = im; }
       if (has("vendor_fee_pct")) { const pc = num("vendor_fee_pct"), fr = num("vendor_fee_free");
         if (!(pc >= 0 && pc <= 50) || !(Number.isInteger(fr) && fr >= 0 && fr <= 100)) return fail("Enter a fee between 0 and 50% and a whole number of free meals.");
@@ -6111,7 +6199,7 @@ async function adminSubmit(e) {
       const pick = f.querySelector("[data-autopick]"), pin = S.newKitPin || {};
       const x = await api.addKitchen({ name: v("name"), public_name: v("public_name"), tagline: v("tagline") || null, address: v("address") || null, whatsapp: w || null, capacity: Number(v("capacity")) || 45, delivery_mode: v("delivery_mode"),
         ...(pin.lat != null ? { lat: pin.lat, lng: pin.lng } : {}), ...(pick && pickedDays(pick).length ? { auto_days: pickedDays(pick) } : {}) });
-      for (const d of menu) await api.saveItem({ kitchen_id: x.id, name: d.name, price: Number(d.price), addons: d.addons, icon: d.icon, active: true });
+      for (const d of menu) await api.saveItem({ kitchen_id: x.id, name: d.name, price: Number(d.price), addons: d.addons.map(({ orig_name, orig_price, ...a }) => a), icon: d.icon, active: true });
       toast(menu.length ? "Vendor added with " + menu.length + " dish" + (menu.length > 1 ? "es" : "") + "." : "Vendor added. Open it in the list to add dishes.");
     }
     if (f.dataset.form === "site") {
@@ -6287,7 +6375,7 @@ async function viewKitchen(token) {
     const termsTop = termsNeed(k) && (k.open || k.paused) ? `<section class="card stack" style="border-color:var(--accent)">${termsBox(k, K.menu)}${(k.auto_days || []).length ? `<p class="small" style="font-weight:600">Your automatic cooking days are paused until you accept the new fee.</p>` : ""}<button class="btn wide" id="acceptTermsOnly">Accept the new terms</button></section>` : "";
     const settingsHtml = `${autoCard(k, d)}${poolCard(k)}${freeCard(k)}`;
     $("#view").innerHTML = `
-      <header class="topzone pagetop"><div class="pagehead"><div class="pagebrand">${LOGO(30)}<p class="brand" style="font-size:18px">ChopPool vendor</p></div><span class="hbtns">${fbBtn("vendor")}${themeBtn()}</span></div><h1>${esc(k.name)}</h1>
+      <header class="topzone pagetop"><div class="pagehead"><div class="pagebrand">${LOGO(30)}<p class="brand" style="font-size:18px">ChopPool vendor</p></div><span class="hbtns">${alertBtn("vendor")}${fbBtn("vendor")}${themeBtn()}</span></div><h1>${esc(k.name)}</h1>
         <p class="muted">${fmtDate(d)} · ready by ${fmtTime(minus(S.settings.delivery_time, 30))} · ${k.no_daily_limit ? used + " meal" + (used === 1 ? "" : "s") + " so far" : used + " of " + k.capacity + " meals"} · ${k.delivery_mode === "runner" ? "you deliver with your own runner" : "a ChopPool rider collects"}</p></header>
       ${dayTabs}
       ${termsTop}
@@ -6346,8 +6434,10 @@ async function viewKitchen(token) {
       }).join("")}
       <details class="card settingsfold"${S.kset ? " open" : ""}><summary><h2>Your settings</h2><span class="small muted">Cooking days, free delivery, menu, photos, alerts</span></summary>
       ${settingsHtml}
-      ${k.added_by_customer ? `<section class="stack"><h2>Your menu</h2><p class="small muted">Check the dishes, prices and extras the customer added for you. Add as many dishes as you like, then save once.</p>
-        ${menuEditor(K.menu, "vendor:" + token, false)}</section>`
+      <section class="stack" id="vMenu"><h2>Your menu</h2><p class="small muted">${k.added_by_customer ? "Check the dishes, prices and extras the customer added for you." : "Change dishes, prices and extras, untick an extra to hide it today, drag to reorder."} Lower prices and changes to names show straight away; a higher price or a new dish or paid extra shows once ChopPool approves it. Save once when you're done.</p>
+        <div id="vReqs"></div>
+        ${menuEditor(K.menu, "vendor:" + token, false)}</section>
+      ${k.added_by_customer ? ""
         : K.menu.length ? `<section class="stack"><h2>Dish photos</h2><p class="small muted">Dishes with photos get chosen more often. Tap a dish to add or change its photo. ChopPool checks each photo before customers see it.</p>
         <p class="small"><strong>Tips:</strong> shoot from above, plate on a plain surface, in daylight. No text or logos.</p>
         <div class="photogrid">${K.menu.map(i => `<div class="mdish" data-item="${esc(i.id)}"><button type="button" class="mphoto" data-photo aria-label="Photo for ${esc(i.name)}">${i.photo_url ? `<img src="${esc(i.photo_url)}" alt="" loading="lazy">` : `<span class="dishpic">${art(dishKind(i))}</span>`}<span class="cam">${CAM}</span></button><span class="small">${esc(i.name)}</span></div>`).join("")}</div></section>` : ""}
@@ -6378,6 +6468,12 @@ async function viewKitchen(token) {
     $("#freeForm")?.addEventListener("change", async () => { try { await api.vendorSetFree(token, Number($("#freeM").value), Number($("#freeMin").value)); toast(Number($("#freeM").value) > 0 ? "Free delivery saved" : "Free delivery is off"); draw(); } catch (e) { toast(cleanErr(e)); draw(); } });
     $("#openDay")?.addEventListener("click", async () => { try { await api.kitchenOpenDay(token, d); notifyServer({ kitchen_token: token, date: d }); toast("Thank you. Customers can now order from you for " + dayLabel(d) + "."); draw(); } catch (e) { toast(cleanErr(e)); } });
     document.querySelectorAll(".photogrid").forEach(g => g.setAttribute("data-medit", "vendor:" + token));
+    // Price changes waiting for (or answered by) ChopPool
+    api.vendorPriceRequests(token).then(rs => { const el = $("#vReqs"); if (!el || !rs.length) return;
+      const lab = r => esc(r.name) + (r.kind === "new_dish" ? " (new dish)" : r.kind === "new_extra" ? " (new extra)" : "") + ": " + (r.old_price != null ? money(r.old_price) + " → " : "") + money(r.new_price);
+      const pend = rs.filter(r => r.status === "pending"), done = rs.filter(r => r.status !== "pending").slice(0, 3);
+      el.innerHTML = (pend.length ? `<div class="note stack" style="gap:4px"><strong>Waiting for ChopPool to approve</strong>${pend.map(r => `<span class="small">${lab(r)}</span>`).join("")}<span class="small muted">Customers see the current price until then.</span></div>` : "")
+        + (done.length ? `<div class="small muted stack" style="gap:2px;margin-top:6px">${done.map(r => `<span>${r.status === "approved" ? "Approved" : "Not approved"}: ${lab(r)}${r.note ? " · " + esc(r.note) : ""}</span>`).join("")}</div>` : ""); }).catch(() => {});
   };
   $("#view").addEventListener("click", async e => {
     if (menuEditorClick(e)) return;
@@ -6386,7 +6482,9 @@ async function viewKitchen(token) {
       const list = readMenu(ms.closest("[data-medit]"));
       if (list.some(x => !x.removed && (x.name.length < 2 || !(Number(x.price) > 0)))) return toast("Each dish needs a name and a price above 0.");
       ms.disabled = true;
-      try { await api.vendorSetMenu(token, list.map(x => ({ id: x.id, name: x.name, price: x.price, addons: x.addons, active: !x.removed }))); toast("Menu saved"); draw(); } catch (err) { ms.disabled = false; toast(cleanErr(err)); }
+      try { await api.vendorSetMenu(token, list.map(x => ({ id: x.id, name: x.name, price: x.price, addons: x.addons, active: x.removed ? false : x.active !== false })));
+        const reqs = await api.vendorPriceRequests(token).catch(() => []), waiting = reqs.filter(r => r.status === "pending").length;
+        toast(waiting ? "Menu saved. " + waiting + " price change" + (waiting > 1 ? "s" : "") + " waiting for ChopPool to approve." : "Menu saved"); draw(); } catch (err) { ms.disabled = false; toast(cleanErr(err)); }
       return;
     }
     const day = e.target.closest("[data-kday]"); if (day) { d = day.dataset.kday; return draw(); }
@@ -6527,7 +6625,7 @@ async function viewRider(token) {
   const NEXT = { ready: ["picked_up", "Picked up"], picked_up: ["delivered", "Delivered"], arriving: ["delivered", "Delivered"] };
   const draw = async () => {
     let R; try { R = await api.riderView(token, d); } catch (e) { $("#view").innerHTML = `<p class="card err">${esc(cleanErr(e))}</p>`; return; }
-    $("#view").innerHTML = `<header class="topzone pagetop"><div class="pagehead"><div class="pagebrand">${LOGO(30)}<p class="brand" style="font-size:18px">ChopPool rider</p></div><span class="hbtns">${fbBtn("rider")}${themeBtn()}</span></div><h1>${esc(R.rider.name)}</h1><p class="muted">${fmtDate(d)} · deliver by ${fmtTime(S.settings.delivery_time)}</p></header>` +
+    $("#view").innerHTML = `<header class="topzone pagetop"><div class="pagehead"><div class="pagebrand">${LOGO(30)}<p class="brand" style="font-size:18px">ChopPool rider</p></div><span class="hbtns">${alertBtn("rider")}${fbBtn("rider")}${themeBtn()}</span></div><h1>${esc(R.rider.name)}</h1><p class="muted">${fmtDate(d)} · deliver by ${fmtTime(S.settings.delivery_time)}</p></header>` +
       (R.pools.length && R.pools.every(p => p.status === "delivered") ? `<section class="card nextup"><p>${R.pools.every(p => p.handoff === "host" || handedOver(p.orders)) ? "All deliveries done for today. Thank you." : "Delivered. Hand over the meals still waiting below."}</p></section>` : "") +
       (R.pools.map((p, i) => {
         const nx = NEXT[p.status];
@@ -6764,8 +6862,8 @@ async function route() {
   document.querySelectorAll("#demoBar a").forEach(a => { if (a.getAttribute("href") === "#" + h || (view === "order" && a.dataset.view === "order")) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
   if (S.appReady && ["kitchen", "rider", "host"].includes(view)) introFor(h);
   if ((view === "kitchen" || view === "rider") && await termsBlock(view === "kitchen" ? "vendor" : "rider", h.slice(view === "kitchen" ? 8 : 6))) return;
-  if (view === "kitchen") return viewKitchen(h.slice(8));
-  if (view === "rider") return viewRider(h.slice(6));
+  if (view === "kitchen") { setTimeout(alertDot, 1500); return viewKitchen(h.slice(8)); }
+  if (view === "rider") { setTimeout(alertDot, 1500); return viewRider(h.slice(6)); }
   if (view === "host") return viewHost(h.slice(5));
   // Team screens and the customer app use different sign-ins; switching between them reloads who is signed in
   if (api.useTeam && api.useTeam(view === "admin")) { S.user = null; S.role = null; S.admin = null; try { await refreshUser(); } catch (e) {} }

@@ -230,6 +230,46 @@ async function tick() {
       await db.from("site_waiters").update({ notified_at: new Date().toISOString() }).eq("site_id", si.id).is("notified_at", null);
     }
   }
+  // 9:00 am lunch reminder (time in Settings) to everyone with alerts on who hasn't ordered yet, on days a vendor is cooking (update 41)
+  const remindAt = new Date(today + "T" + String(s.reminder_time || "09:00").slice(0, 5) + ":00Z"), cutAt = new Date(today + "T" + String(s.cutoff).slice(0, 5) + ":00Z");
+  if (now >= remindAt && now < cutAt && now.getTime() - remindAt.getTime() < 2 * 3600e3) {
+    const { data: ks } = await db.from("kitchens").select("id").eq("active", true).eq("archived", false);
+    let cooking = false; for (const k of ks || []) { const { data: open } = await db.rpc("kitchen_is_open", { p_kitchen: k.id, p_date: today }); if (open) { cooking = true; break; } }
+    if (cooking && await once("remind:" + today)) {
+      const [{ data: subs }, { data: ordered }] = await Promise.all([
+        db.from("push_subs").select("*").is("kitchen_id", null).is("rider_id", null),
+        db.from("orders").select("id,user_id,site_id,created_at").eq("order_date", today).neq("status", "cancelled")]);
+      const doneUsers = new Set((ordered || []).map((o: any) => o.user_id).filter(Boolean)), doneIds = new Set((ordered || []).map((o: any) => o.id));
+      const left = (subs || []).filter((x: any) => !x.is_team && !(x.mute || []).includes("reminder") && !(x.user_id && doneUsers.has(x.user_id)) && !(x.order_ids || []).some((id: string) => doneIds.has(id)));
+      // Each person's building: from their latest order (the app keeps the choice on the phone)
+      const users = [...new Set(left.map((x: any) => x.user_id).filter(Boolean))];
+      const siteOf: Record<string, string> = {};
+      if (users.length) { const { data: last } = await db.from("orders").select("user_id,site_id,created_at").in("user_id", users).order("created_at", { ascending: false }).limit(2000);
+        (last || []).forEach((o: any) => { if (!siteOf[o.user_id]) siteOf[o.user_id] = o.site_id; }); }
+      const { data: sites } = await db.from("sites").select("id,name"); const sName: Record<string, string> = {}; (sites || []).forEach((x: any) => { sName[x.id] = x.name; });
+      const groups: Record<string, any[]> = {};
+      left.forEach((x: any) => { const nm = (x.user_id && sName[siteOf[x.user_id]]) || ""; (groups[nm] = groups[nm] || []).push(x); });
+      for (const nm of Object.keys(groups)) {
+        const g = groups[nm], us = [...new Set(g.map((x: any) => x.user_id).filter(Boolean))];
+        await send(forWho(g, { users: us }), nm ? "Lunch at " + nm + "?" : "Lunchtime is coming",
+          nm ? "Order by " + ampm(s.cutoff) + " and share delivery with your building." : "Order by " + ampm(s.cutoff) + " and share delivery with people in your building.",
+          APP + "/#order", "remind-" + today, "reminder");
+      }
+    }
+  }
+  // Orders closed: tell everyone in each pool (and anyone alone in one) once the cut-off passes
+  if (now >= cutAt && now.getTime() - cutAt.getTime() < 3 * 3600e3) {
+    const todays = (pools || []).filter((p: any) => p.order_date === today && !["cancelled", "waiting"].includes(p.status));
+    for (const p of todays) {
+      if (!await once("closed:" + p.id)) continue;
+      const [{ data: os }, { data: site }] = await Promise.all([db.from("orders").select("*").eq("pool_id", p.id).in("status", ["paid", "collected"]),
+        db.from("sites").select("name").eq("id", p.site_id).single()]);
+      const live = os || []; if (!live.length) continue;
+      const meals = live.reduce((t: number, o: any) => t + o.qty, 0), codes = new Set(live.map((o: any) => o.code)).size, at = site ? site.name : "your building";
+      if (codes === 1) await send(await customerSubs(live), "Orders are closed", "You're the only one in your pool at " + at + ". Your lunch still comes; the full delivery applies.", APP + "/#order", "closed-" + p.id, "solo");
+      else await send(await customerSubs(live), "Orders are closed", "Your pool at " + at + " has " + meals + " meals. Delivery is shared, and your cashback comes after lunch.", APP + "/#order", "closed-" + p.id, "confirm");
+    }
+  }
   // Cut-off summary for each vendor with orders today
   const cut = new Date(today + "T" + String(s.cutoff).slice(0, 5) + ":00Z");
   if (now >= cut && now.getTime() - cut.getTime() < 3 * 3600e3) {
