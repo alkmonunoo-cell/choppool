@@ -521,6 +521,8 @@ td select { padding: 6px 8px; width: auto; }
 .mpin.on { background: var(--accent); }
 .mpin.me { background: #2563EB; border-radius: 50%; transform: none; }
 .leaflet-container { font-family: var(--font-body); }
+.gpow { margin: 6px 2px 0; font-size: 11px; text-align: right; }
+.place-row.busy { opacity: .55; }
 .leaflet-popup-content { font-size: 14px; }
 .admintabs { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
 @media (max-width: 640px) {
@@ -1165,6 +1167,7 @@ const CONFIG = {
   PUBLIC_URL: "https://choppool.com",          // the link you share, e.g. https://choppool.netlify.app
   GOOGLE_SIGN_IN: false,   // set to true after enabling Google in Supabase (see SETUP.md)
   VAPID_PUBLIC_KEY: "BMlJ_jsKjf9TO-1m9RgSNTRxUH7cJpCRHp50JXbGeK1FlYEX934Ryfc-g4p4BYYAJON5Kbma3UNTXbZLJTYiubY",     // push alerts: the public key from PUSH-SETUP.md (blank = alerts only while the app is open)
+  GOOGLE_MAPS_KEY: "AIzaSyDPA7vz6ShOroM7uXf_FVGt8Us0G0sBLTs",   // Google place search (browser key, limited to choppool.com and two APIs)
   PAYSTACK_PUBLIC_KEY: "pk_test_e6118c8e6d8d392219911437f6d1e8033344c39b"   // Paystack public key (safe to be public). Test key for now; swap for pk_live_ when activated
 };
 /* ======================================================================================================= */
@@ -2939,7 +2942,37 @@ function distM(a, b) {
   return 2 * R * Math.asin(Math.sqrt(h));
 }
 const fmtDist = m => m < 1000 ? Math.max(10, Math.round(m / 10) * 10) + " m" : (m / 1000).toFixed(1) + " km";
-async function geocode(q) {
+// Google place search (Places API New, through the Maps JavaScript API). Falls back to OpenStreetMap if Google is off or fails.
+let gmapsP = null;
+window.gm_authFailure = () => { S.gmapsOff = true; };   // Google calls this if the key is refused
+function loadGoogle() {
+  if (!CONFIG.GOOGLE_MAPS_KEY || S.gmapsOff) return Promise.reject(new Error("Google search is off"));
+  if (window.google && window.google.maps && window.google.maps.importLibrary) return Promise.resolve(window.google);
+  return gmapsP || (gmapsP = new Promise((ok, no) => {
+    const fail = () => { gmapsP = null; no(new Error("Google didn't load")); };
+    window.__cpGmaps = () => ok(window.google);
+    const sc = document.createElement("script"); sc.async = true; sc.onerror = fail;
+    sc.src = "https://maps.googleapis.com/maps/api/js?key=" + encodeURIComponent(CONFIG.GOOGLE_MAPS_KEY) + "&v=weekly&loading=async&libraries=places&region=GH&language=en&callback=__cpGmaps";
+    document.head.appendChild(sc);
+    setTimeout(() => { if (!(window.google && window.google.maps && window.google.maps.importLibrary)) fail(); }, 9000);
+  }));
+}
+// One "session" per search box: Google charges the typing and the chosen place together, once
+async function geocodeGoogle(q, ses) {
+  await loadGoogle();
+  const lib = await google.maps.importLibrary("places");
+  if (!ses.token) ses.token = new lib.AutocompleteSessionToken();
+  const { suggestions } = await lib.AutocompleteSuggestion.fetchAutocompleteSuggestions({ input: q, sessionToken: ses.token, includedRegionCodes: ["gh"],
+    locationBias: { center: { lat: 5.6037, lng: -0.187 }, radius: 40000 }, language: "en", region: "gh" });
+  return (suggestions || []).filter(x => x.placePrediction).slice(0, 6).map(x => {
+    const pp = x.placePrediction, short = pp.mainText ? pp.mainText.text : pp.text.text, rest = (pp.secondaryText ? pp.secondaryText.text : "").replace(/,?\s*Ghana$/, "");
+    return { name: pp.text.text, short, rest, lat: null, lng: null, google: true,
+      resolve: async () => { const pl = pp.toPlace(); await pl.fetchFields({ fields: ["location", "displayName", "formattedAddress"] }); ses.token = null;
+        return { name: pl.formattedAddress || pp.text.text, short: pl.displayName || short, rest, lat: pl.location.lat(), lng: pl.location.lng() }; } };
+  });
+}
+async function geocode(q, ses) {
+  if (CONFIG.GOOGLE_MAPS_KEY && !S.gmapsOff) { try { const g = await geocodeGoogle(q, ses || {}); if (g.length) return g; } catch (e) {} }
   let r;
   // Biased to Greater Accra, but anywhere in Ghana is found
   try { r = await fetch("https://nominatim.openstreetmap.org/search?format=json&limit=6&countrycodes=gh&viewbox=-0.45,5.85,0.15,5.45&bounded=0&accept-language=en&q=" + encodeURIComponent(q)); } catch (e) { r = null; }
@@ -2979,17 +3012,21 @@ async function quietNearest() {
 }
 // Live place search (OpenStreetMap): results pop up as you type. Used by every location search in the app.
 function placeSearch(input, out, onPlace, opts = {}) {
-  let t = null, seq = 0;
+  let t = null, seq = 0; const ses = {};
   const run = async () => {
     const q = input.value.trim(), my = ++seq;
     if (q.length < 2) { out.innerHTML = ""; opts.onClear && opts.onClear(); return; }
     out.innerHTML = `<p class="small muted placeload">Searching places…</p>`;
-    let rs; try { rs = await geocode(q); } catch (e) { if (my === seq) out.innerHTML = `<p class="small muted">${esc(cleanErr(e))}</p>`; return; }
+    let rs; try { rs = await geocode(q, ses); } catch (e) { if (my === seq) out.innerHTML = `<p class="small muted">${esc(cleanErr(e))}</p>`; return; }
     if (my !== seq) return;
     out.innerHTML = (opts.title && rs.length ? `<p class="group-title">${esc(opts.title)}</p>` : "") + (rs.length ? `<div class="places">${rs.map((r, n) =>
       `<button type="button" class="place-row" data-r="${n}"><span class="pdot">${ICON.pin.replace('width="13" height="13"', 'width="16" height="16"')}</span><span><strong>${esc(r.short)}</strong><span class="small muted">${esc(r.rest)}</span></span></button>`).join("")}</div>`
-      : `<p class="small muted">${esc(opts.none || "No places found. Try a nearby landmark, or tap the map.")}</p>`);
-    out.onclick = e => { const b = e.target.closest("[data-r]"); if (b) onPlace(rs[+b.dataset.r]); };
+      : `<p class="small muted">${esc(opts.none || "No places found. Try a nearby landmark, or tap the map.")}</p>`)
+      + (rs.length && rs[0].google ? `<p class="small muted gpow">Powered by Google</p>` : "");
+    out.onclick = async e => { const b = e.target.closest("[data-r]"); if (!b) return; const r = rs[+b.dataset.r];
+      if (!r.resolve) return onPlace(r);
+      b.disabled = true; b.classList.add("busy");
+      try { onPlace(await r.resolve()); } catch (er) { b.disabled = false; b.classList.remove("busy"); toast("Couldn't get that place. Try again, or tap the map."); } };
   };
   input.addEventListener("input", () => { clearTimeout(t); t = setTimeout(run, 350); });
   input.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); clearTimeout(t); run(); } });
