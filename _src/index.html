@@ -1212,6 +1212,10 @@ const feeFor = (meals, s, trip) => { const t = Math.min(Number(trip ?? s.trip_co
 // What's charged per meal at checkout so the whole order pays the trip once
 // One order for the steps every screen shows (same as the database)
 // Phone numbers read the same everywhere: 024 123 4567
+const intlPhone = n => { const d = String(n || "").replace(/\D/g, ""); return /^0\d{9}$/.test(d) ? "+233" + d.slice(1) : "+" + d; };   // 024 123 4567 -> +233241234567
+const localPhone = p => { const d = String(p || "").replace(/\D/g, ""); return !d ? null : /^233\d{9}$/.test(d) ? "0" + d.slice(3) : d; };
+// Phone + PIN sign-in: on once "ChopPool" is approved as the SMS sender (Admin › Settings), or on this phone for testing (#phonetest)
+const phoneOn = () => !!((S.settings || {}).phone_signin || local.get("cp_phonetest"));
 const fmtPhone = n => { const d = String(n || "").replace(/\D/g, ""); return d.length === 10 ? d.slice(0, 3) + " " + d.slice(3, 6) + " " + d.slice(6) : String(n || ""); };
 const newToken = () => [...crypto.getRandomValues(new Uint8Array(18))].map(b => b.toString(36).padStart(2, "0")).join("").slice(0, 24);
 const stepRank = st => ["waiting", "collecting", "accepted", "ready", "picked_up", "arriving", "delivered"].indexOf(st);
@@ -1257,7 +1261,7 @@ const isoDow = d => { const w = new Date(d + "T00:00:00Z").getUTCDay(); return w
    DEMO DATA LAYER: in-memory copy of the database logic, with simulated customers
    ===================================================================================== */
 function makeDemoApi() {
-  const settings = { pay_mode: "manual", reminder_time: "09:00", tester_terms_on: true, tester_terms_version: 1, cutoff: "10:30", special_cutoff: "10:00", delivery_time: "12:30", trip_cost: 60, base_fare: 20, per_km: 6, trip_min: 10, max_fee: 10, cap_km: 8, trip_max: 80, quote_pay_min: 15, auto_receive_min: 120, admin_idle_min: 15, service_fee: 2, min_pool: 6, max_meals: 10, pool_ceiling: 15,
+  const settings = { phone_signin: false, pay_mode: "manual", reminder_time: "09:00", tester_terms_on: true, tester_terms_version: 1, cutoff: "10:30", special_cutoff: "10:00", delivery_time: "12:30", trip_cost: 60, base_fare: 20, per_km: 6, trip_min: 10, max_fee: 10, cap_km: 8, trip_max: 80, quote_pay_min: 15, auto_receive_min: 120, admin_idle_min: 15, service_fee: 2, min_pool: 6, max_meals: 10, pool_ceiling: 15,
     commission_rate: 0.15, vendor_fee_rate: 0, vendor_fee_free: 5, next_day_confirm_by: "08:30", countdown_start: "06:00", near_max_fee: 50, free_max_m: 1500, accept_timeout_min: 20, arrival_window_min: 10, notify_daily_cap: 5, momo_number: "024 000 0000", momo_name: "ChopPool Pilot", momo_network: "MTN" };
   const sites = [
     { id: "s1", name: "Heritage Tower, Ridge", drop_point: "Lobby security desk", handoff: "host", host_label: "the security desk in the lobby", host_token: "demoh1", lat: 5.5640, lng: -0.2010, status: "active", active: true },
@@ -1546,6 +1550,15 @@ function makeDemoApi() {
     async resendCode(email) { return true; },
     async signIn(email, pw) { const u = users.find(x => x.email === email && x.pw === pw); if (!u) throw new Error("Wrong email or password."); if (u.pending) { const e = new Error("Email not confirmed"); e.unconfirmed = true; throw e; } me = { id: u.id, email, name: u.name }; return me; },
     async signInGoogle() { throw new Error("Google sign-in works once the app is live. In the demo, use email and password."); },
+    // Demo phone + PIN: any 6-digit code works (not 000000)
+    async signUpPhone(phone, pin, name) { if (users.some(u => u.phone === phone && !u.pending)) throw new Error("That number already has an account. Sign in instead.");
+      const old = users.findIndex(u => u.phone === phone); if (old >= 0) users.splice(old, 1); users.push({ id: "u" + uid(), email: null, phone, name: name || null, pw: pin, pending: true }); return { pending: true, phone }; },
+    async verifyPhone(phone, code) { const u = users.find(x => x.phone === phone); if (!u) throw new Error("Create your account first."); if (!/^\d{6}$/.test(code) || code === "000000") throw new Error("Token has expired or is invalid");
+      delete u.pending; me = { id: u.id, email: null, phone, name: u.name }; return me; },
+    async resendPhone() { return true; },
+    async signInPhone(phone, pin) { const u = users.find(x => x.phone === phone && x.pw === pin); if (!u) throw new Error("Wrong phone number or PIN."); if (u.pending) { const e = new Error("Phone not confirmed"); e.unconfirmed = true; throw e; } me = { id: u.id, email: null, phone, name: u.name }; return me; },
+    async sendLoginCode(phone) { if (!users.some(u => u.phone === phone && !u.pending)) throw new Error("There's no account with that number. Create one instead."); return true; },
+    async setPin(pin) { const u = users.find(x => me && x.id === me.id); if (u) u.pw = pin; return true; },
     async sendReset(email, to) { if (!/^\S+@\S+\.\S+$/.test(email)) throw new Error("Enter a valid email address."); return true; },
     async setNewPassword(pw) { const u = users.find(x => me && x.id === me.id); if (u) u.pw = pw; return true; },
     async signOut() { me = null; },
@@ -1962,7 +1975,7 @@ function makeSupabaseApi() {
     // Signed in = a saved session on this phone. Checked with the server when it can be reached, so a slow
     // network or a token refresh at launch never makes you look signed out.
     async user() {
-      const shape = u => u ? { id: u.id, email: u.email, name: (u.user_metadata && (u.user_metadata.name || u.user_metadata.full_name)) || null } : null;
+      const shape = u => u ? { id: u.id, email: u.email || null, phone: localPhone(u.phone), name: (u.user_metadata && (u.user_metadata.name || u.user_metadata.full_name)) || null } : null;
       let ses = null; try { ses = (await sb.auth.getSession()).data.session; } catch (e) {}
       if (!ses) return null;
       try { const { data, error } = await sb.auth.getUser();
@@ -1984,6 +1997,18 @@ function makeSupabaseApi() {
       if (r.error && /not confirmed/i.test(r.error.message)) { const e = new Error("Confirm your email first. We've sent you a new code."); e.unconfirmed = true; throw e; }
       const d = must(r); return { id: d.user.id, email, name: (d.user.user_metadata && d.user.user_metadata.name) || null }; },
     async signInGoogle() { must(await sb.auth.signInWithOAuth({ provider: "google", options: { redirectTo: baseUrl() } })); },
+    // Phone + PIN accounts (the code comes by SMS through the sms function)
+    async signUpPhone(phone, pin, name) { const d = must(await sb.auth.signUp({ phone: intlPhone(phone), password: pin, options: { data: { name: name || null } } }));
+      if (d.user && Array.isArray(d.user.identities) && !d.user.identities.length) throw new Error("That number already has an account. Sign in instead.");
+      return d.session ? { id: d.user.id, phone, name: name || null } : { pending: true, phone }; },
+    async verifyPhone(phone, token) { const d = must(await sb.auth.verifyOtp({ phone: intlPhone(phone), token, type: "sms" })); return d.user ? { id: d.user.id, phone, name: (d.user.user_metadata && d.user.user_metadata.name) || null } : null; },
+    async resendPhone(phone, login) { if (login) must(await sb.auth.signInWithOtp({ phone: intlPhone(phone), options: { shouldCreateUser: false } })); else must(await sb.auth.resend({ type: "sms", phone: intlPhone(phone) })); return true; },
+    async signInPhone(phone, pin) { const r = await sb.auth.signInWithPassword({ phone: intlPhone(phone), password: pin });
+      if (r.error && /not confirmed/i.test(r.error.message)) { const e = new Error("Confirm your number first. We've sent you a new code."); e.unconfirmed = true; throw e; }
+      if (r.error && /invalid login/i.test(r.error.message)) throw new Error("Wrong phone number or PIN.");
+      const d = must(r); return { id: d.user.id, phone, name: (d.user.user_metadata && d.user.user_metadata.name) || null }; },
+    async sendLoginCode(phone) { must(await sb.auth.signInWithOtp({ phone: intlPhone(phone), options: { shouldCreateUser: false } })); return true; },
+    async setPin(pin) { must(await sb.auth.updateUser({ password: pin })); return true; },
     async fixPayment(id, phone, ref) { return rpc("fix_payment", { p_order: id, p_phone: phone || "", p_ref: ref }); },
     async setPayIssue(id, issue, amount) { const patch = issue === "found" ? { status: "paid", pay_issue: null, amount_received: null } : { pay_issue: issue, amount_received: issue === "short" ? Number(amount) || 0 : null };
       must(await sb.from("orders").update(patch).eq("id", id).select("id")); },
@@ -2546,6 +2571,7 @@ function viewRecovery() {
 // A new account is only created once the 6-digit code sent to the email is entered, so nobody signs up with someone else's email.
 function openAccount(reason, startMode, page) {
   let mode = startMode || (local.get("cp_had_account") ? "signin" : "signup");
+  let how = phoneOn() && local.get("cp_signin_with") !== "email" ? "phone" : "email";   // phone + PIN first when it's on
   const put = html => page ? ($("#view").innerHTML = `<section class="recover gate" id="gate"><div class="card stack" style="gap:14px">
       <div class="pagebrand">${LOGO(30)}<p class="brand" style="font-size:18px">ChopPool</p></div>${html}
       <p class="small muted center" style="margin:0">By continuing you agree to the <a href="#terms" data-legal="terms">terms</a> and <a href="#privacy" data-legal="privacy">privacy notice</a>.</p></div></section>`) : openSheet(html);
@@ -2558,24 +2584,47 @@ function openAccount(reason, startMode, page) {
   const draw = () => put(`
     ${head(mode === "signup" ? "Create your account" : "Welcome back", mode === "signup" ? "Order with your building and get your delivery savings back in your wallet." : "Sign in to see your wallet and orders.")}
     ${reason ? `<p class="note">${esc(reason)}</p>` : ""}
-    ${CONFIG.GOOGLE_SIGN_IN || DEMO ? `<button class="ghost wide" id="google">Continue with Google</button><p class="small muted center">or use your email</p>` : ""}
+    ${(CONFIG.GOOGLE_SIGN_IN || DEMO) && how === "email" ? `<button class="ghost wide" id="google">Continue with Google</button><p class="small muted center">or use your email</p>` : ""}
     <form id="authForm" class="stack" novalidate>
       ${mode === "signup" ? `<div><label for="aName">Your name</label><input id="aName" autocomplete="name" placeholder="e.g. Ama Mensah"></div>` : ""}
-      <div><label for="aEmail">Email</label><input id="aEmail" type="email" autocomplete="email" placeholder="Email address"></div>
-      <div><label for="aPw">Password</label><input id="aPw" type="password" autocomplete="${mode === "signup" ? "new-password" : "current-password"}" placeholder="At least 6 characters"></div>
+      ${how === "phone" ? `<div><label for="aPhone">Phone number</label><input id="aPhone" inputmode="tel" autocomplete="tel" placeholder="024 123 4567" value="${esc(fmtPhone((local.get("cp_me") || {}).phone || ""))}"></div>
+      <div><label for="aPin">${mode === "signup" ? "Create a 6-digit PIN" : "PIN"}</label><input id="aPin" class="codein" type="password" inputmode="numeric" maxlength="6" autocomplete="${mode === "signup" ? "new-password" : "current-password"}" placeholder="6 digits"></div>`
+      : `<div><label for="aEmail">Email</label><input id="aEmail" type="email" autocomplete="email" placeholder="Email address"></div>
+      <div><label for="aPw">Password</label><input id="aPw" type="password" autocomplete="${mode === "signup" ? "new-password" : "current-password"}" placeholder="At least 6 characters"></div>`}
       <p class="err" id="aErr"></p>
-      <button class="btn wide" type="submit">${mode === "signup" ? "Create account" : "Sign in"}</button>
-      ${mode === "signin" ? `<button type="button" class="linkbtn" id="forgot" style="justify-self:center">Forgot password?</button>` : ""}
+      <button class="btn wide" type="submit">${mode === "signup" ? (how === "phone" ? "Send my code" : "Create account") : "Sign in"}</button>
+      ${mode === "signin" ? `<button type="button" class="linkbtn" id="forgot" style="justify-self:center">Forgot ${how === "phone" ? "PIN" : "password"}?</button>` : ""}
     </form>
+    ${phoneOn() ? `<p class="small center" style="margin:0"><button class="linkbtn" id="swapHow">${how === "phone" ? "Use email instead" : "Use your phone number instead"}</button></p>` : ""}
     <p class="small center">${mode === "signup" ? "Already have an account?" : "New to ChopPool?"} <button class="linkbtn" id="swap">${mode === "signup" ? "Sign in" : "Create an account"}</button></p>`);
   const askCode = (email, sent) => codeStep(html => put(head("Check your email", "Enter the code to finish creating your account.") + html), email, sent, finish, () => { draw(); wire(); });
+  const askSms = (phone, sent) => codeStep(html => put(head("Check your messages", "Enter the code to finish creating your account.") + html), phone, sent, finish, () => { draw(); wire(); }, { phone: true });
   const wire = () => {
     $("#swap").addEventListener("click", () => { mode = mode === "signup" ? "signin" : "signup"; draw(); wire(); });
-    $("#forgot")?.addEventListener("click", () => openForgot($("#aEmail").value.trim()));
+    $("#swapHow")?.addEventListener("click", () => { how = how === "phone" ? "email" : "phone"; local.set("cp_signin_with", how); draw(); wire(); });
+    $("#aPin")?.addEventListener("input", e => { e.target.value = e.target.value.replace(/\D/g, "").slice(0, 6); });
+    $("#forgot")?.addEventListener("click", () => how === "phone" ? openForgotPin(($("#aPhone").value || "").replace(/\D/g, ""), put, head, finish) : openForgot($("#aEmail").value.trim()));
     $("#google")?.addEventListener("click", async e => { if (e.currentTarget.disabled) return; const done = busyBtn(e.currentTarget, "Opening Google…"); try { await api.signInGoogle(); } catch (er) { done(); $("#aErr").textContent = cleanErr(er); } });
     $("#authForm").addEventListener("submit", async ev => {
       ev.preventDefault();
       const sb = $("#authForm [type=submit]"); if (sb.disabled) return;
+      if (how === "phone") {
+        const phone = ($("#aPhone").value || "").replace(/\D/g, ""), pin = $("#aPin").value, nm = mode === "signup" ? $("#aName").value.trim() : "";
+        if (mode === "signup" && nm.length < 2) return ($("#aErr").textContent = "Add your name.");
+        if (!/^0[235]\d{8}$/.test(phone)) return ($("#aErr").textContent = "Enter a 10-digit Ghana number, like 024 123 4567.");
+        if (!/^\d{6}$/.test(pin)) return ($("#aErr").textContent = mode === "signup" ? "Choose a 6-digit PIN." : "Enter your 6-digit PIN.");
+        if (mode === "signup" && (/^(\d)\1{5}$/.test(pin) || "0123456789".includes(pin) || "9876543210".includes(pin))) return ($("#aErr").textContent = "Pick a PIN that's harder to guess than " + pin + ".");
+        $("#aErr").textContent = ""; const done = busyBtn(sb, mode === "signup" ? "Sending your code…" : "Signing in…");
+        try {
+          if (mode === "signup") { const r = await api.signUpPhone(phone, pin, nm); local.set("cp_me", { ...(local.get("cp_me") || {}), name: nm, phone }); if (r && r.pending) return askSms(phone, true); }
+          else await api.signInPhone(phone, pin);
+          if (!(local.get("cp_me") || {}).phone) local.set("cp_me", { ...(local.get("cp_me") || {}), phone });
+          await finish();
+        } catch (e) {
+          if (e && e.unconfirmed) { try { await api.resendPhone(phone); } catch (e2) {} return askSms(phone, true); }
+          done(); $("#aErr").textContent = cleanErr(e); }
+        return;
+      }
       const email = $("#aEmail").value.trim().toLowerCase(), pw = $("#aPw").value;
       if (!/^\S+@\S+\.\S+$/.test(email)) return ($("#aErr").textContent = "Enter a valid email address.");
       if (pw.length < 6) return ($("#aErr").textContent = "Use at least 6 characters for the password.");
@@ -2593,14 +2642,36 @@ function openAccount(reason, startMode, page) {
   };
   draw(); wire();
 }
+// Forgot PIN: an SMS code signs you in, then you choose a new PIN
+function openForgotPin(prefill, put, head, finish) {
+  const ask = () => { put(`${head("Reset your PIN", "We'll text you a code to sign in.")}
+    <form id="fpForm" class="stack" novalidate><div><label for="fpPhone">Phone number</label><input id="fpPhone" inputmode="tel" autocomplete="tel" placeholder="024 123 4567" value="${esc(fmtPhone(prefill || ""))}"></div>
+      <p class="err" id="fpErr"></p><button class="btn wide" type="submit">Send my code</button></form>`);
+    $("#fpForm").addEventListener("submit", async ev => { ev.preventDefault(); const b = $("#fpForm [type=submit]"); if (b.disabled) return;
+      const phone = $("#fpPhone").value.replace(/\D/g, ""); if (!/^0[235]\d{8}$/.test(phone)) return ($("#fpErr").textContent = "Enter a 10-digit Ghana number, like 024 123 4567.");
+      const d = busyBtn(b, "Sending…");
+      try { await api.sendLoginCode(phone); prefill = phone;
+        codeStep(html => put(head("Check your messages", "Enter the code, then choose a new PIN.") + html), phone, true, newPin, ask, { phone: true, login: true }); }
+      catch (e) { d(); $("#fpErr").textContent = /not found|signups not allowed|no account/i.test(e.message || "") ? "There's no account with that number. Create one instead." : cleanErr(e); } }); };
+  const newPin = () => { put(`${head("Choose a new PIN", "You'll use it with your phone number to sign in.")}
+    <form id="npForm" class="stack" novalidate><div><label for="npPin">New 6-digit PIN</label><input id="npPin" class="codein" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password" placeholder="6 digits"></div>
+      <p class="err" id="npErr"></p><button class="btn wide" type="submit">Save PIN</button></form>`);
+    $("#npPin").addEventListener("input", e => { e.target.value = e.target.value.replace(/\D/g, "").slice(0, 6); });
+    $("#npForm").addEventListener("submit", async ev => { ev.preventDefault(); const b = $("#npForm [type=submit]"); if (b.disabled) return; const pin = $("#npPin").value;
+      if (!/^\d{6}$/.test(pin)) return ($("#npErr").textContent = "Choose a 6-digit PIN.");
+      if (/^(\d)\1{5}$/.test(pin) || "0123456789".includes(pin) || "9876543210".includes(pin)) return ($("#npErr").textContent = "Pick a PIN that's harder to guess.");
+      const d = busyBtn(b, "Saving…"); try { await api.setPin(pin); toast("PIN saved"); await finish(); } catch (e) { d(); $("#npErr").textContent = cleanErr(e); } }); };
+  ask();
+}
 // The 6-digit code step (customers and team). render(html) draws it; done() runs once the code is accepted.
-function codeStep(render, email, sent, done, back) {
+function codeStep(render, email, sent, done, back, opt) {
+  const ph = !!(opt && opt.phone);
   render(`<form id="codeForm" class="stack" novalidate>
-      <p class="muted" style="margin:0">We sent a code to <strong>${esc(email)}</strong>. It can take a minute; check your spam folder too.</p>
+      <p class="muted" style="margin:0">${ph ? `We sent a code by SMS to <strong>${esc(fmtPhone(email))}</strong>. It can take a minute.` : `We sent a code to <strong>${esc(email)}</strong>. It can take a minute; check your spam folder too.`}</p>
       <div><label for="cCode">Code</label><input id="cCode" class="codein" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="6-digit code"></div>
       <p class="err" id="cErr"></p>
       <button class="btn wide" type="submit">Confirm</button>
-      <p class="small center" style="margin:0"><button type="button" class="linkbtn" id="cResend"></button> · <button type="button" class="linkbtn" id="cBack">Use a different email</button></p></form>`);
+      <p class="small center" style="margin:0"><button type="button" class="linkbtn" id="cResend"></button> · <button type="button" class="linkbtn" id="cBack">Use a different ${ph ? "number" : "email"}</button></p></form>`);
   const rb = $("#cResend"); let left = sent ? 60 : 0, tm = null;
   const tick = () => { if (!$("#cResend")) return clearInterval(tm); rb.disabled = left > 0; rb.textContent = left > 0 ? `Send a new code in ${left}s` : "Send a new code"; if (left > 0) left--; else clearInterval(tm); };
   tick(); tm = setInterval(tick, 1000);
@@ -2608,13 +2679,13 @@ function codeStep(render, email, sent, done, back) {
   $("#cCode").addEventListener("input", e => { e.target.value = e.target.value.replace(/\D/g, "").slice(0, 8); });
   $("#cBack").addEventListener("click", () => { clearInterval(tm); back(); });
   rb.addEventListener("click", async () => { if (rb.disabled) return; rb.disabled = true;
-    try { await api.resendCode(email); left = 60; clearInterval(tm); tick(); tm = setInterval(tick, 1000); toast("New code sent"); } catch (e) { rb.disabled = false; $("#cErr").textContent = cleanErr(e); } });
+    try { if (ph) await api.resendPhone(email, opt.login); else await api.resendCode(email); left = 60; clearInterval(tm); tick(); tm = setInterval(tick, 1000); toast("New code sent"); } catch (e) { rb.disabled = false; $("#cErr").textContent = cleanErr(e); } });
   $("#codeForm").addEventListener("submit", async ev => {
     ev.preventDefault(); const b = $("#codeForm [type=submit]"); if (b.disabled) return;
     const code = $("#cCode").value.trim();
-    if (!/^\d{6,8}$/.test(code)) return ($("#cErr").textContent = "Enter the 6-digit code from the email.");
+    if (!/^\d{6,8}$/.test(code)) return ($("#cErr").textContent = "Enter the 6-digit code from the " + (ph ? "SMS." : "email."));
     $("#cErr").textContent = ""; const d = busyBtn(b, "Checking…");
-    try { await api.verifyCode(email, code); clearInterval(tm); await done(); }
+    try { if (ph) await api.verifyPhone(email, code); else await api.verifyCode(email, code); clearInterval(tm); await done(); }
     catch (e) { d(); $("#cErr").textContent = /expired|invalid|token/i.test(e.message || "") ? "That code is wrong or has expired. Check it, or send a new code." : cleanErr(e); }
   });
 }
@@ -2623,7 +2694,7 @@ const hasSavedSignIn = () => { try { return Object.keys(localStorage).some(k => 
 async function afterSignIn() {
   const me = local.get("cp_me") || {};
   if (S.user === null || S.user === undefined) { try { S.user = await api.user(); } catch (e) {} }
-  try { await api.saveProfile({ name: (S.user && S.user.name) || me.name || null, phone: me.phone || null }); } catch (e) {}
+  try { await api.saveProfile({ name: (S.user && S.user.name) || me.name || null, phone: me.phone || (S.user && S.user.phone) || null }); } catch (e) {}
   try { await api.claimOrders((local.get("cp_orders") || []).map(o => o.id)); } catch (e) {}
   await refreshUser(); refreshMine();
 }
@@ -4120,7 +4191,7 @@ async function renderWallet() {
       <button class="grow" data-acc="feedback"><span class="gic">${ICON.chat}</span><span class="gtx">Send feedback<small>Report a problem or share an idea, with photos</small></span><span class="ch">›</span></button>
       <button class="grow" data-acc="help"><span class="gic">${ICON.help}</span><span class="gtx">How ChopPool works</span><span class="ch">›</span></button>
       <button class="grow" data-acc="legal"><span class="gic">${ICON.list}</span><span class="gtx">Privacy and terms</span><span class="ch">›</span></button>
-      ${S.user ? `<button class="grow" data-acc="signout"><span class="gic">${ICON.out}</span><span class="gtx">Sign out<small>${esc(S.user.email || "")}</small></span></button>` : ""}
+      ${S.user ? `<button class="grow" data-acc="signout"><span class="gic">${ICON.out}</span><span class="gtx">Sign out<small>${esc(S.user.email || fmtPhone(S.user.phone || ""))}</small></span></button>` : ""}
     </div>`;
   if (!el.dataset.wired) { el.dataset.wired = "1"; el.addEventListener("click", accountClick); }
 }
@@ -5886,6 +5957,9 @@ async function renderAdmin(cached, quiet) {   // quiet = background/refresh-butt
       ${isSuper && s.pay_mode !== undefined ? setForm(`<section class="card stack"><h2>Payments</h2>
         <div><label for="stPay">How customers pay</label><select id="stPay" name="pay_mode">${[["manual", "Mobile money transfer with a transaction ID (as now)"], ["team", "Online with Paystack: team only, for testing"], ["paystack", "Online with Paystack: everyone"]].map(([k, l]) => `<option value="${k}"${s.pay_mode === k ? " selected" : ""}>${l}</option>`).join("")}</select></div>
         <p class="small muted">${DEMO || CONFIG.PAYSTACK_PUBLIC_KEY ? "Online payments open a secure Paystack window for mobile money or card, and confirm themselves. Unpaid online orders are cancelled at cut-off." : "Paystack isn't connected to this site yet, so online payment stays off whatever you pick."} Custom orders and payment fixes still use a transaction ID.</p></section>`) : ""}
+      ${isSuper && s.phone_signin !== undefined ? setForm(`<section class="card stack"><h2>Phone sign-in</h2>
+        <div><label for="stPhone">New customers sign in with</label><select id="stPhone" name="phone_signin"><option value="off"${s.phone_signin ? "" : " selected"}>Email and password (as now)</option><option value="on"${s.phone_signin ? " selected" : ""}>Phone number and PIN, with an SMS code</option></select></div>
+        <p class="small muted">Switch this on once "ChopPool" is approved as your SMS sender name on all networks. Email accounts keep working either way. To try it first on your own phone, open ${esc(baseUrl())}/#phonetest.</p></section>`) : ""}
       ${isSuper ? setForm(`<section class="card stack"><h2>Team screens</h2><div><label for="rlIdle">Sign out after this many quiet minutes (5-60)</label><input id="rlIdle" name="admin_idle_min" inputmode="numeric" value="${esc(s.admin_idle_min ?? 15)}"></div>
         <p class="small muted">Everyone on the team is also signed out after 12 hours.</p></section>`) : ""}
       <section class="card stack"><h2>Alerts check</h2><p class="small" id="bellChk">Checking…</p><p class="small muted" style="margin:0">Every alert the app sends is saved for 7 days so customers see it in the bell on any phone. This needs choppool-update.sql version 35 or later and the latest notify function deployed.</p></section>
@@ -6290,6 +6364,7 @@ async function adminSubmit(e) {
         if (hm(String(S.settings.next_day_confirm_by || "08:30").slice(0, 5)) >= hm(cut)) return fail("Orders must close after vendors confirm (" + fmtTime(S.settings.next_day_confirm_by || "08:30") + "). Change that under Vendors & menus › Settings first.");
         Object.assign(patch, { cutoff: cut, delivery_time: lunch, special_cutoff: spec });
         if (has("reminder_time")) { const rt = v("reminder_time"); if (!ok5(rt)) return fail("Enter the reminder time."); if (hm(rt) >= hm(cut)) return fail("The reminder must go out before orders close (" + fmtTime(cut) + ")."); patch.reminder_time = rt; } }
+      if (has("phone_signin")) patch.phone_signin = v("phone_signin") === "on";
       if (has("pay_mode")) { const pm = v("pay_mode"); if (!["manual", "team", "paystack"].includes(pm)) return fail("Pick how customers pay."); patch.pay_mode = pm; }
       if (has("admin_idle_min")) { const im = num("admin_idle_min"); if (!(im >= 5 && im <= 60)) return fail("Choose 5 to 60 minutes for the team screen timeout."); patch.admin_idle_min = im; }
       if (has("vendor_fee_pct")) { const pc = num("vendor_fee_pct"), fr = num("vendor_fee_free");
@@ -6968,6 +7043,10 @@ async function route() {
   if ($("#demoBar")) $("#demoBar").open = false;
   const old = $("#view"), fresh = old.cloneNode(false); old.replaceWith(fresh);   // drops old listeners
   const h = location.hash.slice(1);
+  if (h === "phonetest" || h === "phonetest-off") {   // try phone + PIN sign-in on this phone before it's switched on for everyone
+    local.set("cp_phonetest", h === "phonetest" ? true : null); history.replaceState(null, "", location.pathname + location.search);
+    toast(h === "phonetest" ? "Phone sign-in test is on for this phone." : "Phone sign-in test is off."); return route();
+  }
   if (h.startsWith("join=")) {
     // A shared pool link: switch to that building and open the kitchen's menu
     const [siteId, kid] = h.slice(5).split(",");
