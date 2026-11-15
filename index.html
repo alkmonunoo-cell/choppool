@@ -539,6 +539,11 @@ td select { padding: 6px 8px; width: auto; }
 .settingsfold[open] { display: grid; gap: 18px; }
 .settingsfold .card { box-shadow: none; padding: 0; background: none; border: 0; }
 .tog.xon { display: inline-flex; align-items: center; gap: 10px; padding: 4px 4px 4px 14px; }
+.wrow { cursor: pointer; } .wrow:hover td { background: var(--surface-2); }
+.nearask { display: inline-flex; align-items: center; gap: 6px; margin: 10px 2px; }
+.nearask svg { width: 16px; height: 16px; }
+.mealqty { padding: 12px 14px; border-radius: 16px; background: var(--surface-2); }
+.mealqty .row { align-items: center; gap: 12px; }
 .xname { background: none; border: 0; padding: 6px 0; margin: 0; color: inherit; font: inherit; cursor: pointer; text-align: left; }
 .xstep { display: inline-flex; align-items: center; gap: 2px; background: rgba(0,0,0,.18); border-radius: 999px; padding: 2px; }
 .xstep button { width: 28px; height: 28px; border-radius: 50%; border: none; background: transparent; color: inherit; font-size: 18px; font-weight: 700; line-height: 1; padding: 0; cursor: pointer; }
@@ -868,8 +873,11 @@ body:not(.on-home) #bell, body:not(.on-home) #theme { display: none; }
 .prow .acts { display: flex; gap: 6px; align-items: center; flex: none; }
 /* Narrow phones (360 px and below): nothing squeezed or cut off */
 @media (max-width: 360px) {
-  .hero-stats { grid-template-columns: 1fr 1fr; }
-  .hero-stats > :nth-child(3) { grid-column: 1 / -1; }
+  /* keep the three tiles on one row (feedback from a 360 px Samsung): a step smaller, labels wrap inside the tile */
+  .hero-stats { gap: 6px; }
+  .hero-stat { padding: 8px 8px; border-radius: 14px; font-size: 12px; line-height: 1.3; }
+  button.hero-stat { padding-right: 16px !important; } button.hero-stat::after { right: 6px; font-size: 15px; }
+  .hero-stat b { font-size: 15px; }
   .prow { gap: 10px; padding: 10px; }
   .prow .ptile { width: 46px; height: 46px; } .prow .ptile svg { width: 38px; height: 38px; }
   .prow .acts .iconround { display: none; }
@@ -1087,6 +1095,10 @@ body:not(.on-home) #bell, body:not(.on-home) #theme { display: none; }
 .nupd .dot.r { background: transparent; }
 .nupd b { font-size: 14px; display: block; } .nupd p { font-size: 13px; color: var(--muted); line-height: 1.4; } .nupd small { font-size: 12px; color: var(--muted); }
 #bell { position: relative; }
+/* Alerts on: just the bell in orange (no orange fill); off: grey bell with a slash; unread: the small dot */
+#bell[aria-pressed="true"] { background: var(--surface); color: var(--accent); }
+#bell[aria-pressed="false"] { color: var(--muted); }
+#bell[aria-pressed="false"]::after { content: ""; position: absolute; width: 24px; height: 2px; background: currentColor; border-radius: 2px; transform: rotate(-45deg); box-shadow: 0 0 0 2px var(--surface); }
 #bell .bdot { position: absolute; top: 7px; right: 8px; width: 8px; height: 8px; border-radius: 9px; background: var(--accent); border: 2px solid var(--bg); }
 .hero { transition: background .45s, box-shadow .45s; }
 :root[data-theme="dark"] .hero { background: radial-gradient(90% 70% at 100% 0%, rgba(255,106,43,.30) 0%, rgba(255,106,43,0) 60%), radial-gradient(130% 120% at 85% 0%, #232326 0%, #141416 70%); box-shadow: 0 0 0 1px #2A2A2E, 0 18px 40px -20px rgba(0,0,0,.8); }
@@ -2639,7 +2651,7 @@ async function viewOrder() {
       <button class="place" id="placeBtn" aria-label="Change building"><span class="eyebrow">${ICON.pin} Delivering to</span><strong><span id="placeName"></span>${ICON.chev}</strong></button>
       <h1 class="apptitle hidden" id="appTitle"></h1>
       <button class="iconbtn" id="theme" aria-label="Switch light or dark">${ICON[themeNow() === "dark" ? "light" : "dark"]}</button>
-      <button class="iconbtn" id="bell" aria-label="Notifications">${ICON.bell}<span class="bdot hidden" id="bellDot"></span></button>
+      <button class="iconbtn" id="bell" aria-label="Notifications" aria-pressed="${local.get("cp_alerts") ? "true" : "false"}">${ICON.bell}<span class="bdot hidden" id="bellDot"></span></button>
     </header>
     </div>
 
@@ -2702,7 +2714,13 @@ async function viewOrder() {
         if (/order not found/i.test(er.message || "")) { await refreshUser(); openAccount("Your sign-in on this phone has expired. Sign in again, then tap Got my food.", "signin"); return; }
         throw er; }
       await refreshMine(); refreshUser();
-      const o = (S.mine || []).find(x => x.id === gi.dataset.gotit); markReviewAsked(gi.dataset.gotit); if (o && !o.my_rating) openReview(o, 0); else toast("Enjoy your lunch. Your cashback is on its way."); });
+      const o = (S.mine || []).find(x => x.id === gi.dataset.gotit); markReviewAsked(gi.dataset.gotit);
+      // Say what came back: the cashback for this code if it's posted, otherwise that it's on its way (or nothing to come)
+      let msg = "Enjoy your lunch!";
+      if (o && S.user) { try { const w = await api.wallet(); S.walletEntries = w.entries || []; S.balance = Number(w.balance) || 0;
+        const cb = (w.entries || []).filter(x => Number(x.amount) > 0 && /cashback/i.test(x.reason || "") && String(x.reason).includes(o.code)).reduce((t, x) => t + Number(x.amount), 0);
+        if (cb > 0) msg = "Enjoy your lunch! " + money(cb) + " cashback added to your ChopPool wallet."; else if (Number(o.max_fee) > 0) msg = "Enjoy your lunch! Any delivery cashback will land in your wallet shortly."; } catch (e) {} }
+      toast(msg); if (o && !o.my_rating) setTimeout(() => openReview(o, 0), 1200); });
     const pr = e.target.closest("[data-problem]"); if (pr) return openProblem(pr.dataset.problem);
     const b = e.target.closest("button[data-pay]"); if (b) openPayQuote(b.dataset.pay); const ro = e.target.closest("[data-reorder]"); if (ro) openOrder(ro.dataset.reorder);
     const ap = e.target.closest("[data-addplate]"); if (ap) { const o = (S.mine || []).find(x => x.id === ap.dataset.addplate); if (o) addToOrder(o); }
@@ -2844,13 +2862,15 @@ function openSitePicker(opt) {
       // Before typing: your recent buildings, then the nearest (once we know where you are) or the busiest ones, so the list is never empty
       const rec = recentSites().map(id => rows.find(r => r.x.id === id)).filter(Boolean).slice(0, 2);
       const rest = rows.filter(r => !rec.includes(r));
-      const more = here ? rest.filter(r => r.d != null).sort((a, b) => a.d - b.d).slice(0, rec.length ? 3 : 4)
-                        : rest.sort((a, b) => poolsOpenAt(b.x.id) - poolsOpenAt(a.x.id) || a.i - b.i).slice(0, rec.length ? 3 : 4);
+      // Near you: the 5 closest (location only if this phone already allows it, or after tapping "See buildings near you")
+      const more = here ? rest.filter(r => r.d != null).sort((a, b) => a.d - b.d).slice(0, 5) : [];
       if (rec.length) html += `<p class="group-title">Recent</p>` + rec.map(row).join("");
-      if (more.length) html += `<p class="group-title">${here ? "Near you" : "Popular on ChopPool"}</p>` + more.map(row).join("");
+      if (more.length) html += `<p class="group-title">Near you</p>` + more.map(row).join("");
+      else if (!here && navigator.geolocation) html += `<button type="button" class="linkbtn nearask" data-nearask>${ICON.pin} See buildings near you</button>`;
       if (here && !more.length && !rec.length) $("#siteHint").textContent = "No ChopPool buildings near you yet. Search for yours or pin it on the map.";
     }
     $("#siteList").innerHTML = html;
+    $("#siteList [data-nearask]")?.addEventListener("click", () => $("#nearMe").click());
   };
   list();
   const pick = id => setSite(id, then);
@@ -3499,7 +3519,7 @@ const netBadge = n => { const x = NET_STYLE[n]; return x ? `<span class="logo ne
 // Same dish, same extras and note: one line ("3 × TZ") instead of a list
 function groupDishes(list) {
   const out = [];
-  list.forEach(o => { const ex = [addonText(o.addons), o.note].filter(Boolean).join(" · "), key = o.item_name + "|" + addonPriced(o.addons) + "|" + (o.note || ""); const g = out.find(x => x.key === key); if (g) g.qty += Number(o.qty || 1); else out.push({ key, name: o.item_name, extra: ex, addons: o.addons || [], note: o.note || "", qty: Number(o.qty || 1) }); });
+  list.forEach(o => { const ex = [addonText(o.addons), o.note].filter(Boolean).join(" · "), key = dishKey(o); const g = out.find(x => x.key === key); if (g) g.qty += Number(o.qty || 1); else out.push({ key, name: o.item_name, extra: ex, addons: o.addons || [], note: o.note || "", qty: Number(o.qty || 1) }); });
   return out;
 }
 // Dishes added in the same checkout are paid with the first one (no separate payment of their own)
@@ -3566,12 +3586,15 @@ function openDish(k, dishId) {
   let qty = 1; const extras = new Map(), i0 = menuIndex(k.id);
   const specialOpen = !(S.date === today() && new Date() >= at(S.date, S.settings.special_cutoff));
   openSheet(`<div class="dishhead"><span class="tile" style="background:${tint(i0)}">${plate(d, k.id)}</span><div><h2>${esc(d.name)}</h2><p class="small muted">${esc(k.public_name)} · <span class="num">${money(d.price)}</span></p></div><button class="closex" data-close aria-label="Close">${ICON.close}</button></div>
-    <div class="row"><p class="group-title">How many</p><div class="qty"><button type="button" id="dMinus" aria-label="One less">${GLYPH.minus}</button><output id="dQ">1</output><button type="button" id="dPlus" aria-label="One more">${GLYPH.plus}</button></div></div>
-    ${(d.addons || []).length ? `<div class="group"><p class="group-title">Extras <span class="muted" style="font-weight:500">(optional, added to each plate)</span></p><div class="chips" id="dExtras">${xChips(d.addons, extras)}</div></div>` : ""}
+    ${(d.addons || []).length ? `<div class="group"><p class="group-title">Extras <span class="muted" style="font-weight:500">(optional)</span></p><div class="chips" id="dExtras">${xChips(d.addons, extras)}</div></div>` : ""}
     <div class="group"><label for="dNote">Note for the kitchen <span class="muted" style="font-weight:500">(optional)</span></label><input id="dNote" maxlength="140" placeholder="Less oil, extra napkins"></div>
+    <div class="mealqty"><div class="row"><div><p class="group-title" style="margin:0">How many of this meal?</p><p class="small muted" id="dSum" style="margin:2px 0 0"></p></div><div class="qty"><button type="button" id="dMinus" aria-label="One less">${GLYPH.minus}</button><output id="dQ">1</output><button type="button" id="dPlus" aria-label="One more">${GLYPH.plus}</button></div></div></div>
     ${specialOpen ? `<button type="button" class="linkbtn" id="dSpecial" style="justify-self:start">Want something not on the menu? Make a custom order</button>` : ""}
-    <div class="sheet-foot"><button class="btn wide" id="dAdd">Add to order · <span class="num" id="dTot"></span></button></div>`);
-  const draw = () => { $("#dQ").textContent = qty; const a = addonSum(d.addons, xKeys(extras)); $("#dTot").textContent = money((Number(d.price) + a) * qty); };
+    <div class="sheet-foot"><button class="btn wide" id="dAdd"><span id="dAddL">Add to order</span> · <span class="num" id="dTot"></span></button></div>`);
+  // The count multiplies the whole meal (dish + extras): say so in the summary and on the button
+  const draw = () => { $("#dQ").textContent = qty; const a = addonSum(d.addons, xKeys(extras)), one = Number(d.price) + a, picked = addonPicked(d.addons, xKeys(extras));
+    $("#dSum").textContent = d.name + (picked.length ? " + " + picked.map(x => (x.qty > 1 ? x.qty + " × " : "") + x.name).join(", ") : "") + (qty > 1 ? " · " + qty + " × " + money(one) : "");
+    $("#dAddL").textContent = qty > 1 ? "Add " + qty + " meals" : "Add to order"; $("#dTot").textContent = money(one * qty); };
   draw();
   $("#dMinus").addEventListener("click", () => { qty = Math.max(1, qty - 1); draw(); });
   $("#dPlus").addEventListener("click", () => { qty = Math.min(5, poolSize(k), qty + 1); draw(); });
@@ -3731,7 +3754,7 @@ function pickSwitchDish(o, t) {
 const canConfirm = o => !o.parent_id && !o.received_at && !o.problem && (o.status === "collected" || (o.status === "paid" && o.pool_status === "delivered"));
 // ---- Remove some plates of one dish (newest added first). Paid orders can lose part of their plates;
 // an added plate still waiting for its payment check can only go whole. The first order always keeps 1 plate.
-const dishKey = c => c.item_name + "|" + [addonText(c.addons), c.note].filter(Boolean).join(" · ");
+const dishKey = c => c.item_name + "|" + addonPriced(c.addons) + "|" + (c.note || "");   // same key groupDishes uses
 function plateSources(main, kids, key) {
   const list = [...kids.filter(c => dishKey(c) === key && canCancel(c)).sort((a, b) => a.created_at < b.created_at ? 1 : -1)];
   if (dishKey(main) === key && main.status === "paid" && canCancel(main) && main.qty > 1 && !main.special_request) list.push(main);
@@ -3803,7 +3826,7 @@ function orderCard(o, all, next) {
   const s4 = Math.min(5, step);
   const needsYou = canConfirm(o) || o.status === "quoted" || (o.status === "pending" && o.pay_issue);   // outline = something for you to do
   return `<article class="order-card${needsYou ? " next" : ""}${S.flashCard === o.id ? " flash" : ""}" data-ocard="${esc(o.id)}" data-ocode="${esc(o.code || "")}" data-odate="${esc(o.order_date || "")}"><div class="head"><span class="tile" style="background:${tint(menuIndex(o.kitchen_id))}">${art(dishKind(S.items.find(i => i.kitchen_id === o.kitchen_id && i.name === o.item_name) || o.item_name))}</span>
-      <div><strong>${esc(k.public_name || "")}</strong>${groupDishes([o, ...liveKids]).map(g => { const key = c => c.item_name + "|" + [addonText(c.addons), c.note].filter(Boolean).join(" · ");
+      <div><strong>${esc(k.public_name || "")}</strong>${groupDishes([o, ...liveKids]).map(g => { const key = dishKey;
         const can = removable(o, liveKids, g.key) > 0;   // plates of this dish you could take off now
         return `<p class="small odish" style="font-weight:600">${can ? `<button class="minus1" data-lessplates="${esc(o.id)}" data-key="${esc(g.key)}" aria-label="Remove ${esc(g.name)} plates">${GLYPH.minus}</button>` : ""}<span>${g.qty} × ${esc(g.name)}${g.extra ? ` <span class="muted" style="font-weight:500">· ${esc(g.extra)}</span>` : ""}</span></p>`; }).join("")}${liveKids.length ? `<p class="small muted">Same code, packed together</p>` : ""}</div>
       <div class="c"><span>Code</span><b class="num">${esc(o.code)}</b></div></div>
@@ -4266,7 +4289,8 @@ async function openUpdates() {
   if (S.user && !S.walletEntries) { try { S.walletEntries = (await api.wallet()).entries || []; } catch (e) {} }
   const inbox = await inboxLoad(), seen = new Set(local.get("cp_seen_upd") || []);
   // Alerts you received (newest first), then what's happening right now with your orders
-  const list = [...inbox.map(x => ({ ...x, act: x.srv ? !x.read && !seen.has(x.id) : !seen.has(x.id), got: true })), ...updatesList()];
+  const list = [...inbox.map(x => ({ ...x, act: x.srv ? !x.read && !seen.has(x.id) : !seen.has(x.id), got: true })), ...updatesList()]
+    .sort((a, b) => (Date.parse(b.at) || 0) - (Date.parse(a.at) || 0));   // newest first, alerts and order updates together
   const ago = t => { if (!t) return ""; const m = Math.max(0, Math.round((Date.now() - Date.parse(t)) / 6e4)); return m < 1 ? "Just now" : m < 60 ? m + " min ago" : m < 1440 ? Math.round(m / 60) + " hr ago" : fmtDate(String(t).slice(0, 10)); };
   openSheet(`${sheetHead("Notifications", "")}
     ${local.get("cp_alerts") ? "" : `<div class="vbanner o" style="justify-content:space-between"><span>Alerts are off on this phone.</span><button class="btn" id="updOn" style="padding:8px 14px">Turn on</button></div>`}
@@ -4514,7 +4538,7 @@ function openFeedback(who = {}) {
     <div class="fbpics" id="fbPics"></div>
     <button type="button" class="ghost wide" id="fbAdd">${CAM} Add a photo or screenshot</button>
     ${guest ? `<div class="grid2"><div><label for="fbName">Your name (optional)</label><input id="fbName" autocomplete="name"></div><div><label for="fbContact">Phone or email (optional)</label><input id="fbContact" autocomplete="email" placeholder="So we can reply"></div></div>` : ""}
-    <p class="small muted">We also send which screen you were on and your phone type, to help us fix things faster.</p>
+    <p class="small muted">Your message will include the screen you were on and your phone type. Add a screenshot to show us exactly what you saw.</p>
     <p class="err" id="fbErr"></p><div class="sheet-foot"><button class="btn wide" id="fbSend">Send feedback</button></div>`);
   const drawPics = () => { $("#fbPics").innerHTML = pics.map((p, n) => `<span class="fbpic"><img src="${p.url}" alt="Photo ${n + 1}"><button type="button" data-fbx="${n}" aria-label="Remove photo">${ICON.close}</button></span>`).join("");
     $("#fbAdd").classList.toggle("hidden", pics.length >= 3); };
@@ -4611,7 +4635,7 @@ function openOrder(menuId, opt = {}) {
       <div class="group${trayMode ? " hidden" : ""}"><p class="group-title">Choose your meal</p><div class="dishes">
         ${dishes.map((d, n) => `<label class="dish"><input type="radio" name="dish" value="${esc(d.id)}"${d === item ? " checked" : ""}><span class="tile" style="background:${tint(i0)}">${plate(d, k.id)}</span><span>${esc(d.name)}</span><span class="price num">${money(d.price)}</span></label>`).join("")}
       </div></div>
-      <div class="row${trayMode ? " hidden" : ""}"><p class="group-title">How many</p><div class="qty"><button type="button" id="minus" aria-label="One less">${GLYPH.minus}</button><output id="q">${qty}</output><button type="button" id="plus" aria-label="One more">${GLYPH.plus}</button></div></div>
+      <div class="row${trayMode ? " hidden" : ""}"><p class="group-title">How many of this meal?</p><div class="qty"><button type="button" id="minus" aria-label="One less">${GLYPH.minus}</button><output id="q">${qty}</output><button type="button" id="plus" aria-label="One more">${GLYPH.plus}</button></div></div>
       <div class="group${trayMode ? " hidden" : ""}" id="extrasGroup"></div>
       <div class="group${trayMode ? " hidden" : ""}"><button type="button" class="linkbtn" id="noteToggle" style="justify-self:start">+ Add a note for the kitchen</button>
         <div id="noteBox" class="hidden"><input id="fNote" maxlength="140" placeholder="Less oil, extra napkins" aria-label="Note for the kitchen"></div>
@@ -4635,7 +4659,7 @@ function openOrder(menuId, opt = {}) {
       <div class="sheet-foot"><div class="tot"><b class="num" id="totTxt"></b><span id="totSub"></span></div><button class="btn" type="submit" id="submitBtn">Join the pool</button></div>
     </form>`);
   const drawExtras = () => {
-    $("#extrasGroup").innerHTML = (item.addons || []).length ? `<p class="group-title">Extras <span class="muted" style="font-weight:500">(optional, added to each plate)</span></p><div class="chips">${xChips(item.addons, extras)}</div>` : "";
+    $("#extrasGroup").innerHTML = (item.addons || []).length ? `<p class="group-title">Extras <span class="muted" style="font-weight:500">(optional, for each meal)</span></p><div class="chips">${xChips(item.addons, extras)}</div>` : "";
   };
   // Pay from (your saved numbers) and pay to (ChopPool's number on the same network where we have one)
   const drawPay = due => {
@@ -5433,10 +5457,9 @@ async function renderAdmin(cached, quiet) {   // quiet = background/refresh-butt
           <form class="inline" data-form="resolve" data-id="${esc(o.id)}" style="grid-template-columns:${isOwner ? "1.6fr .7fr" : "1fr"} auto"><div><label>What you did</label><input name="note" placeholder="Called, vendor will replace it tomorrow"></div>${isOwner ? `<div><label>Credit (GHS)</label><input name="credit" inputmode="decimal" placeholder="0"></div>` : ""}<button class="btn">Mark sorted</button></form></div>`).join("")}</div>`
         : `<p class="muted small">No open problems. Customers can report one after collecting; their cashback waits until it's sorted.</p>`}
       <h2>Wallets</h2>
-      ${(A.wallets || []).length ? `<div class="table-wrap"><table><tr><th>Customer</th><th>Phone</th><th>Balance</th></tr>${A.wallets.map(w => `<tr><td>${esc(w.name || "")} <span class="muted small">${esc(w.email || "")}</span></td><td class="num">${esc(fmtPhone(w.phone || ""))}</td><td class="num">${money(w.balance)}</td></tr>`).join("")}</table></div>
-        ${isOwner ? `<form class="card stack" data-form="credit" style="gap:10px"><h3>Adjust a wallet</h3><p class="small muted">Owner only. Adds credit (or takes it back with a minus) and records who did it and why.</p>
-          <div class="grid2"><div><label for="wUser">Customer</label><select id="wUser" name="user">${A.wallets.map(w => `<option value="${esc(w.user_id)}">${esc(w.name || w.email)}</option>`).join("")}</select></div>
-          <div><label for="wAmt">Amount (GHS)</label><input id="wAmt" name="amt" inputmode="decimal" placeholder="10 or -5"></div></div><div><label for="wWhy">Reason</label><input id="wWhy" name="why" placeholder="Late delivery on Mon"></div><button class="btn">Adjust wallet</button></form>` : ""}`
+      ${(A.wallets || []).length ? `<input type="search" id="wSearch" placeholder="Search name, email or phone" aria-label="Search wallets" value="${esc(S.wq || "")}" style="margin-bottom:10px">
+        <div class="table-wrap"><table id="wTable"><tr><th>Customer</th><th>Phone</th><th>Balance</th></tr>${A.wallets.map(w => `<tr${isOwner ? ` class="wrow" data-wallet="${esc(w.user_id)}" tabindex="0" role="button" aria-label="Adjust ${esc(w.name || w.email || "")} wallet"` : ""} data-wq="${esc([w.name, w.email, w.phone, String(w.phone || "").replace(/\D/g, "")].join(" ").toLowerCase())}"><td>${esc(w.name || "")} <span class="muted small">${esc(w.email || "")}</span></td><td class="num">${esc(fmtPhone(w.phone || ""))}</td><td class="num">${money(w.balance)}${isOwner ? ' <span class="muted">›</span>' : ""}</td></tr>`).join("")}</table></div>
+        ${isOwner ? `<p class="small muted">Tap a customer to add or take back wallet credit.</p>` : ""}`
         : `<p class="small muted">No customer accounts yet. Wallets appear when customers create accounts.</p>`}`;
     }
     if (sub === "owed") {
@@ -5833,6 +5856,27 @@ function askRenameOrders(dishes) {
       closeSheet(); toast(n ? "Updated " + n + " open order" + (n === 1 ? "" : "s") : "No open orders had those extras"); renderAdmin(); }
     catch (er) { done(); $("#rnErr").textContent = cleanErr(er); } });
 }
+// Wallets (owner): search the list; tap a customer to adjust their wallet in a pop-up
+document.addEventListener("input", e => { if (e.target.id !== "wSearch") return; S.wq = e.target.value; const q = S.wq.trim().toLowerCase();
+  document.querySelectorAll("#wTable tr[data-wq]").forEach(r => r.classList.toggle("hidden", !!q && !q.split(/\s+/).every(w => r.dataset.wq.includes(w)))); });
+function openWalletAdjust(id) {
+  const w = ((S.admin || {}).wallets || []).find(x => x.user_id === id); if (!w) return;
+  openSheet(`${sheetHead("Adjust wallet", esc(w.name || w.email || "Customer"))}
+    <div class="sumgrid small"><span>Email</span><b>${esc(w.email || "–")}</b><span>Phone</span><b class="num">${esc(fmtPhone(w.phone || "") || "–")}</b><span>Balance now</span><b class="num">${money(w.balance)}</b></div>
+    <div class="grid2"><div><label for="waAmt">Amount (GHS)</label><input id="waAmt" inputmode="decimal" placeholder="10, or -5 to take back"></div><div><label for="waWhy">Reason</label><input id="waWhy" maxlength="140" placeholder="Late delivery on Mon"></div></div>
+    <p class="err" id="waErr"></p><div class="sheet-foot"><button class="btn wide" id="waGo">Adjust wallet</button></div>`);
+  $("#waGo").addEventListener("click", async () => { const b = $("#waGo"); if (b.disabled) return;
+    const amt = Math.round(Number(String($("#waAmt").value).replace(",", ".")) * 100) / 100, why = $("#waWhy").value.trim();
+    if (!amt) return ($("#waErr").textContent = "Enter an amount, e.g. 10 or -5.");
+    if (why.length < 3) return ($("#waErr").textContent = "Add a reason.");
+    if (amt < 0 && -amt > Number(w.balance)) return ($("#waErr").textContent = "That's more than their balance of " + money(w.balance) + ".");
+    if (!b.dataset.sure) { b.dataset.sure = "1"; b.textContent = (amt > 0 ? "Add " + money(amt) + " to " : "Take " + money(-amt) + " from ") + (w.name || "their") + (w.name ? "'s" : "") + " wallet? Tap to confirm"; return; }
+    const done = busyBtn(b, "Updating…");
+    try { await api.creditWallet(w.user_id, amt, why); w.balance = Math.round((Number(w.balance) + amt) * 100) / 100; closeSheet(); toast("Wallet updated · " + (w.name || "customer") + " now has " + money(w.balance)); renderAdmin(true); }
+    catch (er) { done(); delete b.dataset.sure; $("#waErr").textContent = cleanErr(er); } });
+}
+document.addEventListener("click", e => { const r = e.target.closest("tr[data-wallet]"); if (r && location.hash.startsWith("#admin")) openWalletAdjust(r.dataset.wallet); });
+document.addEventListener("keydown", e => { const r = e.target.closest && e.target.closest("tr[data-wallet]"); if (r && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); openWalletAdjust(r.dataset.wallet); } });
 async function adminClick(e) {
   if (menuEditorClick(e)) return;
   const ms = e.target.closest("[data-msave]");
