@@ -1,8 +1,8 @@
 // ChopPool service worker: opens fast and offline (app shell), always fetches fresh data, shows push alerts.
-const CACHE = "choppool-v202611151456";
+const CACHE = "choppool-v202611151503";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icons/icon-192-v2.png", "./icons/icon-512-v2.png", "./icons/apple-touch-icon-v2.png",
   "./fonts/plus-jakarta-sans.woff", "./fonts/bricolage-grotesque.woff"];
-self.addEventListener("install", e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });
+self.addEventListener("install", e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL.map(u => new Request(u, { cache: "reload" })))).then(() => self.skipWaiting())); });
 self.addEventListener("activate", e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE && k !== "cp-inbox").map(k => caches.delete(k)))).then(() => self.clients.claim())); });
 // Files that never change once published (fonts, map library, the versioned Supabase library): cache first
 const immutable = u => (u.origin === location.origin && /\/(fonts|vendor)\//.test(u.pathname)) || (u.hostname === "cdn.jsdelivr.net" && /@\d+\.\d+\.\d+/.test(u.pathname));
@@ -14,6 +14,16 @@ self.addEventListener("fetch", e => {
     return;
   }
   if (u.origin !== location.origin) return;          // data (Supabase, maps, dish photos) always goes to the network
+  // Opening the app: show the saved copy straight away and refresh it in the background.
+  // A new release still arrives quickly, because sw.js itself is always checked and a new version reloads the page.
+  if (e.request.mode === "navigate") {
+    const net = fetch(e.request.url, { cache: "no-cache", credentials: "same-origin" })
+      .then(r => { if (r.ok) { const copy = r.clone(); caches.open(CACHE).then(c => c.put("./", copy)); } return r; });
+    e.waitUntil(net.then(() => {}, () => {}));
+    e.respondWith(caches.open(CACHE).then(c => c.match("./")).then(hit => hit || net)
+      .catch(() => net).catch(() => caches.match("./index.html")));
+    return;
+  }
   // Always ask the server for the newest page (skips the browser's 10-minute cache), fall back to the saved copy offline
   const fresh = e.request.mode === "navigate" ? fetch(e.request.url, { cache: "no-cache", credentials: "same-origin" }) : fetch(e.request, { cache: "no-cache" });
   e.respondWith(fresh.then(r => { if (r.ok) { const copy = r.clone(); caches.open(CACHE).then(c => c.put(e.request, copy)); } return r; })

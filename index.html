@@ -2255,7 +2255,7 @@ function dishKind(x) {
 const photoOk = i => !!(i && i.photo_url && (i.photo_status == null || i.photo_status === "approved"));
 const photoReady = kid => { const ds = S.items.filter(i => i.kitchen_id === kid && i.active !== false); return ds.length > 0 && ds.filter(photoOk).length / ds.length >= 0.6; };
 const plate = (item, kid) => { const it = typeof item === "string" ? null : item; const k = kid || (it && it.kitchen_id);
-  return it && photoOk(it) && photoReady(k) ? `<span class="photoplate"><img src="${esc(it.photo_url)}" alt="" loading="lazy"></span>` : art(dishKind(item)); };
+  return it && photoOk(it) && photoReady(k) ? `<span class="photoplate"><img src="${esc(it.photo_url)}" alt="" loading="lazy" decoding="async"></span>` : art(dishKind(item)); };
 const topDish = kid => { const ds = S.items.filter(i => i.kitchen_id === kid); return ds.find(i => i.photo_url && i.photo_ok !== false) || ds.slice().sort((a, b) => String(a.id) < String(b.id) ? -1 : 1)[0]; };
 /* Rich dish illustrations (one per type of food): plate or bowl from above, same light and shadow on every one */
 const DISH_ART = (() => {
@@ -3700,7 +3700,7 @@ async function loadVendorReviews(k) {
   const pics = vendorPics, notes = rs.filter(r => r.comment || r.rating);
   const avg = sc.ratings ? Number(sc.rating) : n ? rs.reduce((t, r) => t + r.rating, 0) / n : 0;
   box.innerHTML = (avg ? `<div class="rsum"><div class="big"><b>${avg.toFixed(1)}</b><span>${sc.ratings || n} rating${(sc.ratings || n) > 1 ? "s" : ""}</span></div><div class="rbars">${dist.map(([x, pc]) => `<div>${x}<i><u style="width:${pc}%"></u></i></div>`).join("")}</div></div>` : "")
-    + (pics.length ? `<h3 class="vcat">Photos</h3><div class="photostrip">${pics.map((r, m) => `<button type="button" class="pshot" data-shot="${m}"><img src="${esc(r.photo_url)}" alt="" loading="lazy"><span>${r.vendor ? "From the vendor" : starsOf(r.rating, 10)}</span></button>`).join("")}</div>` : "")
+    + (pics.length ? `<h3 class="vcat">Photos</h3><div class="photostrip">${pics.map((r, m) => `<button type="button" class="pshot" data-shot="${m}"><img src="${esc(r.photo_url)}" alt="" loading="lazy" decoding="async"><span>${r.vendor ? "From the vendor" : starsOf(r.rating, 10)}</span></button>`).join("")}</div>` : "")
     + (notes.length ? `<h3 class="vcat">What people say</h3>` + notes.slice(0, 20).map(r => `<div class="rcm"><div class="h"><b>${esc(r.name || "Someone")}</b><span>${esc(r.created_at ? fmtDate(String(r.created_at).slice(0, 10)) : "")}</span></div><span class="stars">${starsOf(r.rating, 13)}</span>${r.comment ? `<p>${esc(r.comment)}</p>` : ""}${r.item_name ? `<span class="small muted">${esc(r.item_name)}</span>` : ""}</div>`).join("") : "")
     || `<div class="emptyrow"><span class="eic">${STAR(false, 22)}</span><div><strong>No reviews yet</strong><p>Customers can rate ${esc(k.public_name)} after they collect their lunch.</p></div></div>`;
   box.onclick = e => { const b = e.target.closest("[data-shot]"); if (!b) return; const r = pics[+b.dataset.shot];
@@ -4652,7 +4652,7 @@ async function loadReviews(k) {
   const pics = vendorPics, notes = rs.filter(r => r.comment).slice(0, 2);
   if (!pics.length && !notes.length && !(sc.ratings > 0)) { el.remove(); return; }
   el.innerHTML = `${sc.ratings ? `<p class="ratingline">${starsOf(sc.rating, 15)} <strong class="num">${Number(sc.rating).toFixed(1)}</strong> <span class="muted">· ${sc.ratings} rating${sc.ratings > 1 ? "s" : ""}</span></p>` : ""}
-    ${pics.length ? `<div class="photostrip">${pics.map((r, n) => `<button type="button" class="pshot" data-shot="${n}"><img src="${esc(r.photo_url)}" alt="" loading="lazy"><span>${r.vendor ? "From the vendor" : starsOf(r.rating, 10)}</span></button>`).join("")}</div>` : ""}
+    ${pics.length ? `<div class="photostrip">${pics.map((r, n) => `<button type="button" class="pshot" data-shot="${n}"><img src="${esc(r.photo_url)}" alt="" loading="lazy" decoding="async"><span>${r.vendor ? "From the vendor" : starsOf(r.rating, 10)}</span></button>`).join("")}</div>` : ""}
     ${notes.map(r => `<p class="revnote">${starsOf(r.rating, 11)} “${esc(r.comment)}” <span class="muted">· ${esc(r.name || "Someone")}</span></p>`).join("")}`;
   el.onclick = e => { const b = e.target.closest("[data-shot]"); if (!b) return; const r = pics[+b.dataset.shot];
     const lb = document.createElement("div"); lb.className = "lightbox"; lb.innerHTML = `<img src="${esc(r.photo_url)}" alt=""><p>${r.vendor ? "From the vendor · " + esc(r.item_name || "") : starsOf(r.rating, 14) + " " + esc(r.item_name || "") + (r.comment ? " · “" + esc(r.comment) + "”" : "")}</p>`;
@@ -5131,7 +5131,7 @@ const extraRow = a => `<div class="mextra${a && a.off ? " xoff" : ""}"${a && a.n
 function dishRow(i, admin) {
   i = i || {};
   return `<div class="mdish" data-item="${esc(i.id || "")}">
-    <div class="mtop"><button type="button" class="mphoto" data-photo aria-label="${i.photo_url ? "Change" : "Add"} dish photo">${i.photo_url ? `<img src="${esc(i.photo_url)}" alt="" loading="lazy">` : `<span class="dishpic">${art(dishKind(i.name ? i : "dish"))}</span>`}<span class="cam">${CAM}</span></button>
+    <div class="mtop"><button type="button" class="mphoto" data-photo aria-label="${i.photo_url ? "Change" : "Add"} dish photo">${i.photo_url ? `<img src="${esc(i.photo_url)}" alt="" loading="lazy" decoding="async">` : `<span class="dishpic">${art(dishKind(i.name ? i : "dish"))}</span>`}<span class="cam">${CAM}</span></button>
       <input data-f="name" value="${esc(i.name || "")}" placeholder="Dish name" aria-label="Dish"><input data-f="price" inputmode="decimal" value="${esc(i.price ?? "")}" placeholder="GHS" aria-label="Price GHS">
       <button type="button" class="xbtn" data-mdel aria-label="Remove dish">${ICON.close}</button></div>
     ${admin ? `<div class="mmeta">${iconSelect(i.icon)}<label class="choice" style="padding:6px 8px"><input type="checkbox" data-f="active"${i.active !== false ? " checked" : ""}><span>On the menu</span></label></div>` : ""}
@@ -5561,7 +5561,7 @@ async function renderAdmin(cached, quiet) {   // quiet = background/refresh-butt
         <div class="row" style="gap:8px"><button class="btn" data-act="ph-ok">Approve</button><button class="ghost" data-act="ph-no">Hide</button></div></article>`).join("")}</div></section>` : "") + `<section class="stack" style="gap:12px"><div><h2>Ratings & photos</h2><p class="small muted">From customers who collected their lunch. Hide anything that isn't right: it disappears from the app and from the vendor's rating.</p></div><div id="revAdmin"><div class="skeleton" style="height:160px"></div></div></section>`;
     api.adminReviews().then(list => { const el = $("#revAdmin"); if (!el) return; const kn = id => (A.kitchens.find(k => k.id === id) || {}).public_name || "";
       el.innerHTML = list.length ? `<div class="revgrid">${list.map(r => `<article class="card revcard${r.hidden ? " hiddenrev" : ""}" data-review="${esc(r.id)}">
-          ${r.photo_url ? `<img src="${esc(r.photo_url)}" alt="" loading="lazy">` : ""}
+          ${r.photo_url ? `<img src="${esc(r.photo_url)}" alt="" loading="lazy" decoding="async">` : ""}
           <div class="stack" style="gap:4px"><p class="small" style="font-weight:700">${esc(kn(r.kitchen_id) || "Vendor")}${r.item_name ? ` · <span style="font-weight:600">${esc(r.item_name)}</span>` : ""}</p>
           <p class="ratingline">${starsOf(r.rating, 14)} <span class="small muted">${esc(r.name || "")} · ${fmtDate(String(r.created_at).slice(0, 10))}</span></p>
           ${r.comment ? `<p class="small">“${esc(r.comment)}”</p>` : ""}
@@ -6440,7 +6440,7 @@ async function viewKitchen(token) {
       ${k.added_by_customer ? ""
         : K.menu.length ? `<section class="stack"><h2>Dish photos</h2><p class="small muted">Dishes with photos get chosen more often. Tap a dish to add or change its photo. ChopPool checks each photo before customers see it.</p>
         <p class="small"><strong>Tips:</strong> shoot from above, plate on a plain surface, in daylight. No text or logos.</p>
-        <div class="photogrid">${K.menu.map(i => `<div class="mdish" data-item="${esc(i.id)}"><button type="button" class="mphoto" data-photo aria-label="Photo for ${esc(i.name)}">${i.photo_url ? `<img src="${esc(i.photo_url)}" alt="" loading="lazy">` : `<span class="dishpic">${art(dishKind(i))}</span>`}<span class="cam">${CAM}</span></button><span class="small">${esc(i.name)}</span></div>`).join("")}</div></section>` : ""}
+        <div class="photogrid">${K.menu.map(i => `<div class="mdish" data-item="${esc(i.id)}"><button type="button" class="mphoto" data-photo aria-label="Photo for ${esc(i.name)}">${i.photo_url ? `<img src="${esc(i.photo_url)}" alt="" loading="lazy" decoding="async">` : `<span class="dishpic">${art(dishKind(i))}</span>`}<span class="cam">${CAM}</span></button><span class="small">${esc(i.name)}</span></div>`).join("")}</div></section>` : ""}
       ${k.added_by_customer ? "" : appTools("#kitchen-" + token, { kitchen_token: token }, "Vendor")}
       </details>
       ${k.added_by_customer ? (k.listing_status === "pending" ? `<p class="note">Your free listing request is with ChopPool. We'll let you know once it's approved.</p>`
@@ -6785,6 +6785,9 @@ function splash() {
   if (!cont && reload) return;
   if (!app && !cont) { try { if (localStorage.getItem(key)) return; localStorage.setItem(key, "1"); } catch (e) {} }
   const still = cont || matchMedia("(prefers-reduced-motion: reduce)").matches;
+  // Regulars (opened the app a few times already) get a shorter intro so lunch is one quick tap away
+  let opens = 0; try { opens = +localStorage.getItem("cp_sp_n") || 0; localStorage.setItem("cp_sp_n", String(Math.min(opens + 1, 99))); } catch (e) {}
+  const minMs = still ? 500 : opens >= 3 ? 1200 : 2100;
   const pk = (cls, x, y, c) => `<i class="sp-p ${cls}" style="left:${x}%;top:${y}%;background:${c}"></i>`;
   const el = document.createElement("div"); el.className = "splash wait" + (still ? " still" : ""); el.setAttribute("aria-hidden", "true");
   el.innerHTML = `<div class="sp-in"><div class="sp-logo">${pk("sp-p1", 20, 61, "#FFF7EE")}${pk("sp-p3", 21, 27, "#FFF7EE")}${pk("sp-p2", 25, 44, "#F5B04A")}</div>
@@ -6803,7 +6806,7 @@ function splash() {
   let gone = false, minDone = false; const done = () => { if (gone) return; gone = true; el.classList.add("out"); setTimeout(() => { el.remove(); S.splashing = false; revealScan(); }, 380); };
   const tryDone = () => { if (minDone && S.appReady) done(); };
   el.addEventListener("click", () => { if (S.appReady) done(); });
-  function startMin() { setTimeout(() => { minDone = true; tryDone(); if (!gone && !matchMedia("(prefers-reduced-motion: reduce)").matches) el.classList.add("hold"); }, still ? 500 : 2100); }
+  function startMin() { setTimeout(() => { minDone = true; tryDone(); if (!gone && !matchMedia("(prefers-reduced-motion: reduce)").matches) el.classList.add("hold"); }, minMs); }
   S.onReady = tryDone;
   setTimeout(done, 15000);   // never stay stuck
 }
