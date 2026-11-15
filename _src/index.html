@@ -1910,7 +1910,11 @@ function makeSupabaseApi() {
   // Calls the paystack server function; its refusals come back as plain sentences
   async function payFn(body) {
     const { data, error } = await sb.functions.invoke("paystack", { body });
-    if (error) { let m = ""; try { m = (await error.context.json()).error; } catch (e) {} throw new Error(m || "Payment didn't start. Check your connection and try again."); }
+    if (error) {   // say what actually went wrong, so a setup problem is easy to spot
+      const st = error.context && error.context.status; let m = "", own = false;
+      try { const b = await error.context.json(); own = !!b.error; m = b.error || b.message || b.msg || ""; } catch (e) {}
+      if (!m && error.name === "FunctionsFetchError") m = "Couldn't reach the payment service. Check your connection and try again";
+      throw new Error(m ? m + (own || !st ? "" : " (" + st + ")") : "Payment didn't start (" + (st || error.name || "error") + "). Try again."); }
     if (data && data.error) throw new Error(data.error);
     return data;
   }
@@ -3912,7 +3916,7 @@ function openLessPlates(mainId, key) {
 function paidLine(o, kids) {
   if (["quote_requested", "quoted", "cancelled"].includes(o.status)) return "";
   const xs = [o, ...kids], tot = x => Number(x.amount_due || 0) + Number(x.wallet_used || 0) + Number(x.carried_amount || 0);
-  const paid = xs.filter(x => ["paid", "collected"].includes(x.status)).reduce((t, x) => t + tot(x), 0), due = xs.filter(x => x.status === "pending").reduce((t, x) => t + tot(x), 0);
+  const paid = xs.filter(x => ["paid", "collected"].includes(x.status)).reduce((t, x) => t + tot(x), 0), due = xs.filter(x => x.status === "pending").reduce((t, x) => t + Number(x.amount_due || 0), 0);   // still owed (wallet part already taken)
   return (paid > 0 ? `<p class="small opaid"><span>Paid</span><b class="num">${money(paid)}</b><span class="muted">incl. delivery and service</span></p>` : "")
     + (due > 0 ? `<p class="small opaid"><span>To pay</span><b class="num">${money(due)}</b><span class="muted">${o.pay_issue ? "" : (S.unpaid || []).some(u => u.id === o.id) ? "not paid yet" : "payment being checked"}</span></p>` : "");
 }
