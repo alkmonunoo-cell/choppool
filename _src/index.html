@@ -393,6 +393,10 @@ form > .sheet-foot:last-child, .sheet > .sheet-foot:last-child { margin-bottom: 
 .sum div span:last-child { color: var(--ink); font-weight: 600; }
 .pay { background: var(--surface-2); border-radius: 18px; padding: 14px; display: grid; gap: 10px; }
 .momo { display: flex; align-items: center; gap: 12px; }
+.momo .logo.ps { background: var(--accent-soft); color: var(--accent); }
+.psdemo { position: fixed; inset: 0; z-index: 9999; background: rgba(0, 0, 0, .5); display: grid; place-items: center; padding: 20px; }
+.psbox { background: var(--surface); color: var(--ink); border-radius: 22px; padding: 22px; display: grid; gap: 10px; width: min(360px, 100%); box-shadow: var(--shadow); }
+.psbox h3 { margin: 0; font-family: var(--font-display); }
 .momo .logo { width: 42px; height: 42px; border-radius: 12px; background: #FFCC00; color: #1E1B24; display: grid; place-items: center; font-weight: 800; font-size: 12px; flex: none; }
 .note { background: var(--hint-soft); color: var(--ink); border-radius: 16px; padding: 12px 14px; font-size: 14px; }
 .err { color: var(--danger); font-size: 14px; min-height: 1em; }
@@ -1160,7 +1164,8 @@ const CONFIG = {
   SUPABASE_ANON_KEY: "sb_publishable_N2WBi5WTRlnGZnHukWysuQ_1zd6p4_S",   // publishable key (safe to be public)
   PUBLIC_URL: "https://choppool.com",          // the link you share, e.g. https://choppool.netlify.app
   GOOGLE_SIGN_IN: false,   // set to true after enabling Google in Supabase (see SETUP.md)
-  VAPID_PUBLIC_KEY: "BMlJ_jsKjf9TO-1m9RgSNTRxUH7cJpCRHp50JXbGeK1FlYEX934Ryfc-g4p4BYYAJON5Kbma3UNTXbZLJTYiubY"     // push alerts: the public key from PUSH-SETUP.md (blank = alerts only while the app is open)
+  VAPID_PUBLIC_KEY: "BMlJ_jsKjf9TO-1m9RgSNTRxUH7cJpCRHp50JXbGeK1FlYEX934Ryfc-g4p4BYYAJON5Kbma3UNTXbZLJTYiubY",     // push alerts: the public key from PUSH-SETUP.md (blank = alerts only while the app is open)
+  PAYSTACK_PUBLIC_KEY: "pk_test_e6118c8e6d8d392219911437f6d1e8033344c39b"   // Paystack public key (safe to be public). Test key for now; swap for pk_live_ when activated
 };
 /* ======================================================================================================= */
 
@@ -1252,7 +1257,7 @@ const isoDow = d => { const w = new Date(d + "T00:00:00Z").getUTCDay(); return w
    DEMO DATA LAYER: in-memory copy of the database logic, with simulated customers
    ===================================================================================== */
 function makeDemoApi() {
-  const settings = { reminder_time: "09:00", tester_terms_on: true, tester_terms_version: 1, cutoff: "10:30", special_cutoff: "10:00", delivery_time: "12:30", trip_cost: 60, base_fare: 20, per_km: 6, trip_min: 10, max_fee: 10, cap_km: 8, trip_max: 80, quote_pay_min: 15, auto_receive_min: 120, admin_idle_min: 15, service_fee: 2, min_pool: 6, max_meals: 10, pool_ceiling: 15,
+  const settings = { pay_mode: "manual", reminder_time: "09:00", tester_terms_on: true, tester_terms_version: 1, cutoff: "10:30", special_cutoff: "10:00", delivery_time: "12:30", trip_cost: 60, base_fare: 20, per_km: 6, trip_min: 10, max_fee: 10, cap_km: 8, trip_max: 80, quote_pay_min: 15, auto_receive_min: 120, admin_idle_min: 15, service_fee: 2, min_pool: 6, max_meals: 10, pool_ceiling: 15,
     commission_rate: 0.15, vendor_fee_rate: 0, vendor_fee_free: 5, next_day_confirm_by: "08:30", countdown_start: "06:00", near_max_fee: 50, free_max_m: 1500, accept_timeout_min: 20, arrival_window_min: 10, notify_daily_cap: 5, momo_number: "024 000 0000", momo_name: "ChopPool Pilot", momo_network: "MTN" };
   const sites = [
     { id: "s1", name: "Heritage Tower, Ridge", drop_point: "Lobby security desk", handoff: "host", host_label: "the security desk in the lobby", host_token: "demoh1", lat: 5.5640, lng: -0.2010, status: "active", active: true },
@@ -1315,17 +1320,28 @@ function makeDemoApi() {
   function balance(user) { return Math.round(ledger.filter(e => e.user_id === user).reduce((t, e) => t + e.amount, 0) * 100) / 100; }
   const pendingCash = user => Math.round(orders.filter(o => o.user_id === user && !o.parent_id && ["paid", "collected"].includes(o.status) && !o.cashback_posted && pastCutoff(o.order_date)
     && pools.find(p => p.id === o.pool_id).status !== "cancelled").reduce((t, o) => t + cashOf(o), 0) * 100) / 100;
+  // Online payment marker (as the database's trigger): 'PAYSTACK' means "paying online", if online payment is on
+  function psMark(o) {
+    if (!o.momo_ref || o.momo_ref.toUpperCase() !== "PAYSTACK") return;
+    if (!["paystack", "team"].includes(settings.pay_mode)) throw new Error("Online payment isn't available right now. Pay by mobile money instead.");
+    o.momo_ref = null; o.pay_via = "paystack";
+  }
+  const psRefs = {};
+  const psGroup = o => orders.filter(x => x.id === o.id || (x.basket && x.status === "pending" && (x.parent_id === o.id || (o.parent_id && x.parent_id === o.parent_id && x.created_at === o.created_at && x.id !== o.id))));
+  const psDue = o => psGroup(o).filter(x => x.status === "pending").reduce((t, x) => t + Math.max(0, dueOf(x) - (x.wallet_used || 0)), 0);
   function settle(o, ref, useWallet) {
     const total = dueOf(o); let use = 0;
     if (useWallet && me && o.user_id === me.id) { use = Math.max(0, Math.min(balance(me.id), total)); if (use > 0) ledger.push({ user_id: me.id, amount: -use, reason: "Paid for order " + o.code, order_id: o.id, created_at: nowIso() }); }
     if (use < total && (!ref || ref.trim().length < 4)) throw new Error("Enter the mobile money transaction ID for the remaining " + (total - use).toFixed(2) + ".");
-    o.wallet_used += use; if (use < total) o.momo_ref = ref.trim(); o.status = use >= total ? "paid" : "pending";
+    o.wallet_used += use; if (use < total) o.momo_ref = ref.trim(); o.status = use >= total ? "paid" : "pending"; psMark(o);
     return { total, wallet_used: use, momo_due: total - use };
   }
   function housekeeping() {
     // A delivered pool's trip cost fills itself in (update 29); own-runner vendors and free delivery owe no rider
     pools.forEach(p => { if (p.status === "delivered" && p.trip_cost == null) { const k = kitchens.find(x => x.id === p.kitchen_id);
       if (k && k.delivery_mode !== "runner" && !pfree(p.id)) p.trip_cost = tripFor(k, sites.find(x => x.id === p.site_id), settings); } });
+    // Unpaid online orders close at cut-off, like a payment never found
+    orders.filter(o => o.status === "pending" && o.pay_via === "paystack" && !o.basket && !o.pay_issue && pastCutoff(o.order_date)).forEach(o => { o.pay_issue = "not_found"; o.amount_received = 0; });
     // Payment never found by cut-off: cancelled; a short payment goes back
     orders.filter(o => o.status === "pending" && o.pay_issue && pastCutoff(o.order_date)).forEach(o => {
       o.status = "cancelled"; o.cancel_reason = "Payment not received"; o.refund_due = Number(o.amount_received || 0); o.refund_needed = o.refund_due > 0 && !o.user_id;
@@ -1464,6 +1480,7 @@ function makeDemoApi() {
         if (r.useWallet && me && made[0].user_id === me.id) { use = Math.max(0, Math.min(balance(me.id), total)); if (use > 0) ledger.push({ user_id: me.id, amount: -use, reason: "Paid for order " + made[0].code, order_id: made[0].id, created_at: nowIso() }); }
         if (use < total && (!r.ref || r.ref.trim().length < 4)) throw new Error("Enter the mobile money transaction ID for the remaining " + (total - use).toFixed(2) + ".");
         let left = use; made.forEach((o, n) => { const t = dueOf(o), part = Math.min(left, t); left -= part; o.wallet_used = part; o.status = use >= total ? "paid" : "pending"; o.momo_ref = n === 0 && use < total ? r.ref.trim() : null; });
+        psMark(made[0]);
         const pl = pools.find(p => p.id === made[0].pool_id);
         return { id: made[0].id, code: made[0].code, ids: made.map(o => o.id), total, wallet_used: use, momo_due: total - use, status: made[0].status, order_date: made[0].order_date, pool_id: pl.id, pool_seq: pl.seq, pool_status: pl.status, meals: meals(pl.id) };
       } catch (e) {
@@ -1794,6 +1811,20 @@ function makeDemoApi() {
       return { name: hit[0].customer_name, items: items_, item_name: items_, qty: todo.reduce((t, o) => t + o.qty, 0), was_paid: wasPaid, code: c };
     },
     async isAdmin() { return true; },
+    async payStart(id) { housekeeping(); const o = orders.find(x => x.id === id);
+      if (!o || !me || o.user_id !== me.id) throw new Error("This order isn't yours.");
+      if (o.status !== "pending" || o.pay_via !== "paystack") throw new Error(["paid", "collected"].includes(o.status) ? "This order is already paid." : "This order can't be paid online.");
+      if (pastCutoff(o.order_date)) throw new Error("Orders have closed for this day.");
+      const amount = Math.round(psDue(o) * 100) / 100, reference = "CPDEMO" + uid(); psRefs[reference] = { order: o.id, amount, done: false };
+      return { access_code: "demo", reference, amount }; },
+    async payCheck(ref) { const p = psRefs[ref]; if (!p) throw new Error("Payment not found."); if (p.done) return { result: p.done };
+      const o = orders.find(x => x.id === p.order);
+      if (o.status === "pending" && o.pay_via === "paystack" && p.amount + 0.005 >= psDue(o)) { psGroup(o).forEach(x => { if (x.status === "pending") x.status = "paid"; }); o.momo_ref = "PSK:" + ref; p.done = "paid"; }
+      else { ledger.push({ user_id: o.user_id, amount: p.amount, reason: "Money back: online payment for code " + o.code + " arrived after the order closed", order_id: o.id, created_at: nowIso() }); p.done = "credited"; }
+      return { result: p.done, order_id: o.id }; },
+    async unpaidOnline() { housekeeping(); if (!me) return [];
+      return orders.filter(o => o.user_id === me.id && o.status === "pending" && o.pay_via === "paystack" && !o.basket && !pastCutoff(o.order_date))
+        .map(o => ({ id: o.id, code: o.code, order_date: o.order_date, amount: Math.round(psDue(o) * 100) / 100, parent_id: o.parent_id })); },
     async adminData(date) {
       housekeeping();
       return { orders: orders.filter(o => o.order_date === date), pools: pools.filter(p => p.order_date === date).map(p => ({ ...p, meals: meals(p.id) })), riders, sites, kitchens,
@@ -1876,6 +1907,13 @@ function makeSupabaseApi() {
   const mk = (key, detect) => window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: detect, ...(key ? { storageKey: key } : {}) } });
   const sbCustomer = mk(null, !teamLink), sbTeam = mk("cp-team-auth", teamLink);
   let sb = teamPage ? sbTeam : sbCustomer;
+  // Calls the paystack server function; its refusals come back as plain sentences
+  async function payFn(body) {
+    const { data, error } = await sb.functions.invoke("paystack", { body });
+    if (error) { let m = ""; try { m = (await error.context.json()).error; } catch (e) {} throw new Error(m || "Payment didn't start. Check your connection and try again."); }
+    if (data && data.error) throw new Error(data.error);
+    return data;
+  }
   // A password-reset email link signs the person in for one step: choose a new password
   [sbCustomer, sbTeam].forEach(c => c.auth.onAuthStateChange(ev => { if (ev === "PASSWORD_RECOVERY") { S.recovery = true; S.recoveryTeam = c === sbTeam; if (S.appReady) showRecovery(); } }));
   const must = r => { if (r.error) throw new Error(r.error.message); return r.data; };
@@ -1996,6 +2034,9 @@ function makeSupabaseApi() {
       if (p.mute) { try { return await rpc("save_push_sub", { ...base, p_mute: p.mute }); } catch (e) { /* database not on update 17 yet */ } }
       return rpc("save_push_sub", base); },
     notify: body => sb.functions.invoke("notify", { body }),
+    payStart: id => payFn({ action: "start", order_id: id }),
+    payCheck: ref => payFn({ action: "check", reference: ref }),
+    async unpaidOnline() { const r = await sb.rpc("my_unpaid_online"); return r.error ? [] : r.data || []; },
     riderUpdate: (t, p, s) => rpc("rider_update", { p_token: t, p_pool: p, p_status: s }),
     hostView: (t, d) => rpc("host_view", { p_token: t, p_date: d }),
     collectCode: (t, c, d, pool, unpaid) => rpc("collect_code", { p_token: t, p_code: c, p_date: d, ...(pool ? { p_pool: pool } : {}), ...(unpaid ? { p_unpaid: unpaid } : {}) }),
@@ -2416,7 +2457,8 @@ const sheetHead = (title, sub) => `<div class="top" style="align-items:flex-star
 async function refreshUser() {
   const was = S.user && S.user.id;
   try { S.user = await api.user(); } catch (e) { S.user = null; }
-  if ((S.user && S.user.id) !== was) { S.hist = null; S.histLoaded = false; S.histMore = false; }   // another account: its own past orders
+  if ((S.user && S.user.id) !== was) { S.hist = null; S.histLoaded = false; S.histMore = false; S.unpaid = []; }   // another account: its own past orders
+  checkPayTeam();
   S.balance = 0;
   S.walletEntries = null;
   if (S.user) { try { const w = await api.wallet(); S.balance = Number(w.balance) || 0; S.walletEntries = w.entries || []; } catch (e) {}
@@ -2757,6 +2799,7 @@ async function viewOrder() {
       const oldest = (S.hist || []).reduce((m, o) => !m || o.created_at < m ? o.created_at : m, null);
       api.orderHistory(oldest).then(r => { const have = new Set((S.hist || []).map(o => o.id)); S.hist = (S.hist || []).concat((r || []).filter(o => !have.has(o.id))); S.histMore = (r || []).length >= 20; renderOrders(); }).catch(() => { hm.disabled = false; hm.textContent = "Load more"; }); return; }
     const vd = e.target.closest("[data-vendor]"); if (vd) return openVendor(vd.dataset.vendor);
+    const pn = e.target.closest("[data-paynow]"); if (pn) return payFromOrders(pn);
     const fx = e.target.closest("[data-fixpay]"); if (fx) return openFixPayment((S.mine || []).find(o => o.id === fx.dataset.fixpay), fx.dataset.mode);
     if (soloClick(e)) return;
     const gi = e.target.closest("[data-gotit]"); if (gi) return run0(async () => {
@@ -3871,12 +3914,12 @@ function paidLine(o, kids) {
   const xs = [o, ...kids], tot = x => Number(x.amount_due || 0) + Number(x.wallet_used || 0) + Number(x.carried_amount || 0);
   const paid = xs.filter(x => ["paid", "collected"].includes(x.status)).reduce((t, x) => t + tot(x), 0), due = xs.filter(x => x.status === "pending").reduce((t, x) => t + tot(x), 0);
   return (paid > 0 ? `<p class="small opaid"><span>Paid</span><b class="num">${money(paid)}</b><span class="muted">incl. delivery and service</span></p>` : "")
-    + (due > 0 ? `<p class="small opaid"><span>To pay</span><b class="num">${money(due)}</b><span class="muted">${o.pay_issue ? "" : "payment being checked"}</span></p>` : "");
+    + (due > 0 ? `<p class="small opaid"><span>To pay</span><b class="num">${money(due)}</b><span class="muted">${o.pay_issue ? "" : (S.unpaid || []).some(u => u.id === o.id) ? "not paid yet" : "payment being checked"}</span></p>` : "");
 }
 function orderCard(o, all, next) {
   const step = progressOf(o), k = menuOf(o.kitchen_id), kids = all.filter(c => c.parent_id === o.id).sort((a, b) => a.created_at < b.created_at ? -1 : 1), liveKids = kids.filter(c => c.status !== "cancelled");
   const s4 = Math.min(5, step);
-  const needsYou = canConfirm(o) || o.status === "quoted" || (o.status === "pending" && o.pay_issue);   // outline = something for you to do
+  const needsYou = canConfirm(o) || o.status === "quoted" || (o.status === "pending" && o.pay_issue) || (S.unpaid || []).some(u => u.id === o.id);   // outline = something for you to do
   return `<article class="order-card${needsYou ? " next" : ""}${S.flashCard === o.id ? " flash" : ""}" data-ocard="${esc(o.id)}" data-ocode="${esc(o.code || "")}" data-odate="${esc(o.order_date || "")}"><div class="head"><span class="tile" style="background:${tint(menuIndex(o.kitchen_id))}">${art(dishKind(S.items.find(i => i.kitchen_id === o.kitchen_id && i.name === o.item_name) || o.item_name))}</span>
       <div><strong>${esc(k.public_name || "")}</strong>${groupDishes([o, ...liveKids]).map(g => { const key = dishKey;
         const can = removable(o, liveKids, g.key) > 0;   // plates of this dish you could take off now
@@ -3891,7 +3934,7 @@ function orderCard(o, all, next) {
       ${o.problem ? `<div class="vbanner w"><span><b>${o.problem_resolved ? "Problem sorted" : "Problem reported"}</b> · ${esc(o.problem)}${o.problem_resolved ? "" : ". We're on it; your cashback waits until it's sorted."}</span></div>` : ""}
       ${o.status === "pending" && o.pay_issue ? `<div class="vbanner bad" style="display:grid;gap:10px"><span><b>${o.pay_issue === "short" ? "Your payment was short" : "We couldn't find your payment"}</b> · ${money(dueWithTray(o))} for code ${esc(o.code)}. Fix it before ${fmtTime(S.settings.cutoff)} so your lunch counts.</span>
         <div class="row" style="gap:8px;flex-wrap:wrap">${o.pay_issue === "short" ? `<button class="btn" data-fixpay="${esc(o.id)}" data-mode="rest">Pay the rest</button>` : `<button class="btn" data-fixpay="${esc(o.id)}" data-mode="ref">Fix the reference</button><button class="ghost" data-fixpay="${esc(o.id)}" data-mode="again">Pay again</button>`}</div></div>` : ""}
-      ${liveKids.filter(c => c.status === "pending" && !isTrayKid(c)).length ? `<p class="small muted">Added plate: payment being checked.</p>` : ""}
+      ${liveKids.filter(c => c.status === "pending" && !isTrayKid(c)).length ? `<p class="small muted">Added plate: payment being checked.</p>` : ""}${liveKids.some(c => (S.unpaid || []).some(u => u.id === c.id)) ? `<p class="small muted">Added plate: not paid yet.</p>` : ""}
       ${savingLine(o)}
       ${canAddPlate(o) || shareablePool(o) ? `<div class="minebtns">${canAddPlate(o) ? `<button class="btn wide" data-addplate="${esc(o.id)}">${SV('<path d="M12 5v14M5 12h14"/>', 18)} Add a plate</button>` : ""}${shareablePool(o) ? `<button class="ghost sharebtn" data-share="${esc(o.site_id)},${esc(o.kitchen_id)}" aria-label="Share this pool">${SHARE}</button>` : ""}</div>` : ""}
       ${canCancel(o) ? `<div class="row" style="justify-content:flex-start"><button class="linkbtn" data-cancel="${esc(o.id)}" style="color:var(--danger)">Cancel order</button></div>` : ""}</article>`;
@@ -4013,6 +4056,8 @@ function renderOrders() {
   let body = "";
   if (S.oseg === "up") {
     let last = null;
+    body = (S.unpaid || []).map(u => `<div class="vbanner bad" style="display:grid;gap:10px;margin-bottom:12px"><span><b>Not paid yet</b> · ${money(u.amount)} for code ${esc(u.code)}. Pay before ${fmtTime(S.settings.cutoff)} or the order is cancelled.</span>
+      <div class="row" style="gap:8px"><button class="btn" data-paynow="${esc(u.id)}">Pay now</button></div></div>`).join("");
     up.forEach((o, n) => { if (o.order_date !== last) { body += `<p class="ohead">${esc(dateHead(o.order_date))}</p>`; last = o.order_date; } body += orderCard(o, all, n === 0); });
     body = body || `<div class="emptyrow"><span class="eic">${ICON.receipt}</span><div><strong>No upcoming orders</strong><p>Join an active pool or start one from a vendor near you.</p></div></div><button class="btn wide" data-gohome>See active pools</button>`;
   } else {
@@ -4436,6 +4481,7 @@ function statusLine0(o) {
   if (o.status === "quoted") return seller + " priced your request at " + money(o.quote_price) + " a meal. Check the total and pay to confirm.";
   if (st === "waiting") { const w = o.wait_until && new Date(o.wait_until), by = w && isFinite(w) ? "by " + fmtTime(w.toISOString().slice(11, 16)) + (w.toISOString().slice(0, 10) > today() ? " " + (dayLabel(w.toISOString().slice(0, 10)) === "tomorrow" ? "tomorrow" : fmtDate(w.toISOString().slice(0, 10))) : "") : confirmText(o.order_date);
     return "Waiting for " + seller + " to confirm " + by + ". If they don't, you get your money back."; }
+  if (o.status === "pending" && (S.unpaid || []).some(u => u.id === o.id)) return "Not paid yet. Pay before " + fmtTime(S.settings.cutoff) + " or the order is cancelled.";
   if (o.status === "pending" && st === "collecting") return "Payment being checked.";
   if (st === "collecting") return "Confirmed. Pool " + o.pool_seq + " closes at " + fmtTime(S.settings.cutoff) + ".";
   if (st === "accepted") return "The vendor is packing your order.";
@@ -4469,6 +4515,10 @@ async function refreshMine() {
   let rows = [];
   if (saved.length || S.user) { try { rows = await api.myOrders(saved.map(o => o.id)); } catch (e) { return; } }
   S.mine = rows;
+  // Orders still waiting for an online payment (only asked when online payment is on, or something looks unpaid)
+  if (S.user && api.unpaidOnline && (["team", "paystack"].includes((S.settings || {}).pay_mode) || rows.some(o => o.status === "pending" && !o.momo_ref && !o.pay_issue && !isTrayKid(o)))) {
+    try { S.unpaid = await api.unpaidOnline() || []; } catch (e) {}
+  } else S.unpaid = [];
   const prev = S.mineStatus || {}; S.mineStatus = {};
   rows.forEach(o => {
     const key = o.status + "|" + o.pool_status; S.mineStatus[o.id] = key;
@@ -4711,7 +4761,7 @@ function openOrder(menuId, opt = {}) {
       </div>
       <div class="group" id="payGroup"><p class="group-title">Payment</p><div class="sum" id="sum"></div>
         <div class="pay" id="payPart"><div id="payFrom"></div><div id="payTo"></div>${payAlts()}
-          <div><label for="fRef">Transaction ID from your mobile money SMS</label><input id="fRef" placeholder="e.g. 51234567890"></div></div>
+          <div id="refBox"><label for="fRef">Transaction ID from your mobile money SMS</label><input id="fRef" placeholder="e.g. 51234567890"></div></div>
         <p class="small muted" id="saveTxt">What the pool saves on delivery comes back to your ChopPool wallet once you've got your lunch.</p>
         <p class="small muted">By paying you agree to our <a href="#terms" target="_blank" rel="noopener">terms</a> and <a href="#privacy" target="_blank" rel="noopener">privacy notice</a>.</p>
       </div>
@@ -4723,6 +4773,9 @@ function openOrder(menuId, opt = {}) {
   };
   // Pay from (your saved numbers) and pay to (ChopPool's number on the same network where we have one)
   const drawPay = due => {
+    const online = payOnline();
+    $("#refBox")?.classList.toggle("hidden", online); $("#payPart .payalts")?.classList.toggle("hidden", online);
+    if (online) { $("#payFrom").innerHTML = ""; $("#payTo").innerHTML = payOnlineBox(due); return; }
     // Typing your own number: keep what's typed (don't redraw the boxes), and match the pay-to number to its network
     const typed = !payFrom && $("#pfNum"), pt = payToFor(payFrom ? payFrom.network : typed ? $("#pfNet").value : guessNet(me.phone));
     if (!typed) $("#payFrom").innerHTML = payFrom ? `<div class="pfrom"><span class="small muted">Paying from</span><span class="pfm">${netBadge(payFrom.network)}<span><b>${esc(payFrom.nick || payFrom.network || "Mobile money")}</b> <span class="num muted">${esc(maskNum(payFrom.number))}</span></span><button type="button" class="linkbtn" id="pfChange">Change</button></span></div>`
@@ -4749,7 +4802,7 @@ function openOrder(menuId, opt = {}) {
         `<div><span>Service fee (${money(sFee)} a meal)</span><span class="num">${money(sFee * meals)}</span></div>` + (useW ? `<div><span>From wallet</span><span class="num">−${money(useW)}</span></div>` : "");
       $("#payPart").classList.toggle("hidden", due <= 0); drawPay(due);
       $("#totTxt").textContent = due <= 0 ? money(useW) : money(due);
-      $("#totSub").textContent = due <= 0 ? money(useW) + " from your wallet" : useW ? money(useW) + " from wallet, rest by mobile money" : "Pay by mobile money";
+      $("#totSub").textContent = due <= 0 ? money(useW) + " from your wallet" : useW ? money(useW) + " from wallet, rest by " + payByTxt() : "Pay by " + payByTxt();
       const startsPool = !roomyPool(k, meals);
       $("#submitBtn").textContent = join ? "Add to my order" : startsPool ? "Start pool" : "Join pool"; return;
     }
@@ -4771,7 +4824,7 @@ function openOrder(menuId, opt = {}) {
       (useW ? `<div><span>From wallet</span><span class="num">−${money(useW)}</span></div>` : "");
     $("#payPart").classList.toggle("hidden", due <= 0); drawPay(due);
     $("#totTxt").textContent = due <= 0 ? money(useW) : money(due);
-    $("#totSub").textContent = due <= 0 ? money(useW) + " from your wallet" : useW ? money(useW) + " from wallet, rest by mobile money" : "Pay by mobile money";
+    $("#totSub").textContent = due <= 0 ? money(useW) + " from your wallet" : useW ? money(useW) + " from wallet, rest by " + payByTxt() : "Pay by " + payByTxt();
     const startsPool = !join && !roomyPool(k, qty);
     $("#submitBtn").textContent = join ? "Add to pool" : startsPool ? "Start pool" : "Join pool";
   };
@@ -4810,19 +4863,27 @@ function openOrder(menuId, opt = {}) {
     if (name.length < 2) { showMe(); return (err.textContent = "Add your name."); }
     if (!/^0\d{9}$/.test(phone)) { showMe(); return (err.textContent = "Enter a 10-digit mobile money number starting with 0, like 024 123 4567."); }
     const payVisible = !special && !$("#payPart").classList.contains("hidden");
-    let from = payFrom;
-    if (payVisible && !from) { const num = ($("#pfNum")?.value || "").replace(/\D/g, "") || phone; if (!/^0\d{9}$/.test(num)) { $("#pfNum")?.focus(); return (err.textContent = "Enter the 10-digit mobile money number you'll pay from."); }
+    const online = payVisible && payOnline();
+    let from = online ? null : payFrom;
+    if (payVisible && !online && !from) { const num = ($("#pfNum")?.value || "").replace(/\D/g, "") || phone; if (!/^0\d{9}$/.test(num)) { $("#pfNum")?.focus(); return (err.textContent = "Enter the 10-digit mobile money number you'll pay from."); }
       from = { id: "pm" + Date.now(), number: num, network: ($("#pfNum")?.value ? $("#pfNet").value : guessNet(num) || $("#pfNet").value), nick: "", save: !!$("#pfSave")?.checked }; }
-    if (payVisible && ref.length < 4) { $("#fRef").focus(); return (err.textContent = "Enter the transaction ID from your mobile money SMS."); }
+    if (payVisible && !online && ref.length < 4) { $("#fRef").focus(); return (err.textContent = "Enter the transaction ID from your mobile money SMS."); }
     $("#submitBtn").disabled = true; err.textContent = "";
     try {
       const trayMeals = trayMode ? tray.lines.reduce((a, l) => a + l.qty, 0) : 0;
       const r = trayMode
-        ? await api.placeBasket({ site: site.id, lines: tray.lines, name, phone, ref, useWallet: !!$("#fWallet")?.checked, payerPhone: from && from.number, payerNetwork: from && from.network, join: join ? join.id : null })
+        ? await api.placeBasket({ site: site.id, lines: tray.lines, name, phone, ref: online ? "PAYSTACK" : ref, useWallet: !!$("#fWallet")?.checked, payerPhone: from && from.number, payerNetwork: from && from.network, join: join ? join.id : null })
         : (!special && !join && api.placeBasket)
-          ? await api.placeBasket({ site: site.id, lines: [{ item: item.id, qty, addons: xKeys(extras), note: $("#fNote").value }], name, phone, ref, useWallet: !!$("#fWallet")?.checked, payerPhone: from && from.number, payerNetwork: from && from.network })
-          : await api.placeOrder({ site: site.id, item: item.id, qty, name, phone, ref, addons: xKeys(extras), note: $("#fNote").value, special: sp || null, useWallet: !!$("#fWallet")?.checked, join: join ? join.id : null });
+          ? await api.placeBasket({ site: site.id, lines: [{ item: item.id, qty, addons: xKeys(extras), note: $("#fNote").value }], name, phone, ref: online ? "PAYSTACK" : ref, useWallet: !!$("#fWallet")?.checked, payerPhone: from && from.number, payerNetwork: from && from.network })
+          : await api.placeOrder({ site: site.id, item: item.id, qty, name, phone, ref: online ? "PAYSTACK" : ref, addons: xKeys(extras), note: $("#fNote").value, special: sp || null, useWallet: !!$("#fWallet")?.checked, join: join ? join.id : null });
       if (trayMode) { tray.lines = []; traySave(tray); }
+      // Online payment: the order is held; pay now in the Paystack window (it confirms on the server before the order counts as paid)
+      let payRes = null;
+      if (online && r.status !== "paid") {
+        $("#submitBtn").textContent = "Opening payment…";
+        try { payRes = await payNow(r.id); } catch (e) { payRes = "error"; err.textContent = ""; }
+        if (payRes === "paid") r.status = "paid";
+      }
       // Remember the number paid from (once the order went through, and only once per number)
       if (from && from.save) { const L = payMethods(); if (!L.some(m => m.number === from.number) && L.length < 3) { L.push({ id: from.id, number: from.number, network: from.network, nick: "", def: !L.length }); savePayMethods(L); } }
       local.set("cp_me", { name, phone });
@@ -4830,6 +4891,7 @@ function openOrder(menuId, opt = {}) {
       if (S.user) { try { await api.saveProfile({ name, phone }); } catch (e) {} }
       await refreshBoard(); try { await refreshMine(); } catch (e) {} refreshUser();
       notifyServer({ order_id: r.id }); if (local.get("cp_push")) pushSubscribe({ order_ids: [r.id] }, true);
+      if (payRes && payRes !== "paid") { closeSheet(); closeVendor(); setTab("orders"); toast(payLeftMsg(payRes)); return; }
       if (join) { closeSheet(); closeVendor(); toast("Added to code " + r.code + ". " + (r.status === "paid" ? "Paid." : "Payment being checked.")); setTab("orders"); return; }
       r.myQty = trayMeals || qty; showConfirmation(r, k, site, sp);
     } catch (e) {
@@ -4914,6 +4976,55 @@ function showConfirmation(r, k, site, special) {
 }
 /* ---------- Payment options: main mobile money account first, others one tap away ---------- */
 const payList = () => { const pm = (S.payMethods || []).slice().sort((a, b) => (b.is_main - a.is_main) || (a.sort || 0) - (b.sort || 0)); const s = S.settings; return pm.length ? pm : [{ network: s.momo_network || "", number: s.momo_number, name: s.momo_name }]; };
+/* ---------- Online payment (Paystack: mobile money and card). Off until Admin › Settings › Payments switches it on ---------- */
+const payOnline = () => { const m = (S.settings || {}).pay_mode; return (DEMO || !!CONFIG.PAYSTACK_PUBLIC_KEY) && (m === "paystack" || (m === "team" && S.payTeam === true)); };
+const payByTxt = () => payOnline() ? "mobile money or card" : "mobile money";
+const payOnlineBox = due => `<div class="momo"><span class="logo ps">${ICON.wallet}</span><span style="flex:1;display:grid"><span class="small muted">Pay <strong id="dueTxt">${money(due)}</strong> online</span><strong>Mobile money or card</strong><span class="small muted">A secure Paystack window opens when you tap the button. MTN, Telecel, AirtelTigo or card.</span></span></div>`;
+const payLeftMsg = res => res === "pending" ? "Payment received. We're confirming it now." : res === "credited" ? "Your payment went to your wallet: this order had already closed."
+  : "Not paid yet. Your order is held until " + fmtTime(S.settings.cutoff) + ". Tap Pay now under Orders.";
+async function checkPayTeam() {   // "team only" mode: find out once per account whether this person is on the team
+  if ((S.settings || {}).pay_mode !== "team" || !S.user) { S.payTeam = false; S.payTeamFor = null; return; }
+  if (S.payTeamFor === S.user.id) return; S.payTeamFor = S.user.id;
+  try { S.payTeam = !!(await api.isAdmin()); } catch (e) { S.payTeam = false; }
+}
+let psLoad = null;
+const loadPaystack = () => psLoad || (psLoad = new Promise((ok, no) => {
+  if (window.PaystackPop) return ok();
+  const sc = document.createElement("script"); sc.src = "https://js.paystack.co/v2/inline.js"; sc.async = true;
+  sc.onload = () => ok(); sc.onerror = () => { psLoad = null; sc.remove(); no(new Error("Couldn't open the payment window. Check your connection and try again.")); };
+  document.head.appendChild(sc);
+}));
+const demoPaySheet = amount => new Promise(res => {   // demo only: stands in for the Paystack window
+  const d = document.createElement("div"); d.className = "psdemo";
+  d.innerHTML = `<div class="psbox" role="dialog" aria-label="Test payment"><p class="eyebrow">Paystack · demo</p><h3>Pay ${money(amount)}</h3><p class="small muted">Demo only: no money moves.</p><button class="btn wide" data-ps="success">Pay</button><button class="ghost wide" data-ps="cancelled">Cancel</button></div>`;
+  document.body.appendChild(d); d.addEventListener("click", e => { const b = e.target.closest("[data-ps]"); if (b) { d.remove(); res(b.dataset.ps); } });
+});
+// Pay what an order still owes. Resolves "paid", "credited" (went to the wallet), "cancelled" (window closed) or "pending" (still confirming)
+async function payNow(orderId) {
+  const st = await api.payStart(orderId);
+  if (st.paid) return "paid";
+  let out;
+  if (DEMO) out = await demoPaySheet(st.amount);
+  else {
+    await loadPaystack();
+    out = await new Promise(res => { try { new window.PaystackPop().resumeTransaction(st.access_code, { onSuccess: () => res("success"), onCancel: () => res("cancelled"), onError: () => res("error") }); } catch (e) { res("error"); } });
+  }
+  if (out === "cancelled") return "cancelled";
+  if (out === "error") throw new Error("The payment window had a problem. Try again.");
+  for (let n = 0; n < 6; n++) {   // Paystack has confirmed in the window; wait for our server to record it
+    try { const c = await api.payCheck(st.reference); if (c && (c.result === "paid" || c.result === "credited")) return c.result; } catch (e) {}
+    await new Promise(r => setTimeout(r, 1500));
+  }
+  return "pending";
+}
+async function payFromOrders(btn) {
+  btn.disabled = true; const label = btn.textContent; btn.textContent = "Opening payment…";
+  let res; try { res = await payNow(btn.dataset.paynow); } catch (e) { res = "error"; toast(e.message); }
+  try { await refreshMine(); } catch (e) {} refreshUser();
+  if (res === "paid") { toast("Paid. You're in the pool."); notifyServer({ order_id: btn.dataset.paynow }); }
+  else if (res !== "error") toast(payLeftMsg(res));
+  renderOrders(); if (btn.isConnected) { btn.disabled = false; btn.textContent = label; }
+}
 const payAlts = () => { const o = payList().slice(1); return o.length ? `<details class="payalts"><summary class="small">Other ways to pay (${o.length})</summary>${o.map(p => `<div class="payalt"><span><strong class="num">${esc(p.number)}</strong> <span class="small muted">${esc(p.network)} · ${esc(p.name)}</span></span><button type="button" class="linkbtn" data-copynum="${esc(p.number)}">Copy</button></div>`).join("")}</details>` : ""; };
 function openPayQuote(id) {
   const o = (S.mine || []).find(x => x.id === id); if (!o) return;
@@ -5379,7 +5490,7 @@ async function renderAdmin(cached, quiet) {   // quiet = background/refresh-butt
       ["Vendors yet to accept the new fee", A.kitchens.filter(k => k.active && !k.archived && (Number(s.vendor_fee_rate) > Number(k.fee_ack || 0) || Number(s.vendor_fee_free) < Number(k.fee_free_ack ?? 5))).length, "menus:list", "warn", "Their automatic days are paused until they accept on their page"],
       ["Rider applications", riderApps.length, "riders:apply", "warn", "Riders asking to join"],
       ["Small pools", small.length, "today:pools", "warn", "Under " + s.min_pool + " meals near cut-off"],
-      ["Unchecked at cut-off", nearCut ? live.filter(o => o.status === "pending" && !o.pay_issue).length : 0, "today:orders", "bad", "Payments still not checked"],
+      ["Unchecked at cut-off", nearCut ? live.filter(o => o.status === "pending" && !o.pay_issue && o.pay_via !== "paystack").length : 0, "today:orders", "bad", "Payments still not checked"],
       ["Only one customer", nearCut ? soloPools.length : 0, "today:pools", "warn", soloPools.map(p => p.answer).filter(Boolean).join(", ") || "Asked to keep, switch or cancel"],
       ["Running late", overdue.length, "today:pools", "bad", overdue.slice(0, 2).map(x => x.what).join(" · ")],
       ["Problems reported", (A.problems || []).length, "today:wallets", "bad", "Cashback paused until sorted"],
@@ -5478,7 +5589,9 @@ async function renderAdmin(cached, quiet) {   // quiet = background/refresh-butt
         const reach = S.reach && S.reach.has(o.id), from = o.payer_phone ? `<br><span class="small muted">From ${esc(o.payer_network || "")} ${esc(fmtPhone(o.payer_phone))}</span>` : "";
         const tellMsg = `Hi ${firstOf(o.customer_name)}, this is ChopPool. We couldn't find your mobile money payment of ${money(due)} for code ${o.code}${o.momo_ref ? " (ID " + o.momo_ref + ")" : ""}. Please check the transaction ID or pay again before ${fmtTime(S.settings.cutoff)} so your lunch counts.`;
         const tell = o.status === "pending" && !reach ? `<span class="small"><span class="chip">No alerts on</span> <a href="https://wa.me/233${esc(String(o.phone).replace(/^0/, ""))}?text=${encodeURIComponent(tellMsg)}" target="_blank" rel="noopener">WhatsApp</a> · <a href="sms:${esc(o.phone)}?&body=${encodeURIComponent(tellMsg)}">SMS</a></span>` : "";
-        const payCell = o.basket && o.status === "pending" ? `<span class="small muted">Paid together with the first dish on code ${esc(o.code)}</span>` : o.status === "pending" ? `<div class="stack" style="gap:6px;min-width:190px"><span class="num">${esc(paid || "—")}${reused ? ` <span class="chip bad">Ref used ${reused}×</span>` : ""}<br><span class="small muted">Expect ${money(due)}${kids.length ? " for " + (kids.length + 1) + " dishes" : ""}${Number(o.carried_amount) > 0 ? " (" + money(o.carried_amount) + " moved from another pool)" : ""}</span>${from}</span>${tell}
+        const payCell = o.basket && o.status === "pending" ? `<span class="small muted">Paid together with the first dish on code ${esc(o.code)}</span>`
+          : o.status === "pending" && o.pay_via === "paystack" ? `<span class="chip">Paying online</span><br><span class="small muted">${money(due)} · confirms by itself when Paystack does. Not paid by ${fmtTime(S.settings.cutoff)}: cancelled.</span>`
+          : o.status === "pending" ? `<div class="stack" style="gap:6px;min-width:190px"><span class="num">${esc(paid || "—")}${reused ? ` <span class="chip bad">Ref used ${reused}×</span>` : ""}<br><span class="small muted">Expect ${money(due)}${kids.length ? " for " + (kids.length + 1) + " dishes" : ""}${Number(o.carried_amount) > 0 ? " (" + money(o.carried_amount) + " moved from another pool)" : ""}</span>${from}</span>${tell}
             ${o.pay_issue ? `<span class="chip warn">${o.pay_issue === "short" ? "Short: " + money(o.amount_received || 0) + " received" : "Not found"} · customer told</span>` : ""}
             <div class="row" style="gap:6px;flex-wrap:wrap;justify-content:flex-start"><button class="btn" data-act="pay-found" style="padding:7px 12px">Payment found</button><button class="ghost" data-act="pay-issue" style="padding:7px 12px">Not found / short</button></div></div>` : `<span class="num">${esc(paid || "—")}</span>`;
         return `<tr data-orow="${esc(o.id)}"><td class="num">${flag ? `<span class="pdotx" title="Payment to confirm"></span>` : ""}${clock(o.created_at)}</td><td>${esc(o.customer_name)}${bad ? `<br><span class="chip bad" title="Payments not received in the last 60 days">${bad} unpaid before</span>` : ""}</td><td class="num">${esc(o.phone)}</td><td>${esc(sName(o.site_id))}</td>
@@ -5766,6 +5879,9 @@ async function renderAdmin(cached, quiet) {   // quiet = background/refresh-butt
           <div><label for="stSpec">Custom orders close</label><input id="stSpec" name="special_cutoff" type="time" value="${tv(s.special_cutoff)}"></div>
           ${s.reminder_time !== undefined ? `<div><label for="stRem">Daily lunch reminder</label><input id="stRem" name="reminder_time" type="time" value="${tv(s.reminder_time)}"></div>` : ""}</div>
         <p class="small muted">Customers see "Order by ${fmtTime(s.cutoff)} · lunch at ${fmtTime(s.delivery_time)}". Vendors have lunch ready 30 minutes before it arrives. Changes apply from the next order.</p></section>`) : ""}
+      ${isSuper && s.pay_mode !== undefined ? setForm(`<section class="card stack"><h2>Payments</h2>
+        <div><label for="stPay">How customers pay</label><select id="stPay" name="pay_mode">${[["manual", "Mobile money transfer with a transaction ID (as now)"], ["team", "Online with Paystack: team only, for testing"], ["paystack", "Online with Paystack: everyone"]].map(([k, l]) => `<option value="${k}"${s.pay_mode === k ? " selected" : ""}>${l}</option>`).join("")}</select></div>
+        <p class="small muted">${DEMO || CONFIG.PAYSTACK_PUBLIC_KEY ? "Online payments open a secure Paystack window for mobile money or card, and confirm themselves. Unpaid online orders are cancelled at cut-off." : "Paystack isn't connected to this site yet, so online payment stays off whatever you pick."} Custom orders and payment fixes still use a transaction ID.</p></section>`) : ""}
       ${isSuper ? setForm(`<section class="card stack"><h2>Team screens</h2><div><label for="rlIdle">Sign out after this many quiet minutes (5-60)</label><input id="rlIdle" name="admin_idle_min" inputmode="numeric" value="${esc(s.admin_idle_min ?? 15)}"></div>
         <p class="small muted">Everyone on the team is also signed out after 12 hours.</p></section>`) : ""}
       <section class="card stack"><h2>Alerts check</h2><p class="small" id="bellChk">Checking…</p><p class="small muted" style="margin:0">Every alert the app sends is saved for 7 days so customers see it in the bell on any phone. This needs choppool-update.sql version 35 or later and the latest notify function deployed.</p></section>
@@ -6170,11 +6286,12 @@ async function adminSubmit(e) {
         if (hm(String(S.settings.next_day_confirm_by || "08:30").slice(0, 5)) >= hm(cut)) return fail("Orders must close after vendors confirm (" + fmtTime(S.settings.next_day_confirm_by || "08:30") + "). Change that under Vendors & menus › Settings first.");
         Object.assign(patch, { cutoff: cut, delivery_time: lunch, special_cutoff: spec });
         if (has("reminder_time")) { const rt = v("reminder_time"); if (!ok5(rt)) return fail("Enter the reminder time."); if (hm(rt) >= hm(cut)) return fail("The reminder must go out before orders close (" + fmtTime(cut) + ")."); patch.reminder_time = rt; } }
+      if (has("pay_mode")) { const pm = v("pay_mode"); if (!["manual", "team", "paystack"].includes(pm)) return fail("Pick how customers pay."); patch.pay_mode = pm; }
       if (has("admin_idle_min")) { const im = num("admin_idle_min"); if (!(im >= 5 && im <= 60)) return fail("Choose 5 to 60 minutes for the team screen timeout."); patch.admin_idle_min = im; }
       if (has("vendor_fee_pct")) { const pc = num("vendor_fee_pct"), fr = num("vendor_fee_free");
         if (!(pc >= 0 && pc <= 50) || !(Number.isInteger(fr) && fr >= 0 && fr <= 100)) return fail("Enter a fee between 0 and 50% and a whole number of free meals.");
         patch.vendor_fee_rate = Math.round(pc * 10) / 1000; patch.vendor_fee_free = fr; }
-      await api.updateSettings(patch); Object.assign(S, await api.load()); toast("Saved");
+      await api.updateSettings(patch); Object.assign(S, await api.load()); S.payTeamFor = null; checkPayTeam(); toast("Saved");
     }
     if (f.dataset.form === "refund") {
       const ref = v("ref"); if (ref.length < 4) return fail("Enter the mobile money reference of the refund you sent.");
