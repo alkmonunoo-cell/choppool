@@ -3020,7 +3020,7 @@ function myPosition() {
       () => rej(new Error("Allow location access, or search for your area instead.")), { enableHighAccuracy: true, timeout: 10000 });
   });
 }
-const osmLink = x => `https://www.openstreetmap.org/?mlat=${x.lat}&mlon=${x.lng}#map=18/${x.lat}/${x.lng}`;
+const osmLink = x => `https://www.google.com/maps/search/?api=1&query=${x.lat},${x.lng}`;   // opens the pin in Google Maps (the app on phones)
 
 // Buildings this phone used, most recent first
 const recentSites = () => (local.get("cp_recent_sites") || []).filter(id => S.sites.some(x => x.id === id)).slice(0, 3);
