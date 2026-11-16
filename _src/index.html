@@ -1743,6 +1743,7 @@ function makeDemoApi() {
       const momo = Math.max(0, dueOf(o) - o.wallet_used); let to, credit = 0;
       if (["quote_requested", "quoted"].includes(o.status)) to = "nothing";
       else if (o.status === "paid" && momo > 0 && o.user_id && (refund || "wallet") === "wallet") { to = "wallet"; credit = momo; }
+      else if (momo > 0 && o.status === "pending" && !(o.momo_ref || (o.basket && orders.some(m => !m.basket && m.momo_ref && (m.id === o.parent_id || (o.parent_id && m.parent_id === o.parent_id && m.created_at === o.created_at)))))) to = "nothing";   // never paid: nothing to refund
       else if (momo > 0) to = "momo"; else to = "wallet";
       credit += o.wallet_used;
       o.status = "cancelled"; o.cancel_reason = "You cancelled" + (String(reason || "").trim() ? " (" + String(reason).trim() + ")" : ""); o.refund_needed = to === "momo";
@@ -1881,6 +1882,7 @@ function makeDemoApi() {
       if (was === "pending" && o.status === "paid") orders.filter(c => c.basket && c.status === "pending" && (c.parent_id === o.id || (o.parent_id && c.parent_id === o.parent_id && c.created_at === o.created_at && c.id !== o.id))).forEach(c => { c.status = "paid"; }); },
     async updatePool(id, patch) { const p = pools.find(x => x.id === id); Object.assign(p, patch); if (patch.status && stamp[patch.status]) p[stamp[patch.status]] = nowIso(); },
     async updateKitchen(id, patch) { Object.assign(kitchens.find(k => k.id === id), patch); },
+    async confirmPassword(pw) { if (pw === "wrong" || pw.length < 6) throw new Error("That password isn't right."); return true; },
     async creditWallet(user_id, amount, reason) { ledger.push({ user_id, amount: Number(amount), reason, created_at: nowIso(), created_by: "coordinator" }); },
     async myRole() { return "super"; },
     async claimOwner() { return "super"; },
@@ -2168,6 +2170,9 @@ function makeSupabaseApi() {
     async updateKitchen(id, patch) { const r = await sb.from("kitchens").update(patch).eq("id", id).select("id");
       if (r.error && /lat|lng|column|schema cache/i.test(r.error.message)) throw new Error("Run update-6.sql in the Supabase SQL Editor once, then try again.");
       if (!must(r).length) throw new Error("Not saved. Your account may not have permission to edit kitchens."); },
+    // Re-enter the password before a wallet change (the database checks it was entered in the last 10 minutes)
+    async confirmPassword(pw) { const u = (await sb.auth.getUser()).data.user; if (!u || !u.email) throw new Error("Sign in with your email and password to adjust wallets.");
+      const r = await sb.auth.signInWithPassword({ email: u.email, password: pw }); if (r.error) throw new Error(/invalid/i.test(r.error.message) ? "That password isn't right." : r.error.message); return true; },
     async creditWallet(user_id, amount, reason) { must(await sb.from("wallet_entries").insert({ user_id, amount: Number(amount), reason, created_by: "coordinator" })); },
     myRole: () => rpc("my_role"),
     claimOwner: () => rpc("claim_owner"),
@@ -4603,7 +4608,7 @@ const OLD_CUSTOM = { "Special request not paid in time": "Custom order not paid 
 function statusLine(o) { if (o && OLD_CUSTOM[o.cancel_reason]) o = { ...o, cancel_reason: OLD_CUSTOM[o.cancel_reason] }; return vendorWord(statusLine0(o)); }
 function statusLine0(o) {
   const site = siteOf(o.site_id), st = o.pool_status, seller = menuOf(o.kitchen_id).public_name || "The vendor";
-  if (o.status === "cancelled" && /^You cancelled/.test(o.cancel_reason || "")) return o.cancel_reason + "." + (o.refund_needed ? " ChopPool will refund your mobile money payment." : o.has_account && Number(o.max_fee) ? " Your money is back in your wallet." : "");
+  if (o.status === "cancelled" && /^You cancelled/.test(o.cancel_reason || "")) return o.cancel_reason + "." + (o.refund_needed ? " ChopPool will refund your mobile money payment." : !o.momo_ref && !Number(o.wallet_used) ? " Nothing was charged." : o.has_account && Number(o.max_fee) ? " Your money is back in your wallet." : "");
   if (o.status === "cancelled" && /^The seller can't/.test(o.cancel_reason || "")) return o.cancel_reason + ". Nothing was charged. You can still order the standard meal.";
   if (o.status === "cancelled" && VENDOR_NO.test(o.cancel_reason || "")) {
     const back = Number(o.refund_due || 0) + Number(o.wallet_used || 0), lead = /isn't cooking/.test(o.cancel_reason) ? "The vendor isn't cooking today." : "The vendor didn't confirm in time.";
@@ -4711,6 +4716,7 @@ function openCancel(id) {
           <label class="choice"><input type="radio" name="to" value="wallet" checked><span>To my ChopPool wallet, straight away</span></label>
           <label class="choice"><input type="radio" name="to" value="momo"><span>Back to my mobile money (ChopPool sends it, usually the same day)</span></label></div>`
         : paidMomo ? `<p class="note">ChopPool will refund ${money(o.amount_due)} to your mobile money, usually the same day.</p>`
+        : (S.unpaid || []).some(u => u.id === o.id) ? `<p class="note">You haven't paid for this order, so nothing is charged.${Number(o.wallet_used) > 0 ? " The " + money(o.wallet_used) + " from your wallet goes straight back." : ""}</p>`
         : o.status === "pending" && Number(o.amount_due) > 0 ? `<p class="note">Your mobile money payment is still being checked. Once it's confirmed, ChopPool refunds it to your mobile money.</p>`
         : `<p class="note">Your wallet payment goes straight back to your wallet.</p>`}
       <p class="err" id="cancelErr"></p>
@@ -4722,7 +4728,7 @@ function openCancel(id) {
     if (why === "Other") { const t = $("#whyOther").value.trim(); if (t.length < 3) { $("#cancelErr").textContent = "Tell us briefly why you're cancelling."; $("#whyOther").focus(); return; } why = "Other: " + t.slice(0, 200); }
     try {
       const r = await api.cancelOrder(id, why, to); closeSheet();
-      toast(r.refund === "nothing" ? "Request cancelled. Nothing was charged." : r.refund === "momo" ? "Cancelled. ChopPool will refund " + money(r.momo) + " to your mobile money." : r.wallet_credit ? "Cancelled. " + money(r.wallet_credit) + " is back in your wallet." : "Order cancelled.");
+      toast(r.refund === "nothing" ? (Number(r.wallet_credit) > 0 ? "Cancelled. " + money(r.wallet_credit) + " is back in your wallet." : special ? "Request cancelled. Nothing was charged." : "Cancelled. Nothing was charged.") : r.refund === "momo" ? "Cancelled. ChopPool will refund " + money(r.momo) + " to your mobile money." : r.wallet_credit ? "Cancelled. " + money(r.wallet_credit) + " is back in your wallet." : "Order cancelled.");
       await refreshMine(); refreshBoard(); if (S.user) renderWallet();
     } catch (err) { $("#cancelErr").textContent = cleanErr(err); }
   });
@@ -6212,16 +6218,17 @@ function openWalletAdjust(id) {
   openSheet(`${sheetHead("Adjust wallet", esc(w.name || w.email || "Customer"))}
     <div class="sumgrid small"><span>Email</span><b>${esc(w.email || "–")}</b><span>Phone</span><b class="num">${esc(fmtPhone(w.phone || "") || "–")}</b><span>Balance now</span><b class="num">${money(w.balance)}</b></div>
     <div class="grid2"><div><label for="waAmt">Amount (GHS)</label><input id="waAmt" inputmode="decimal" placeholder="10, or -5 to take back"></div><div><label for="waWhy">Reason</label><input id="waWhy" maxlength="140" placeholder="Late delivery on Mon"></div></div>
+    <div><label for="waPw">Your password</label><input id="waPw" type="password" autocomplete="current-password" placeholder="To confirm it's you"></div>
     <p class="err" id="waErr"></p><div class="sheet-foot"><button class="btn wide" id="waGo">Adjust wallet</button></div>`);
   $("#waGo").addEventListener("click", async () => { const b = $("#waGo"); if (b.disabled) return;
     const amt = Math.round(Number(String($("#waAmt").value).replace(",", ".")) * 100) / 100, why = $("#waWhy").value.trim();
     if (!amt) return ($("#waErr").textContent = "Enter an amount, e.g. 10 or -5.");
     if (why.length < 3) return ($("#waErr").textContent = "Add a reason.");
     if (amt < 0 && -amt > Number(w.balance)) return ($("#waErr").textContent = "That's more than their balance of " + money(w.balance) + ".");
-    if (!b.dataset.sure) { b.dataset.sure = "1"; b.textContent = (amt > 0 ? "Add " + money(amt) + " to " : "Take " + money(-amt) + " from ") + (w.name || "their") + (w.name ? "'s" : "") + " wallet? Tap to confirm"; return; }
-    const done = busyBtn(b, "Updating…");
-    try { await api.creditWallet(w.user_id, amt, why); w.balance = Math.round((Number(w.balance) + amt) * 100) / 100; closeSheet(); toast("Wallet updated · " + (w.name || "customer") + " now has " + money(w.balance)); renderAdmin(true); }
-    catch (er) { done(); delete b.dataset.sure; $("#waErr").textContent = cleanErr(er); } });
+    const pw = $("#waPw").value; if (!pw) { $("#waPw").focus(); return ($("#waErr").textContent = "Enter your password to confirm."); }
+    const done = busyBtn(b, "Checking…");
+    try { await api.confirmPassword(pw); b.textContent = "Updating…"; await api.creditWallet(w.user_id, amt, why); w.balance = Math.round((Number(w.balance) + amt) * 100) / 100; closeSheet(); toast("Wallet updated · " + (w.name || "customer") + " now has " + money(w.balance)); renderAdmin(true); }
+    catch (er) { done(); $("#waPw").value = ""; $("#waErr").textContent = cleanErr(er); } });
 }
 document.addEventListener("click", e => { const r = e.target.closest("tr[data-wallet]"); if (r && location.hash.startsWith("#admin")) openWalletAdjust(r.dataset.wallet); });
 document.addEventListener("keydown", e => { const r = e.target.closest && e.target.closest("tr[data-wallet]"); if (r && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); openWalletAdjust(r.dataset.wallet); } });
