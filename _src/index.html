@@ -5213,11 +5213,7 @@ function openAddVendor() {
   // Optional pin: vendors can be anywhere; the delivery estimate updates with the distance
   let vPin = null, vMap = null, vMk = null;
   const est = () => {
-    const s = S.settings, from = vPin || site, trip = tripFor(from, site, s), km = hasPin(from) && hasPin(site) ? roadKm(from, site) : null, per = feeFor(Number(s.max_meals), s, trip);
-    // The trip is shared by everyone in the pool: say the trip price, then the lowest share per meal (when the pool is full)
-    $("#vEst").textContent = (km != null && vPin ? "About " + (km < 1 ? "1" : km.toFixed(km < 10 ? 1 : 0)) + " km by road. Delivery about " + money(trip) + " a trip"
-      : "Delivery from about " + money(trip) + " a trip") + ", shared by the pool: as little as " + money(per) + " a meal when it fills."
-      + (vPin ? "" : " Pin where they cook for the exact price.");
+    $("#vEst").textContent = "Delivery will be split as more people join the pool.";
   };
   const putPin = (p, z) => { vPin = { lat: p.lat, lng: p.lng }; const L = window.L;
     if (!vMk) { vMk = L.marker([p.lat, p.lng], { draggable: true, icon: pinIcon(L, "on") }).addTo(vMap); vMk.on("dragend", () => { const ll = vMk.getLatLng(); vPin = { lat: ll.lat, lng: ll.lng }; est(); }); } else vMk.setLatLng([p.lat, p.lng]);
