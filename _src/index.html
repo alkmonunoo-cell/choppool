@@ -521,6 +521,9 @@ td select { padding: 6px 8px; width: auto; }
 .mpin.on { background: var(--accent); }
 .mpin.me { background: #2563EB; border-radius: 50%; transform: none; }
 .leaflet-container { font-family: var(--font-body); }
+.glogo { line-height: 0; margin: 0 0 4px 6px !important; }
+.glogo img { display: block; }
+.glogo.txt { font: 600 13px/1 Arial, sans-serif; color: #5f6368; background: rgba(255, 255, 255, .85); padding: 3px 6px; border-radius: 4px; }
 .gpow { margin: 6px 2px 0; font-size: 11px; text-align: right; }
 .place-row.busy { opacity: .55; }
 .leaflet-popup-content { font-size: 14px; }
@@ -2931,9 +2934,39 @@ async function makeMap(el, center, zoom) {
   const L = await loadLeaflet();
   if (!el || !el.isConnected) return null;   // the page was redrawn while the map library loaded
   const m = L.map(el).setView([(center || ACCRA).lat, (center || ACCRA).lng], zoom || 12);
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "&copy; OpenStreetMap contributors" }).addTo(m);
+  const osm = () => L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "&copy; OpenStreetMap contributors" });
+  const ses = await googleTileSession();
+  if (ses && el.isConnected) {
+    // Google's map pictures (Map Tiles API), with the Google logo and Google's own copyright line, as Google requires
+    const key = encodeURIComponent(CONFIG.GOOGLE_MAPS_KEY);
+    const gl = L.tileLayer("https://tile.googleapis.com/v1/2dtiles/{z}/{x}/{y}?session=" + encodeURIComponent(ses) + "&key=" + key, { maxZoom: 20, attribution: "Map data &copy;" + new Date().getFullYear() + " Google" }).addTo(m);
+    m.attributionControl.setPrefix(false);
+    const logo = L.control({ position: "bottomleft" }); logo.onAdd = () => { const d = L.DomUtil.create("div", "glogo"); d.innerHTML = `<img src="https://maps.gstatic.com/mapfiles/api-3/images/google_white5_hdpi.png" width="66" height="26" alt="Google">`; d.querySelector("img").onerror = () => { d.textContent = "Google"; d.classList.add("txt"); }; return d; }; logo.addTo(m);
+    let errs = 0, ok = 0;
+    gl.on("tileload", () => { ok++; });
+    gl.on("tileerror", () => { if (++errs >= 3 && !ok) { m.removeLayer(gl); logo.remove(); osm().addTo(m); local.set("cp_gtile", null); } });   // key refused: back to the free map
+    let vt = null;
+    const credit = () => { clearTimeout(vt); vt = setTimeout(async () => { if (!el.isConnected) return; const b = m.getBounds();
+      try { const r = await fetch("https://tile.googleapis.com/tile/v1/viewport?session=" + encodeURIComponent(ses) + "&key=" + key + "&zoom=" + m.getZoom() + "&north=" + b.getNorth() + "&south=" + b.getSouth() + "&east=" + b.getEast() + "&west=" + b.getWest());
+        if (r.ok) { const d = await r.json(); if (d.copyright) { m.attributionControl.removeAttribution(gl.getAttribution()); gl.options.attribution = esc(d.copyright); m.attributionControl.addAttribution(gl.options.attribution); } } } catch (e) {} }, 700); };
+    m.on("moveend", credit); credit();
+  } else osm().addTo(m);
   setTimeout(() => { if (el.isConnected) m.invalidateSize(); }, 200);
   return m;
+}
+// A Google map-tiles session lasts about two weeks; keep it on the phone so maps open without an extra request
+async function googleTileSession() {
+  if (!CONFIG.GOOGLE_MAPS_KEY || S.gtilesOff) return null;
+  const c = local.get("cp_gtile");
+  if (c && c.key === CONFIG.GOOGLE_MAPS_KEY && Date.parse(c.exp) - Date.now() > 864e5) return c.session;
+  try {
+    const r = await fetch("https://tile.googleapis.com/v1/createSession?key=" + encodeURIComponent(CONFIG.GOOGLE_MAPS_KEY), { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mapType: "roadmap", language: "en-GB", region: "GH" }) });
+    if (!r.ok) { S.gtilesOff = true; return null; }
+    const d = await r.json(); if (!d.session) { S.gtilesOff = true; return null; }
+    local.set("cp_gtile", { key: CONFIG.GOOGLE_MAPS_KEY, session: d.session, exp: new Date(Number(d.expiry) * 1000).toISOString() });
+    return d.session;
+  } catch (e) { S.gtilesOff = true; return null; }
 }
 const pinIcon = (L, kind) => L.divIcon({ className: "", html: `<span class="mpin ${kind || ""}"></span>`, iconSize: [24, 24], iconAnchor: [12, 24] });
 function distM(a, b) {
