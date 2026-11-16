@@ -3869,7 +3869,7 @@ function drawVendor() {
       <div class="vplate">${plate(topDish(k.id), k.id)}</div></div>
     <div class="vbody">
       <h1>${esc(k.public_name)}</h1>
-      <p class="cu">${esc(k.added_by_customer ? "A local vendor added by a customer. ChopPool doesn't inspect their kitchen." : k.tagline || "")}</p>
+      <p class="cu">${esc(k.added_by_customer ? "Added by a customer." : k.tagline || "")}</p>
       <div class="vfacts">${facts.map(([b, t]) => `<div><b>${b}</b><span>${esc(t)}</span></div>`).join("")}</div>
       <div id="vpBanner">${vendorBanner(k)}</div>
       <div class="vtabs" role="tablist"><button data-vtab="menu" aria-pressed="${S.vp.tab === "menu"}">Menu</button><button data-vtab="rev" aria-pressed="${S.vp.tab === "rev"}">Reviews${sc.ratings ? " · " + sc.ratings : ""}</button></div>
@@ -4882,7 +4882,7 @@ function openOrder(menuId, opt = {}) {
     ${join ? sheetHead("Add to my order", esc(k.public_name) + " · same code " + esc(join.code) + ", packed together") : sheetHead(esc(k.public_name), esc(site.name) + " · " + fmtDate(S.date) + ", " + fmtTime(s.delivery_time))}
     ${join || opt.fromPage ? "" : `<div id="revStrip" class="revstrip"></div>`}
     ${join ? `<p class="note">Your plate joins code <strong>${esc(join.code)}</strong>. You pay only for the plate and its service fee: delivery is already paid, and the final split counts every meal under your code.</p>` : ""}
-    ${!join && k.added_by_customer ? `<p class="note">A local vendor added by a customer. ChopPool doesn't inspect their kitchen.</p>` : ""}
+    ${!join && k.added_by_customer ? `<p class="note">Added by a customer.</p>` : ""}
     ${join || st.open ? "" : waitingHere ? `<p class="note"><strong>${esc(k.public_name)} hasn't confirmed yet.</strong> Join anyway: if they don't confirm ${confirmText(S.date)}, everyone gets their money back.</p>`
       : `<p class="note">You're first today. We'll ask ${esc(k.public_name)} to confirm ${confirmText(S.date)}. Others here can join while you wait. If they don't confirm, you get your money back.</p>`}
     <form id="orderForm" class="stack" novalidate>
@@ -5204,7 +5204,7 @@ function openAddVendor() {
         <div id="vPinBox" class="stack hidden">${searchRow("vSearch", "Search their area or landmark")}<div class="chips">${useMeChip("vMe")}</div><div id="vResults" class="stack"></div>
           <div id="vMap" class="map" style="height:220px" aria-label="Map: tap where they cook"></div><p class="small muted" id="vPinTxt">Search, or tap the map where they cook.</p></div>
         <p class="small" id="vEst" style="color:var(--hint)"></p></div>
-      <p class="note">ChopPool doesn't inspect vendors added by customers. Others will see "Added by a customer".</p>
+      <p class="note">Others will see "Added by a customer".</p>
       <p class="err" id="vErr"></p><button class="btn wide" type="submit">Add vendor</button>
     </form>`);
   const row = () => { const d = document.createElement("div"); d.className = "dishprice"; d.innerHTML = `<input aria-label="Dish" placeholder="e.g. Waakye full"><input aria-label="Price in cedis" inputmode="decimal" placeholder="GHS">`; $("#vItems").appendChild(d); };
