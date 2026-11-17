@@ -353,6 +353,8 @@ s.was { color: var(--muted); font-weight: 500; text-decoration-thickness: 1.5px;
 .dslist { display: grid; gap: 6px; max-height: 260px; overflow: auto; }
 .dsrow { display: grid; text-align: left; gap: 2px; padding: 10px 12px; border-radius: 12px; border: 1.5px solid var(--line); background: var(--surface); color: var(--ink); }
 .dsrow.on { border-color: var(--accent); background: var(--accent-soft); }
+.mgopts [data-x=price] { padding-left: 8px; padding-right: 4px; }
+@media (max-width: 480px) { .mgopts .mextra { grid-template-columns: 20px 24px minmax(0, 1fr) 84px 24px; gap: 6px; } .mgroup { padding: 8px; } .mgtop input { padding-left: 10px; padding-right: 8px; } }
 [data-feebox] [hidden] { display: none !important; }
 [data-medit="setup"] .mphoto { pointer-events: none; }
 [data-medit="setup"] .mphoto .cam { display: none; }
@@ -5525,9 +5527,12 @@ const GRIP = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor
 const extraRow = a => `<div class="mextra${a && a.off ? " xoff" : ""}"${a && a.name ? ` data-orig="${esc(a.name)}" data-oprice="${esc(Number(a.price) || 0)}"` : ""}${a && a.pending ? ' data-pending="1"' : ""}><button type="button" class="xgrip" data-xgrip aria-label="Hold and drag to move this extra (or use the arrow keys)" title="Hold and drag to reorder">${GRIP}</button><label class="xlive" title="Show this extra to customers"><input type="checkbox" data-x="live"${a && a.off ? "" : " checked"} aria-label="Show to customers"></label><input data-x="name" value="${esc(a ? a.name : "")}" placeholder="Extra chicken" aria-label="Extra"><input data-x="price" inputmode="decimal" value="${a ? esc(a.price) : ""}" placeholder="GHS 0" aria-label="Extra price"><button type="button" class="xbtn" data-xdel aria-label="Remove extra">${ICON.close}</button>${a && a.pending ? `<span class="xwait small">Waiting for ChopPool to approve</span>` : ""}</div>`;
 // Required choices in the editor (update 47): a title ("Choose your protein") and its options (same rows as extras)
 const ARROW_UP = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>`;
+// An option row: an extra row with its own hints ("Option 1", "+GHS 0")
+const optRow = (a, n) => extraRow(a).replace('placeholder="Extra chicken"', `placeholder="Option ${n + 1}"`).replace('placeholder="GHS 0"', 'placeholder="+GHS 0"');
+const renumberOpts = g => g && g.querySelectorAll(".mgopts .mextra [data-x=name]").forEach((x, n) => { x.placeholder = "Option " + (n + 1); });
 const groupBlock = (title, opts) => `<div class="mgroup"><div class="mgtop"><span class="reqtag" style="margin:0">Required</span><input data-g="title" value="${esc(title || "")}" placeholder="e.g. Choose your protein" aria-label="Choice title" maxlength="40">
     <button type="button" class="xbtn" data-gdel aria-label="Remove this choice">${ICON.close}</button></div>
-  <div class="mgopts">${(opts && opts.length ? opts : [null, null]).map(extraRow).join("")}</div>
+  <div class="mgopts">${(opts && opts.length ? opts : [null, null]).map((a, n) => optRow(a, n)).join("")}</div>
   <div class="row" style="justify-content:space-between;gap:8px"><button type="button" class="linkbtn small" data-gopt>+ Add option</button><button type="button" class="linkbtn small" data-gcopy>Copy to other dishes</button></div><div class="gcopy hidden"></div></div>`;
 function dishRow(i, admin) {
   i = i || {};
@@ -5607,7 +5612,7 @@ function menuEditorClick(e) {
     r.scrollIntoView({ block: "nearest", behavior: "smooth" }); return true; }
   if (t.closest("[data-mgroup]")) { const r = t.closest(".mdish"); if (r.querySelectorAll(".mgroup").length >= 3) { toast("Up to 3 required choices on a dish."); return true; }
     r.querySelector(".mgroups").insertAdjacentHTML("beforeend", groupBlock("", null)); r.querySelector(".mgroup:last-child [data-g=title]").focus(); return true; }
-  if (t.closest("[data-gopt]")) { const g = t.closest(".mgroup"); g.querySelector(".mgopts").insertAdjacentHTML("beforeend", extraRow(null)); g.querySelector(".mgopts .mextra:last-child [data-x=name]").focus(); return true; }
+  if (t.closest("[data-gopt]")) { const g = t.closest(".mgroup"); g.querySelector(".mgopts").insertAdjacentHTML("beforeend", optRow(null, g.querySelectorAll(".mgopts .mextra").length)); g.querySelector(".mgopts .mextra:last-child [data-x=name]").focus(); return true; }
   if (t.closest("[data-gdel]")) { t.closest(".mgroup").remove(); return true; }
   if (t.closest("[data-gcopy]")) { const g = t.closest(".mgroup"), box = g.querySelector(".gcopy"), me = g.closest(".mdish");
     const others = [...root.querySelectorAll(".mdish")].filter(r => r !== me && !r.classList.contains("hidden"));
@@ -5629,7 +5634,7 @@ function menuEditorClick(e) {
     return true; }
   if (t.closest("[data-madd]")) { const isAdmin = root.dataset.medit.startsWith("admin"); root.querySelector(".mrows").insertAdjacentHTML("beforeend", dishRow(null, isAdmin)); root.querySelector(".mdish:last-child [data-f=name]").focus(); return true; }
   if (t.closest("[data-mextra]")) { const r = t.closest(".mdish"); r.querySelector(".mextras").insertAdjacentHTML("beforeend", extraRow(null)); r.querySelector(".mextra:last-child input").focus(); return true; }
-  if (t.closest("[data-xdel]")) { t.closest(".mextra").remove(); return true; }
+  if (t.closest("[data-xdel]")) { const g = t.closest(".mgroup"); t.closest(".mextra").remove(); renumberOpts(g); return true; }
   if (t.closest("[data-mdel]")) { const r = t.closest(".mdish"); if (r.dataset.item) { r.dataset.removed = "1"; r.classList.add("hidden"); } else r.remove(); return true; }
   if (t.closest("[data-photo]")) { const r = t.closest(".mdish"); if (!r.dataset.item) { toast("Save the dish first, then add its photo."); return true; } pickPhoto(root.dataset.medit, r); return true; }
   return false;
