@@ -324,6 +324,8 @@ button { font: inherit; cursor: pointer; border-radius: 14px; border: 1px solid 
 .ghost { background: var(--surface); color: var(--ink); border-color: var(--line); }
 .wide { width: 100%; padding: 15px; font-size: 16px; }
 .linkbtn { background: none; border: none; padding: 0; color: var(--accent); font-weight: 700; }
+[data-medit="setup"] .mphoto { pointer-events: none; }
+[data-medit="setup"] .mphoto .cam { display: none; }
 .wa { display: flex; align-items: center; justify-content: center; gap: 8px; text-decoration: none; background: #1F8F4E; color: #fff; font-weight: 700; padding: 14px; border-radius: 14px; }
 .wa.quiet { background: var(--surface); color: var(--ink); border: 1px solid var(--line); }
 select:focus-visible, input:focus-visible, button:focus-visible, a:focus-visible, textarea:focus-visible, summary:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 60%, transparent); outline-offset: 2px; }
@@ -1906,6 +1908,34 @@ function makeDemoApi() {
       if (!r.expiry || r.expiry < today()) throw new Error("Your driving licence has expired. Renew it, then apply.");
       const gc = "GHA-" + card.slice(3, 12) + "-" + card.slice(12); if (riders.some(x => x.ghana_card === gc)) throw new Error("This Ghana Card has already applied.");
       riders.push({ id: "r" + uid(), token: "demo" + uid(), name: r.name, phone: ph, bike: r.bike, area: r.area, momo: r.momo, status: "pending", active: false, created_at: nowIso(), ghana_card: gc, licence_no: lic.slice(0, 20), licence_expiry: r.expiry }); },
+    // Vendor fills in their own form from a link (demo mirror of update 45)
+    async vendorInvite(name, whatsapp) { const w = String(whatsapp || "").replace(/\D/g, ""); if (String(name || "").trim().length < 2) throw new Error("Add the vendor's name.");
+      if (w && !/^0\d{9}$/.test(w)) throw new Error("Enter a 10-digit WhatsApp number starting with 0.");
+      const k = { id: "k" + uid(), token: "setup" + uid(), name: name.trim(), public_name: name.trim(), whatsapp: w || null, active: false, added_by_customer: false, site_id: null, capacity: 45, delivery_mode: "rider", setup_status: "draft", created_at: nowIso() };
+      kitchens.push(k); return { id: k.id, token: k.token }; },
+    async vendorSetupGet(t) { const k = kitchens.find(x => x.token === t && !x.archived); if (!k) throw new Error("This link is not valid. Ask ChopPool for a new one.");
+      if (!k.setup_status) return { live: k.active !== false, name: k.public_name };
+      return { status: k.setup_status, note: k.setup_note || null, name: k.public_name, tagline: k.tagline || null, owner_name: k.owner_name || null, whatsapp: k.whatsapp, address: k.address || null, lat: k.lat ?? null, lng: k.lng ?? null,
+        auto_days: k.auto_days || null, capacity: k.capacity, payout_momo: k.payout_momo || null, payout_network: k.payout_network || null,
+        items: items.filter(i => i.kitchen_id === k.id).map(i => ({ id: i.id, name: i.name, price: i.price, addons: i.addons || [], icon: i.icon || null })) }; },
+    async vendorSetupSave(t, d, list, submit) { const k = kitchens.find(x => x.token === t && !x.archived); if (!k) throw new Error("This link is not valid. Ask ChopPool for a new one.");
+      if (!k.setup_status) throw new Error("Your page is already live. Open your vendor page to make changes.");
+      const wa = String(d.whatsapp || "").replace(/\D/g, ""), mo = String(d.payout_momo || "").replace(/\D/g, "");
+      if (wa && !/^0\d{9}$/.test(wa)) throw new Error("Enter a 10-digit WhatsApp number starting with 0."); if (mo && !/^0\d{9}$/.test(mo)) throw new Error("Enter a 10-digit mobile money number starting with 0.");
+      Object.assign(k, { public_name: String(d.name || "").trim() || k.public_name, tagline: String(d.tagline || "").trim() || null, owner_name: String(d.owner_name || "").trim() || null, whatsapp: wa || k.whatsapp,
+        address: String(d.address || "").trim() || null, lat: d.lat ?? k.lat ?? null, lng: d.lng ?? k.lng ?? null, auto_days: Array.isArray(d.auto_days) ? d.auto_days : k.auto_days, capacity: Math.max(1, Math.min(500, Number(d.capacity) || k.capacity)),
+        payout_momo: mo || null, payout_network: d.payout_network || null });
+      if (Array.isArray(list)) { for (let n = items.length - 1; n >= 0; n--) if (items[n].kitchen_id === k.id) items.splice(n, 1);
+        list.filter(x => String(x.name || "").trim().length >= 2 && Number(x.price) > 0).forEach(x => items.push({ id: "i" + uid(), kitchen_id: k.id, name: x.name.trim(), price: Math.round(Number(x.price) * 100) / 100,
+          addons: (x.addons || []).filter(a => String(a.name || "").trim().length >= 2).map(a => ({ name: a.name.trim(), price: Math.max(0, Number(a.price) || 0), ...(a.off ? { off: true } : {}) })), icon: x.icon || null, active: true })); }
+      const n = items.filter(i => i.kitchen_id === k.id).length;
+      if (submit) { if (!k.public_name || k.public_name.length < 2) throw new Error("Add your business name."); if (!k.whatsapp) throw new Error("Add your WhatsApp number.");
+        if (k.lat == null) throw new Error("Show where you cook on the map."); if (!n) throw new Error("Add at least one dish with its price."); if (!k.payout_momo) throw new Error("Add the mobile money number we pay you on.");
+        k.setup_status = "submitted"; k.setup_submitted_at = nowIso(); k.setup_note = null; }
+      return { status: k.setup_status, dishes: n }; },
+    async vendorReview(id, ok, note) { const k = kitchens.find(x => x.id === id); if (!k || !k.setup_status) throw new Error("This vendor form isn't waiting for review.");
+      if (ok) { if (k.setup_status !== "submitted") throw new Error("The vendor hasn't submitted their form yet."); Object.assign(k, { setup_status: null, setup_note: null, active: true }); }
+      else { if (String(note || "").trim().length < 3) throw new Error("Say what they should change."); Object.assign(k, { setup_status: "returned", setup_note: note.trim() }); } },
     async vendorRequestListing(token, listing) { const k = byToken(kitchens, "token", token); if (!k.added_by_customer || k.listing_status === "approved") throw new Error("You are already listed on ChopPool."); k.listing = listing; k.listing_status = "pending"; k.listing_requested_at = nowIso(); },
     async savePushSub() {}, async notify() {},
     async addSite(si) { sites.push({ id: "s" + uid(), host_token: "demo" + uid(), status: "active", active: true, created_at: nowIso(), ...si }); },
@@ -2065,6 +2095,10 @@ function makeSupabaseApi() {
     riderView: (t, d) => rpc("rider_view", { p_token: t, p_date: d }),
     async riderApply(r) { const x = await sb.rpc("rider_apply", { p_name: r.name, p_phone: r.phone, p_bike: r.bike, p_area: r.area, p_momo: r.momo, p_ghana_card: r.card || null, p_licence_no: r.licence || null, p_licence_expiry: r.expiry || null });
       if (x.error && /function|schema cache/i.test(x.error.message)) throw new Error("Rider sign-up isn't switched on yet. Please contact ChopPool."); return must(x); },
+    vendorInvite: (name, whatsapp) => rpc("admin_vendor_invite", { p_name: name, p_whatsapp: whatsapp || null }),
+    vendorSetupGet: t => rpc("vendor_setup_get", { p_token: t }),
+    vendorSetupSave: (t, d, list, submit) => rpc("vendor_setup_save", { p_token: t, p_data: d, p_items: list, p_submit: !!submit }),
+    vendorReview: (id, ok, note) => rpc("admin_vendor_review", { p_kitchen: id, p_ok: !!ok, p_note: note || null }),
     async vendorRequestListing(t, listing) { const x = await sb.rpc("vendor_request_listing", { p_token: t, p_listing: listing });
       if (x.error && /function|schema cache/i.test(x.error.message)) throw new Error("Listing isn't switched on yet. Please contact ChopPool."); return must(x); },
     savePushSub: async p => { const base = { p_endpoint: p.endpoint, p_p256dh: p.p256dh, p_auth: p.auth, p_order_ids: p.order_ids || [], p_kitchen_token: p.kitchen_token || null, p_rider_token: p.rider_token || null };
@@ -5255,7 +5289,7 @@ const ADMIN_TABS = [["dash", "Dashboard"], ["today", "Today"], ["menus", "Vendor
 // Sub-sections per tab; a third value marks owner-only sections
 const ADMIN_SUBS = {
   today: [["pools", "Pools"], ["orders", "Orders & payments"], ["wallets", "Refunds & problems"], ["owed", "Money owed"], ["rules", "Settings"]],
-  menus: [["list", "Vendors"], ["prices", "Price changes"], ["reviews", "Ratings & photos"], ["requests", "Listing requests"], ["rules", "Settings"]],
+  menus: [["list", "Vendors"], ["prices", "Price changes"], ["reviews", "Ratings & photos"], ["requests", "New vendors"], ["rules", "Settings"]],
   buildings: [["list", "Active"], ["requests", "New & duplicates"]],
   riders: [["list", "Riders"], ["apply", "Applications"], ["rules", "Settings"]],
   team: [["members", "Team members"], ["terms", "Tester agreement"], ["payments", "Payment options", true], ["accounts", "Customer accounts", true], ["activity", "Activity log", true]]
@@ -5399,8 +5433,8 @@ function dishRow(i, admin) {
     <button type="button" class="linkbtn small" data-mextra style="justify-self:start">+ Add extra</button></div>`;
 }
 const menuEditor = (items, ctx, admin) => `<div class="medit" data-medit="${esc(ctx)}"><div class="mrows stack">${items.map(i => dishRow(i, admin)).join("")}${items.length ? "" : dishRow(null, admin)}</div>
-  <div class="row" style="justify-content:space-between;gap:8px;flex-wrap:wrap"><button type="button" class="ghost" data-madd>+ Add dish</button><button type="button" class="btn" data-msave>Save menu</button></div>
-  <p class="small muted">Extras: e.g. Extra chicken GHS 15, No shito GHS 0. Tap a picture to add a photo of the dish (saved dishes only).</p></div>`;
+  <div class="row" style="justify-content:space-between;gap:8px;flex-wrap:wrap"><button type="button" class="ghost" data-madd>+ Add dish</button>${ctx === "setup" ? "" : `<button type="button" class="btn" data-msave>Save menu</button>`}</div>
+  <p class="small muted">${ctx === "setup" ? "Extras: e.g. Extra chicken GHS 15, No shito GHS 0. You can add dish photos once your page is live." : "Extras: e.g. Extra chicken GHS 15, No shito GHS 0. Tap a picture to add a photo of the dish (saved dishes only)."}</p></div>`;
 // Everything in the editor, ready to save; removed saved dishes go off the menu
 // Extras: hold the grip and drag to reorder (finger or mouse); arrow keys on the grip move it one place. Save menu keeps the order.
 (function extrasDrag() {
@@ -5568,6 +5602,7 @@ async function renderAdmin(cached, quiet) {   // quiet = background/refresh-butt
   const prSub = document.querySelector('[data-asub="prices"]'); if (prSub) prSub.textContent = "Price changes" + (prN ? " (" + prN + ")" : "");
   const fbNew = (A.feedback || []).filter(f => f.status === "new").length, fbTab = document.querySelector('[data-atab="feedback"]'); if (fbTab) fbTab.textContent = "Feedback" + (fbNew ? " (" + fbNew + " new)" : "");
   const livePools = A.pools.filter(p => p.status !== "cancelled" && p.meals > 0);
+  const vForms = A.kitchens.filter(k => k.setup_status && !k.archived), vToCheck = vForms.filter(k => k.setup_status === "submitted");
   const listReq = A.kitchens.filter(k => k.listing_status === "pending"), riderApps = A.riders.filter(r => r.status === "pending");
   const ridersOk = A.riders.filter(r => !r.status || r.status === "approved");
   A.pools.forEach(p => { p.runner = K(p.kitchen_id).delivery_mode === "runner"; });
@@ -5578,7 +5613,7 @@ async function renderAdmin(cached, quiet) {   // quiet = background/refresh-butt
   if (subs.length && !subs.some(x => x[0] === S.adminSub[tab])) S.adminSub[tab] = subs[0][0];
   const sub = S.adminSub[tab];
   const nav = $("#aSub"), frame = $("#aFrame");
-  if (nav) nav.innerHTML = subs.map(([k, l]) => `<button data-asub="${k}"${k === sub ? ' aria-current="page"' : ""}>${esc(l)}${tab === "buildings" && k === "requests" && pending.length ? " (" + pending.length + ")" : ""}${tab === "menus" && k === "requests" && listReq.length ? " (" + listReq.length + ")" : ""}${tab === "riders" && k === "apply" && riderApps.length ? " (" + riderApps.length + ")" : ""}</button>`).join("");
+  if (nav) nav.innerHTML = subs.map(([k, l]) => `<button data-asub="${k}"${k === sub ? ' aria-current="page"' : ""}>${esc(l)}${tab === "buildings" && k === "requests" && pending.length ? " (" + pending.length + ")" : ""}${tab === "menus" && k === "requests" && listReq.length + vToCheck.length ? " (" + (listReq.length + vToCheck.length) + ")" : ""}${tab === "riders" && k === "apply" && riderApps.length ? " (" + riderApps.length + ")" : ""}</button>`).join("");
   if (frame) frame.classList.toggle("has-sub", subs.length > 0);
   const body = $("#aBody");
   if (S.lastSub !== tab + ":" + sub) { body.classList.remove("fade-in"); void body.offsetWidth; body.classList.add("fade-in"); delete body.dataset.rvdone; }   // fade only when you change section
@@ -5635,6 +5670,7 @@ async function renderAdmin(cached, quiet) {   // quiet = background/refresh-butt
       ["Possible duplicate buildings", (() => { const nd = new Set(local.get("cp_notdup") || []), L = A.sites.filter(x => !x.archived && x.status === "active"); let n = 0;
         for (let i = 0; i < L.length; i++) for (let j = i + 1; j < L.length; j++) { const a = L[i], b = L[j]; if (nd.has([a.id, b.id].sort().join("|"))) continue; if ((hasPin(a) && hasPin(b) && distM(a, b) <= 150) || String(a.name).trim().toLowerCase() === String(b.name).trim().toLowerCase()) n++; } return n; })(), "buildings:requests", "warn", "Check and merge copies of the same place"],
       ["Building requests", pending.length, "buildings:requests", "warn", "Waiting for approval"],
+      ["Vendor forms to check", vToCheck.length, "menus:requests", "warn", "Vendors who sent their details"],
       ["Vendor listing requests", listReq.length, "menus:requests", "warn", "Vendors asking to be listed"],
       ["Vendors yet to accept the new fee", A.kitchens.filter(k => k.active && !k.archived && (Number(s.vendor_fee_rate) > Number(k.fee_ack || 0) || Number(s.vendor_fee_free) < Number(k.fee_free_ack ?? 5))).length, "menus:list", "warn", "Their automatic days are paused until they accept on their page"],
       ["Rider applications", riderApps.length, "riders:apply", "warn", "Riders asking to join"],
@@ -5850,16 +5886,34 @@ async function renderAdmin(cached, quiet) {   // quiet = background/refresh-butt
   }
   if (tab === "menus" && sub !== "reviews" && sub !== "prices") {
     const items = A.items || [];
-    if (sub === "requests") body.innerHTML = listReq.length ? `<div class="stack" style="gap:10px">${listReq.map(k => { const L = k.listing || {}, dishes = items.filter(i => i.kitchen_id === k.id && i.active !== false);
+    const DAYN = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const formCard = k => { const dishes = items.filter(i => i.kitchen_id === k.id);
+      return `<article class="card" data-kitchen="${esc(k.id)}" style="border:2px solid var(--hint)"><div class="top" style="align-items:flex-start"><div><h3>${esc(k.public_name || k.name)}</h3><p class="small muted">${esc(k.tagline || "")}${k.setup_submitted_at ? " · sent " + fmtDate(String(k.setup_submitted_at).slice(0, 10)) : ""}</p></div>${pill("To check", "warn")}</div>
+        <div class="grid2 small"><p><strong>Owner:</strong> ${esc(k.owner_name || "—")}</p><p><strong>WhatsApp:</strong> <span class="num">${esc(fmtPhone(k.whatsapp || "") || "—")}</span></p>
+          <p><strong>Cooks:</strong> ${esc((k.auto_days || []).map(d => DAYN[d]).join(", ") || "—")}</p><p><strong>Meals per lunch:</strong> ${esc(k.capacity)}</p>
+          <p><strong>Payout:</strong> <span class="num">${esc(fmtPhone(k.payout_momo || "") || "—")}</span> ${esc(k.payout_network || "")}</p><p><strong>Area:</strong> ${esc(k.address || "—")}</p></div>
+        ${hasPin(k) ? `<a class="linkbtn" href="${osmLink(k)}" target="_blank" rel="noopener">See where they cook</a>` : ""}
+        <p class="group-title">Menu</p><div class="dishline">${dishes.map(x => `<span>${esc(x.name)} · ${money(x.price)}${(x.addons || []).length ? " (+" + x.addons.map(a => esc(a.name) + (Number(a.price) ? " " + money(a.price) : "")).join(", ") + ")" : ""}</span>`).join("") || `<span>No dishes</span>`}</div>
+        <p class="small muted">Approving puts them live for nearby buildings. Call them first and, if you can, order a test meal.</p>
+        <div class="row" style="justify-content:flex-start;gap:8px;flex-wrap:wrap"><button class="btn" data-act="vform-approve">Approve and go live</button>${k.whatsapp ? `<a class="wa quiet" style="padding:8px 12px" href="${wa(k.whatsapp)}" target="_blank" rel="noopener">${ICON.wa} WhatsApp</a>` : ""}</div>
+        <div class="inline" style="grid-template-columns:1fr auto;align-items:end"><div><label>Or send it back: what should they change?</label><input data-vnote placeholder="Add a clearer photo-worthy name for the jollof"></div><button class="ghost" data-act="vform-return">Send back</button></div></article>`; };
+    const waitRow = k => `<div class="card row" data-kitchen="${esc(k.id)}" style="justify-content:space-between;gap:10px;flex-wrap:wrap;padding:12px 14px"><span><strong>${esc(k.public_name || k.name)}</strong><span class="small muted"> · ${k.setup_status === "returned" ? "sent back: " + esc(k.setup_note || "") : "waiting for the vendor to fill it in"}</span></span>
+      <span class="row" style="gap:6px"><button class="ghost" data-act="vform-link">Share link again</button><button class="ghost" data-act="vform-remove">Remove</button></span></div>`;
+    const formsHtml = (vToCheck.length ? `<h2 style="margin:4px 0 10px">Vendor forms to check</h2><div class="stack" style="gap:10px">${vToCheck.map(formCard).join("")}</div>` : "")
+      + (vForms.length > vToCheck.length ? `<h2 style="margin:18px 0 10px">Waiting for the vendor</h2><div class="stack" style="gap:8px">${vForms.filter(k => k.setup_status !== "submitted").map(waitRow).join("")}</div>` : "")
+      + `<div class="row" style="justify-content:flex-start;margin:${vForms.length ? "16px" : "0"} 0 18px"><button class="ghost" data-act="vform-new">Send a vendor the form</button></div>`
+      + `<h2 style="margin:0 0 10px">Listing requests</h2>`;
+    if (sub === "requests") body.innerHTML = formsHtml + (listReq.length ? `<div class="stack" style="gap:10px">${listReq.map(k => { const L = k.listing || {}, dishes = items.filter(i => i.kitchen_id === k.id && i.active !== false);
         return `<article class="card" data-kitchen="${esc(k.id)}" style="border:2px solid var(--hint)"><div class="top" style="align-items:flex-start"><div><h3>${esc(L.name || k.name)}</h3><p class="small muted">${esc(L.tagline || "")}${k.listing_requested_at ? " · asked " + fmtDate(String(k.listing_requested_at).slice(0, 10)) : ""} · first added by a customer at ${esc(sName(k.site_id))}</p></div>${pill("Wants to be listed", "warn")}</div>
           <div class="grid2 small"><p><strong>Cooks:</strong> ${esc(L.hours || "—")}</p><p><strong>Meals a day:</strong> ${esc(L.capacity || k.capacity)}</p><p><strong>Mobile money:</strong> <span class="num">${esc(L.momo || "—")}</span></p><p><strong>WhatsApp:</strong> <span class="num">${esc(k.whatsapp || "—")}</span></p></div>
           ${L.lat != null ? `<a class="linkbtn" href="${osmLink(L)}" target="_blank" rel="noopener">See where they cook</a>` : ""}
           <p class="group-title">Menu</p><div class="dishline">${dishes.map(x => `<span>${esc(x.name)} · ${money(x.price)}</span>`).join("") || `<span>No dishes yet</span>`}</div>
           <p class="small muted">Approving lists them for every nearby building. Call them first and, if you can, visit or order a test meal.</p>
           <div class="row" style="justify-content:flex-start;gap:8px;flex-wrap:wrap"><button class="btn" data-act="listing-approve">Approve listing</button><button class="ghost" data-act="listing-decline">Decline</button>${k.whatsapp ? `<a class="wa quiet" style="padding:8px 12px" href="${wa(k.whatsapp)}" target="_blank" rel="noopener">${ICON.wa} WhatsApp</a>` : ""}</div></article>`; }).join("")}</div>`
-      : `<div class="note">No listing requests. Vendors that customers add can ask to be listed from their own page.</div>`;
+      : `<div class="note">No listing requests. Vendors that customers add can ask to be listed from their own page.</div>`);
     const addForm = `
       <form class="card" data-form="kitchen"><h2>Add a vendor</h2>
+        <div class="note row" style="justify-content:space-between;gap:10px;flex-wrap:wrap"><span>Rather have the vendor fill this in?</span><button type="button" class="ghost" id="nkInvite">Send them the form</button></div>
         <div class="grid2"><div><label for="nkName">Real name</label><input id="nkName" name="name" placeholder="Auntie Akos Kitchen"></div><div><label for="nkPub">Menu name customers see</label><input id="nkPub" name="public_name" placeholder="Local favourites"></div></div>
         <div><label for="nkTag">Short description</label><input id="nkTag" name="tagline" placeholder="Ghanaian classics, cooked fresh each morning"></div>
         <div class="grid2"><div><label for="nkAddr">Pickup address</label><input id="nkAddr" name="address" placeholder="Osu, Oxford Street"></div><div><label for="nkWa">WhatsApp number</label><input id="nkWa" name="whatsapp" inputmode="tel" placeholder="024 123 4567"></div></div>
@@ -5873,13 +5927,14 @@ async function renderAdmin(cached, quiet) {   // quiet = background/refresh-butt
     S.addInit = () => {
       S.newKitPin = null; let put = null;
       $("#sheet").onclick = e => { menuEditorClick(e); };
+      $("#nkInvite").addEventListener("click", openVendorInvite);
       makeMap($("#newKitMap"), ACCRA, 12).then(m => { if (!m) return; adminMaps.push(m); let mk;
         put = (p, z) => { S.newKitPin = { lat: p.lat, lng: p.lng }; if (!mk) { mk = window.L.marker([p.lat, p.lng], { draggable: true, icon: pinIcon(window.L, "on") }).addTo(m); mk.on("dragend", () => { const ll = mk.getLatLng(); S.newKitPin = { lat: ll.lat, lng: ll.lng }; }); } else mk.setLatLng([p.lat, p.lng]); if (z) m.setView([p.lat, p.lng], z); $("#nkPin").textContent = "Pin placed. Drag it or tap the map to adjust."; };
         m.on("click", e => put(e.latlng)); }).catch(() => {});
       placeSearch($("#nkSearch"), $("#nkResults"), r => { if (put) put(r, 16); else S.newKitPin = { lat: r.lat, lng: r.lng }; $("#nkResults").innerHTML = ""; $("#nkSearch").value = ""; $("#nkPin").textContent = "Pin placed at " + r.short + "."; if (!$("#nkAddr").value) $("#nkAddr").value = r.short; });
     };
     if (sub === "list") {
-      const list = sorted(A.kitchens, "k", liveK, k => k.name + " " + k.public_name, k => k.active ? "a" : "b");
+      const list = sorted(A.kitchens.filter(k => !k.setup_status), "k", liveK, k => k.name + " " + k.public_name, k => k.active ? "a" : "b");
       body.innerHTML = addBar("Add vendor") + listBar("k") + `<div class="stack" style="gap:8px">${list.map(k => { const m = livePools.filter(p => p.kitchen_id === k.id).reduce((t, p) => t + p.meals, 0);
         return `<details class="item" data-kitchen="${esc(k.id)}" data-key="k:${esc(k.id)}"${isOpen("k:" + k.id)}>
         <summary><span class="ititle"><strong>${esc(k.name)}</strong><span class="small muted">"${esc(k.public_name)}"${k.added_by_customer ? " · added by a customer" : ""}</span></span>
@@ -6300,10 +6355,16 @@ async function adminClick(e) {
         ${os.map(o => `<a class="wa quiet" href="${wa(o.phone)}?text=${encodeURIComponent(text + " Your code: " + o.code)}" target="_blank" rel="noopener">${esc(o.customer_name)} · ${esc(o.code)}</a>`).join("")}`);
     }
   }
+  if (act === "vform-new") return openVendorInvite();
   const kc = t.closest("[data-kitchen]");
   if (kc) {
     const k = A.kitchens.find(x => x.id === kc.dataset.kitchen);
     if (act === "kitchen-copy") return copy(baseUrl() + "/#kitchen-" + k.token, "Link copied");
+    if (act === "vform-approve") return run(async () => { await api.vendorReview(k.id, true); S.admin = null; }, (k.public_name || k.name) + " is live. Send them their vendor page link from the Vendors list.");
+    if (act === "vform-return") { const n = (kc.querySelector("[data-vnote]") || {}).value || ""; if (n.trim().length < 3) { toast("Say what they should change."); return kc.querySelector("[data-vnote]").focus(); }
+      return run(async () => { await api.vendorReview(k.id, false, n.trim()); S.admin = null; }, "Sent back. Share their link so they see your note."); }
+    if (act === "vform-link") return showVendorLink(k.public_name || k.name, k.whatsapp, k.token);
+    if (act === "vform-remove") return run(async () => { await api.updateKitchen(k.id, { archived: true }); S.admin = null; }, "Vendor form removed. Its link no longer works.");
     if (act === "kitchen-listall") return run(() => api.updateKitchen(k.id, { listing_status: "approved", added_by_customer: false, site_id: null }).then(async () => Object.assign(S, await api.load())), "Listed. Nearby buildings can now see " + k.public_name + ".");
     if (act === "listing-approve") { const L = k.listing || {}; return run(() => api.updateKitchen(k.id, { listing_status: "approved", added_by_customer: false, site_id: null, name: L.name || k.name, public_name: L.name || k.public_name, tagline: L.tagline || k.tagline || null, capacity: Number(L.capacity) || k.capacity, ...(L.lat != null ? { lat: L.lat, lng: L.lng } : {}) }).then(async () => Object.assign(S, await api.load())), "Listed. Nearby buildings can now see " + (L.name || k.name) + "."); }
     if (act === "listing-decline") return run(() => api.updateKitchen(k.id, { listing_status: "declined" }), "Listing declined. They can still serve the building that added them.");
@@ -7018,6 +7079,99 @@ function viewRiderSignup() {
   });
 }
 
+/* ---------- Vendors fill in their own details (link from the team) ---------- */
+const vendorSetupUrl = token => baseUrl() + "/#vendor-setup-" + token;
+const vendorInviteMsg = (name, token) => `Hi ${name}, this is ChopPool. Set up your ChopPool vendor page here, it takes about 10 minutes: ${vendorSetupUrl(token)}`;
+const NETWORKS_MOMO = ["MTN", "Telecel", "AirtelTigo"];
+// The team: start a vendor form and share its link
+function openVendorInvite() {
+  openSheet(`${sheetHead("Send the form to the vendor", "They fill in their details, location, menu and payout number themselves. You check it before it goes live.")}
+    <form id="viForm" class="stack" novalidate>
+      <div class="grid2"><div><label for="viName">Vendor's name</label><input id="viName" placeholder="Auntie Akos Kitchen"></div><div><label for="viWa">Their WhatsApp</label><input id="viWa" inputmode="tel" placeholder="024 123 4567"></div></div>
+      <p class="err" id="viErr"></p><div class="sheet-foot"><button class="btn wide">Create their link</button></div></form>`);
+  $("#viForm").addEventListener("submit", async e => {
+    e.preventDefault(); const b = $("#viForm .btn"); if (b.disabled) return;
+    const name = $("#viName").value.trim(), w = $("#viWa").value.replace(/\D/g, "");
+    if (name.length < 2) return ($("#viErr").textContent = "Add the vendor's name.");
+    if (w && !/^0\d{9}$/.test(w)) return ($("#viErr").textContent = "Enter a 10-digit WhatsApp number starting with 0.");
+    const done = busyBtn(b, "Creating…");
+    try { const r = await api.vendorInvite(name, w); S.admin = null; showVendorLink(name, w, r.token); renderAdmin(); }
+    catch (er) { done(); $("#viErr").textContent = cleanErr(er); }
+  });
+}
+function showVendorLink(name, w, token) {
+  const msg = vendorInviteMsg(name, token);
+  openSheet(`${sheetHead("Send " + name + " their link", "It opens their form. They can come back to it any time until you approve them.")}
+    <div class="stack"><input readonly value="${esc(vendorSetupUrl(token))}" aria-label="Their link" onclick="this.select()">
+      ${w ? `<a class="wa" href="${wa(w)}?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener">${ICON.wa} Send on WhatsApp</a>` : ""}
+      <button type="button" class="${w ? "ghost" : "btn"} wide" id="viCopy">Copy message</button>
+      <p class="small muted">You'll find it under Vendors &amp; menus › New vendors, with everything they send.</p></div>`);
+  $("#viCopy").addEventListener("click", () => copy(msg, "Message copied"));
+}
+// The vendor's form
+async function viewVendorSetup(token) {
+  $("#view").innerHTML = `<div class="center muted" style="padding:40px 0">Opening your form…</div>`;
+  let d; try { d = await api.vendorSetupGet(token); }
+  catch (e) { $("#view").innerHTML = `<section class="card center stack"><h1>Link not working</h1><p class="muted">${esc(cleanErr(e))}</p></section>`; return; }
+  const head = (t, sub) => `<header class="topzone pagetop"><div class="pagehead"><div class="pagebrand">${LOGO(30)}<p class="brand" style="font-size:18px">ChopPool vendors</p></div>${themeBtn()}</div><h1>${t}</h1><p class="muted">${sub}</p></header>`;
+  if (!d.status) {
+    $("#view").innerHTML = head("You're live on ChopPool", "Your page is approved. Orders, your menu and prices are on your vendor page.")
+      + `<section class="card stack"><a class="btn wide" href="#kitchen-${esc(token)}">Open your vendor page</a></section>`;
+    return;
+  }
+  let pin = d.lat != null ? { lat: d.lat, lng: d.lng } : null;
+  const pinTxt = () => pin ? "Location set on the map." : "Not set yet.";
+  $("#view").innerHTML = head("Set up your ChopPool page", "Fill this in once. ChopPool checks it, then your menu goes live for nearby offices and hostels.")
+    + (d.status === "returned" ? `<div class="vbanner bad" style="margin-bottom:12px"><span><b>ChopPool asked for a change:</b> ${esc(d.note || "")}</span></div>`
+      : d.status === "submitted" ? `<div class="note" style="margin-bottom:12px">Sent. ChopPool is checking it and will call you. You can still make changes and send again.</div>` : "")
+    + `<form id="vsForm" class="stack" novalidate>
+      <section class="card stack"><h2>About you</h2>
+        <div><label for="vsName">Business name customers see</label><input id="vsName" value="${esc(d.name || "")}" placeholder="Sister Ama Waakye"></div>
+        <div><label for="vsTag">What you sell, in a few words</label><input id="vsTag" value="${esc(d.tagline || "")}" placeholder="Waakye and gob3, cooked every morning"></div>
+        <div class="grid2"><div><label for="vsOwner">Your name</label><input id="vsOwner" autocomplete="name" value="${esc(d.owner_name || "")}" placeholder="Ama Mensah"></div><div><label for="vsWa">Your WhatsApp</label><input id="vsWa" inputmode="tel" value="${esc(fmtPhone(d.whatsapp || ""))}" placeholder="024 123 4567"></div></div></section>
+      <section class="card stack"><h2>Where you cook</h2>
+        <div class="row" style="justify-content:flex-start;gap:10px"><span class="small" id="vsPinTxt">${pinTxt()}</span><button type="button" class="ghost" id="vsPin">${pin ? "Move pin" : "Set on map"}</button></div>
+        <div><label for="vsAddr">Area or landmark (optional)</label><input id="vsAddr" value="${esc(d.address || "")}" placeholder="Osu, near the Danquah Circle"></div></section>
+      <section class="card stack"><h2>When you cook</h2>${autoPicker(d.auto_days || [])}
+        <div><label for="vsCap">Meals you can make for lunch</label><input id="vsCap" inputmode="numeric" value="${esc(d.capacity || 30)}"></div></section>
+      <section class="card stack"><h2>Your menu</h2><p class="small muted">Add each dish with its price, and any extras customers can add.</p>${menuEditor(d.items || [], "setup", false)}</section>
+      <section class="card stack"><h2>Getting paid</h2>
+        <div class="grid2"><div><label for="vsMomo">Mobile money number we pay you on</label><input id="vsMomo" inputmode="tel" value="${esc(fmtPhone(d.payout_momo || ""))}" placeholder="024 123 4567"></div>
+          <div><label for="vsNet">Network</label><select id="vsNet">${NETWORKS_MOMO.map(n => `<option${d.payout_network === n ? " selected" : ""}>${n}</option>`).join("")}</select></div></div>
+        <p class="small muted">Customers never see your phone or payout number. You'll confirm ChopPool's fee terms when your page goes live.</p></section>
+      <p class="err" id="vsErr"></p>
+      <div class="stack" style="gap:8px"><button class="btn wide" id="vsSend">Send to ChopPool</button><button type="button" class="ghost wide" id="vsSave">Save and finish later</button></div></form>`;
+  $("#view").onclick = e => { menuEditorClick(e); };
+  $("#vsPin").addEventListener("click", () => openPinSheet("Where do you cook?", pin, p => { pin = p; $("#vsPinTxt").textContent = pinTxt(); $("#vsPin").textContent = "Move pin"; }));
+  const gather = () => ({
+    data: { name: $("#vsName").value.trim(), tagline: $("#vsTag").value.trim(), owner_name: $("#vsOwner").value.trim(), whatsapp: $("#vsWa").value.replace(/\D/g, ""), address: $("#vsAddr").value.trim(),
+      lat: pin ? pin.lat : null, lng: pin ? pin.lng : null, auto_days: pickedDays($("#vsForm [data-autopick]")), capacity: Number($("#vsCap").value) || 30,
+      payout_momo: $("#vsMomo").value.replace(/\D/g, ""), payout_network: $("#vsNet").value },
+    items: readMenu($("#vsForm [data-medit]")).filter(x => !x.removed).map(x => ({ name: x.name, price: x.price, icon: x.icon, addons: x.addons.map(({ orig_name, orig_price, pending, ...a }) => a) })) });
+  const save = async submit => {
+    const g = gather(), err = $("#vsErr"); err.textContent = "";
+    if (submit) {
+      if (g.data.name.length < 2) return (err.textContent = "Add your business name.");
+      if (!/^0\d{9}$/.test(g.data.whatsapp)) return (err.textContent = "Enter your 10-digit WhatsApp number.");
+      if (!pin) return (err.textContent = "Show where you cook on the map.");
+      if (!g.items.some(x => x.name.length >= 2 && Number(x.price) > 0)) return (err.textContent = "Add at least one dish with its price.");
+      if (g.items.some(x => x.name.length < 2 || !(Number(x.price) > 0))) return (err.textContent = "Each dish needs a name and a price above 0.");
+      if (!/^0\d{9}$/.test(g.data.payout_momo)) return (err.textContent = "Enter the 10-digit mobile money number we pay you on.");
+    }
+    const b = submit ? $("#vsSend") : $("#vsSave"); if (b.disabled) return; const done = busyBtn(b, submit ? "Sending…" : "Saving…");
+    try {
+      await api.vendorSetupSave(token, g.data, g.items, submit);
+      if (submit) {
+        $("#view").innerHTML = head("Sent to ChopPool", "Thank you. ChopPool will check your details and call you. Your page goes live once it's approved.")
+          + `<section class="card stack"><button class="ghost wide" id="vsAgain">Make changes</button></section>`;
+        $("#vsAgain").addEventListener("click", () => viewVendorSetup(token)); scrollTo(0, 0);
+      } else { done(); toast("Saved. Open the same link to carry on."); }
+    } catch (er) { done(); err.textContent = cleanErr(er); }
+  };
+  $("#vsForm").addEventListener("submit", e => { e.preventDefault(); save(true); });
+  $("#vsSave").addEventListener("click", () => save(false));
+}
+
 /* ---------- Free listing for sellers customers added ---------- */
 function openListingForm(token, k) {
   const L = k.listing || {}; let pin = L.lat != null ? { lat: L.lat, lng: L.lng } : null;
@@ -7131,10 +7285,11 @@ async function route() {
   }
   document.body.classList.remove("is-admin");
   // The browser tab says which page this is
-  document.title = h === "rider-signup" ? "Rider sign-up · ChopPool" : h.startsWith("kitchen-") ? "Vendor · ChopPool" : h.startsWith("rider-") ? "Rider · ChopPool"
+  document.title = h === "rider-signup" ? "Rider sign-up · ChopPool" : h.startsWith("vendor-setup-") ? "Vendor sign-up · ChopPool" : h.startsWith("kitchen-") ? "Vendor · ChopPool" : h.startsWith("rider-") ? "Rider · ChopPool"
     : h.startsWith("host-") ? "Drop point · ChopPool" : h === "admin" ? "Admin · ChopPool" : "ChopPool · " + TAGLINE;
   if (S.recovery) return viewRecovery();   // nothing else until the new password is set
   if (h === "rider-signup") return viewRiderSignup();
+  if (h.startsWith("vendor-setup-")) return viewVendorSetup(h.slice(13));
   if (h === "privacy" || h === "terms") return viewLegal(h);
   const view = h.startsWith("kitchen-") ? "kitchen" : h.startsWith("rider-") ? "rider" : h.startsWith("host-") ? "host" : h === "admin" ? "admin" : "order";
   document.querySelectorAll("#demoBar a").forEach(a => { if (a.getAttribute("href") === "#" + h || (view === "order" && a.dataset.view === "order")) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
