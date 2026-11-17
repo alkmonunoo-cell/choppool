@@ -324,6 +324,7 @@ button { font: inherit; cursor: pointer; border-radius: 14px; border: 1px solid 
 .ghost { background: var(--surface); color: var(--ink); border-color: var(--line); }
 .wide { width: 100%; padding: 15px; font-size: 16px; }
 .linkbtn { background: none; border: none; padding: 0; color: var(--accent); font-weight: 700; }
+[data-feebox] [hidden] { display: none !important; }
 [data-medit="setup"] .mphoto { pointer-events: none; }
 [data-medit="setup"] .mphoto .cam { display: none; }
 .wa { display: flex; align-items: center; justify-content: center; gap: 8px; text-decoration: none; background: #1F8F4E; color: #fff; font-weight: 700; padding: 14px; border-radius: 14px; }
@@ -1312,8 +1313,9 @@ function makeDemoApi() {
     : new Date(Math.min(+at(p.order_date, settings.cutoff), Math.max(Date.parse(p.created_at) + settings.accept_timeout_min * 6e4, +confirmAt(p.order_date))));
   const poolFee = p => { const os = orders.filter(o => o.pool_id === p.id && ["paid", "collected"].includes(o.status)), food = os.reduce((t, o) => t + (Number(o.quote_price ?? o.unit_price) + Number(o.addons_total || 0)) * o.qty, 0), n = os.reduce((t, o) => t + o.qty, 0);
     return n ? Math.round(Number(p.fee_rate || 0) * food * Math.max(0, n - Number(p.fee_free ?? 5)) / n * 100) / 100 : 0; };
+  const kRate = k => k && k.fee_own ? Number(k.fee_own_rate) : Number(settings.vendor_fee_rate), kFree = k => k && k.fee_own ? Number(k.fee_own_free) : Number(settings.vendor_fee_free);   // a vendor's own fee, else the default (update 46)
   const isOpen = (kid, d) => days.some(x => x.kitchen_id === kid && x.order_date === d) || (k => !!k && (k.auto_days || []).includes(isoDow(d)) && !(k.paused_dates || []).includes(d)
-    && Number(settings.vendor_fee_rate) <= Number(k.fee_ack || 0) && Number(settings.vendor_fee_free) >= Number(k.fee_free_ack ?? 5))(kitchens.find(x => x.id === kid));   // automatic days need the current fee accepted
+    && kRate(k) <= Number(k.fee_ack || 0) && kFree(k) >= Number(k.fee_free_ack ?? 5))(kitchens.find(x => x.id === kid));   // automatic days need the current fee accepted
   const nowIso = () => new Date().toISOString();
   const unmatched = [], payouts = [], activity = [];
   const pastCutoff = d => new Date() >= at(d, settings.cutoff);
@@ -1408,7 +1410,7 @@ function makeDemoApi() {
     const st = isOpen(k.id, d) ? "collecting" : "waiting";
     let pl = pools.filter(p => p.order_date === d && p.site_id === si.id && p.kitchen_id === k.id && p.status === st && meals(p.id) + Math.max(r.qty, r.need || 0) <= ps).sort((a, b) => a.seq - b.seq)[0];
     if (!pl) { pl = { id: "p" + uid(), created_at: nowIso(), order_date: d, site_id: si.id, kitchen_id: k.id, seq: nextSeq(), status: st, rider_id: null, trip_ref: "", trip_cost: null,
-      fee_rate: Math.min(Number(k.fee_ack || 0), Number(settings.vendor_fee_rate)), fee_free: Math.max(Number(k.fee_free_ack ?? 5), Number(settings.vendor_fee_free)) }; pools.push(pl); }
+      fee_rate: Math.min(Number(k.fee_ack || 0), kRate(k)), fee_free: Math.max(Number(k.fee_free_ack ?? 5), kFree(k)) }; pools.push(pl); }
     const code = newCode(si.id, d, pl.id);
     const o = { id: "o" + uid(), created_at: nowIso(), order_date: d, pool_id: pl.id, site_id: si.id, kitchen_id: k.id, item_id: m.id, user_id: sim ? null : (me ? me.id : null),
       item_name: m.name, unit_price: m.price, qty: r.qty, addons: add, addons_total: addT, note: (r.note || "").trim() || null, special_request: special, quote_price: null,
@@ -1590,7 +1592,7 @@ function makeDemoApi() {
       return { kitchen: { name: k.name, public_name: k.public_name, capacity: k.capacity, pool_size: kSize(k), pool_size_own: k.pool_size || null, no_daily_limit: !!k.no_daily_limit, pool_default: settings.max_meals, pool_ceiling: settings.pool_ceiling, delivery_mode: k.delivery_mode, added_by_customer: k.added_by_customer, open: isOpen(k.id, date), listing_status: k.listing_status || "none", listing: k.listing || null,
           auto_days: k.auto_days || [], paused: (k.paused_dates || []).includes(date), confirmed: days.some(x => x.kitchen_id === k.id && x.order_date === date),
           has_pin: hasPin(k), free_m: k.free_m || null, free_min: k.free_min || 0, free_max_m: settings.free_max_m, fee_ack: Number(k.fee_ack || 0), fee_free_ack: Number(k.fee_free_ack ?? 5),
-          fee_rate: Number(settings.vendor_fee_rate), fee_free: Number(settings.vendor_fee_free), next_day_confirm_by: settings.next_day_confirm_by },
+          fee_rate: kRate(k), fee_free: kFree(k), fee_own: !!k.fee_own, next_day_confirm_by: settings.next_day_confirm_by },
         menu: items.filter(i => i.kitchen_id === k.id && i.active !== false).map(i => ({ id: i.id, name: i.name, price: i.price, addons: i.addons || [], photo_url: i.photo_url || null, icon: i.icon || null })),
         pools: pools.filter(p => p.kitchen_id === k.id && p.order_date === date && p.status !== "cancelled" && meals(p.id) > 0).map(p => {
           const si = sites.find(s => s.id === p.site_id);
@@ -1706,7 +1708,7 @@ function makeDemoApi() {
     async uploadReviewPhoto(orderId, blob) { return await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(blob); }); },
     async vendorSetPhoto(token, itemId, url) { const k = byToken(kitchens, "token", token); const i = items.find(x => x.id === itemId && x.kitchen_id === k.id); if (!i) throw new Error("That dish is not on your menu."); i.photo_url = url; i.photo_status = "pending"; },
     async uploadPhoto(folder, blob) { return await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(blob); }); },
-    async kitchenAcceptTerms(token) { const k = byToken(kitchens, "token", token); k.fee_ack = Number(settings.vendor_fee_rate); k.fee_free_ack = Number(settings.vendor_fee_free);
+    async kitchenAcceptTerms(token) { const k = byToken(kitchens, "token", token); k.fee_ack = kRate(k); k.fee_free_ack = kFree(k);
       pools.filter(p => p.kitchen_id === k.id && p.status === "waiting").forEach(p => { p.fee_rate = k.fee_ack; p.fee_free = k.fee_free_ack; }); return { rate: k.fee_ack, free: k.fee_free_ack }; },
     async vendorSetCapacity(token, pool, daily, noLimit) { const k = byToken(kitchens, "token", token);
       if (pool != null && (pool < 5 || pool > settings.pool_ceiling)) throw new Error("Meals per pool must be between 5 and " + settings.pool_ceiling + ".");
@@ -1716,7 +1718,7 @@ function makeDemoApi() {
     async vendorSetFree(token, m, min) { const k = byToken(kitchens, "token", token); if (!hasPin(k)) throw new Error("Ask ChopPool to pin your kitchen on the map first.");
       k.free_m = Number(m) > 0 ? Math.min(Math.round(Number(m)), Number(settings.free_max_m)) : null; k.free_min = Math.max(0, Math.min(Number(min) || 0, 50)); return { free_m: k.free_m, free_min: k.free_min }; },
     async kitchenOpenDay(token, date) { const k = byToken(kitchens, "token", token);
-      if (Number(settings.vendor_fee_rate) > Number(k.fee_ack || 0) || Number(settings.vendor_fee_free) < Number(k.fee_free_ack ?? 5)) throw new Error("Accept the new ChopPool fee terms first."); k.paused_dates = (k.paused_dates || []).filter(x => x !== date); if (!isOpen(k.id, date)) days.push({ kitchen_id: k.id, order_date: date }); pools.filter(p => p.kitchen_id === k.id && p.order_date === date && p.status === "waiting").forEach(p => { p.status = "collecting"; }); },
+      if (kRate(k) > Number(k.fee_ack || 0) || kFree(k) < Number(k.fee_free_ack ?? 5)) throw new Error("Accept the new ChopPool fee terms first."); k.paused_dates = (k.paused_dates || []).filter(x => x !== date); if (!isOpen(k.id, date)) days.push({ kitchen_id: k.id, order_date: date }); pools.filter(p => p.kitchen_id === k.id && p.order_date === date && p.status === "waiting").forEach(p => { p.status = "collecting"; }); },
     async kitchenUpdate(token, pid, status) {
       const k = byToken(kitchens, "token", token); const p = pools.find(x => x.id === pid && x.kitchen_id === k.id);
       if (["picked_up", "arriving", "delivered"].includes(status) && k.delivery_mode !== "runner" && !pfree(p.id)) throw new Error("A ChopPool rider delivers this pool.");
@@ -5672,7 +5674,7 @@ async function renderAdmin(cached, quiet) {   // quiet = background/refresh-butt
       ["Building requests", pending.length, "buildings:requests", "warn", "Waiting for approval"],
       ["Vendor forms to check", vToCheck.length, "menus:requests", "warn", "Vendors who sent their details"],
       ["Vendor listing requests", listReq.length, "menus:requests", "warn", "Vendors asking to be listed"],
-      ["Vendors yet to accept the new fee", A.kitchens.filter(k => k.active && !k.archived && (Number(s.vendor_fee_rate) > Number(k.fee_ack || 0) || Number(s.vendor_fee_free) < Number(k.fee_free_ack ?? 5))).length, "menus:list", "warn", "Their automatic days are paused until they accept on their page"],
+      ["Vendors yet to accept the new fee", A.kitchens.filter(k => k.active && !k.archived && (vFeeRate(k, s) > Number(k.fee_ack || 0) || vFeeFree(k, s) < Number(k.fee_free_ack ?? 5))).length, "menus:list", "warn", "Their automatic days are paused until they accept on their page"],
       ["Rider applications", riderApps.length, "riders:apply", "warn", "Riders asking to join"],
       ["Small pools", small.length, "today:pools", "warn", "Under " + s.min_pool + " meals near cut-off"],
       ["Unchecked at cut-off", nearCut ? live.filter(o => o.status === "pending" && !o.pay_issue && o.pay_via !== "paystack").length : 0, "today:orders", "bad", "Payments still not checked"],
@@ -5938,7 +5940,7 @@ async function renderAdmin(cached, quiet) {   // quiet = background/refresh-butt
       body.innerHTML = addBar("Add vendor") + listBar("k") + `<div class="stack" style="gap:8px">${list.map(k => { const m = livePools.filter(p => p.kitchen_id === k.id).reduce((t, p) => t + p.meals, 0);
         return `<details class="item" data-kitchen="${esc(k.id)}" data-key="k:${esc(k.id)}"${isOpen("k:" + k.id)}>
         <summary><span class="ititle"><strong>${esc(k.name)}</strong><span class="small muted">"${esc(k.public_name)}"${k.added_by_customer ? " · added by a customer" : ""}</span></span>
-          <span class="imeta">${liveK.has(k.id) ? pill(m + " meals " + (d === today() ? "today" : fmtDate(d)), "ok") : ""}${k.active ? "" : pill("Paused", "dim")}${hasPin(k) ? "" : pill("No map pin", "warn")}<span class="small muted">${esc(added(k))}</span></span></summary>
+          <span class="imeta">${liveK.has(k.id) ? pill(m + " meals " + (d === today() ? "today" : fmtDate(d)), "ok") : ""}${k.active ? "" : pill("Paused", "dim")}${k.fee_own ? pill("Own fee " + pct(k.fee_own_rate), "dim") : ""}${hasPin(k) ? "" : pill("No map pin", "warn")}<span class="small muted">${esc(added(k))}</span></span></summary>
         <div class="ibody">
         <div class="grid2"><div><label>Real name</label><input data-f="name" value="${esc(k.name)}"></div><div><label>Menu name customers see</label><input data-f="public_name" value="${esc(k.public_name)}"></div></div>
         <div class="grid2"><div><label>Short description</label><input data-f="tagline" value="${esc(k.tagline || "")}"></div><div><label>Pickup address</label><input data-f="address" value="${esc(k.address || "")}"></div></div>
@@ -5952,6 +5954,7 @@ async function renderAdmin(cached, quiet) {   // quiet = background/refresh-butt
           <label class="choice" style="padding:8px 10px"><input type="checkbox" data-f="active"${k.active ? " checked" : ""}><span>Active</span></label></div>
         <div class="group"><p class="group-title">Days they cook (pools open without the vendor confirming)</p>${autoPicker(k.auto_days)}
           <p class="small muted" style="margin-top:4px">${(k.auto_days || []).length ? "On: " + daysText(k.auto_days) + ". Untick every day to switch it off for a vendor who lets pools down." : "Off: the vendor confirms each day."}${(k.paused_dates || []).filter(x => x >= today()).length ? " Paused: " + k.paused_dates.filter(x => x >= today()).map(fmtDate).join(", ") + "." : ""}</p></div>
+        ${feeBox(k, isSuper)}
         ${k.added_by_customer ? `<p class="small muted">Added by a customer: only their building sees this vendor.</p><button class="ghost" data-act="kitchen-listall" style="justify-self:start">List for all nearby buildings</button>` : ""}
         <div class="row" style="justify-content:flex-start;gap:8px;flex-wrap:wrap"><button class="ghost" data-act="kitchen-save">Save</button>${sendLink(k.whatsapp, MSG.sellerPage(k))}<button class="ghost" data-act="kitchen-copy">Copy link</button><button class="ghost" data-act="kitchen-reset">Reset link</button><button class="ghost" data-act="kitchen-remove" style="color:var(--danger)">Remove</button></div>
         <p class="group-title">Menu</p>
@@ -6070,7 +6073,8 @@ async function renderAdmin(cached, quiet) {   // quiet = background/refresh-butt
       ${isSuper ? `<section class="card stack"><h2>ChopPool fee on bigger pools <span class="small muted">(owner only)</span></h2>
         <div class="grid2"><div><label for="rlRate">Fee on each meal after the free ones (%)</label><input id="rlRate" name="vendor_fee_pct" inputmode="decimal" value="${esc(Math.round(Number(s.vendor_fee_rate || 0) * 1000) / 10)}"></div>
           <div><label for="rlFreeN">Free meals in every pool</label><input id="rlFreeN" name="vendor_fee_free" inputmode="numeric" value="${esc(s.vendor_fee_free ?? 5)}"></div></div>
-        <p class="small muted">0% switches it off. Vendors see new terms before they confirm their next pool; pools they've already confirmed keep the old terms.</p></section>` : ""}`);
+        <p class="small muted">0% switches it off. Vendors see new terms before they confirm their next pool; pools they've already confirmed keep the old terms.</p>
+        <p class="small muted">This is the default for every vendor. To give one vendor their own terms, open them under Vendors &amp; menus › Vendors and tick "Own terms for this vendor".</p></section>` : ""}`);
   if (sub === "rules" && tab === "today") body.innerHTML = setForm(`<section class="card stack"><h2>Collecting lunch</h2>
         <div><label for="pfRecv">"Got my food" confirms itself after (minutes)</label><input id="pfRecv" name="auto_receive_min" inputmode="numeric" value="${esc(s.auto_receive_min ?? 120)}"></div>
         <p class="small muted">If a customer forgets to tap Got my food, the order is marked received after this time. At least 30 minutes.</p></section>`);
@@ -6375,9 +6379,23 @@ async function adminClick(e) {
       const psz = fval(kc, "pool_size"), ceil = Number(S.settings.pool_ceiling || 15);
       if (psz && !(Number.isInteger(+psz) && +psz >= 5 && +psz <= ceil)) return toast("Meals per pool must be from 5 to " + ceil + ", or empty for the default.");
       const poolPatch = psz === undefined ? {} : { pool_size: psz && +psz !== Number(S.settings.max_meals) ? +psz : null, no_daily_limit: !!fval(kc, "no_daily_limit") };
-      return run(() => api.updateKitchen(k.id, { ...poolPatch, name: fval(kc, "name"), public_name: fval(kc, "public_name"), tagline: fval(kc, "tagline") || null, address: fval(kc, "address") || null,
+      // The vendor's own fee (owner only; the box isn't there for coordinators)
+      let feePatch = {}, feeMsg = "Saved";
+      if (kc.querySelector('[data-f="fee_own"]')) {
+        const own = !!fval(kc, "fee_own");
+        if (own) {
+          const pc = Number(String(fval(kc, "fee_own_pct")).replace("%", "").trim()), fr = Number(fval(kc, "fee_own_free"));
+          if (!(String(fval(kc, "fee_own_pct")).trim() !== "" && pc >= 0 && pc <= 50)) return toast("Enter the vendor's fee from 0 to 50%.");
+          if (!(Number.isInteger(fr) && fr >= 0 && fr <= 100)) return toast("Enter the free meals as a whole number from 0 to 100.");
+          feePatch = { fee_own: true, fee_own_rate: Math.round(pc * 10) / 1000, fee_own_free: fr };
+        } else feePatch = { fee_own: false, fee_own_rate: null, fee_own_free: null };
+        if (feePatch.fee_own === !!k.fee_own && Number(feePatch.fee_own_rate ?? -1) === Number(k.fee_own_rate ?? -1) && Number(feePatch.fee_own_free ?? -1) === Number(k.fee_own_free ?? -1)) feePatch = {};
+        else { const nk = { ...k, ...feePatch };
+          if (k.active && (vFeeRate(nk, S.settings) > Number(k.fee_ack || 0) || vFeeFree(nk, S.settings) < Number(k.fee_free_ack ?? 5))) feeMsg = "Saved. " + (k.public_name || k.name) + " will be asked to accept the new fee before their next pool opens."; }
+      }
+      return run(() => api.updateKitchen(k.id, { ...poolPatch, ...feePatch, name: fval(kc, "name"), public_name: fval(kc, "public_name"), tagline: fval(kc, "tagline") || null, address: fval(kc, "address") || null,
         whatsapp: w || null, delivery_mode: fval(kc, "delivery_mode"), capacity: Number(fval(kc, "capacity")) || k.capacity, active: fval(kc, "active"), free_m: Number(fval(kc, "free_m")) > 0 ? Math.min(Math.round(Number(fval(kc, "free_m"))), Number(S.settings.free_max_m || 1500)) : null,
-        ...(kc.querySelector("[data-autopick]") ? { auto_days: pickedDays(kc.querySelector("[data-autopick]")) } : {}) }).then(async () => Object.assign(S, await api.load())), "Saved");
+        ...(kc.querySelector("[data-autopick]") ? { auto_days: pickedDays(kc.querySelector("[data-autopick]")) } : {}) }).then(async () => Object.assign(S, await api.load())), feeMsg);
     }
     if (act === "kitchen-pin") return openPinSheet("Where is " + k.name + "?", hasPin(k) ? k : null, pin => run(() => api.updateKitchen(k.id, { lat: pin.lat, lng: pin.lng }).then(async () => Object.assign(S, await api.load())), "Location saved"));
     if (act === "kitchen-remove") return confirmRemove("Remove " + k.name + "?", "Customers will no longer see this menu. If it has past orders, it's archived so your records stay complete.", () => api.removeKitchen(k.id));
@@ -6878,6 +6896,22 @@ document.addEventListener("change", e => {
 const daysText = list => { const l = [...list].sort(); if (l.join() === "1,2,3,4,5") return "Mon–Fri"; if (l.join() === "1,2,3,4,5,6,7") return "every day"; return l.map(n => DOW[n - 1][1]).join(", "); };
 // ChopPool fee terms for vendors: the first N meals in each pool are free, then X% of each meal
 const pct = r => Math.round(Number(r) * 1000) / 10 + "%";
+const vFeeRate = (k, s) => k.fee_own ? Number(k.fee_own_rate) : Number(s.vendor_fee_rate), vFeeFree = (k, s) => k.fee_own ? Number(k.fee_own_free) : Number(s.vendor_fee_free ?? 5);
+// The team's view of one vendor's ChopPool fee: the default from Settings, or their own terms (owner sets them)
+function feeBox(k, isSuper) {
+  const s = S.settings, own = !!k.fee_own, r = vFeeRate(k, s), f = vFeeFree(k, s);
+  const dflt = "the first " + (s.vendor_fee_free ?? 5) + " meals in each pool free, then " + pct(s.vendor_fee_rate || 0);
+  const waiting = k.active && (r > Number(k.fee_ack || 0) || f < Number(k.fee_free_ack ?? 5));
+  return `<div class="group" data-feebox><p class="group-title">ChopPool fee</p>
+    ${isSuper ? `<label class="choice" style="padding:8px 10px;justify-self:start"><input type="checkbox" data-f="fee_own"${own ? " checked" : ""}><span>Own terms for this vendor</span></label>
+      <p class="small muted" data-feedflt${own ? " hidden" : ""}>Uses the default: ${esc(dflt)}.</p>
+      <div class="grid2" data-feeown${own ? "" : " hidden"}><div><label>Fee on each meal after the free ones (%)</label><input data-f="fee_own_pct" inputmode="decimal" value="${esc(Math.round(r * 1000) / 10)}"></div>
+        <div><label>Free meals in every pool</label><input data-f="fee_own_free" inputmode="numeric" value="${esc(f)}"></div></div>`
+      : `<p class="small">${own ? "Own terms: the first " + esc(f) + " meals in each pool free, then " + esc(pct(r)) + "." : "Uses the default: " + esc(dflt) + "."} <span class="muted">Only the owner can change this.</span></p>`}
+    ${waiting ? `<p class="small" style="color:var(--hint)">Waiting for them to accept these terms on their vendor page. Their automatic days are paused until they do.</p>` : ""}</div>`;
+}
+document.addEventListener("change", e => { const c = e.target.closest && e.target.closest('[data-feebox] [data-f="fee_own"]'); if (!c) return;
+  const b = c.closest("[data-feebox]"); b.querySelector("[data-feeown]").hidden = !c.checked; b.querySelector("[data-feedflt]").hidden = c.checked; });
 const termsNeed = k => Number(k.fee_rate) > Number(k.fee_ack || 0) || Number(k.fee_free) < Number(k.fee_free_ack ?? 5);
 const termsLine = k => "ChopPool fee: the first " + k.fee_free + " meals in each pool are free, then " + pct(k.fee_rate) + " of each meal.";
 function termsBox(k, menu) {
@@ -7121,7 +7155,7 @@ async function viewVendorSetup(token) {
   }
   let pin = d.lat != null ? { lat: d.lat, lng: d.lng } : null;
   const pinTxt = () => pin ? "Location set on the map." : "Not set yet.";
-  $("#view").innerHTML = head("Set up your ChopPool page", "Fill this in once. ChopPool checks it, then your menu goes live for nearby offices and hostels.")
+  $("#view").innerHTML = head("Set up your ChopPool page", "Tell us about your food and where you cook. Once ChopPool approves it, nearby offices and hostels can order from you.")
     + (d.status === "returned" ? `<div class="vbanner bad" style="margin-bottom:12px"><span><b>ChopPool asked for a change:</b> ${esc(d.note || "")}</span></div>`
       : d.status === "submitted" ? `<div class="note" style="margin-bottom:12px">Sent. ChopPool is checking it and will call you. You can still make changes and send again.</div>` : "")
     + `<form id="vsForm" class="stack" novalidate>
