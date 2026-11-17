@@ -324,6 +324,35 @@ button { font: inherit; cursor: pointer; border-radius: 14px; border: 1px solid 
 .ghost { background: var(--surface); color: var(--ink); border-color: var(--line); }
 .wide { width: 100%; padding: 15px; font-size: 16px; }
 .linkbtn { background: none; border: none; padding: 0; color: var(--accent); font-weight: 700; }
+/* Building discounts and required choices (update 47) */
+.discbadge { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 800; color: var(--ok); background: var(--ok-soft); border-radius: 99px; padding: 3px 9px; width: fit-content; }
+.discbadge.inl { margin: 2px 0; }
+.discbadge.big { font-size: 13.5px; padding: 6px 12px; margin: 2px 0 6px; }
+s.was { color: var(--muted); font-weight: 500; text-decoration-thickness: 1.5px; margin-right: 2px; }
+.discline { color: var(--ok); font-weight: 700; }
+.reqtag { font-size: 11px; font-weight: 800; color: var(--accent); background: var(--accent-soft); border-radius: 99px; padding: 2px 8px; margin-left: 6px; vertical-align: 1px; }
+.cgroup.need .reqtag { color: var(--on-accent); background: var(--danger); }
+.cgroup.need .chips { animation: cpShake .35s; }
+@keyframes cpShake { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+.copt svg { width: 14px; height: 14px; vertical-align: -2px; margin-right: 4px; }
+.mbar { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.mmove { margin-left: auto; display: flex; gap: 6px; }
+.mmove button { width: 36px; height: 34px; padding: 0; display: grid; place-items: center; border-radius: 10px; }
+.mmove [data-mdown] svg { transform: rotate(180deg); }
+.mrows > .mdish:first-child [data-mup], .mrows > .mdish:last-child [data-mdown] { opacity: .35; }
+.mdish.moved { animation: cpMoved .5s ease-out; }
+@keyframes cpMoved { from { box-shadow: 0 0 0 2px var(--accent); } to { box-shadow: 0 0 0 2px transparent; } }
+.mgroups { display: grid; gap: 8px; padding-left: 60px; }
+.mgroups:empty { display: none; }
+.mgroup { display: grid; gap: 6px; padding: 10px; border-radius: 14px; border: 1.5px dashed color-mix(in srgb, var(--accent) 45%, var(--line)); background: var(--surface); }
+.mgtop { display: grid; grid-template-columns: auto minmax(0, 1fr) 32px; gap: 8px; align-items: center; }
+.mgopts { display: grid; gap: 6px; }
+.gcopy { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+@media (max-width: 480px) { .mgroups { padding-left: 0; } }
+.discrow { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 12px; border-radius: 14px; background: var(--surface-2); }
+.dslist { display: grid; gap: 6px; max-height: 260px; overflow: auto; }
+.dsrow { display: grid; text-align: left; gap: 2px; padding: 10px 12px; border-radius: 12px; border: 1.5px solid var(--line); background: var(--surface); color: var(--ink); }
+.dsrow.on { border-color: var(--accent); background: var(--accent-soft); }
 [data-feebox] [hidden] { display: none !important; }
 [data-medit="setup"] .mphoto { pointer-events: none; }
 [data-medit="setup"] .mphoto .cam { display: none; }
@@ -1313,6 +1342,18 @@ function makeDemoApi() {
     : new Date(Math.min(+at(p.order_date, settings.cutoff), Math.max(Date.parse(p.created_at) + settings.accept_timeout_min * 6e4, +confirmAt(p.order_date))));
   const poolFee = p => { const os = orders.filter(o => o.pool_id === p.id && ["paid", "collected"].includes(o.status)), food = os.reduce((t, o) => t + (Number(o.quote_price ?? o.unit_price) + Number(o.addons_total || 0)) * o.qty, 0), n = os.reduce((t, o) => t + o.qty, 0);
     return n ? Math.round(Number(p.fee_rate || 0) * food * Math.max(0, n - Number(p.fee_free ?? 5)) / n * 100) / 100 : 0; };
+  const discounts = [];   // vendor -> building % off (update 47)
+  const discPct = (kid, sid) => (discounts.find(d => d.kitchen_id === kid && d.site_id === sid) || {}).pct || 0;
+  const cut = (v, p) => Math.round(Math.round(Number(v || 0) * 100) * (100 - p) / 100) / 100;
+  // Mirrors place_order: required choices, then the building discount on the dish and extras
+  const priceLine = (m, keys, sid, special) => {
+    const add = addonPicked(m.addons, keys || []);
+    if (!special) for (const g of [...new Set((m.addons || []).filter(a => a.group && !a.off && !a.pending).map(a => a.group))]) {
+      const got = add.filter(a => a.group === g); if (!got.length) throw new Error('Pick one option for "' + g + '" on ' + m.name + "."); if (got.length > 1 || got[0].qty > 1) throw new Error('Pick just one option for "' + g + '" on ' + m.name + ".");
+    }
+    const p = discPct(m.kitchen_id, sid), adds = p ? add.map(a => ({ ...a, price: cut(a.price, p), was: a.price })) : add;
+    return { unit: p ? cut(m.price, p) : m.price, add: adds, addT: Math.round(adds.reduce((t, a) => t + Number(a.price) * a.qty, 0) * 100) / 100, pct: p };
+  };
   const kRate = k => k && k.fee_own ? Number(k.fee_own_rate) : Number(settings.vendor_fee_rate), kFree = k => k && k.fee_own ? Number(k.fee_own_free) : Number(settings.vendor_fee_free);   // a vendor's own fee, else the default (update 46)
   const isOpen = (kid, d) => days.some(x => x.kitchen_id === kid && x.order_date === d) || (k => !!k && (k.auto_days || []).includes(isoDow(d)) && !(k.paused_dates || []).includes(d)
     && kRate(k) <= Number(k.fee_ack || 0) && kFree(k) >= Number(k.fee_free_ack ?? 5))(kitchens.find(x => x.id === kid));   // automatic days need the current fee accepted
@@ -1402,7 +1443,7 @@ function makeDemoApi() {
     const d = orderDate(settings), special = (r.special || "").trim() || null;
     if ((k.paused_dates || []).includes(d) && !days.some(x => x.kitchen_id === k.id && x.order_date === d)) throw new Error(k.public_name + " isn't cooking " + (d === today() ? "today" : "on that day") + ". Choose another vendor.");
     if (special && d === today() && new Date() >= at(d, settings.special_cutoff)) throw new Error("Custom orders close at " + settings.special_cutoff + ". You can still order from the menu.");
-    const add = addonPicked(m.addons, r.addons || []), addT = add.reduce((t, a) => t + Number(a.price) * a.qty, 0);
+    const pr = priceLine(m, r.addons, si.id, special), add = pr.add, addT = pr.addT;
     const load = orders.filter(o => o.kitchen_id === k.id && o.order_date === d && o.status !== "cancelled").reduce((t, o) => t + o.qty, 0);
     if (!k.no_daily_limit && load + r.qty > k.capacity) throw new Error("This menu is fully booked for today. Try another one.");
     const nextSeq = () => Math.max(0, ...pools.filter(p => p.order_date === d && p.site_id === si.id && p.kitchen_id === k.id && p.status !== "cancelled").map(p => p.seq)) + 1;
@@ -1413,7 +1454,7 @@ function makeDemoApi() {
       fee_rate: Math.min(Number(k.fee_ack || 0), kRate(k)), fee_free: Math.max(Number(k.fee_free_ack ?? 5), kFree(k)) }; pools.push(pl); }
     const code = newCode(si.id, d, pl.id);
     const o = { id: "o" + uid(), created_at: nowIso(), order_date: d, pool_id: pl.id, site_id: si.id, kitchen_id: k.id, item_id: m.id, user_id: sim ? null : (me ? me.id : null),
-      item_name: m.name, unit_price: m.price, qty: r.qty, addons: add, addons_total: addT, note: (r.note || "").trim() || null, special_request: special, quote_price: null,
+      item_name: m.name, unit_price: pr.unit, discount_pct: pr.pct, qty: r.qty, addons: add, addons_total: addT, note: (r.note || "").trim() || null, special_request: special, quote_price: null,
       customer_name: r.name, phone: r.phone, momo_ref: null, wallet_used: 0, code, max_fee: upfrontPerMeal(tripOf(pl.id), r.qty, settings), service_fee: settings.service_fee, fee_per_meal: true, parent_id: null,
       status: special ? "quote_requested" : "pending", cancel_reason: null, refund_needed: false, collected_at: null };
     orders.push(o);
@@ -1432,8 +1473,8 @@ function makeDemoApi() {
     const pl = pools.find(p => p.id === par.pool_id);
     if (!["waiting", "collecting"].includes(pl.status)) throw new Error("This pool has closed. Start a new order instead.");
     if (meals(pl.id) + r.qty > kSize(kitchens.find(x => x.id === par.kitchen_id))) throw new Error("This pool is full. Start a new order for more plates.");
-    const add = addonPicked(m.addons, r.addons || []), addT = add.reduce((t, a) => t + Number(a.price) * a.qty, 0);
-    const o = { ...par, id: "o" + uid(), created_at: nowIso(), item_id: m.id, item_name: m.name, unit_price: m.price, qty: r.qty, addons: add, addons_total: addT, note: (r.note || "").trim() || null,
+    const pr = priceLine(m, r.addons, par.site_id, false), add = pr.add, addT = pr.addT;
+    const o = { ...par, id: "o" + uid(), created_at: nowIso(), item_id: m.id, item_name: m.name, unit_price: pr.unit, discount_pct: pr.pct, qty: r.qty, addons: add, addons_total: addT, note: (r.note || "").trim() || null,
       special_request: null, quote_price: null, momo_ref: null, wallet_used: 0, max_fee: 0, service_fee: settings.service_fee, fee_per_meal: true, parent_id: par.id, status: "pending", cancel_reason: null, refund_needed: false, collected_at: null };
     orders.push(o);
     let payment; try { payment = settle(o, r.ref, r.useWallet); } catch (e) { orders.pop(); throw e; }
@@ -1469,7 +1510,7 @@ function makeDemoApi() {
     async load() { const pop = {}, siteCounts = {}; orders.filter(o => o.status !== "cancelled").forEach(o => { pop[o.item_id] = (pop[o.item_id] || 0) + o.qty; (siteCounts[o.site_id] = siteCounts[o.site_id] || {})[o.kitchen_id] = ((siteCounts[o.site_id] || {})[o.kitchen_id] || 0) + o.qty; });
       const scores = { k1: { orders: 140, on_time: 98, reliable: 100, come_back: 64, rating: 4.7, ratings: 38 }, k2: { orders: 36, on_time: 91, reliable: 95, come_back: 41, rating: 4.4, ratings: 9 } };
       kitchens.forEach(k => { const rs = reviews.filter(r => r.kitchen_id === k.id && !r.hidden); if (rs.length) { scores[k.id] = scores[k.id] || { orders: 0 }; scores[k.id].rating = Math.round(rs.reduce((t, r) => t + r.rating, 0) / rs.length * 10) / 10; scores[k.id].ratings = rs.length; } });
-      return { pop, siteCounts, scores, payMethods: payMethods.filter(p => p.active), settings, sites: sites.filter(x => x.status === "active" && x.active), menus: kitchens.filter(k => k.active).map(k => ({ id: k.id, public_name: k.public_name, tagline: k.tagline, capacity: k.capacity, site_id: k.site_id, added_by_customer: k.added_by_customer, lat: k.lat ?? null, lng: k.lng ?? null, pool_size: kSize(k), pool_size_own: k.pool_size || null, no_daily_limit: !!k.no_daily_limit })), items: items.filter(i => i.active !== false) }; },
+      return { pop, siteCounts, scores, payMethods: payMethods.filter(p => p.active), settings, sites: sites.filter(x => x.status === "active" && x.active), menus: kitchens.filter(k => k.active).map(k => ({ id: k.id, public_name: k.public_name, tagline: k.tagline, capacity: k.capacity, site_id: k.site_id, added_by_customer: k.added_by_customer, lat: k.lat ?? null, lng: k.lng ?? null, pool_size: kSize(k), pool_size_own: k.pool_size || null, no_daily_limit: !!k.no_daily_limit })), items: items.filter(i => i.active !== false).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0) || a.price - b.price), discounts: discounts.map(d => ({ ...d })) }; },
     async board(date) {
       housekeeping();
       const load = {}; orders.filter(o => o.order_date === date && o.status !== "cancelled").forEach(o => { load[o.kitchen_id] = (load[o.kitchen_id] || 0) + o.qty; });
@@ -1592,8 +1633,9 @@ function makeDemoApi() {
       return { kitchen: { name: k.name, public_name: k.public_name, capacity: k.capacity, pool_size: kSize(k), pool_size_own: k.pool_size || null, no_daily_limit: !!k.no_daily_limit, pool_default: settings.max_meals, pool_ceiling: settings.pool_ceiling, delivery_mode: k.delivery_mode, added_by_customer: k.added_by_customer, open: isOpen(k.id, date), listing_status: k.listing_status || "none", listing: k.listing || null,
           auto_days: k.auto_days || [], paused: (k.paused_dates || []).includes(date), confirmed: days.some(x => x.kitchen_id === k.id && x.order_date === date),
           has_pin: hasPin(k), free_m: k.free_m || null, free_min: k.free_min || 0, free_max_m: settings.free_max_m, fee_ack: Number(k.fee_ack || 0), fee_free_ack: Number(k.fee_free_ack ?? 5),
-          fee_rate: kRate(k), fee_free: kFree(k), fee_own: !!k.fee_own, next_day_confirm_by: settings.next_day_confirm_by },
-        menu: items.filter(i => i.kitchen_id === k.id && i.active !== false).map(i => ({ id: i.id, name: i.name, price: i.price, addons: i.addons || [], photo_url: i.photo_url || null, icon: i.icon || null })),
+          fee_rate: kRate(k), fee_free: kFree(k), fee_own: !!k.fee_own, next_day_confirm_by: settings.next_day_confirm_by,
+          discounts: discounts.filter(d => d.kitchen_id === k.id).map(d => ({ site_id: d.site_id, name: (sites.find(x => x.id === d.site_id) || {}).name, pct: d.pct })).sort((a, b) => a.name < b.name ? -1 : 1) },
+        menu: items.filter(i => i.kitchen_id === k.id && i.active !== false).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)).map(i => ({ id: i.id, name: i.name, price: i.price, addons: i.addons || [], photo_url: i.photo_url || null, icon: i.icon || null })),
         pools: pools.filter(p => p.kitchen_id === k.id && p.order_date === date && p.status !== "cancelled" && meals(p.id) > 0).map(p => {
           const si = sites.find(s => s.id === p.site_id);
           return { id: p.id, seq: p.seq, status: p.status, site: si.name, drop_point: si.drop_point, handoff: si.handoff, host_label: si.host_label, created_at: p.created_at,
@@ -1780,11 +1822,12 @@ function makeDemoApi() {
       const k = byToken(kitchens, "token", token); if (!k) throw new Error("This vendor link is not valid.");
       const req = (item, kind, name, oldP, newP) => { priceReqs.forEach(r => { if (r.kitchen_id === k.id && r.status === "pending" && r.item_id === item && r.kind === kind && (["dish", "new_dish"].includes(kind) || (r.name === name && r.old_price === oldP))) r.status = "replaced"; });
         priceReqs.unshift({ id: "pr" + uid(), created_at: nowIso(), kitchen_id: k.id, item_id: item, kind, name, old_price: oldP, new_price: newP, status: "pending" }); };
-      list.forEach(it => {
+      list.forEach((it, pos) => {
+        if (Array.isArray(it.addons) && new Set(it.addons.filter(a => String(a.group || "").trim().length >= 2).map(a => String(a.group).trim())).size > 3) throw new Error("A dish can have up to 3 required choices.");
         const o = it.id ? items.find(x => x.id === it.id && x.kitchen_id === k.id) : null, waitingDish = o && priceReqs.some(r => r.item_id === o.id && r.kind === "new_dish" && r.status === "pending");
         let add = null;
         if (Array.isArray(it.addons)) add = it.addons.filter(a => (a.name || "").trim().length >= 2).map(a => {
-          const n = { name: a.name.trim(), price: Math.max(0, Number(a.price) || 0) }; if (a.off) n.off = true;
+          const n = { name: a.name.trim(), price: Math.max(0, Number(a.price) || 0) }; if (a.off) n.off = true; if (String(a.group || "").trim().length >= 2) n.group = String(a.group).trim().slice(0, 40);
           const orig = o && a.orig_name != null ? (o.addons || []).find(e => e.name === a.orig_name && Number(e.price || 0) === Number(a.orig_price || 0)) : null;
           if (orig) { if (orig.pending) n.pending = true; if (n.price > Number(orig.price) && !orig.pending) { if (!waitingDish) req(o.id, "extra", n.name, Number(orig.price), n.price); n.price = Number(orig.price); } }
           else if (n.price > 0) { n.pending = true; if (o && !waitingDish) req(o.id, "new_extra", n.name, null, n.price); }
@@ -1792,10 +1835,10 @@ function makeDemoApi() {
         if (o) {
           let price = Number(it.price) > 0 ? Number(it.price) : o.price;
           if (waitingDish) { priceReqs.filter(r => r.item_id === o.id && r.kind === "new_dish" && r.status === "pending").forEach(r => { r.new_price = price; r.name = it.name || r.name; });
-            Object.assign(o, { name: it.name || o.name, price, addons: add ? add.map(({ pending, ...x }) => x) : o.addons, active: false }); return; }
+            Object.assign(o, { name: it.name || o.name, price, addons: add ? add.map(({ pending, ...x }) => x) : o.addons, active: false, sort_order: pos + 1 }); return; }
           if (price > o.price) { req(o.id, "dish", it.name || o.name, o.price, price); price = o.price; }
-          Object.assign(o, { name: it.name || o.name, price, active: it.active !== false }); if (add) o.addons = add;
-        } else if ((it.name || "").trim().length >= 2 && Number(it.price) > 0) { const id = "i" + uid(); items.push({ id, kitchen_id: k.id, name: it.name.trim(), price: Number(it.price), addons: (add || []).map(({ pending, ...x }) => x), active: false }); req(id, "new_dish", it.name.trim(), null, Number(it.price)); }
+          Object.assign(o, { name: it.name || o.name, price, active: it.active !== false, sort_order: pos + 1 }); if (add) o.addons = add;
+        } else if ((it.name || "").trim().length >= 2 && Number(it.price) > 0) { const id = "i" + uid(); items.push({ id, kitchen_id: k.id, name: it.name.trim(), price: Number(it.price), addons: (add || []).map(({ pending, ...x }) => x), active: false, sort_order: pos + 1 }); req(id, "new_dish", it.name.trim(), null, Number(it.price)); }
       });
     },
     async vendorPriceRequests(token) { const k = byToken(kitchens, "token", token); return k ? priceReqs.filter(r => r.kitchen_id === k.id && r.status !== "replaced") : []; },
@@ -1915,11 +1958,20 @@ function makeDemoApi() {
       if (w && !/^0\d{9}$/.test(w)) throw new Error("Enter a 10-digit WhatsApp number starting with 0.");
       const k = { id: "k" + uid(), token: "setup" + uid(), name: name.trim(), public_name: name.trim(), whatsapp: w || null, active: false, added_by_customer: false, site_id: null, capacity: 45, delivery_mode: "rider", setup_status: "draft", created_at: nowIso() };
       kitchens.push(k); return { id: k.id, token: k.token }; },
+    async vendorDiscountSites(t) { const k = byToken(kitchens, "token", t); return sites.filter(x => x.status === "active" && x.active && !x.archived && (!k.site_id || x.id === k.site_id))
+      .map(x => ({ id: x.id, name: x.name, drop_point: x.drop_point, d: hasPin(k) && hasPin(x) ? distM(k, x) : 1e12 })).sort((a, b) => a.d - b.d || (a.name < b.name ? -1 : 1)).map(({ d, ...x }) => x); },
+    async vendorDiscountSet(t, sid, pct) { const k = byToken(kitchens, "token", t), i = discounts.findIndex(d => d.kitchen_id === k.id && d.site_id === sid);
+      if (!Number(pct)) { if (i >= 0) discounts.splice(i, 1); return; }
+      if (!(Number.isInteger(+pct) && pct >= 5 && pct <= 50)) throw new Error("A discount must be from 5% to 50%.");
+      if (!sites.some(x => x.id === sid && x.active)) throw new Error("Choose a ChopPool building."); if (k.site_id && k.site_id !== sid) throw new Error("You deliver to one building only.");
+      if (i >= 0) discounts[i].pct = +pct; else discounts.push({ kitchen_id: k.id, site_id: sid, pct: +pct }); },
+    async adminDiscounts() { return discounts.map(d => ({ ...d })); },
+    async removeDiscount(kid, sid) { const i = discounts.findIndex(d => d.kitchen_id === kid && d.site_id === sid); if (i >= 0) discounts.splice(i, 1); },
     async vendorSetupGet(t) { const k = kitchens.find(x => x.token === t && !x.archived); if (!k) throw new Error("This link is not valid. Ask ChopPool for a new one.");
       if (!k.setup_status) return { live: k.active !== false, name: k.public_name };
       return { status: k.setup_status, note: k.setup_note || null, name: k.public_name, tagline: k.tagline || null, owner_name: k.owner_name || null, whatsapp: k.whatsapp, address: k.address || null, lat: k.lat ?? null, lng: k.lng ?? null,
         auto_days: k.auto_days || null, capacity: k.capacity, payout_momo: k.payout_momo || null, payout_network: k.payout_network || null,
-        items: items.filter(i => i.kitchen_id === k.id).map(i => ({ id: i.id, name: i.name, price: i.price, addons: i.addons || [], icon: i.icon || null })) }; },
+        items: items.filter(i => i.kitchen_id === k.id).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)).map(i => ({ id: i.id, name: i.name, price: i.price, addons: i.addons || [], icon: i.icon || null })) }; },
     async vendorSetupSave(t, d, list, submit) { const k = kitchens.find(x => x.token === t && !x.archived); if (!k) throw new Error("This link is not valid. Ask ChopPool for a new one.");
       if (!k.setup_status) throw new Error("Your page is already live. Open your vendor page to make changes.");
       const wa = String(d.whatsapp || "").replace(/\D/g, ""), mo = String(d.payout_momo || "").replace(/\D/g, "");
@@ -1929,7 +1981,7 @@ function makeDemoApi() {
         payout_momo: mo || null, payout_network: d.payout_network || null });
       if (Array.isArray(list)) { for (let n = items.length - 1; n >= 0; n--) if (items[n].kitchen_id === k.id) items.splice(n, 1);
         list.filter(x => String(x.name || "").trim().length >= 2 && Number(x.price) > 0).forEach(x => items.push({ id: "i" + uid(), kitchen_id: k.id, name: x.name.trim(), price: Math.round(Number(x.price) * 100) / 100,
-          addons: (x.addons || []).filter(a => String(a.name || "").trim().length >= 2).map(a => ({ name: a.name.trim(), price: Math.max(0, Number(a.price) || 0), ...(a.off ? { off: true } : {}) })), icon: x.icon || null, active: true })); }
+          addons: (x.addons || []).filter(a => String(a.name || "").trim().length >= 2).map(a => ({ name: a.name.trim(), price: Math.max(0, Number(a.price) || 0), ...(a.off ? { off: true } : {}), ...(String(a.group || "").trim().length >= 2 ? { group: String(a.group).trim().slice(0, 40) } : {}) })), icon: x.icon || null, active: true, sort_order: items.filter(i => i.kitchen_id === k.id).length + 1 })); }
       const n = items.filter(i => i.kitchen_id === k.id).length;
       if (submit) { if (!k.public_name || k.public_name.length < 2) throw new Error("Add your business name."); if (!k.whatsapp) throw new Error("Add your WhatsApp number.");
         if (k.lat == null) throw new Error("Show where you cook on the map."); if (!n) throw new Error("Add at least one dish with its price."); if (!k.payout_momo) throw new Error("Add the mobile money number we pay you on.");
@@ -1987,9 +2039,10 @@ function makeSupabaseApi() {
         sb.from("settings").select("*").eq("id", 1).single().then(must),
         sb.from("public_sites").select("*").order("name").then(must),
         sb.from("public_menus").select("*").order("public_name").then(must),
-        sb.from("menu_items").select("*").eq("active", true).order("price").then(must)
+        sb.from("menu_items").select("*").eq("active", true).order("sort_order").order("price").then(r => r.error && /sort_order/.test(r.error.message) ? sb.from("menu_items").select("*").eq("active", true).order("price") : r).then(must)
       ]);
-      return { settings, sites, menus, items, payMethods: payMethods || [], pop, scores, siteCounts };
+      const discounts = await soft(sb.from("kitchen_discounts").select("kitchen_id,site_id,pct"));
+      return { settings, sites, menus, items, payMethods: payMethods || [], pop, scores, siteCounts, discounts: discounts || [] };
     },
     async board(date) {
       // One call for the whole board (update 14); falls back to separate reads before the database update
@@ -2087,6 +2140,10 @@ function makeSupabaseApi() {
       if (r.error && /function|schema cache/i.test(r.error.message)) throw new Error("Removing some plates isn't switched on yet. Cancel the plate instead, or contact ChopPool."); return must(r); },
     async waitingPools(date) { const ps = must(await sb.from("public_pools").select("*").eq("order_date", date).eq("status", "waiting")); return ps.filter(p => p.meals > 0); },
     vendorSetMenu: (t, items) => rpc("vendor_set_menu", { p_token: t, p_items: items }),
+    vendorDiscountSites: t => rpc("vendor_discount_sites", { p_token: t }),
+    vendorDiscountSet: (t, site, pct) => rpc("vendor_discount_set", { p_token: t, p_site: site, p_pct: pct }),
+    async adminDiscounts() { const r = await sb.from("kitchen_discounts").select("kitchen_id,site_id,pct"); return r.error ? [] : r.data; },
+    async removeDiscount(kid, sid) { must(await sb.from("kitchen_discounts").delete().eq("kitchen_id", kid).eq("site_id", sid)); },
     // update 41: price approvals, vendor/rider alerts, past orders (each quietly empty before the update is run)
     async vendorPriceRequests(t) { const r = await sb.rpc("vendor_price_requests", { p_token: t }); return r.error ? [] : r.data || []; },
     async priceRequests() { const r = await sb.from("price_requests").select("*, kitchens(public_name)").neq("status", "replaced").gte("created_at", new Date(Date.now() - 30 * 864e5).toISOString()).order("created_at", { ascending: false }).limit(200); return r.error ? null : r.data; },
@@ -2234,7 +2291,24 @@ function makeSupabaseApi() {
 }
 
 let api = DEMO ? makeDemoApi() : null;
-const S = { settings: null, sites: [], menus: [], items: [], board: { pools: [], load: {}, activity: [], open: [] }, siteId: null, date: null, timers: [], user: null, balance: 0 };
+const S = { settings: null, sites: [], menus: [], board: { pools: [], load: {}, activity: [], open: [] }, siteId: null, date: null, timers: [], user: null, balance: 0 };
+// Menus as the customer sees them: a vendor's discount for the chosen building is already in each price (update 47).
+// "was" keeps the price before the discount; the server applies the same discount when the order is placed.
+const MENU = { raw: [], view: [], key: "" };
+const centsOff = (v, p) => Math.round(Math.round(Number(v || 0) * 100) * (100 - p) / 100) / 100;
+const discOf = (kid, sid = S.siteId) => (sid && (S.discounts || []).find(d => d.kitchen_id === kid && d.site_id === sid) || {}).pct || 0;
+Object.defineProperty(S, "items", { enumerable: true,
+  set(v) { MENU.raw = v || []; MENU.key = ""; },
+  get() {
+    const key = (S.siteId || "") + "|" + (S.discounts || []).map(d => d.kitchen_id + d.site_id + d.pct).join(",");
+    if (MENU.key !== key || MENU.src !== MENU.raw) {
+      MENU.view = MENU.raw.map(i => { const p = discOf(i.kitchen_id); return p ? { ...i, price: centsOff(i.price, p), was: i.price, disc: p,
+        addons: (i.addons || []).map(a => ({ ...a, price: centsOff(a.price, p), was: Number(a.price) || 0 })) } : i; });
+      MENU.key = key; MENU.src = MENU.raw;
+    }
+    return MENU.view;
+  } });
+S.items = [];
 
 /* ---------- Shared UI helpers ---------- */
 let toastTimer;
@@ -3403,7 +3477,7 @@ function tickCountdown() {
   if ($("#countdownMini")) $("#countdownMini").textContent = $("#countdown").textContent;
   if ($("#ghNow")) $("#ghNow").textContent = ghanaNow();
 }
-const saveBoot = () => { if (!DEMO) local.set("cp_boot", { v: 2, date: S.date || orderDate(S.settings), board: S.board, load: { settings: S.settings, sites: S.sites, menus: S.menus, items: S.items, payMethods: S.payMethods, pop: S.pop, scores: S.scores, siteCounts: S.siteCounts } }); };
+const saveBoot = () => { if (!DEMO) local.set("cp_boot", { v: 2, date: S.date || orderDate(S.settings), board: S.board, load: { settings: S.settings, sites: S.sites, menus: S.menus, items: MENU.raw, discounts: S.discounts || [], payMethods: S.payMethods, pop: S.pop, scores: S.scores, siteCounts: S.siteCounts } }); };
 async function refreshBoard() {
   try { S.board = await api.board(S.date); } catch (e) { console.error(e); return; }
   if (!S.bootSaved || Math.random() < 0.2) { S.bootSaved = true; saveBoot(); }
@@ -3588,12 +3662,12 @@ function vendorTile(k, nearest) {
   const v = vInfo(k), i = menuIndex(k.id);
   const badge = v.st.full ? `<span class="vbadge bad">${v.st.off ? "Not cooking" : "Fully booked"}</span>` : v.st.waiting ? `<span class="vbadge">Waiting to confirm</span>` : v.active ? `<span class="vbadge ok">${v.p.meals} in a pool</span>` : "";
   return `<button class="vtile" data-vendor="${esc(k.id)}"><span class="vph" style="background:${tint(i)}">${badge}${nearest ? `<span class="vnear">Nearest</span>` : ""}${plate(topDish(k.id), k.id)}</span>
-    <span class="vb"><strong>${esc(k.public_name)}</strong><span class="vmeta">${rateHtml(k)}${v.km != null ? ` · ${kmText(v.km)}` : ""}</span><span class="vdl${S.noSite || v.st.full ? " dim" : ""}">${esc(v.dl)}</span></span></button>`;
+    <span class="vb"><strong>${esc(k.public_name)}</strong>${discBadge(k, " inl")}<span class="vmeta">${rateHtml(k)}${v.km != null ? ` · ${kmText(v.km)}` : ""}</span><span class="vdl${S.noSite || v.st.full ? " dim" : ""}">${esc(v.dl)}</span></span></button>`;
 }
 function vendorRow(k) {
   const v = vInfo(k), i = menuIndex(k.id), dishes = S.items.filter(it => it.kitchen_id === k.id);
   return `<button class="vrow" data-vendor="${esc(k.id)}"><span class="vph" style="background:${tint(i)}">${plate(topDish(k.id), k.id)}</span>
-    <span class="vtx"><strong>${esc(k.public_name)}</strong><span class="cu">${esc(k.tagline || dishes.slice(0, 2).map(d => d.name).join(", "))}</span><span class="vmeta">${rateHtml(k)}${v.km != null ? ` · ${kmText(v.km)}` : ""}</span>
+    <span class="vtx"><strong>${esc(k.public_name)}</strong>${discBadge(k, " inl")}<span class="cu">${esc(k.tagline || dishes.slice(0, 2).map(d => d.name).join(", "))}</span><span class="vmeta">${rateHtml(k)}${v.km != null ? ` · ${kmText(v.km)}` : ""}</span>
       ${v.active ? `<span class="small" style="color:var(--ok);font-weight:800">${v.p.meals} in a pool</span>` : v.st.full ? `<span class="small" style="color:var(--danger);font-weight:700">${v.st.off ? "Not cooking" : "Fully booked"}</span>` : ""}</span>
     ${S.noSite || v.st.full ? "" : `<span class="vr"><b>${esc(v.short)}</b><small>${esc(v.unit)}</small></span>`}</button>`;
 }
@@ -3837,7 +3911,7 @@ function traySave(t) { local.set("cp_tray", t.lines.length ? t : null); if ($("#
 const lineItem = l => S.items.find(i => i.id === l.item) || {};
 // Extras: a dish can list the same name more than once (Fish at 15, 20, 30). Those are picked as "Fish#20" so only that one is charged;
 // a bare name that appears more than once counts once (the first), matching the server
-const addonKey = (list, a) => (list || []).filter(x => x.name === a.name).length > 1 ? a.name + "#" + Number(a.price) : a.name;
+const addonKey = (list, a) => (list || []).filter(x => x.name === a.name).length > 1 ? a.name + "#" + Number(a.was ?? a.price) : a.name;
 // A key sent twice means two of that extra (2 eggs on each plate), up to 5
 const addonPicked = (list, keys) => (list || []).map((a, i) => ({ ...a, qty: Math.min(5, keys.filter(k => k === addonKey(list, a) || (k === a.name && list.findIndex(x => x.name === a.name) === i)).length) })).filter(a => a.qty > 0);
 const addonSum = (list, keys) => addonPicked(list, keys).reduce((t, a) => t + Number(a.price) * a.qty, 0);
@@ -3847,7 +3921,22 @@ const lineAdd = l => addonSum(lineItem(l).addons, l.addons || []);
 // Extras chips: tap to add one; then − count + (up to 5 of each per plate)
 const xKeys = ex => [...ex].flatMap(([k, c]) => Array(c).fill(k));
 const xLive = a => !a.off && !a.pending;
-const xChips = (list, ex) => (list || []).filter(xLive).map(a => { const k = addonKey(list, a), c = ex.get(k) || 0, lab = esc(a.name) + (a.price ? " +" + money(a.price) : "");
+// Optional extras vs required choices (options tagged with a group, update 47): pick exactly one in each group
+const xOpt = a => xLive(a) && !a.group;
+const choiceGroups = list => [...new Set((list || []).filter(a => a.group && xLive(a)).map(a => a.group))];
+const choicesHtml = (list, ex) => choiceGroups(list).map(g => `<div class="group cgroup" data-cgroup="${esc(g)}"><p class="group-title">${esc(g)} <span class="reqtag">Required</span></p><div class="chips">${
+  (list || []).filter(a => a.group === g && xLive(a)).map(a => { const k = addonKey(list, a), on = ex.has(k);
+    return `<button type="button" class="tog copt" data-pick="${esc(k)}" data-grp="${esc(g)}" aria-pressed="${on}">${on ? GLYPH.check || "" : ""}${esc(a.name)}${Number(a.price) ? " +" + money(a.price) : ""}</button>`; }).join("")}</div></div>`).join("");
+function pickClick(e, list, ex) {
+  const b = e.target.closest("[data-pick]"); if (!b) return false;
+  (list || []).filter(a => a.group === b.dataset.grp).forEach(a => ex.delete(addonKey(list, a))); ex.set(b.dataset.pick, 1); return true;
+}
+const missingChoice = (list, ex) => choiceGroups(list).find(g => !(list || []).some(a => a.group === g && xLive(a) && ex.has(addonKey(list, a))));
+// Before the building discount: what the meal would cost at full price (to show what the customer saves)
+const fullOf = (d, keys) => Number(d.was ?? d.price) + addonPicked(d.addons, keys || []).reduce((t, a) => t + Number(a.was ?? a.price) * a.qty, 0);
+const priceTag = d => d.was != null ? `<s class="was num">${money(d.was)}</s> ${money(d.price)}` : money(d.price);
+const discBadge = (k, cls = "") => { const p = discOf(k.id); return p && !S.noSite ? `<span class="discbadge${cls}">${p}% off for ${esc(siteOf(S.siteId).name)}</span>` : ""; };
+const xChips = (list, ex) => (list || []).filter(xOpt).map(a => { const k = addonKey(list, a), c = ex.get(k) || 0, lab = esc(a.name) + (a.price ? " +" + money(a.price) : "");
   return c ? `<span class="tog xon" aria-pressed="true"><button type="button" class="xname" data-xoff="${esc(k)}" aria-label="Remove ${esc(a.name)}">${lab}</button><span class="xstep"><button type="button" data-xm="${esc(k)}" aria-label="One less ${esc(a.name)}">−</button><b class="num">${c}</b><button type="button" data-xp="${esc(k)}" aria-label="One more ${esc(a.name)}"${c >= 5 ? " disabled" : ""}>+</button></span></span>`
     : `<button type="button" class="tog" data-addon="${esc(k)}" aria-pressed="false">${lab}</button>`; }).join("");
 function xClick(e, ex) {
@@ -3866,8 +3955,9 @@ function openDish(k, dishId) {
   const st = menuState(k); if (st.full) return toast(k.public_name + (st.off ? " isn't cooking " : " is fully booked ") + dayLabel(S.date) + ".");
   let qty = 1; const extras = new Map(), i0 = menuIndex(k.id);
   const specialOpen = !(S.date === today() && new Date() >= at(S.date, S.settings.special_cutoff));
-  openSheet(`<div class="dishhead"><span class="tile" style="background:${tint(i0)}">${plate(d, k.id)}</span><div><h2>${esc(d.name)}</h2><p class="small muted">${esc(k.public_name)} · <span class="num">${money(d.price)}</span></p></div><button class="closex" data-close aria-label="Close">${ICON.close}</button></div>
-    ${(d.addons || []).some(xLive) ? `<div class="group"><p class="group-title">Extras <span class="muted" style="font-weight:500">(optional)</span></p><div class="chips" id="dExtras">${xChips(d.addons, extras)}</div></div>` : ""}
+  openSheet(`<div class="dishhead"><span class="tile" style="background:${tint(i0)}">${plate(d, k.id)}</span><div><h2>${esc(d.name)}</h2><p class="small muted">${esc(k.public_name)} · <span class="num">${priceTag(d)}</span></p>${discBadge(k, " inl")}</div><button class="closex" data-close aria-label="Close">${ICON.close}</button></div>
+    <div id="dChoices">${choicesHtml(d.addons, extras)}</div>
+    ${(d.addons || []).some(xOpt) ? `<div class="group"><p class="group-title">Extras <span class="muted" style="font-weight:500">(optional)</span></p><div class="chips" id="dExtras">${xChips(d.addons, extras)}</div></div>` : ""}
     <div class="group"><label for="dNote">Note for the kitchen <span class="muted" style="font-weight:500">(optional)</span></label><input id="dNote" maxlength="140" placeholder="Less oil, extra napkins"></div>
     <div class="mealqty"><div class="row"><div><p class="group-title" style="margin:0">How many of this meal?</p><p class="small muted" id="dSum" style="margin:2px 0 0"></p></div><div class="qty"><button type="button" id="dMinus" aria-label="One less">${GLYPH.minus}</button><output id="dQ">1</output><button type="button" id="dPlus" aria-label="One more">${GLYPH.plus}</button></div></div></div>
     ${specialOpen ? `<button type="button" class="linkbtn" id="dSpecial" style="justify-self:start">Want something not on the menu? Make a custom order</button>` : ""}
@@ -3880,8 +3970,11 @@ function openDish(k, dishId) {
   $("#dMinus").addEventListener("click", () => { qty = Math.max(1, qty - 1); draw(); });
   $("#dPlus").addEventListener("click", () => { qty = Math.min(5, poolSize(k), qty + 1); draw(); });
   $("#dExtras")?.addEventListener("click", e => { if (!xClick(e, extras)) return; $("#dExtras").innerHTML = xChips(d.addons, extras); draw(); });
+  $("#dChoices").addEventListener("click", e => { if (!pickClick(e, d.addons, extras)) return; $("#dChoices").innerHTML = choicesHtml(d.addons, extras); draw(); });
   $("#dSpecial")?.addEventListener("click", () => openOrder(k.id, { preset: { item_id: d.id, qty: 1 }, fromPage: true, special: true }));
   $("#dAdd").addEventListener("click", () => {
+    const miss = missingChoice(d.addons, extras);
+    if (miss) { const g = $(`#dChoices [data-cgroup="${CSS.escape(miss)}"]`); g?.classList.add("need"); g?.scrollIntoView({ block: "center", behavior: "smooth" }); return toast('Pick one option for "' + miss + '".'); }
     const t = trayFor(k.id), line = { item: d.id, qty, addons: xKeys(extras), note: $("#dNote").value.trim() || null };
     const meals = t.lines.reduce((a, l) => a + l.qty, 0) + qty, cap = Math.min(10, poolSize(k));
     if (meals > cap) return toast("Up to " + cap + " meals in one order.");
@@ -3910,12 +4003,12 @@ function drawVendor() {
       <div class="vplate">${plate(topDish(k.id), k.id)}</div></div>
     <div class="vbody">
       <h1>${esc(k.public_name)}</h1>
-      <p class="cu">${esc(k.added_by_customer ? "Added by a customer." : k.tagline || "")}</p>
+      <p class="cu">${esc(k.added_by_customer ? "Added by a customer." : k.tagline || "")}</p>${discBadge(k, " big")}
       <div class="vfacts">${facts.map(([b, t]) => `<div><b>${b}</b><span>${esc(t)}</span></div>`).join("")}</div>
       <div id="vpBanner">${vendorBanner(k)}</div>
       <div class="vtabs" role="tablist"><button data-vtab="menu" aria-pressed="${S.vp.tab === "menu"}">Menu</button><button data-vtab="rev" aria-pressed="${S.vp.tab === "rev"}">Reviews${sc.ratings ? " · " + sc.ratings : ""}</button></div>
       <div id="vpBody" class="stack" style="gap:8px">${S.vp.tab === "menu" ? groups.map(([t, ds]) => `<h3 class="vcat">${esc(t)}</h3>` + ds.map(d => `<button class="vitem" data-dish="${esc(d.id)}"${v.st.full && !(S.noSite ? null : myOrderIn(k)) ? " disabled" : ""}>
-          <span class="vph" style="background:${tint(i0)}">${plate(d, k.id)}</span><span class="vtx"><strong>${esc(d.name)}</strong>${(d.addons || []).some(xLive) ? `<span class="ds">Extras: ${esc(d.addons.filter(xLive).map(a => a.name).join(", "))}</span>` : ""}<span class="pr num">${money(d.price)}</span></span><span class="plus" aria-hidden="true">${GLYPH.plus}</span></button>`).join("")).join("")
+          <span class="vph" style="background:${tint(i0)}">${plate(d, k.id)}</span><span class="vtx"><strong>${esc(d.name)}</strong>${choiceGroups(d.addons).length ? `<span class="ds">${esc(choiceGroups(d.addons).map(g => g + ": " + d.addons.filter(a => a.group === g && xLive(a)).map(a => a.name).join(", ")).join(" · "))}</span>` : ""}${(d.addons || []).some(xOpt) ? `<span class="ds">Extras: ${esc(d.addons.filter(xOpt).map(a => a.name).join(", "))}</span>` : ""}<span class="pr num">${priceTag(d)}</span></span><span class="plus" aria-hidden="true">${GLYPH.plus}</span></button>`).join("")).join("")
         || `<p class="small muted">No dishes on the menu yet.</p>` : `<p class="small muted">Loading reviews…</p>`}</div>
     </div>`;
   if ($("#vfoot")) { $("#vfoot").innerHTML = vendorFoot(k); $("#vfoot").classList.toggle("on", !!$("#vfoot").innerHTML); }
@@ -4930,7 +5023,7 @@ function openOrder(menuId, opt = {}) {
     <form id="orderForm" class="stack" novalidate>
       ${trayMode ? `<div class="group"><div class="top"><p class="group-title">Your order</p><button type="button" class="linkbtn" id="moreDishes">+ Add more dishes</button></div><div class="tlines" id="tLines"></div></div>` : ""}
       <div class="group${trayMode ? " hidden" : ""}"><p class="group-title">Choose your meal</p><div class="dishes">
-        ${dishes.map((d, n) => `<label class="dish"><input type="radio" name="dish" value="${esc(d.id)}"${d === item ? " checked" : ""}><span class="tile" style="background:${tint(i0)}">${plate(d, k.id)}</span><span>${esc(d.name)}</span><span class="price num">${money(d.price)}</span></label>`).join("")}
+        ${dishes.map((d, n) => `<label class="dish"><input type="radio" name="dish" value="${esc(d.id)}"${d === item ? " checked" : ""}><span class="tile" style="background:${tint(i0)}">${plate(d, k.id)}</span><span>${esc(d.name)}</span><span class="price num">${priceTag(d)}</span></label>`).join("")}
       </div></div>
       <div class="row${trayMode ? " hidden" : ""}"><p class="group-title">How many of this meal?</p><div class="qty"><button type="button" id="minus" aria-label="One less">${GLYPH.minus}</button><output id="q">${qty}</output><button type="button" id="plus" aria-label="One more">${GLYPH.plus}</button></div></div>
       <div class="group${trayMode ? " hidden" : ""}" id="extrasGroup"></div>
@@ -4956,7 +5049,7 @@ function openOrder(menuId, opt = {}) {
       <div class="sheet-foot"><div class="tot"><b class="num" id="totTxt"></b><span id="totSub"></span></div><button class="btn" type="submit" id="submitBtn">Join the pool</button></div>
     </form>`);
   const drawExtras = () => {
-    $("#extrasGroup").innerHTML = (item.addons || []).some(xLive) ? `<p class="group-title">Extras <span class="muted" style="font-weight:500">(optional, for each meal)</span></p><div class="chips">${xChips(item.addons, extras)}</div>` : "";
+    $("#extrasGroup").innerHTML = `<div id="oChoices">${choicesHtml(item.addons, extras)}</div>` + ((item.addons || []).some(xOpt) ? `<p class="group-title">Extras <span class="muted" style="font-weight:500">(optional, for each meal)</span></p><div class="chips">${xChips(item.addons, extras)}</div>` : "");
   };
   // Pay from (your saved numbers) and pay to (ChopPool's number on the same network where we have one)
   const drawPay = due => {
@@ -4982,9 +5075,11 @@ function openOrder(menuId, opt = {}) {
     if (trayMode) {
       drawTray();
       const meals = tray.lines.reduce((a, l) => a + l.qty, 0), food = trayFood(tray), first = tray.lines[0].qty;
+      const tSave = Math.round(tray.lines.reduce((a, l) => { const it = lineItem(l); return a + (it.was != null ? (fullOf(it, l.addons) - Number(it.price) - lineAdd(l)) * l.qty : 0); }, 0) * 100) / 100;
       const tripN = tripNow(k, site), dTot = join ? 0 : upfrontPerMeal(tripN, first, s) * first, sFee = Number(s.service_fee), total = food + dTot + sFee * meals;
       const useW = $("#fWallet")?.checked ? Math.min(S.balance, total) : 0, due = total - useW;
-      $("#sum").innerHTML = `<div><span>Food (${meals} meal${meals === 1 ? "" : "s"})</span><span class="num">${money(food)}</span></div>` +
+      $("#sum").innerHTML = `<div><span>Food (${meals} meal${meals === 1 ? "" : "s"})</span><span class="num">${money(food + tSave)}</span></div>` +
+        (tSave > 0 ? `<div class="discline"><span>${esc(siteOf(site.id).name)} discount (${discOf(k.id, site.id)}%)</span><span class="num">−${money(tSave)}</span></div>` : "") +
         (join ? `<div><span>Delivery</span><span class="num">Already paid</span></div>` : tripN === 0 ? `<div><span>Delivery, by the vendor</span><span class="num">Free</span></div>` : `<div><span>Delivery (full trip)${delivHint(k, site, meals, dTot)}</span><span class="num">${money(dTot)}</span></div>`) +
         `<div><span>Service fee (${money(sFee)} a meal)</span><span class="num">${money(sFee * meals)}</span></div>` + (useW ? `<div><span>From wallet</span><span class="num">−${money(useW)}</span></div>` : "");
       $("#payPart").classList.toggle("hidden", due <= 0); drawPay(due);
@@ -5004,8 +5099,11 @@ function openOrder(menuId, opt = {}) {
     const tripN = tripNow(k, site), dFee = join ? 0 : upfrontPerMeal(tripN, qty, s), sFee = Number(s.service_fee);
     const total = (Number(item.price) + addT) * qty + dFee * qty + sFee * qty;
     const useW = $("#fWallet")?.checked ? Math.min(S.balance, total) : 0, due = total - useW;
-    $("#sum").innerHTML = `<div><span>${qty} × ${esc(item.name)}</span><span class="num">${money(item.price * qty)}</span></div>` +
-      (addT ? `<div><span>Extras</span><span class="num">${money(addT * qty)}</span></div>` : "") +
+    const full = item.was != null ? fullOf(item, xKeys(extras)) : 0, save = item.was != null ? Math.round((full - Number(item.price) - addT) * qty * 100) / 100 : 0;
+    const addFull = item.was != null ? full - Number(item.was) : addT;
+    $("#sum").innerHTML = `<div><span>${qty} × ${esc(item.name)}</span><span class="num">${money(Number(item.was ?? item.price) * qty)}</span></div>` +
+      (addFull ? `<div><span>Extras</span><span class="num">${money(addFull * qty)}</span></div>` : "") +
+      (save > 0 ? `<div class="discline"><span>${esc(siteOf(site.id).name)} discount (${item.disc}%)</span><span class="num">−${money(save)}</span></div>` : "") +
       (join ? `<div><span>Delivery</span><span class="num">Already paid</span></div>` : tripN === 0 ? `<div><span>Delivery, by the vendor</span><span class="num">Free</span></div>` : `<div><span>Delivery (full trip)${delivHint(k, site, qty, dFee * qty)}</span><span class="num">${money(dFee * qty)}</span></div>`) +
       `<div><span>Service fee${qty > 1 ? " (" + money(sFee) + " a meal)" : ""}</span><span class="num">${money(sFee * qty)}</span></div>` +
       (useW ? `<div><span>From wallet</span><span class="num">−${money(useW)}</span></div>` : "");
@@ -5022,7 +5120,7 @@ function openOrder(menuId, opt = {}) {
     l.qty += +b.dataset.d; if (l.qty < 1) tray.lines.splice(+b.dataset.tl, 1); else l.qty = Math.min(5, l.qty);
     traySave(tray); if (!tray.lines.length) { closeSheet(); return toast("Your order is empty."); } draw(); });
   $("#orderForm").addEventListener("change", e => { if (e.target.name === "dish") { item = dishes.find(d => d.id === e.target.value); extras = new Map(); drawExtras(); } draw(); });
-  $("#extrasGroup").addEventListener("click", e => { if (!xClick(e, extras)) return; drawExtras(); draw(); });
+  $("#extrasGroup").addEventListener("click", e => { if (!pickClick(e, item.addons, extras) && !xClick(e, extras)) return; drawExtras(); draw(); });
   $("#minus").addEventListener("click", () => { qty = Math.max(1, qty - 1); draw(); });
   $("#plus").addEventListener("click", () => { qty = Math.min(5, poolSize(k), qty + 1); draw(); });
   $("#noteToggle").addEventListener("click", () => { $("#noteBox").classList.toggle("hidden"); $("#noteToggle").classList.add("hidden"); $("#fNote").focus(); });
@@ -5047,6 +5145,7 @@ function openOrder(menuId, opt = {}) {
     const sp = special ? $("#fSpecial").value.trim() : "";
     const showMe = () => { $("#meRow")?.classList.add("hidden"); $("#meFields").classList.remove("hidden"); };
     if (special && sp.length < 4) return (err.textContent = "Describe what you'd like the vendor to make.");
+    if (!special && !trayMode) { const miss = missingChoice(item.addons, extras); if (miss) { $(`#oChoices [data-cgroup="${CSS.escape(miss)}"]`)?.scrollIntoView({ block: "center", behavior: "smooth" }); return (err.textContent = 'Pick one option for "' + miss + '".'); } }
     if (name.length < 2) { showMe(); return (err.textContent = "Add your name."); }
     if (!/^0\d{9}$/.test(phone)) { showMe(); return (err.textContent = "Enter a 10-digit mobile money number starting with 0, like 024 123 4567."); }
     const payVisible = !special && !$("#payPart").classList.contains("hidden");
@@ -5424,6 +5523,12 @@ const CAM = SV('<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3
 const GRIP = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="9" cy="6" r="1.7"/><circle cx="15" cy="6" r="1.7"/><circle cx="9" cy="12" r="1.7"/><circle cx="15" cy="12" r="1.7"/><circle cx="9" cy="18" r="1.7"/><circle cx="15" cy="18" r="1.7"/></svg>`;
 // Each extra: drag grip, a "live" tick (unticked = hidden from customers), name, price, remove. Extras waiting for ChopPool's approval say so.
 const extraRow = a => `<div class="mextra${a && a.off ? " xoff" : ""}"${a && a.name ? ` data-orig="${esc(a.name)}" data-oprice="${esc(Number(a.price) || 0)}"` : ""}${a && a.pending ? ' data-pending="1"' : ""}><button type="button" class="xgrip" data-xgrip aria-label="Hold and drag to move this extra (or use the arrow keys)" title="Hold and drag to reorder">${GRIP}</button><label class="xlive" title="Show this extra to customers"><input type="checkbox" data-x="live"${a && a.off ? "" : " checked"} aria-label="Show to customers"></label><input data-x="name" value="${esc(a ? a.name : "")}" placeholder="Extra chicken" aria-label="Extra"><input data-x="price" inputmode="decimal" value="${a ? esc(a.price) : ""}" placeholder="GHS 0" aria-label="Extra price"><button type="button" class="xbtn" data-xdel aria-label="Remove extra">${ICON.close}</button>${a && a.pending ? `<span class="xwait small">Waiting for ChopPool to approve</span>` : ""}</div>`;
+// Required choices in the editor (update 47): a title ("Choose your protein") and its options (same rows as extras)
+const ARROW_UP = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>`;
+const groupBlock = (title, opts) => `<div class="mgroup"><div class="mgtop"><span class="reqtag" style="margin:0">Required</span><input data-g="title" value="${esc(title || "")}" placeholder="e.g. Choose your protein" aria-label="Choice title" maxlength="40">
+    <button type="button" class="xbtn" data-gdel aria-label="Remove this choice">${ICON.close}</button></div>
+  <div class="mgopts">${(opts && opts.length ? opts : [null, null]).map(extraRow).join("")}</div>
+  <div class="row" style="justify-content:space-between;gap:8px"><button type="button" class="linkbtn small" data-gopt>+ Add option</button><button type="button" class="linkbtn small" data-gcopy>Copy to other dishes</button></div><div class="gcopy hidden"></div></div>`;
 function dishRow(i, admin) {
   i = i || {};
   return `<div class="mdish" data-item="${esc(i.id || "")}">
@@ -5431,8 +5536,10 @@ function dishRow(i, admin) {
       <input data-f="name" value="${esc(i.name || "")}" placeholder="Dish name" aria-label="Dish"><input data-f="price" inputmode="decimal" value="${esc(i.price ?? "")}" placeholder="GHS" aria-label="Price GHS">
       <button type="button" class="xbtn" data-mdel aria-label="Remove dish">${ICON.close}</button></div>
     ${admin ? `<div class="mmeta">${iconSelect(i.icon)}<label class="choice" style="padding:6px 8px"><input type="checkbox" data-f="active"${i.active !== false ? " checked" : ""}><span>On the menu</span></label></div>` : ""}
-    <div class="mextras">${(i.addons || []).map(extraRow).join("")}</div>
-    <button type="button" class="linkbtn small" data-mextra style="justify-self:start">+ Add extra</button></div>`;
+    <div class="mextras">${(i.addons || []).filter(a => !a.group).map(extraRow).join("")}</div>
+    <div class="mgroups">${[...new Set((i.addons || []).filter(a => a.group).map(a => a.group))].map(g => groupBlock(g, i.addons.filter(a => a.group === g))).join("")}</div>
+    <div class="mbar"><button type="button" class="linkbtn small" data-mextra>+ Add extra</button><button type="button" class="linkbtn small" data-mgroup>+ Add a required choice</button>
+      <span class="mmove"><button type="button" class="ghost" data-mup aria-label="Move dish up" title="Move up">${ARROW_UP}</button><button type="button" class="ghost" data-mdown aria-label="Move dish down" title="Move down">${ARROW_UP}</button></span></div></div>`;
 }
 const menuEditor = (items, ctx, admin) => `<div class="medit" data-medit="${esc(ctx)}"><div class="mrows stack">${items.map(i => dishRow(i, admin)).join("")}${items.length ? "" : dishRow(null, admin)}</div>
   <div class="row" style="justify-content:space-between;gap:8px;flex-wrap:wrap"><button type="button" class="ghost" data-madd>+ Add dish</button>${ctx === "setup" ? "" : `<button type="button" class="btn" data-msave>Save menu</button>`}</div>
@@ -5464,7 +5571,9 @@ function readMenu(root) {
   return [...root.querySelectorAll(".mdish")].map(r => {
     const g = f => (r.querySelector(`[data-f="${f}"]`) || {}).value, act = r.querySelector('[data-f="active"]');
     return { id: r.dataset.item || null, removed: r.dataset.removed === "1", name: (g("name") || "").trim(), price: (g("price") || "").trim(), icon: g("icon") || null, active: act ? act.checked : true,
-      addons: [...r.querySelectorAll(".mextra")].map(x => { const a = { name: x.querySelector("[data-x=name]").value.trim(), price: Number(x.querySelector("[data-x=price]").value) || 0 };
+      groups: [...r.querySelectorAll(".mgroup")].map(g => ({ title: g.querySelector("[data-g=title]").value.trim(), n: [...g.querySelectorAll(".mextra [data-x=name]")].filter(x => x.value.trim().length >= 2).length })),
+      addons: [...r.querySelectorAll(".mextras > .mextra, .mgroup .mextra")].map(x => { const a = { name: x.querySelector("[data-x=name]").value.trim(), price: Number(x.querySelector("[data-x=price]").value) || 0 };
+        const gr = x.closest(".mgroup"); if (gr) a.group = gr.querySelector("[data-g=title]").value.trim();
         if (x.querySelector("[data-x=live]") && !x.querySelector("[data-x=live]").checked) a.off = true;
         if (x.dataset.pending) a.pending = true;
         if (x.dataset.orig) { a.orig_name = x.dataset.orig; a.orig_price = Number(x.dataset.oprice) || 0; }   // vendor saves: what it was, so a higher price waits for approval
@@ -5474,8 +5583,50 @@ function readMenu(root) {
   }).filter(d => d.id || d.name || d.price);
 }
 document.addEventListener("change", e => { if (e.target.matches && e.target.matches(".mextra [data-x=live]")) e.target.closest(".mextra").classList.toggle("xoff", !e.target.checked); });
+// Problems to fix before saving a menu (each save path checks this)
+function menuProblem(list) {
+  for (const d of list.filter(x => !x.removed)) {
+    if (d.name.length < 2 || !(Number(d.price) > 0)) return "Each dish needs a name and a price above 0.";
+    const gs = d.groups || [];
+    if (gs.length > 3) return d.name + ": up to 3 required choices on a dish.";
+    if (gs.some(g => g.title.length < 2)) return d.name + ": give each required choice a title, like Choose your protein.";
+    if (gs.some(g => g.n < 2)) return d.name + ": a required choice needs at least 2 options.";
+    if (new Set(gs.map(g => g.title.toLowerCase())).size < gs.length) return d.name + ": two required choices have the same title.";
+    const names = d.addons.map(a => a.name.toLowerCase() + "#" + Number(a.price));
+    if (new Set(names).size < names.length) return d.name + ": the same extra or option is listed twice. Give each a different name or price.";
+  }
+  return null;
+}
 function menuEditorClick(e) {
   const t = e.target, root = t.closest("[data-medit]"); if (!root) return false;
+  const mv = t.closest("[data-mup], [data-mdown]");
+  if (mv) { const r = mv.closest(".mdish"), up = mv.hasAttribute("data-mup"); let o = up ? r.previousElementSibling : r.nextElementSibling;
+    while (o && o.classList.contains("hidden")) o = up ? o.previousElementSibling : o.nextElementSibling;
+    if (!o) return true; if (up) o.before(r); else o.after(r);
+    r.classList.remove("moved"); void r.offsetWidth; r.classList.add("moved"); r.querySelector(up ? "[data-mup]" : "[data-mdown]").focus({ preventScroll: true });
+    r.scrollIntoView({ block: "nearest", behavior: "smooth" }); return true; }
+  if (t.closest("[data-mgroup]")) { const r = t.closest(".mdish"); if (r.querySelectorAll(".mgroup").length >= 3) { toast("Up to 3 required choices on a dish."); return true; }
+    r.querySelector(".mgroups").insertAdjacentHTML("beforeend", groupBlock("", null)); r.querySelector(".mgroup:last-child [data-g=title]").focus(); return true; }
+  if (t.closest("[data-gopt]")) { const g = t.closest(".mgroup"); g.querySelector(".mgopts").insertAdjacentHTML("beforeend", extraRow(null)); g.querySelector(".mgopts .mextra:last-child [data-x=name]").focus(); return true; }
+  if (t.closest("[data-gdel]")) { t.closest(".mgroup").remove(); return true; }
+  if (t.closest("[data-gcopy]")) { const g = t.closest(".mgroup"), box = g.querySelector(".gcopy"), me = g.closest(".mdish");
+    const others = [...root.querySelectorAll(".mdish")].filter(r => r !== me && !r.classList.contains("hidden"));
+    if (!others.length) { toast("Add another dish first."); return true; }
+    box.innerHTML = `<p class="small muted" style="margin:0">Copy this choice to:</p>${others.map(r => `<label class="choice" style="padding:6px 10px"><input type="checkbox" data-gto="${[...root.querySelectorAll(".mdish")].indexOf(r)}"><span>${esc((r.querySelector("[data-f=name]") || {}).value || "New dish")}</span></label>`).join("")}
+      <div class="row" style="justify-content:flex-start;gap:8px"><button type="button" class="ghost" data-gcopygo style="padding:6px 12px">Copy</button><button type="button" class="linkbtn small" data-gcopyx>Cancel</button></div>`;
+    box.classList.toggle("hidden"); return true; }
+  if (t.closest("[data-gcopyx]")) { t.closest(".gcopy").classList.add("hidden"); return true; }
+  if (t.closest("[data-gcopygo]")) { const g = t.closest(".mgroup"), title = g.querySelector("[data-g=title]").value.trim(), rows = [...root.querySelectorAll(".mdish")];
+    const opts = [...g.querySelectorAll(".mgopts .mextra")].map(x => ({ name: x.querySelector("[data-x=name]").value.trim(), price: Number(x.querySelector("[data-x=price]").value) || 0, off: !x.querySelector("[data-x=live]").checked })).filter(a => a.name.length >= 2);
+    if (title.length < 2 || opts.length < 2) { toast("Give the choice a title and at least 2 options first."); return true; }
+    let n = 0, full = 0;
+    g.querySelectorAll("[data-gto]:checked").forEach(c => { const r = rows[+c.dataset.gto]; if (!r) return;
+      const same = [...r.querySelectorAll(".mgroup")].find(x => x.querySelector("[data-g=title]").value.trim().toLowerCase() === title.toLowerCase());
+      const tmp = document.createElement("div"); tmp.innerHTML = groupBlock(title, opts); const blk = tmp.firstElementChild;
+      if (same) { same.replaceWith(blk); n++; } else if (r.querySelectorAll(".mgroup").length >= 3) full++; else { r.querySelector(".mgroups").appendChild(blk); n++; } });
+    g.querySelector(".gcopy").classList.add("hidden");
+    toast(n ? "Copied to " + n + " dish" + (n > 1 ? "es" : "") + ". Save the menu to keep it." + (full ? " " + full + " already had 3 choices." : "") : full ? "Those dishes already have 3 choices." : "Tick the dishes to copy to.");
+    return true; }
   if (t.closest("[data-madd]")) { const isAdmin = root.dataset.medit.startsWith("admin"); root.querySelector(".mrows").insertAdjacentHTML("beforeend", dishRow(null, isAdmin)); root.querySelector(".mdish:last-child [data-f=name]").focus(); return true; }
   if (t.closest("[data-mextra]")) { const r = t.closest(".mdish"); r.querySelector(".mextras").insertAdjacentHTML("beforeend", extraRow(null)); r.querySelector(".mextra:last-child input").focus(); return true; }
   if (t.closest("[data-xdel]")) { t.closest(".mextra").remove(); return true; }
@@ -5565,16 +5716,16 @@ async function renderAdmin(cached, quiet) {   // quiet = background/refresh-butt
     const guess = S.adminDate || dToday;
     if (!quiet && S.admin && S.admin.date === guess && !S.adminPainting) { S.adminPainting = true; try { await renderAdmin(true); } finally { S.adminPainting = false; } }
     const two = dNext !== dToday, seq = (S.adminSeq = (S.adminSeq || 0) + 1);
-    let wt = [], wn = [], data = null, fbRows = null, prRows = null;
+    let wt = [], wn = [], data = null, fbRows = null, prRows = null, dRows = [];
     try {
-      [wt, wn, data, fbRows, prRows] = await Promise.all([two ? api.waitingPools(dToday).catch(() => []) : [], two ? api.waitingPools(dNext).catch(() => []) : [], api.adminData(guess), api.listFeedback ? api.listFeedback().catch(() => null) : null, api.priceRequests ? api.priceRequests().catch(() => null) : null]);
+      [wt, wn, data, fbRows, prRows, dRows] = await Promise.all([two ? api.waitingPools(dToday).catch(() => []) : [], two ? api.waitingPools(dNext).catch(() => []) : [], api.adminData(guess), api.listFeedback ? api.listFeedback().catch(() => null) : null, api.priceRequests ? api.priceRequests().catch(() => null) : null, api.adminDiscounts ? api.adminDiscounts().catch(() => []) : []]);
     } catch (e) { toast("Couldn't load: " + cleanErr(e)); return; }
     if (seq !== S.adminSeq) return;   // a newer refresh has started
     if (two && !S.adminDate && !S.adminDayPicked) { S.adminDayPicked = true; if (wn.length && !wt.length && !((data && data.pools) || []).some(p => !["cancelled", "delivered"].includes(p.status))) { S.adminDate = dNext; try { data = await api.adminData(dNext); } catch (e) {} } }
     const cur = S.adminDate || dToday;
     otherWait = two && [dToday, dNext].includes(cur) ? (cur === dToday ? wn : wt) : [];
     S.adminOtherWait = otherWait;
-    data.feedback = fbRows; data.priceReqs = prRows;
+    data.feedback = fbRows; data.priceReqs = prRows; data.discounts = dRows || [];
     data.date = cur; data.kitchens = data.kitchens.filter(k => !k.archived); data.sites = data.sites.filter(x => !x.archived);
     // Compare what's there, not the order rows came back in (rows with the same timestamp come back shuffled)
     const norm = v => Array.isArray(v) ? v.map(norm).sort((x, y) => { const a = (x && x.id) || JSON.stringify(x), b = (y && y.id) || JSON.stringify(y); return a < b ? -1 : a > b ? 1 : 0; })
@@ -5955,10 +6106,12 @@ async function renderAdmin(cached, quiet) {   // quiet = background/refresh-butt
         <div class="group"><p class="group-title">Days they cook (pools open without the vendor confirming)</p>${autoPicker(k.auto_days)}
           <p class="small muted" style="margin-top:4px">${(k.auto_days || []).length ? "On: " + daysText(k.auto_days) + ". Untick every day to switch it off for a vendor who lets pools down." : "Off: the vendor confirms each day."}${(k.paused_dates || []).filter(x => x >= today()).length ? " Paused: " + k.paused_dates.filter(x => x >= today()).map(fmtDate).join(", ") + "." : ""}</p></div>
         ${feeBox(k, isSuper)}
+        ${(() => { const ds = (A.discounts || []).filter(x => x.kitchen_id === k.id); return ds.length ? `<div class="group"><p class="group-title">Building discounts <span class="muted" style="font-weight:500">(set by the vendor)</span></p>
+          <div class="stack" style="gap:6px">${ds.map(x => `<div class="row" style="justify-content:space-between;gap:8px"><span>${esc(sName(x.site_id) || "A building")} · <b>${x.pct}% off</b></span><button class="ghost" data-act="disc-remove" data-site="${esc(x.site_id)}" style="padding:6px 12px">Remove</button></div>`).join("")}</div></div>` : ""; })()}
         ${k.added_by_customer ? `<p class="small muted">Added by a customer: only their building sees this vendor.</p><button class="ghost" data-act="kitchen-listall" style="justify-self:start">List for all nearby buildings</button>` : ""}
         <div class="row" style="justify-content:flex-start;gap:8px;flex-wrap:wrap"><button class="ghost" data-act="kitchen-save">Save</button>${sendLink(k.whatsapp, MSG.sellerPage(k))}<button class="ghost" data-act="kitchen-copy">Copy link</button><button class="ghost" data-act="kitchen-reset">Reset link</button><button class="ghost" data-act="kitchen-remove" style="color:var(--danger)">Remove</button></div>
         <p class="group-title">Menu</p>
-        ${menuEditor(items.filter(i => i.kitchen_id === k.id), "admin:" + k.id, true)}
+        ${menuEditor(items.filter(i => i.kitchen_id === k.id).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)), "admin:" + k.id, true)}
         </div></details>`; }).join("") || `<p class="muted">No vendors match.</p>`}</div>`;
     }
   }
@@ -6296,10 +6449,10 @@ async function adminClick(e) {
   const ms = e.target.closest("[data-msave]");
   if (ms) {
     const root = ms.closest("[data-medit]"), kid = root.dataset.medit.slice(6), list = readMenu(root);
-    const bad = list.find(d => !d.removed && (d.name.length < 2 || !(Number(d.price) > 0))); if (bad) return toast("Each dish needs a name and a price above 0.");
+    const bad = menuProblem(list); if (bad) return toast(bad);
     ms.disabled = true;
     const clean = xs => xs.map(({ orig_name, orig_price, ...a }) => a);
-    try { for (const d of list) { const it = { name: d.name, price: Number(d.price), addons: clean(d.addons), icon: d.icon, active: d.removed ? false : d.active };
+    try { for (const [n, d] of list.entries()) { const it = { name: d.name, price: Number(d.price), addons: clean(d.addons), icon: d.icon, active: d.removed ? false : d.active, sort_order: n + 1 };
         if (d.id) await api.saveItem({ id: d.id, ...it }); else if (!d.removed) await api.saveItem({ kitchen_id: kid, ...it }); }
       Object.assign(S, await api.load()); renderAdmin();
       const ren = list.filter(d => d.id && !d.removed && d.renames.length); if (ren.length) askRenameOrders(ren); else toast("Menu saved");
@@ -6364,6 +6517,7 @@ async function adminClick(e) {
   if (kc) {
     const k = A.kitchens.find(x => x.id === kc.dataset.kitchen);
     if (act === "kitchen-copy") return copy(baseUrl() + "/#kitchen-" + k.token, "Link copied");
+    if (act === "disc-remove") return run(async () => { await api.removeDiscount(k.id, t.dataset.site); S.admin = null; }, "Discount removed. Customers there now see full prices.");
     if (act === "vform-approve") return run(async () => { await api.vendorReview(k.id, true); S.admin = null; }, (k.public_name || k.name) + " is live. Send them their vendor page link from the Vendors list.");
     if (act === "vform-return") { const n = (kc.querySelector("[data-vnote]") || {}).value || ""; if (n.trim().length < 3) { toast("Say what they should change."); return kc.querySelector("[data-vnote]").focus(); }
       return run(async () => { await api.vendorReview(k.id, false, n.trim()); S.admin = null; }, "Sent back. Share their link so they see your note."); }
@@ -6545,11 +6699,11 @@ async function adminSubmit(e) {
       if (v("name").length < 2 || v("public_name").length < 2) return fail("Add the real name and the menu name customers see.");
       if (w && !/^0\d{9}$/.test(w)) return fail("Enter a 10-digit WhatsApp number starting with 0.");
       const menu = f.querySelector("[data-medit]") ? readMenu(f.querySelector("[data-medit]")).filter(d => !d.removed) : [];
-      if (menu.some(d => d.name.length < 2 || !(Number(d.price) > 0))) return fail("Each dish needs a name and a price above 0.");
+      { const bad = menuProblem(menu); if (bad) return fail(bad); }
       const pick = f.querySelector("[data-autopick]"), pin = S.newKitPin || {};
       const x = await api.addKitchen({ name: v("name"), public_name: v("public_name"), tagline: v("tagline") || null, address: v("address") || null, whatsapp: w || null, capacity: Number(v("capacity")) || 45, delivery_mode: v("delivery_mode"),
         ...(pin.lat != null ? { lat: pin.lat, lng: pin.lng } : {}), ...(pick && pickedDays(pick).length ? { auto_days: pickedDays(pick) } : {}) });
-      for (const d of menu) await api.saveItem({ kitchen_id: x.id, name: d.name, price: Number(d.price), addons: d.addons.map(({ orig_name, orig_price, ...a }) => a), icon: d.icon, active: true });
+      for (const [n, d] of menu.entries()) await api.saveItem({ kitchen_id: x.id, name: d.name, price: Number(d.price), addons: d.addons.map(({ orig_name, orig_price, ...a }) => a), icon: d.icon, active: true, sort_order: n + 1 });
       toast(menu.length ? "Vendor added with " + menu.length + " dish" + (menu.length > 1 ? "es" : "") + "." : "Vendor added. Open it in the list to add dishes.");
     }
     if (f.dataset.form === "site") {
@@ -6787,6 +6941,11 @@ async function viewKitchen(token) {
       <section class="stack" id="vMenu"><h2>Your menu</h2><p class="small muted">${k.added_by_customer ? "Check the dishes, prices and extras the customer added for you." : "Change dishes, prices and extras, untick an extra to hide it today, drag to reorder."} Lower prices and changes to names show straight away; a higher price or a new dish or paid extra shows once ChopPool approves it. Save once when you're done.</p>
         <div id="vReqs"></div>
         ${menuEditor(K.menu, "vendor:" + token, false)}</section>
+      <section class="stack" id="vDisc"><h2>Building discounts</h2><p class="small muted">Give a ChopPool building a % off your food (dishes, extras and choices). Customers there see it on your menu. Delivery and the service fee don't change. Orders already placed keep their price.</p>
+        <div class="stack" style="gap:8px" id="vDiscList">${(k.discounts || []).map(x => `<div class="discrow"><span><b>${esc(x.name || "Building")}</b><span class="discbadge" style="margin-left:8px">${x.pct}% off</span></span>
+          <span class="row" style="gap:6px"><button type="button" class="ghost" data-dedit="${esc(x.site_id)}" data-dpct="${x.pct}" data-dname="${esc(x.name || "")}" style="padding:6px 12px">Change</button><button type="button" class="ghost" data-ddel="${esc(x.site_id)}" style="padding:6px 12px">Remove</button></span></div>`).join("")
+          || `<p class="small muted" style="margin:0">No discounts yet.</p>`}</div>
+        <button type="button" class="ghost" id="vDiscAdd" style="justify-self:start">+ Add a building discount</button></section>
       ${k.added_by_customer ? ""
         : K.menu.length ? `<section class="stack"><h2>Dish photos</h2><p class="small muted">Dishes with photos get chosen more often. Tap a dish to add or change its photo. ChopPool checks each photo before customers see it.</p>
         <p class="small"><strong>Tips:</strong> shoot from above, plate on a plain surface, in daylight. No text or logos.</p>
@@ -6797,6 +6956,11 @@ async function viewKitchen(token) {
         : `<section class="card listcta"><div><strong>Get seen by more buildings, free.</strong><p class="small muted">${k.listing_status === "declined" ? "Your last request wasn't approved. You can update it and try again." : "Right now only the building that added you can order from you. Ask ChopPool to show you to every nearby office, hostel and apartment."}</p></div><button class="btn" id="listMe">Ask to be listed</button></section>`)
         : ""}`;
     $("#view").querySelector(".settingsfold")?.addEventListener("toggle", e => { S.kset = e.target.open; });
+    $("#vDiscAdd")?.addEventListener("click", () => openDiscountSheet(token, null, draw));
+    $("#vDiscList")?.addEventListener("click", async e => {
+      const ed = e.target.closest("[data-dedit]"); if (ed) return openDiscountSheet(token, { site_id: ed.dataset.dedit, pct: +ed.dataset.dpct, name: ed.dataset.dname }, draw);
+      const del = e.target.closest("[data-ddel]"); if (!del) return; if (del.disabled) return; del.disabled = true;
+      try { await api.vendorDiscountSet(token, del.dataset.ddel, 0); toast("Discount removed. Customers there see your full prices."); draw(); } catch (er) { del.disabled = false; toast(cleanErr(er)); } });
     $("#listMe")?.addEventListener("click", () => openListingForm(token, k));
     // Always cooking: weekdays that open automatically; one-tap pause for a single day
     const saveAuto = async list => { try { await api.kitchenSetAuto(token, list); notifyServer({ kitchen_token: token, date: d }); toast(list.length ? "You cook " + daysText(list) + ". Pools open straight away on those days." : "No days ticked. Confirm each day instead."); draw(); } catch (e) { toast(cleanErr(e)); } };
@@ -6830,7 +6994,7 @@ async function viewKitchen(token) {
     const ms = e.target.closest("[data-msave]");
     if (ms) {
       const list = readMenu(ms.closest("[data-medit]"));
-      if (list.some(x => !x.removed && (x.name.length < 2 || !(Number(x.price) > 0)))) return toast("Each dish needs a name and a price above 0.");
+      { const bad = menuProblem(list); if (bad) return toast(bad); }
       ms.disabled = true;
       try { await api.vendorSetMenu(token, list.map(x => ({ id: x.id, name: x.name, price: x.price, addons: x.addons, active: x.removed ? false : x.active !== false })));
         const reqs = await api.vendorPriceRequests(token).catch(() => []), waiting = reqs.filter(r => r.status === "pending").length;
@@ -7113,6 +7277,33 @@ function viewRiderSignup() {
   });
 }
 
+/* ---------- A vendor's discount for one building (update 47) ---------- */
+async function openDiscountSheet(token, cur, done) {
+  let sites = []; try { sites = await api.vendorDiscountSites(token); } catch (e) { return toast(cleanErr(e)); }
+  let pick = cur ? cur.site_id : null;
+  openSheet(`${sheetHead(cur ? "Discount for " + (cur.name || "this building") : "Add a building discount", "Customers at this building get this % off your food.")}
+    <form id="dsForm" class="stack" novalidate>
+      ${cur ? "" : `<div><label for="dsQ">Building</label><input id="dsQ" placeholder="Search ChopPool buildings" autocomplete="off"></div><div class="dslist" id="dsList"></div>`}
+      <div><label for="dsPct">Discount (%)</label><div class="row" style="justify-content:flex-start;gap:8px;flex-wrap:wrap"><input id="dsPct" inputmode="numeric" style="width:96px" value="${cur ? cur.pct : ""}" placeholder="e.g. 20">
+        ${[10, 15, 20, 25].map(n => `<button type="button" class="tog" data-dsq="${n}" aria-pressed="${cur && cur.pct === n}">${n}%</button>`).join("")}</div>
+        <p class="small muted" id="dsEx" style="margin:6px 0 0"></p></div>
+      <p class="err" id="dsErr"></p><div class="sheet-foot"><button class="btn wide">${cur ? "Save discount" : "Add discount"}</button></div></form>`);
+  const drawList = () => { const q = ($("#dsQ") || {}).value || "", hits = sites.filter(x => !q || x.name.toLowerCase().includes(q.toLowerCase()) || fuzzyHit(q, x.name)).slice(0, 8);
+    $("#dsList").innerHTML = hits.map(x => `<button type="button" class="dsrow${pick === x.id ? " on" : ""}" data-dsite="${esc(x.id)}"><b>${esc(x.name)}</b><span class="small muted">${esc(x.drop_point || "")}</span></button>`).join("") || `<p class="small muted">No building matches.</p>`; };
+  const ex = () => { const p = Number($("#dsPct").value); $("#dsEx").textContent = p >= 5 && p <= 50 ? "A GHS 40 meal becomes " + money(centsOff(40, p)) + " for them." : "From 5% to 50%."; };
+  if (!cur) { drawList(); $("#dsQ").addEventListener("input", drawList); $("#dsList").addEventListener("click", e => { const b = e.target.closest("[data-dsite]"); if (!b) return; pick = b.dataset.dsite; drawList(); }); }
+  ex(); $("#dsPct").addEventListener("input", ex);
+  $("#dsForm").addEventListener("click", e => { const b = e.target.closest("[data-dsq]"); if (!b) return; $("#dsPct").value = b.dataset.dsq; $("#dsForm").querySelectorAll("[data-dsq]").forEach(x => x.setAttribute("aria-pressed", String(x === b))); ex(); });
+  $("#dsForm").addEventListener("submit", async e => {
+    e.preventDefault(); const b = $("#dsForm .btn"); if (b.disabled) return; const p = Number($("#dsPct").value);
+    if (!pick) return ($("#dsErr").textContent = "Choose the building.");
+    if (!(Number.isInteger(p) && p >= 5 && p <= 50)) return ($("#dsErr").textContent = "Enter a whole number from 5 to 50.");
+    const d = busyBtn(b, "Saving…");
+    try { await api.vendorDiscountSet(token, pick, p); closeSheet(); toast(p + "% off for " + ((sites.find(x => x.id === pick) || cur || {}).name || "that building") + ". Customers there see it now."); done && done(); }
+    catch (er) { d(); $("#dsErr").textContent = cleanErr(er); }
+  });
+}
+
 /* ---------- Vendors fill in their own details (link from the team) ---------- */
 const vendorSetupUrl = token => baseUrl() + "/#vendor-setup-" + token;
 const vendorInviteMsg = (name, token) => `Hi ${name}, this is ChopPool. Set up your ChopPool vendor page here, it takes about 10 minutes: ${vendorSetupUrl(token)}`;
@@ -7189,7 +7380,7 @@ async function viewVendorSetup(token) {
       if (!/^0\d{9}$/.test(g.data.whatsapp)) return (err.textContent = "Enter your 10-digit WhatsApp number.");
       if (!pin) return (err.textContent = "Show where you cook on the map.");
       if (!g.items.some(x => x.name.length >= 2 && Number(x.price) > 0)) return (err.textContent = "Add at least one dish with its price.");
-      if (g.items.some(x => x.name.length < 2 || !(Number(x.price) > 0))) return (err.textContent = "Each dish needs a name and a price above 0.");
+      { const bad = menuProblem(readMenu($("#vsForm [data-medit]"))); if (bad) return (err.textContent = bad); }
       if (!/^0\d{9}$/.test(g.data.payout_momo)) return (err.textContent = "Enter the 10-digit mobile money number we pay you on.");
     }
     const b = submit ? $("#vsSend") : $("#vsSave"); if (b.disabled) return; const done = busyBtn(b, submit ? "Sending…" : "Saving…");
