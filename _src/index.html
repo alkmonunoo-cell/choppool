@@ -1734,10 +1734,14 @@ function makeDemoApi() {
           food: r2(os.reduce((t, o) => t + food0(o), 0)), vendor_fee: r2(ps.reduce((t, p) => t + p.fee, 0)), service: r2(os.reduce((t, o) => t + Number(o.service_fee || 0) * (o.fee_per_meal ? o.qty : 1), 0)),
           delivery_in: r2(os.reduce((t, o) => t + Number(o.max_fee || 0) * o.qty, 0)), trips_riders: r2(ps.filter(p => !p.noTrip && p.rider_id).reduce((t, p) => t + Number(p.trip), 0)),
           trips_apps: r2(ps.filter(p => !p.noTrip && !p.rider_id).reduce((t, p) => t + Number(p.trip), 0)), trips_estimated: ps.filter(p => !p.noTrip && p.trip_cost == null).length,
-          cashback: r2(ledger.filter(e => ids.has(e.order_id) && /^Delivery cashback/.test(e.reason)).reduce((t, e) => t + e.amount, 0)),
+          cashback: r2(ledger.filter(e => ids.has(e.order_id) && /^Delivery cashback/.test(e.reason)).reduce((t, e) => t + e.amount, 0)
+            + os.filter(o => !o.parent_id && o.user_id && !o.cashback_posted && (pools.find(x => x.id === o.pool_id) || {}).status !== "cancelled" && !ledger.some(e => e.order_id === o.id && /^Delivery cashback/.test(e.reason))).reduce((t, o) => t + cashOf(o), 0)),
+          cashback_estimated: os.filter(o => !o.parent_id && o.user_id && !o.cashback_posted && (pools.find(x => x.id === o.pool_id) || {}).status !== "cancelled" && !ledger.some(e => e.order_id === o.id && /^Delivery cashback/.test(e.reason)) && cashOf(o) > 0).length,
+          credits: r2(ledger.filter(e => (ids.has(e.order_id) && /^Sorted:/.test(e.reason)) || (!e.order_id && e.created_by && e.created_by !== "system" && String(e.created_at).slice(0, 10) === d)).reduce((t, e) => t + e.amount, 0)),
+          paystack_fees: r2(Object.values(psRefs).filter(x => x.done === "paid" || x.done === "credited").filter(x => (orders.find(o => o.id === x.order) || {}).order_date === d).reduce((t, x) => t + x.amount, 0) * 0.0195),
           refunds: r2(ledger.filter(e => e.amount > 0 && /^(Refund|Money back)/.test(e.reason) && (orders.find(o => o.id === e.order_id) || {}).order_date === d).reduce((t, e) => t + e.amount, 0)),
           paid_vendors: r2(py("seller")), paid_riders: r2(py("rider")) };
-        if (row.orders || row.paid_vendors || row.paid_riders || row.refunds) days.push(row); }
+        if (row.orders || row.paid_vendors || row.paid_riders || row.refunds || row.credits) days.push(row); }
       const vendors = kitchens.map(k => { const ps = pl.filter(p => p.kitchen_id === k.id), fd = paid.filter(o => ps.some(p => p.id === o.pool_id)).reduce((t, o) => t + food0(o), 0), fee = ps.reduce((t, p) => t + p.fee, 0);
         return { id: k.id, name: k.name, food: r2(fd), fee: r2(fee), earned: r2(fd - fee), paid: r2(payouts.filter(x => x.kitchen_id === k.id && x.payee_type === "seller" && String(x.created_at).slice(0, 10) >= from && String(x.created_at).slice(0, 10) <= to).reduce((t, x) => t + Number(x.amount), 0)) }; }).filter(v => v.food > 0);
       const rid = riders.map(r => { const ps = pl.filter(p => p.rider_id === r.id && p.status === "delivered"); return { id: r.id, name: r.name, deliveries: ps.length, trips: r2(ps.reduce((t, p) => t + Number(p.trip), 0)),
@@ -5899,7 +5903,8 @@ async function renderAdmin(cached, quiet) {   // quiet = background/refresh-butt
       const viaOf = o => o.pay_via || (o.parent_id && !o.momo_ref ? (A.orders.find(x => x.id === o.parent_id) || {}).pay_via : null);
       const pstk = paidOrders.filter(o => viaOf(o) === "paystack").reduce((t, o) => t + orderTotal(o) - Number(o.wallet_used || 0), 0);
       const momo = received - wal - pstk;
-      return { received: r2(received), wallet: r2(wal), paystack: r2(pstk), momo: r2(Math.max(0, momo)), food: r2(foodP), vfee: r2(vfee), vendors: r2(foodP - vfee), delivery: r2(delivery), tripEst, cashback: r2(cb), service: r2(service), dmargin: r2(dmargin), profit: r2(service + vfee + dmargin) };
+      const psFee = pstk * 0.0195;   // Paystack keeps 1.95% (Ghana)
+      return { received: r2(received), wallet: r2(wal), paystack: r2(pstk), psFee: r2(psFee), momo: r2(Math.max(0, momo)), food: r2(foodP), vfee: r2(vfee), vendors: r2(foodP - vfee), delivery: r2(delivery), tripEst, cashback: r2(cb), service: r2(service), dmargin: r2(dmargin), profit: r2(service + vfee + dmargin - pstk * 0.0195) };
     })();
     const tile = (label, val, go, cls, sub) => `<button class="dtile ${cls || ""}" ${go ? `data-go="${go}"` : "disabled"}><b class="num">${val}</b><span>${esc(label)}</span>${sub ? `<small>${esc(sub)}</small>` : ""}</button>`;
     body.innerHTML = `
@@ -5922,7 +5927,7 @@ async function renderAdmin(cached, quiet) {   // quiet = background/refresh-butt
           ${tile("Owed to vendors", money(mny.vendors), "today:owed", "", "Food " + money(mny.food) + (mny.vfee > 0 ? " less " + money(mny.vfee) + " ChopPool fee" : ""))}
           ${tile("Owed to delivery", money(mny.delivery), "today:pools", "", mny.tripEst ? "Includes estimated trips not booked yet" : "Trip costs of today's pools")}
           ${tile("Cashback to customers", money(mny.cashback), "today:wallets", "", cashback == null ? "Estimate until " + fmtTime(s.cutoff) : "Delivery shares paid back")}
-          ${tile(cashback == null ? "Your profit so far" : "Your profit", money(mny.profit), "", mny.profit < 0 ? "bad" : "", "Service fees " + money(mny.service) + " + vendor fee " + money(mny.vfee) + (Math.abs(mny.dmargin) >= 0.01 ? (mny.dmargin >= 0 ? " + " : " − ") + "delivery " + money(Math.abs(mny.dmargin)) : ""))}
+          ${tile(cashback == null ? "Your profit so far" : "Your profit", money(mny.profit), "", mny.profit < 0 ? "bad" : "", "Service fees " + money(mny.service) + " + vendor fee " + money(mny.vfee) + (Math.abs(mny.dmargin) >= 0.01 ? (mny.dmargin >= 0 ? " + " : " − ") + "delivery " + money(Math.abs(mny.dmargin)) : "") + (mny.psFee >= 0.01 ? " − Paystack fees " + money(mny.psFee) : ""))}
           ${tile("Cashback for this day", cashback == null ? "Pending" : money(cashback), "today:wallets", "", cashback == null ? "Worked out after " + fmtTime(s.cutoff) : "")}
           ${tile("Wallet balances owed", money(owed), "today:wallets", "", "Money customers hold with ChopPool")}
           <button class="dtile" data-go="team:accounts" id="dashAccts"><b class="num">…</b><span>Customer accounts</span></button>
@@ -6790,13 +6795,13 @@ function trend(c, p, pct) {
 const repTabs = cur => `<div class="fchips" style="margin:0 0 12px;padding:0">${[["week", "Weekly report"], ["money", "Daily money"]].map(([k, l]) => `<button data-repview="${k}" aria-pressed="${k === cur}">${l}</button>`).join("")}</div>`;
 document.addEventListener("click", e => { const b = e.target.closest("[data-repview]"); if (!b) return; S.repView = b.dataset.repview; renderAdmin(true); });
 const MONEY_COLS = [["day", "Date"], ["orders", "Orders"], ["meals", "Meals"], ["received", "Received"], ["food", "Food"], ["vendor_fee", "ChopPool vendor fee"], ["owed_vendors", "Owed to vendors"],
-  ["service", "Service fees"], ["delivery_in", "Delivery charged"], ["trips_riders", "Trips: ChopPool riders"], ["trips_apps", "Trips: Bolt/Yango/other"], ["cashback", "Cashback paid"], ["profit", "Profit"],
+  ["service", "Service fees"], ["delivery_in", "Delivery charged"], ["trips_riders", "Trips: ChopPool riders"], ["trips_apps", "Trips: Bolt/Yango/other"], ["cashback", "Cashback"], ["credits", "Credits given"], ["paystack_fees", "Paystack fees"], ["profit", "Profit"],
   ["refunds", "Refunds"], ["paid_vendors", "Paid out to vendors"], ["paid_riders", "Paid out to riders"]];
 function moneyRows(R) {
   const rows = (R.days || []).map(d => { const n = k => Number(d[k] || 0); return { ...d, owed_vendors: Math.round((n("food") - n("vendor_fee")) * 100) / 100,
-    profit: Math.round((n("service") + n("vendor_fee") + n("delivery_in") - n("trips_riders") - n("trips_apps") - n("cashback")) * 100) / 100 }; });
+    profit: Math.round((n("service") + n("vendor_fee") + n("delivery_in") - n("trips_riders") - n("trips_apps") - n("cashback") - n("credits") - n("paystack_fees")) * 100) / 100 }; });
   const tot = { day: "Total" }; MONEY_COLS.slice(1).forEach(([k]) => { tot[k] = Math.round(rows.reduce((t, r) => t + Number(r[k] || 0), 0) * 100) / 100; });
-  tot.trips_estimated = rows.reduce((t, r) => t + Number(r.trips_estimated || 0), 0); return { rows, tot };
+  tot.trips_estimated = rows.reduce((t, r) => t + Number(r.trips_estimated || 0), 0); tot.cashback_estimated = rows.reduce((t, r) => t + Number(r.cashback_estimated || 0), 0); return { rows, tot };
 }
 function moneyCsv(R, from, to) {
   const q = x => '"' + String(x ?? "").replace(/"/g, '""') + '"', { rows, tot } = moneyRows(R);
@@ -6812,14 +6817,14 @@ function renderMoneyReport(body) {
       <div class="row" style="gap:8px;flex-wrap:wrap"><select id="mPer" aria-label="Period" style="width:auto">${[["week", "This week"], ["lastweek", "Last week"], ["month", "This month"], ["lastmonth", "Last month"], ["custom", "Pick dates"]].map(([k, l]) => `<option value="${k}"${k === per ? " selected" : ""}>${l}</option>`).join("")}</select>
       ${per === "custom" ? `<input type="date" id="mFrom" value="${from}" max="${t}" style="width:auto" aria-label="From"><input type="date" id="mTo" value="${to}" max="${t}" style="width:auto" aria-label="To">` : ""}
       <button class="ghost" id="mCopy">Copy for Excel</button><button class="ghost" id="mCsv">Download CSV</button></div></div>
-    <p class="small muted" style="margin:0">${fmtDate(from)} to ${fmtDate(to)} · paid orders only, by order day. Profit = service fees + ChopPool vendor fee + delivery charged − trip costs − cashback. Paid out = payments you recorded under Money owed.</p>
+    <p class="small muted" style="margin:0">${fmtDate(from)} to ${fmtDate(to)} · paid orders only, by order day. Profit = service fees + ChopPool vendor fee + delivery charged − trip costs − cashback − credits given − Paystack fees (1.95%). Cashback includes what's still due on orders not received yet (est.). Credits given = wallet credit to sort problems, and credit added by hand. Paid out = payments you recorded under Money owed.</p>
     <div id="mBody"><div class="skeleton" style="height:180px"></div></div></section>`;
   $("#mPer").addEventListener("change", e => { S.moneyPer = e.target.value; renderAdmin(true); });
   ["#mFrom", "#mTo"].forEach(id => $(id)?.addEventListener("change", () => { S.moneyFrom = $("#mFrom").value; S.moneyTo = $("#mTo").value; renderAdmin(true); }));
   const key = from + "|" + to;
   const draw = R => { const el = $("#mBody"); if (!el) return; const { rows, tot } = moneyRows(R), f = (k, v) => k === "day" ? (v === "Total" ? "<b>Total</b>" : esc(fmtDate(v))) : k === "orders" || k === "meals" ? v : money(v);
-    el.innerHTML = `${rows.length ? `<div class="dash-grid" style="margin-bottom:12px">${[["Received", tot.received], ["Owed to vendors", tot.owed_vendors], ["Trip costs", tot.trips_riders + tot.trips_apps], ["Cashback paid", tot.cashback], ["Profit", tot.profit]].map(([l, v]) => `<div class="dtile${l === "Profit" && v < 0 ? " bad" : ""}"><b class="num">${money(v)}</b><span>${l}</span></div>`).join("")}</div>
-      <div class="table-wrap"><table class="mtable"><tr>${MONEY_COLS.map(c => `<th>${esc(c[1])}</th>`).join("")}</tr>${rows.map(r => `<tr>${MONEY_COLS.map(([k]) => `<td class="num${k === "profit" && r[k] < 0 ? " neg" : ""}">${f(k, r[k])}${k === "trips_apps" && r.trips_estimated ? ' <span class="small muted" title="Trip not booked yet: estimated">est.</span>' : ""}</td>`).join("")}</tr>`).join("")}
+    el.innerHTML = `${rows.length ? `<div class="dash-grid" style="margin-bottom:12px">${[["Received", tot.received], ["Owed to vendors", tot.owed_vendors], ["Trip costs", tot.trips_riders + tot.trips_apps], ["Cashback", tot.cashback], ["Profit", tot.profit]].map(([l, v]) => `<div class="dtile${l === "Profit" && v < 0 ? " bad" : ""}"><b class="num">${money(v)}</b><span>${l}</span></div>`).join("")}</div>
+      <div class="table-wrap"><table class="mtable"><tr>${MONEY_COLS.map(c => `<th>${esc(c[1])}</th>`).join("")}</tr>${rows.map(r => `<tr>${MONEY_COLS.map(([k]) => `<td class="num${k === "profit" && r[k] < 0 ? " neg" : ""}">${f(k, r[k])}${k === "trips_apps" && r.trips_estimated ? ' <span class="small muted" title="Trip not booked yet: estimated">est.</span>' : ""}${k === "cashback" && r.cashback_estimated ? ' <span class="small muted" title="Includes cashback still due on orders not received yet">est.</span>' : ""}</td>`).join("")}</tr>`).join("")}
       <tr class="tsum">${MONEY_COLS.map(([k]) => `<td class="num">${k === "day" ? "<b>Total</b>" : `<b>${f(k, tot[k])}</b>`}</td>`).join("")}</tr></table></div>`
       : `<p class="muted">No paid orders in this period.</p>`}
       <div class="grid2" style="margin-top:14px;align-items:start"><section class="card stack" style="gap:8px"><h3>Vendors</h3>${(R.vendors || []).length ? `<div class="table-wrap"><table><tr><th>Vendor</th><th>Food</th><th>ChopPool fee</th><th>Earned</th><th>Paid out</th></tr>${R.vendors.map(v => `<tr><td>${esc(v.name)}</td><td class="num">${money(v.food)}</td><td class="num">${money(v.fee)}</td><td class="num"><b>${money(v.earned)}</b></td><td class="num">${money(v.paid)}</td></tr>`).join("")}</table></div>` : `<p class="small muted">None in this period.</p>`}</section>
