@@ -787,9 +787,11 @@ button.dtile:not([disabled]):hover { outline: 2px solid var(--accent-soft); }
 .installhint .ghost, .installhint .btn { padding: 8px 14px; flex: none; white-space: nowrap; }
 .setform { gap: 12px; }
 .setform .grid2 { align-items: end; }
-.savebar { position: sticky; bottom: calc(10px + env(safe-area-inset-bottom)); z-index: 5; display: grid; gap: 6px; }
+.savebar { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 6px 12px; margin-top: -2px; }
+.savebar .err { flex: 1 1 200px; margin: 0; }
+.savebar .btn { min-width: 120px; padding-left: 28px; padding-right: 28px; }
 .savebar .err:empty { display: none; }
-.savebar .btn { box-shadow: 0 8px 24px rgba(0,0,0,.18); }
+
 .poolhead .ph-t { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
 .poolhead h3 { margin: 0; }
 .poolrider { grid-template-columns: 1fr 1fr; }
@@ -6255,7 +6257,7 @@ async function renderAdmin(cached, quiet) {   // quiet = background/refresh-butt
   /* ---------- Settings live with what they control; Settings keeps only the general ones ---------- */
   const ex = (km, x = s) => Math.max(Number(x.trip_min ?? 0), Math.min(Number(x.trip_max ?? 80), Math.round(Number(x.base_fare ?? 0) + Number(x.per_km ?? 0) * km)));
   const exLine = x => `Examples: 1 km trip ${money(ex(1, x))} · 2 km ${money(ex(2, x))} · 5 km ${money(ex(5, x))} · 10 km ${money(ex(10, x))}`;
-  const setForm = inner => `<form class="stack setform" data-form="settings">${inner}<div class="savebar"><p class="err" data-err></p><button class="btn wide">Save</button></div></form>`;
+  const setForm = inner => `<form class="stack setform" data-form="settings">${inner}<div class="savebar"><p class="err" data-err></p><button class="btn">Save</button></div></form>`;
   if (sub === "rules" && tab === "riders") body.innerHTML = setForm(`<section class="card stack"><h2>Delivery pricing</h2>
         <p class="small muted">Each trip is priced by distance, like Bolt and Yango: base fare + rate per km of road from the kitchen to the building. The trip is then shared across the meals in the pool. Check a few real Bolt or Yango quotes and match them.</p>
         <div class="grid2"><div><label for="pfBase">Base fare (GHS)</label><input id="pfBase" name="base_fare" inputmode="decimal" value="${esc(s.base_fare ?? "")}"></div>
