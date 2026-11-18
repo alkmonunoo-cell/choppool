@@ -1450,7 +1450,8 @@ function makeDemoApi() {
     if (k.site_id && k.site_id !== si.id) throw new Error("That vendor only delivers to another drop point.");
     if (!(r.qty >= 1 && r.qty <= Math.min(5, ps))) throw new Error("Choose between 1 and " + Math.min(5, ps) + " meals.");
     const ph = String(r.phone || "").replace(/\D/g, "");
-    if (orders.filter(o => !o.parent_id && o.status === "pending" && String(o.phone || "").replace(/\D/g, "") === ph && Date.now() - new Date(o.created_at) < 864e5).length >= 3) throw new Error("You have 3 orders waiting for their payment to be checked. Wait for those before placing another.");
+    if (!ph && !me && !sim) throw new Error("Sign in to order.");
+    if (ph && orders.filter(o => !o.parent_id && o.status === "pending" && String(o.phone || "").replace(/\D/g, "") === ph && Date.now() - new Date(o.created_at) < 864e5).length >= 3) throw new Error("You have 3 orders waiting for their payment to be checked. Wait for those before placing another.");
     const d = orderDate(settings), special = (r.special || "").trim() || null;
     if ((k.paused_dates || []).includes(d) && !days.some(x => x.kitchen_id === k.id && x.order_date === d)) throw new Error(k.public_name + " isn't cooking " + (d === today() ? "today" : "on that day") + ". Choose another vendor.");
     if (special && d === today() && new Date() >= at(d, settings.special_cutoff)) throw new Error("Custom orders close at " + settings.special_cutoff + ". You can still order from the menu.");
@@ -1466,7 +1467,7 @@ function makeDemoApi() {
     const code = newCode(si.id, d, pl.id);
     const o = { id: "o" + uid(), created_at: nowIso(), order_date: d, pool_id: pl.id, site_id: si.id, kitchen_id: k.id, item_id: m.id, user_id: sim ? null : (me ? me.id : null),
       item_name: m.name, unit_price: pr.unit, discount_pct: pr.pct, qty: r.qty, addons: add, addons_total: addT, note: (r.note || "").trim() || null, special_request: special, quote_price: null,
-      customer_name: r.name, phone: r.phone, momo_ref: null, wallet_used: 0, code, max_fee: upfrontPerMeal(tripOf(pl.id), r.qty, settings), service_fee: settings.service_fee, fee_per_meal: true, parent_id: null,
+      customer_name: r.name, phone: ph || (me && me.phone) || null, momo_ref: null, wallet_used: 0, code, max_fee: upfrontPerMeal(tripOf(pl.id), r.qty, settings), service_fee: settings.service_fee, fee_per_meal: true, parent_id: null,
       status: special ? "quote_requested" : "pending", cancel_reason: null, refund_needed: false, collected_at: null };
     orders.push(o);
     let payment = null;
@@ -1477,7 +1478,7 @@ function makeDemoApi() {
   function addPlate(r) {
     const par = orders.find(o => o.id === r.join && !o.parent_id), m = items.find(i => i.id === r.item);
     if (!par || !["pending", "paid"].includes(par.status)) throw new Error("That order can't take another plate. Start a new order instead.");
-    if (!((me && par.user_id === me.id) || par.phone === String(r.phone || "").replace(/\D/g, ""))) throw new Error("Use the phone or account that placed the order.");
+    if (!((me && par.user_id === me.id) || (par.phone && par.phone === String(r.phone || "").replace(/\D/g, "")))) throw new Error("Use the phone or account that placed the order.");
     if (!m || m.kitchen_id !== par.kitchen_id) throw new Error("Add a dish from the same vendor.");
     if (pastCutoff(par.order_date)) throw new Error("Orders closed at " + settings.cutoff + ". You can't add to this order now.");
     if (!(r.qty >= 1 && r.qty <= 5)) throw new Error("Choose between 1 and 5 meals.");
@@ -5040,7 +5041,6 @@ function openOrder(menuId, opt = {}) {
     if ((item.addons || []).some(x => addonKey(item.addons, x) === k || x.name === k)) m.set(k, Math.min(5, (m.get(k) || 0) + n)); }); return m; };
   let extras = presetX();
   const specialOpen = !join && !(S.date === today() && new Date() >= at(S.date, s.special_cutoff));
-  const known = me.name && me.phone;
   const waitingHere = S.board.pools.some(p => p.site_id === site.id && p.kitchen_id === k.id && p.status === "waiting" && p.meals > 0);
   openSheet(`
     ${join ? sheetHead("Add to my order", esc(k.public_name) + " · same code " + esc(join.code) + ", packed together") : sheetHead(esc(k.public_name), esc(site.name) + " · " + fmtDate(S.date) + ", " + fmtTime(s.delivery_time))}
@@ -5062,12 +5062,7 @@ function openOrder(menuId, opt = {}) {
         <div id="specialBox" class="hidden stack"><p class="small"><b>Custom order:</b> something not on the menu. The vendor sets the price.</p><textarea id="fSpecial" rows="3" maxlength="300" placeholder="Jollof with fried fish instead of chicken" aria-label="Custom order"></textarea>
           <p class="small muted">The vendor prices it before ${fmtTime(s.special_cutoff)}. You pay after you see the price.</p></div>` : join ? "" : `<p class="small muted">Custom orders close at ${fmtTime(s.special_cutoff)}.</p>`}
       </div>
-      <div class="group"><p class="group-title">Your details</p>
-        ${known ? `<div class="me-row" id="meRow"><span class="avatar">${esc(me.name.slice(0, 1).toUpperCase())}</span><span style="flex:1;display:grid"><strong>${esc(me.name)}</strong><span class="small muted num">${esc(me.phone)}</span></span><button type="button" class="linkbtn" id="meEdit">Change</button></div>` : ""}
-        <div class="grid2${known ? " hidden" : ""}" id="meFields"><div><label for="fName">Your name</label><input id="fName" autocomplete="name" value="${esc(me.name || "")}" placeholder="e.g. Ama Mensah"></div>
-          <div><label for="fPhone">Phone number</label><input id="fPhone" inputmode="tel" placeholder="024 123 4567" value="${esc(me.phone || "")}"></div></div>
-        ${S.user && S.balance > 0 ? `<label class="switch"><span>Use wallet <span class="muted num">(${money(S.balance)})</span></span><input type="checkbox" id="fWallet" checked></label>` : ""}
-      </div>
+      ${S.user && S.balance > 0 ? `<div class="group"><label class="switch"><span>Use wallet <span class="muted num">(${money(S.balance)})</span></span><input type="checkbox" id="fWallet" checked></label></div>` : ""}
       <div class="group" id="payGroup"><p class="group-title">Payment</p><div class="sum" id="sum"></div>
         <div class="pay" id="payPart"><div id="payFrom"></div><div id="payTo"></div>${payAlts()}
           <div id="refBox"><label for="fRef">Transaction ID from your mobile money SMS</label><input id="fRef" placeholder="e.g. 51234567890"></div></div>
@@ -5155,7 +5150,6 @@ function openOrder(menuId, opt = {}) {
   $("#minus").addEventListener("click", () => { qty = Math.max(1, qty - 1); draw(); });
   $("#plus").addEventListener("click", () => { qty = Math.min(5, poolSize(k), qty + 1); draw(); });
   $("#noteToggle").addEventListener("click", () => { $("#noteBox").classList.toggle("hidden"); $("#noteToggle").classList.add("hidden"); $("#fNote").focus(); });
-  $("#meEdit")?.addEventListener("click", () => { $("#meRow").classList.add("hidden"); $("#meFields").classList.remove("hidden"); $("#fName").focus(); });
   $("#specialToggle")?.addEventListener("click", () => {
     special = !special; $("#specialBox").classList.toggle("hidden", !special);
     $("#specialToggle").textContent = special ? "Order from the menu instead" : "+ Make a custom order (not on the menu)"; draw();
@@ -5172,18 +5166,20 @@ function openOrder(menuId, opt = {}) {
   });
   $("#orderForm").addEventListener("submit", async ev => {
     ev.preventDefault();
-    const name = $("#fName").value.trim(), phone = $("#fPhone").value.replace(/\D/g, ""), ref = $("#fRef").value.trim(), err = $("#formErr");
+    // Name and phone come from the account (or this phone's saved details); paying by transfer uses the number they pay from
+    const acctName = ((S.user && S.user.name) || me.name || (S.user && S.user.email ? S.user.email.split("@")[0] : "") || "").trim().slice(0, 80);
+    const name = acctName.length >= 2 ? acctName : "ChopPool customer";
+    let phone = String(me.phone || (S.user && S.user.phone) || "").replace(/\D/g, ""); if (!/^0\d{9}$/.test(phone)) phone = "";
+    const ref = $("#fRef").value.trim(), err = $("#formErr");
     const sp = special ? $("#fSpecial").value.trim() : "";
-    const showMe = () => { $("#meRow")?.classList.add("hidden"); $("#meFields").classList.remove("hidden"); };
     if (special && sp.length < 4) return (err.textContent = "Describe what you'd like the vendor to make.");
     if (!special && !trayMode) { const miss = missingChoice(item.addons, extras); if (miss) { $(`#oChoices [data-cgroup="${CSS.escape(miss)}"]`)?.scrollIntoView({ block: "center", behavior: "smooth" }); return (err.textContent = 'Pick one option for "' + miss + '".'); } }
-    if (name.length < 2) { showMe(); return (err.textContent = "Add your name."); }
-    if (!/^0\d{9}$/.test(phone)) { showMe(); return (err.textContent = "Enter a 10-digit mobile money number starting with 0, like 024 123 4567."); }
     const payVisible = !special && !$("#payPart").classList.contains("hidden");
     const online = payVisible && payOnline();
     let from = online ? null : payFrom;
     if (payVisible && !online && !from) { const num = ($("#pfNum")?.value || "").replace(/\D/g, "") || phone; if (!/^0\d{9}$/.test(num)) { $("#pfNum")?.focus(); return (err.textContent = "Enter the 10-digit mobile money number you'll pay from."); }
       from = { id: "pm" + Date.now(), number: num, network: ($("#pfNum")?.value ? $("#pfNet").value : guessNet(num) || $("#pfNet").value), nick: "", save: !!$("#pfSave")?.checked }; }
+    if (!phone && from && /^0\d{9}$/.test(from.number)) phone = from.number;
     if (payVisible && !online && ref.length < 4) { $("#fRef").focus(); return (err.textContent = "Enter the transaction ID from your mobile money SMS."); }
     $("#submitBtn").disabled = true; err.textContent = "";
     try {
@@ -5203,7 +5199,7 @@ function openOrder(menuId, opt = {}) {
       }
       // Remember the number paid from (once the order went through, and only once per number)
       if (from && from.save) { const L = payMethods(); if (!L.some(m => m.number === from.number) && L.length < 3) { L.push({ id: from.id, number: from.number, network: from.network, nick: "", def: !L.length }); savePayMethods(L); } }
-      local.set("cp_me", { name, phone });
+      local.set("cp_me", { ...me, name: me.name || name, phone: me.phone || phone || "" });
       const mine = (local.get("cp_orders") || []).filter(o => o.order_date >= today()); mine.push({ id: r.id, order_date: r.order_date }); local.set("cp_orders", mine); if (local.get("cp_hide_name")) syncNamePrivacy();
       if (S.user) { try { await api.saveProfile({ name, phone }); } catch (e) {} }
       await refreshBoard(); try { await refreshMine(); } catch (e) {} refreshUser();
@@ -5966,13 +5962,13 @@ async function renderAdmin(cached, quiet) {   // quiet = background/refresh-butt
         const due = own(o) + kids.reduce((t, c) => t + own(c), 0), bad = unpaid[o.phone] || 0, reused = o.momo_ref && (S.refsSeen || {})[String(o.momo_ref).trim()];
         const reach = S.reach && S.reach.has(o.id), from = o.payer_phone ? `<br><span class="small muted">From ${esc(o.payer_network || "")} ${esc(fmtPhone(o.payer_phone))}</span>` : "";
         const tellMsg = `Hi ${firstOf(o.customer_name)}, this is ChopPool. We couldn't find your mobile money payment of ${money(due)} for code ${o.code}${o.momo_ref ? " (ID " + o.momo_ref + ")" : ""}. Please check the transaction ID or pay again before ${fmtTime(S.settings.cutoff)} so your lunch counts.`;
-        const tell = o.status === "pending" && !reach ? `<span class="small"><span class="chip">No alerts on</span> <a href="https://wa.me/233${esc(String(o.phone).replace(/^0/, ""))}?text=${encodeURIComponent(tellMsg)}" target="_blank" rel="noopener">WhatsApp</a> · <a href="sms:${esc(o.phone)}?&body=${encodeURIComponent(tellMsg)}">SMS</a></span>` : "";
+        const tell = o.status === "pending" && !reach && o.phone ? `<span class="small"><span class="chip">No alerts on</span> <a href="https://wa.me/233${esc(String(o.phone).replace(/^0/, ""))}?text=${encodeURIComponent(tellMsg)}" target="_blank" rel="noopener">WhatsApp</a> · <a href="sms:${esc(o.phone)}?&body=${encodeURIComponent(tellMsg)}">SMS</a></span>` : "";
         const payCell = o.basket && o.status === "pending" ? `<span class="small muted">Paid together with the first dish on code ${esc(o.code)}</span>`
           : o.status === "pending" && o.pay_via === "paystack" ? `<span class="chip">Paying online</span><br><span class="small muted">${money(due)} · confirms by itself when Paystack does. Not paid by ${fmtTime(S.settings.cutoff)}: cancelled.</span>`
           : o.status === "pending" ? `<div class="stack" style="gap:6px;min-width:190px"><span class="num">${esc(paid || "—")}${reused ? ` <span class="chip bad">Ref used ${reused}×</span>` : ""}<br><span class="small muted">Expect ${money(due)}${kids.length ? " for " + (kids.length + 1) + " dishes" : ""}${Number(o.carried_amount) > 0 ? " (" + money(o.carried_amount) + " moved from another pool)" : ""}</span>${from}</span>${tell}
             ${o.pay_issue ? `<span class="chip warn">${o.pay_issue === "short" ? "Short: " + money(o.amount_received || 0) + " received" : "Not found"} · customer told</span>` : ""}
             <div class="row" style="gap:6px;flex-wrap:wrap;justify-content:flex-start"><button class="btn" data-act="pay-found" style="padding:7px 12px">Payment found</button><button class="ghost" data-act="pay-issue" style="padding:7px 12px">Not found / short</button></div></div>` : `<span class="num">${esc(paid || "—")}</span>`;
-        return `<tr data-orow="${esc(o.id)}"><td class="num">${flag ? `<span class="pdotx" title="Payment to confirm"></span>` : ""}${clock(o.created_at)}</td><td>${esc(o.customer_name)}${bad ? `<br><span class="chip bad" title="Payments not received in the last 60 days">${bad} unpaid before</span>` : ""}</td><td class="num">${esc(o.phone)}</td><td>${esc(sName(o.site_id))}</td>
+        return `<tr data-orow="${esc(o.id)}"><td class="num">${flag ? `<span class="pdotx" title="Payment to confirm"></span>` : ""}${clock(o.created_at)}</td><td>${esc(o.customer_name)}${bad ? `<br><span class="chip bad" title="Payments not received in the last 60 days">${bad} unpaid before</span>` : ""}</td><td class="num">${o.phone ? esc(o.phone) : '<span class="muted">Account</span>'}</td><td>${esc(sName(o.site_id))}</td>
           <td>${o.qty} × ${esc(o.item_name)}<br><span class="small muted">${esc(k.public_name || "")} Pool ${p.seq || ""}</span></td><td style="white-space:normal;min-width:180px">${esc(extras)}</td>${amtCell(o)}<td>${payCell}</td><td class="num">${esc(o.code)}</td>
           <td><select data-order="${esc(o.id)}" aria-label="Order status">${ST.map(x => `<option${x === o.status ? " selected" : ""}>${x}</option>`).join("")}</select></td></tr>`; };
       // Which customers can get a phone alert about their payment (fetched quietly, then the cards update)
@@ -6002,7 +5998,7 @@ async function renderAdmin(cached, quiet) {   // quiet = background/refresh-butt
       body.innerHTML = `
       <h2>Refunds due</h2>
       ${refunds.length ? `<div class="stack" style="gap:10px">${refunds.map(o => `<div class="card stack" style="gap:6px" data-refund="${esc(o.id)}"><div class="top"><strong>${esc(o.customer_name)} · <span class="num">${esc(o.code)}</span></strong><b class="num">${money(amt(o))}</b></div>
-          <p class="small">${esc(o.cancel_reason || "Cancelled")} · send to <a class="num" href="tel:${esc(o.phone)}">${esc(fmtPhone(o.phone))}</a>${o.momo_ref ? ` · paid with <span class="num">${esc(o.momo_ref)}</span>` : ""}</p>
+          <p class="small">${esc(o.cancel_reason || "Cancelled")} · ${o.phone ? `send to <a class="num" href="tel:${esc(o.phone)}">${esc(fmtPhone(o.phone))}</a>` : "no phone on the order: refund to their wallet"}${o.momo_ref ? ` · paid with <span class="num">${esc(o.momo_ref)}</span>` : ""}</p>
           <form class="inline" data-form="refund" data-id="${esc(o.id)}" data-amt="${amt(o)}" style="grid-template-columns:1fr auto"><div><label>Mobile money reference of your refund</label><input name="ref" autocomplete="off" placeholder="e.g. 5123456789"></div><button class="btn">Mark refunded</button></form></div>`).join("")}</div>`
         : `<p class="muted small">No refunds due for ${fmtDate(d)}.</p>`}
       <h2>Payments with no order</h2>
@@ -6012,7 +6008,7 @@ async function renderAdmin(cached, quiet) {   // quiet = background/refresh-butt
         : `<p class="muted small">None. When someone pays but their order can't go through (sold out, closed), it shows here for a refund.</p>`}
       <h2>Problems reported</h2>
       ${(A.problems || []).length ? `<div class="stack" style="gap:10px">${A.problems.map(o => `<div class="card stack" style="gap:6px"><div class="top"><strong>${esc(o.customer_name)} · <span class="num">${esc(o.code)}</span></strong><span class="small muted">${fmtDate(o.order_date)}</span></div>
-          <p class="small">${esc(o.problem)} · ${esc((A.kitchens.find(k => k.id === o.kitchen_id) || {}).public_name || "")} · <a href="tel:${esc(o.phone)}">${esc(fmtPhone(o.phone))}</a></p>
+          <p class="small">${esc(o.problem)} · ${esc((A.kitchens.find(k => k.id === o.kitchen_id) || {}).public_name || "")} ${o.phone ? ` · <a href="tel:${esc(o.phone)}">${esc(fmtPhone(o.phone))}</a>` : ""}</p>
           <form class="inline" data-form="resolve" data-id="${esc(o.id)}" style="grid-template-columns:${isOwner ? "1.6fr .7fr" : "1fr"} auto"><div><label>What you did</label><input name="note" placeholder="Called, vendor will replace it tomorrow"></div>${isOwner ? `<div><label>Credit (GHS)</label><input name="credit" inputmode="decimal" placeholder="0"></div>` : ""}<button class="btn">Mark sorted</button></form></div>`).join("")}</div>`
         : `<p class="muted small">No open problems. Customers can report one after collecting; their cashback waits until it's sorted.</p>`}
       <h2>Wallets</h2>
@@ -6549,7 +6545,7 @@ async function adminClick(e) {
       const text = site.handoff === "host" ? "Your ChopPool lunch is at " + site.name + ". Collect it from " + (site.host_label || site.drop_point) + " with your code, like K-27."
         : "Your ChopPool lunch arrives at " + site.name + ", " + site.drop_point + ", in about 5 minutes. Bring your code. The rider waits " + s.arrival_window_min + " minutes.";
       return openSheet(`${sheetHead("Arrival message", "Customers with the app open get this automatically. Message the others:")}<textarea rows="4" aria-label="Message">${esc(text)}</textarea>
-        ${os.map(o => `<a class="wa quiet" href="${wa(o.phone)}?text=${encodeURIComponent(text + " Your code: " + o.code)}" target="_blank" rel="noopener">${esc(o.customer_name)} · ${esc(o.code)}</a>`).join("")}`);
+        ${os.filter(o => o.phone).map(o => `<a class="wa quiet" href="${wa(o.phone)}?text=${encodeURIComponent(text + " Your code: " + o.code)}" target="_blank" rel="noopener">${esc(o.customer_name)} · ${esc(o.code)}</a>`).join("")}`);
     }
   }
   if (act === "vform-new") return openVendorInvite();
