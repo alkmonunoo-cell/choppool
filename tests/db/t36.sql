@@ -17,7 +17,7 @@ select 'A4 unique name still works', addons_total = 4 from orders where id = (:'
 select place_order(:'s1', :'i1', 2, 'Ama B', '0240000105', 'REFXA5', array['Fried eggs','Fried eggs','Fish#20'], null, null, false, null) as o5 \gset
 select 'A5 2 eggs + Fish 20 per plate', addons_total = 28 and (select (e ->> 'qty')::int from jsonb_array_elements(addons) e where e ->> 'name' = 'Fried eggs') = 2 from orders where id = (:'o5'::json ->> 'id')::uuid;
 select place_order(:'s1', :'i1', 1, 'Ama C', '0240000106', 'REFXA6', array['Fried eggs','Fried eggs','Fried eggs','Fried eggs','Fried eggs','Fried eggs','Fried eggs'], null, null, false, null) as o6 \gset
-select 'A6 at most 5 of one extra', addons_total = 20 from orders where id = (:'o6'::json ->> 'id')::uuid;
+select 'A6 seven of one extra (the cap is now 99)', addons_total = 28 from orders where id = (:'o6'::json ->> 'id')::uuid;
 insert into admins (email, role) values ('boss@x.com', 'coordinator') on conflict do nothing;
 set request.jwt.claims = '{"sub":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa","email":"ama@x.com"}'; set role authenticated;
 do $$ begin begin perform admin_rename_addons(null, '[]'); raise notice 'R1 FAIL'; exception when others then raise notice 'R1 ok not team'; end; end $$;

@@ -3943,7 +3943,8 @@ const lineItem = l => S.items.find(i => i.id === l.item) || {};
 // a bare name that appears more than once counts once (the first), matching the server
 const addonKey = (list, a) => (list || []).filter(x => x.name === a.name).length > 1 ? a.name + "#" + Number(a.was ?? a.price) : a.name;
 // A key sent twice means two of that extra (2 eggs on each plate), up to 5
-const addonPicked = (list, keys) => (list || []).map((a, i) => ({ ...a, qty: Math.min(5, keys.filter(k => k === addonKey(list, a) || (k === a.name && list.findIndex(x => x.name === a.name) === i)).length) })).filter(a => a.qty > 0);
+const MAX_EXTRA = 99;   // of one extra on a plate (the server allows the same)
+const addonPicked = (list, keys) => (list || []).map((a, i) => ({ ...a, qty: Math.min(MAX_EXTRA, keys.filter(k => k === addonKey(list, a) || (k === a.name && list.findIndex(x => x.name === a.name) === i)).length) })).filter(a => a.qty > 0);
 const addonSum = (list, keys) => addonPicked(list, keys).reduce((t, a) => t + Number(a.price) * a.qty, 0);
 const addonLabel = k => String(k).replace(/#(\d+(?:\.\d+)?)$/, (m, p) => " (" + money(Number(p)) + ")");
 const addonsShort = keys => { const m = new Map(); (keys || []).forEach(k => m.set(k, (m.get(k) || 0) + 1)); return [...m].map(([k, c]) => (c > 1 ? c + " × " : "") + addonLabel(k)).join(", "); };
@@ -3967,12 +3968,12 @@ const fullOf = (d, keys) => Number(d.was ?? d.price) + addonPicked(d.addons, key
 const priceTag = d => d.was != null ? `<s class="was num">${money(d.was)}</s> ${money(d.price)}` : money(d.price);
 const discBadge = (k, cls = "") => { const p = discOf(k.id); return p && !S.noSite ? `<span class="discbadge${cls}">${p}% off for ${esc(siteOf(S.siteId).name)}</span>` : ""; };
 const xChips = (list, ex) => (list || []).filter(xOpt).map(a => { const k = addonKey(list, a), c = ex.get(k) || 0, lab = esc(a.name) + (a.price ? " +" + money(a.price) : "");
-  return c ? `<span class="tog xon" aria-pressed="true"><button type="button" class="xname" data-xoff="${esc(k)}" aria-label="Remove ${esc(a.name)}">${lab}</button><span class="xstep"><button type="button" data-xm="${esc(k)}" aria-label="One less ${esc(a.name)}">−</button><b class="num">${c}</b><button type="button" data-xp="${esc(k)}" aria-label="One more ${esc(a.name)}"${c >= 5 ? " disabled" : ""}>+</button></span></span>`
+  return c ? `<span class="tog xon" aria-pressed="true"><button type="button" class="xname" data-xoff="${esc(k)}" aria-label="Remove ${esc(a.name)}">${lab}</button><span class="xstep"><button type="button" data-xm="${esc(k)}" aria-label="One less ${esc(a.name)}">−</button><b class="num">${c}</b><button type="button" data-xp="${esc(k)}" aria-label="One more ${esc(a.name)}"${c >= MAX_EXTRA ? " disabled" : ""}>+</button></span></span>`
     : `<button type="button" class="tog" data-addon="${esc(k)}" aria-pressed="false">${lab}</button>`; }).join("");
 function xClick(e, ex) {
   const a = e.target.closest("[data-addon]"), m = e.target.closest("[data-xm]"), p = e.target.closest("[data-xp]"), off = e.target.closest("[data-xoff]");
   if (off) ex.delete(off.dataset.xoff);   // tap the name: remove it, whatever the count
-  else if (a) ex.set(a.dataset.addon, 1); else if (p) ex.set(p.dataset.xp, Math.min(5, (ex.get(p.dataset.xp) || 0) + 1));
+  else if (a) ex.set(a.dataset.addon, 1); else if (p) ex.set(p.dataset.xp, Math.min(MAX_EXTRA, (ex.get(p.dataset.xp) || 0) + 1));
   else if (m) { const c = (ex.get(m.dataset.xm) || 0) - 1; if (c > 0) ex.set(m.dataset.xm, c); else ex.delete(m.dataset.xm); } else return false;
   return true;
 }
@@ -5038,7 +5039,7 @@ function openOrder(menuId, opt = {}) {
   let payFrom = defaultPM();
   // Extras as key -> count; "Order again" brings back the same extras and counts
   const presetX = () => { const m = new Map(); (preset && preset.addons || []).forEach(a => { const k = typeof a === "string" ? a : addonKey(item.addons, a), n = typeof a === "string" ? 1 : Math.max(1, Number(a.qty) || 1);
-    if ((item.addons || []).some(x => addonKey(item.addons, x) === k || x.name === k)) m.set(k, Math.min(5, (m.get(k) || 0) + n)); }); return m; };
+    if ((item.addons || []).some(x => addonKey(item.addons, x) === k || x.name === k)) m.set(k, Math.min(MAX_EXTRA, (m.get(k) || 0) + n)); }); return m; };
   let extras = presetX();
   const specialOpen = !join && !(S.date === today() && new Date() >= at(S.date, s.special_cutoff));
   const waitingHere = S.board.pools.some(p => p.site_id === site.id && p.kitchen_id === k.id && p.status === "waiting" && p.meals > 0);
