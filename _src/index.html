@@ -355,6 +355,18 @@ s.was { color: var(--muted); font-weight: 500; text-decoration-thickness: 1.5px;
 .dsrow.on { border-color: var(--accent); background: var(--accent-soft); }
 .mgopts [data-x=price] { padding-left: 8px; padding-right: 4px; }
 @media (max-width: 480px) { .mgopts .mextra { grid-template-columns: 20px 24px minmax(0, 1fr) 84px 24px; gap: 6px; } .mgroup { padding: 8px; } .mgtop input { padding-left: 10px; padding-right: 8px; } }
+/* Recent buildings: swipe left to remove */
+.recent-t { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.recent-t span { font-size: 11.5px; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--muted); }
+@media (hover: hover) and (pointer: fine) { .recent-t span { display: none; } }
+.swrow { position: relative; overflow: hidden; border-radius: 12px; touch-action: pan-y; transition: height .26s ease, opacity .26s ease; }
+.swbg { position: absolute; inset: 0; display: flex; align-items: center; justify-content: flex-end; padding-right: 18px; background: var(--danger-soft, #FDECEA); color: var(--danger); font-weight: 800; font-size: 14px; border-radius: inherit; transition: background .15s, color .15s; }
+.swrow.armed .swbg { background: var(--danger); color: var(--surface); }
+.swbg { opacity: 0; } .swrow.swiping .swbg, .swrow.gone .swbg, .swrow.back .swbg { opacity: 1; }
+.swfg > .place-row { margin: 0; }
+.swfg { position: relative; background: var(--surface); transition: transform .24s cubic-bezier(.25,.8,.25,1); }
+.swrow.swiping .swfg { transition: none; }
+.swrow.gone { height: 0 !important; opacity: 0; }
 [data-feebox] [hidden] { display: none !important; }
 [data-medit="setup"] .mphoto { pointer-events: none; }
 [data-medit="setup"] .mphoto .cam { display: none; }
@@ -3220,7 +3232,7 @@ function openSitePicker(opt) {
       const rest = rows.filter(r => !rec.includes(r));
       // Near you: the 5 closest (location only if this phone already allows it, or after tapping "See buildings near you")
       const more = here ? rest.filter(r => r.d != null).sort((a, b) => a.d - b.d).slice(0, 5) : [];
-      if (rec.length) html += `<p class="group-title">Recent</p>` + rec.map(row).join("");
+      if (rec.length) html += `<p class="group-title recent-t">Recent<span>Swipe left to remove</span></p>` + rec.map(r => `<div class="swrow" data-recent="${esc(r.x.id)}"><div class="swbg" aria-hidden="true">Remove</div><div class="swfg">${row(r)}</div></div>`).join("");
       if (more.length) html += `<p class="group-title">Near you</p>` + more.map(row).join("");
       else if (!here && navigator.geolocation) html += `<button type="button" class="linkbtn nearask" data-nearask>${ICON.pin} See buildings near you</button>`;
       if (here && !more.length && !rec.length) $("#siteHint").textContent = "No ChopPool buildings near you yet. Search for yours or pin it on the map.";
@@ -3229,6 +3241,23 @@ function openSitePicker(opt) {
     $("#siteList [data-nearask]")?.addEventListener("click", () => $("#nearMe").click());
   };
   list();
+  // Swipe a recent building left to take it off Recent (this phone only; the building itself stays on ChopPool)
+  (() => { const host = $("#siteList"); let sw = null;
+    host.addEventListener("pointerdown", e => { const r = e.target.closest(".swrow"); if (!r || e.button > 0) return; sw = { r, x: e.clientX, y: e.clientY, dx: 0, on: false, id: e.pointerId }; });
+    host.addEventListener("pointermove", e => { if (!sw || e.pointerId !== sw.id) return; const dx = e.clientX - sw.x, dy = e.clientY - sw.y;
+      if (!sw.on) { if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) { sw = null; return; }
+        if (dx < -8 && Math.abs(dx) > Math.abs(dy)) { sw.on = true; sw.r.classList.add("swiping"); try { sw.r.setPointerCapture(e.pointerId); } catch (x) {} } }
+      if (sw.on) { sw.dx = Math.min(0, dx); sw.r.querySelector(".swfg").style.transform = `translateX(${sw.dx}px)`; sw.r.classList.toggle("armed", sw.dx < -Math.min(110, sw.r.offsetWidth * .35)); } });
+    const end = () => { if (!sw) return; const { r, dx, on } = sw; sw = null; if (!on) return; host.dataset.swiped = Date.now(); r.classList.remove("swiping");
+      const fg = r.querySelector(".swfg"), w = r.offsetWidth;
+      if (dx < -Math.min(110, w * .35)) {
+        fg.style.transform = `translateX(${-w}px)`; r.style.height = r.offsetHeight + "px"; requestAnimationFrame(() => requestAnimationFrame(() => r.classList.add("gone")));
+        setTimeout(() => { local.set("cp_recent_sites", (local.get("cp_recent_sites") || []).filter(x => x !== r.dataset.recent)); if ($("#siteList")) list(); toast("Removed from Recent."); }, 280);
+      } else { r.classList.add("back"); fg.style.transform = ""; r.classList.remove("armed"); setTimeout(() => r.classList.remove("back"), 260); } };
+    host.addEventListener("pointerup", end); host.addEventListener("pointercancel", end);
+    // A swipe is not a tap: don't pick the building
+    host.addEventListener("click", e => { if (Date.now() - (+host.dataset.swiped || 0) < 450) { e.preventDefault(); e.stopPropagation(); } }, true);
+  })();
   const pick = id => setSite(id, then);
   $("#siteList").addEventListener("click", e => { if (e.target.name === "site") pick(e.target.value); });
   $("#fbQ").addEventListener("input", () => { const typing = !!$("#fbQ").value.trim(); $("#sheet").classList.toggle("searching", typing); $("#fbChips").classList.toggle("hidden", typing); if (typing) { $("#siteMap").classList.add("hidden"); $("#mapToggle").textContent = "Show on map"; } list(); });
@@ -7594,7 +7623,7 @@ async function start() {
   const saved = local.get("cp_site");
   // No building chosen yet: the app opens on Home with a welcome card (no forced location sheet)
   S.siteId = S.sites.some(x => x.id === saved) ? saved : null; S.noSite = !S.siteId;
-  if (S.siteId && !(local.get("cp_recent_sites") || []).length) local.set("cp_recent_sites", [S.siteId]);
+  if (S.siteId && local.get("cp_recent_sites") == null) local.set("cp_recent_sites", [S.siteId]);
   $("#sheetBg").addEventListener("click", e => { if (e.target === $("#sheetBg")) closeSheet(); });
   initSheetDrag();
   document.addEventListener("keydown", e => { if (e.key === "Escape") closeSheet(); });
