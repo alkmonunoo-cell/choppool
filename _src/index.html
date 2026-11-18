@@ -2130,6 +2130,7 @@ function makeSupabaseApi() {
       if (miss(r.error)) throw miss(r.error); if (!must(r).length) throw new Error("Not saved. Only the owner can change payment options.");
     },
     async removePayMethod(id) { must(await sb.from("payment_methods").delete().eq("id", id)); return "deleted"; },
+    async payMode() { const r = await sb.from("settings").select("pay_mode").eq("id", 1).single(); return r.error ? null : r.data.pay_mode; },
     async updateSettings(patch) { const r = await sb.from("settings").update(patch).eq("id", 1).select("id");
       if (r.error && /momo_network/i.test(r.error.message)) throw new Error("Run update-10.sql in the Supabase SQL Editor once, then try again.");
       if (r.error && /cap_km/i.test(r.error.message)) throw new Error("Run the latest ChopPool update in the Supabase SQL Editor once, then try again.");
@@ -5142,6 +5143,8 @@ function openOrder(menuId, opt = {}) {
     $("#submitBtn").textContent = join ? "Add to pool" : startsPool ? "Start pool" : "Join pool";
   };
   drawExtras(); draw(); if (!join && !opt.fromPage) loadReviews(k);
+  // The app may have opened with an older payment setting: check it now, so a change in Settings counts straight away
+  freshPayMode().then(ch => { if (ch && $("#orderForm")) draw(); });
   if (opt.special) setTimeout(() => $("#specialToggle")?.click(), 0);   // after the toggle's own handler is attached below
   $("#moreDishes")?.addEventListener("click", () => closeSheet());
   $("#tLines")?.addEventListener("click", e => { const b = e.target.closest("[data-tl]"); if (!b) return; const l = tray.lines[+b.dataset.tl];
@@ -5296,6 +5299,12 @@ const payByTxt = () => payOnline() ? "mobile money or card" : "mobile money";
 const payOnlineBox = due => `<div class="momo"><span class="logo ps">${ICON.wallet}</span><span style="flex:1;display:grid"><span class="small muted">Pay <strong id="dueTxt">${money(due)}</strong> online</span><strong>Mobile money or card</strong><span class="small muted">A secure Paystack window opens when you tap the button. MTN, Telecel, AirtelTigo or card.</span></span></div>`;
 const payLeftMsg = res => res === "pending" ? "Payment received. We're confirming it now." : res === "credited" ? "Your payment went to your wallet: this order had already closed."
   : "Not paid yet. Your order is held until " + fmtTime(S.settings.cutoff) + ". Tap Pay now under Orders.";
+// How customers pay, read fresh (one small request); true if it changed
+async function freshPayMode() {
+  if (DEMO || !api.payMode) return false;
+  try { const m = await api.payMode(); if (!m || !S.settings || m === S.settings.pay_mode) return false;
+    S.settings = { ...S.settings, pay_mode: m }; S.payTeamFor = null; await checkPayTeam(); return true; } catch (e) { return false; }
+}
 async function checkPayTeam() {   // "team only" mode: find out once per account whether this person is on the team
   if ((S.settings || {}).pay_mode !== "team" || !S.user) { S.payTeam = false; S.payTeamFor = null; return; }
   if (S.payTeamFor === S.user.id) return; S.payTeamFor = S.user.id;
