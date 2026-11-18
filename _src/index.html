@@ -1316,7 +1316,7 @@ const isoDow = d => { const w = new Date(d + "T00:00:00Z").getUTCDay(); return w
    DEMO DATA LAYER: in-memory copy of the database logic, with simulated customers
    ===================================================================================== */
 function makeDemoApi() {
-  const settings = { phone_signin: false, pay_mode: "manual", reminder_time: "09:00", tester_terms_on: true, tester_terms_version: 1, cutoff: "10:30", special_cutoff: "10:00", delivery_time: "12:30", trip_cost: 60, base_fare: 20, per_km: 6, trip_min: 10, max_fee: 10, cap_km: 8, trip_max: 80, quote_pay_min: 15, auto_receive_min: 120, admin_idle_min: 15, service_fee: 2, min_pool: 6, max_meals: 10, pool_ceiling: 15,
+  const settings = { reports_from: null, phone_signin: false, pay_mode: "manual", reminder_time: "09:00", tester_terms_on: true, tester_terms_version: 1, cutoff: "10:30", special_cutoff: "10:00", delivery_time: "12:30", trip_cost: 60, base_fare: 20, per_km: 6, trip_min: 10, max_fee: 10, cap_km: 8, trip_max: 80, quote_pay_min: 15, auto_receive_min: 120, admin_idle_min: 15, service_fee: 2, min_pool: 6, max_meals: 10, pool_ceiling: 15,
     commission_rate: 0.15, vendor_fee_rate: 0, vendor_fee_free: 5, next_day_confirm_by: "08:30", countdown_start: "06:00", near_max_fee: 50, free_max_m: 1500, accept_timeout_min: 20, arrival_window_min: 10, notify_daily_cap: 5, momo_number: "024 000 0000", momo_name: "ChopPool Pilot", momo_network: "MTN" };
   const sites = [
     { id: "s1", name: "Heritage Tower, Ridge", drop_point: "Lobby security desk", handoff: "host", host_label: "the security desk in the lobby", host_token: "demoh1", lat: 5.5640, lng: -0.2010, status: "active", active: true },
@@ -1663,8 +1663,9 @@ function makeDemoApi() {
     },
     async weeklyReport(w0) {
       const add = (d, n) => { const x = new Date(d + "T00:00:00Z"); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
-      const w1 = add(w0, 6), v0 = add(w0, -7), v1 = add(w0, -1), live = orders.filter(o => ["pending", "paid", "collected"].includes(o.status));
-      const cur = live.filter(o => o.order_date >= w0 && o.order_date <= w1), prev = live.filter(o => o.order_date >= v0 && o.order_date <= v1);
+      const rf = settings.reports_from || "0000-00-00", c0 = w0 > rf ? w0 : rf;   // nothing before Settings › Reports start from
+      const w1 = add(w0, 6), v0 = add(w0, -7) > rf ? add(w0, -7) : rf, v1 = add(w0, -1), live = orders.filter(o => ["pending", "paid", "collected"].includes(o.status) && o.order_date >= rf);
+      const cur = live.filter(o => o.order_date >= c0 && o.order_date <= w1), prev = live.filter(o => o.order_date >= v0 && o.order_date <= v1);
       const head = (L, from, to) => { const ps = pools.filter(p => p.order_date >= from && p.order_date <= to && p.status !== "cancelled" && meals(p.id) > 0);
         const firsts = {}; live.forEach(o => { if (!firsts[o.phone] || o.order_date < firsts[o.phone]) firsts[o.phone] = o.order_date; });
         const phones = [...new Set(L.map(o => o.phone))];
@@ -1724,6 +1725,7 @@ function makeDemoApi() {
     async notifications(ids) { return []; },
     async bellStatus() { return { last_at: nowIso(), today: 3 }; },
     async moneyDays(from, to) {   // same sums as admin_money_days on the server
+      if (settings.reports_from && from < settings.reports_from) from = settings.reports_from;
       const r2 = x => Math.round(x * 100) / 100, food0 = o => (Number(o.quote_price ?? o.unit_price) + Number(o.addons_total || 0)) * o.qty;
       const paid = orders.filter(o => o.order_date >= from && o.order_date <= to && ["paid", "collected"].includes(o.status));
       const pl = pools.filter(p => p.order_date >= from && p.order_date <= to && p.status !== "cancelled" && paid.some(o => o.pool_id === p.id))
@@ -6300,6 +6302,9 @@ async function renderAdmin(cached, quiet) {   // quiet = background/refresh-butt
       ${isSuper && s.pay_mode !== undefined ? setForm(`<section class="card stack"><h2>Payments</h2>
         <div><label for="stPay">How customers pay</label><select id="stPay" name="pay_mode">${[["manual", "Mobile money transfer with a transaction ID (as now)"], ["team", "Online with Paystack: team only, for testing"], ["paystack", "Online with Paystack: everyone"]].map(([k, l]) => `<option value="${k}"${s.pay_mode === k ? " selected" : ""}>${l}</option>`).join("")}</select></div>
         <p class="small muted">${DEMO || CONFIG.PAYSTACK_PUBLIC_KEY ? "Online payments open a secure Paystack window for mobile money or card, and confirm themselves. Unpaid online orders are cancelled at cut-off." : "Paystack isn't connected to this site yet, so online payment stays off whatever you pick."} Custom orders and payment fixes still use a transaction ID.</p></section>`) : ""}
+      ${isSuper && s.reports_from !== undefined ? setForm(`<section class="card stack"><h2>Reports</h2>
+        <div><label for="stRepFrom">Reports start from</label><input id="stRepFrom" name="reports_from" type="date" value="${esc(s.reports_from || "")}" style="max-width:220px"></div>
+        <p class="small muted">The money report, the weekly report and new-customer counts leave out days before this, such as test days. Nothing is deleted: clear the date to see everything again.</p></section>`) : ""}
       ${isSuper && s.phone_signin !== undefined ? setForm(`<section class="card stack"><h2>Phone sign-in</h2>
         <div><label for="stPhone">New customers sign in with</label><select id="stPhone" name="phone_signin"><option value="off"${s.phone_signin ? "" : " selected"}>Email and password (as now)</option><option value="on"${s.phone_signin ? " selected" : ""}>Phone number and PIN, with an SMS code</option></select></div>
         <p class="small muted">Switch this on once "ChopPool" is approved as your SMS sender name on all networks. Email accounts keep working either way. To try it first on your own phone, open ${esc(baseUrl())}/#phonetest.</p></section>`) : ""}
@@ -6730,6 +6735,7 @@ async function adminSubmit(e) {
         Object.assign(patch, { cutoff: cut, delivery_time: lunch, special_cutoff: spec });
         if (has("reminder_time")) { const rt = v("reminder_time"); if (!ok5(rt)) return fail("Enter the reminder time."); if (hm(rt) >= hm(cut)) return fail("The reminder must go out before orders close (" + fmtTime(cut) + ")."); patch.reminder_time = rt; } }
       if (has("phone_signin")) patch.phone_signin = v("phone_signin") === "on";
+      if (has("reports_from")) { const d = v("reports_from"); if (d && !/^\d{4}-\d{2}-\d{2}$/.test(d)) return fail("Pick a date."); patch.reports_from = d || null; }
       if (has("pay_mode")) { const pm = v("pay_mode"); if (!["manual", "team", "paystack"].includes(pm)) return fail("Pick how customers pay."); patch.pay_mode = pm; }
       if (has("admin_idle_min")) { const im = num("admin_idle_min"); if (!(im >= 5 && im <= 60)) return fail("Choose 5 to 60 minutes for the team screen timeout."); patch.admin_idle_min = im; }
       if (has("vendor_fee_pct")) { const pc = num("vendor_fee_pct"), fr = num("vendor_fee_free");
