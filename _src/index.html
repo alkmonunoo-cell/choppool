@@ -370,6 +370,17 @@ s.was { color: var(--muted); font-weight: 500; text-decoration-thickness: 1.5px;
 .paysplit .psrow span { font-size: 14px; font-weight: 600; color: var(--ink); }
 .paysplit .psrow small { display: block; font-size: 11.5px; font-weight: 500; color: var(--muted); }
 .paysplit .psrow b { font-size: 17px; }
+/* Income statement */
+table.pnl { width: 100%; border-collapse: collapse; }
+table.pnl th, table.pnl td { padding: 8px 10px; text-align: right; border-bottom: 1px solid var(--line); }
+table.pnl th:first-child, table.pnl td:first-child { text-align: left; }
+table.pnl .ph td { font-weight: 800; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); padding-top: 16px; border-bottom: 0; }
+table.pnl .pt td { font-weight: 700; border-top: 1.5px solid var(--line); }
+table.pnl .pg td { font-weight: 800; font-size: 16px; background: var(--surface-2); border-top: 2px solid var(--ink); }
+table.pnl .neg, .dtile .neg { color: var(--danger); }
+.ghost.danger { color: var(--danger); border-color: var(--danger); }
+.seg3 { display: flex; gap: 6px; flex-wrap: wrap; }
+.seg3 .tog { flex: 1 1 140px; }
 [data-feebox] [hidden] { display: none !important; }
 [data-medit="setup"] .mphoto { pointer-events: none; }
 [data-medit="setup"] .mphoto .cam { display: none; }
@@ -1362,6 +1373,7 @@ function makeDemoApi() {
   const poolFee = p => { const os = orders.filter(o => o.pool_id === p.id && ["paid", "collected"].includes(o.status)), food = os.reduce((t, o) => t + (Number(o.quote_price ?? o.unit_price) + Number(o.addons_total || 0)) * o.qty, 0), n = os.reduce((t, o) => t + o.qty, 0);
     return n ? Math.round(Number(p.fee_rate || 0) * food * Math.max(0, n - Number(p.fee_free ?? 5)) / n * 100) / 100 : 0; };
   const discounts = [];   // vendor -> building % off (update 47)
+  const costs = [];       // business costs for the income statement (update 52)
   const discPct = (kid, sid) => (discounts.find(d => d.kitchen_id === kid && d.site_id === sid) || {}).pct || 0;
   const cut = (v, p) => Math.round(Math.round(Number(v || 0) * 100) * (100 - p) / 100) / 100;
   // Mirrors place_order: required choices, then the building discount on the dish and extras
@@ -1992,6 +2004,10 @@ function makeDemoApi() {
       if (!sites.some(x => x.id === sid && x.active)) throw new Error("Choose a ChopPool building."); if (k.site_id && k.site_id !== sid) throw new Error("You deliver to one building only.");
       if (i >= 0) discounts[i].pct = +pct; else discounts.push({ kitchen_id: k.id, site_id: sid, pct: +pct }); },
     async adminDiscounts() { return discounts.map(d => ({ ...d })); },
+    async listCosts() { return costs.map(c => ({ ...c })).sort((a, b) => a.cost_date < b.cost_date ? 1 : -1); },
+    async saveCost(c) { if (!(Number(c.amount) > 0)) throw new Error("Enter the amount."); if (c.treatment !== "expense" && !(c.months >= 1)) throw new Error("Enter the number of months.");
+      if (c.id) Object.assign(costs.find(x => x.id === c.id), c); else costs.push({ ...c, id: "bc" + uid(), created_by: "owner", created_at: nowIso() }); },
+    async deleteCost(id) { const i = costs.findIndex(x => x.id === id); if (i >= 0) costs.splice(i, 1); },
     async removeDiscount(kid, sid) { const i = discounts.findIndex(d => d.kitchen_id === kid && d.site_id === sid); if (i >= 0) discounts.splice(i, 1); },
     async vendorSetupGet(t) { const k = kitchens.find(x => x.token === t && !x.archived); if (!k) throw new Error("This link is not valid. Ask ChopPool for a new one.");
       if (!k.setup_status) return { live: k.active !== false, name: k.public_name };
@@ -2145,6 +2161,9 @@ function makeSupabaseApi() {
       if (miss(r.error)) throw miss(r.error); if (!must(r).length) throw new Error("Not saved. Only the owner can change payment options.");
     },
     async removePayMethod(id) { must(await sb.from("payment_methods").delete().eq("id", id)); return "deleted"; },
+    async listCosts() { const r = await sb.from("business_costs").select("*").order("cost_date", { ascending: false }); if (r.error) throw r.error; return r.data; },
+    async saveCost(c) { const { id, ...row } = c; must(id ? await sb.from("business_costs").update(row).eq("id", id) : await sb.from("business_costs").insert(row)); },
+    async deleteCost(id) { must(await sb.from("business_costs").delete().eq("id", id)); },
     async payMode() { const r = await sb.from("settings").select("pay_mode").eq("id", 1).single(); return r.error ? null : r.data.pay_mode; },
     async updateSettings(patch) { const r = await sb.from("settings").update(patch).eq("id", 1).select("id");
       if (r.error && /momo_network/i.test(r.error.message)) throw new Error("Run update-10.sql in the Supabase SQL Editor once, then try again.");
@@ -5838,6 +5857,7 @@ async function renderAdmin(cached, quiet) {   // quiet = background/refresh-butt
 
   /* ---------- Weekly reports ---------- */
   if (tab === "reports" && isSuper && S.repView === "money") { renderMoneyReport(body); }
+  else if (tab === "reports" && isSuper && S.repView === "pnl") { renderPnl(body); }
   else if (tab === "reports") {
     const weeks = Array.from({ length: 10 }, (_, n) => mondayOf(today(), -n));
     const wk = S.reportWeek && weeks.includes(S.reportWeek) ? S.reportWeek : weeks[0];
@@ -6800,7 +6820,7 @@ function trend(c, p, pct) {
   return `${v} <span class="${c > p ? "up" : "down"}">${c > p ? "↑" : "↓"} ${pct ? Math.abs(c - p) + " pts" : Math.abs(Math.round((c - p) * 10) / 10)}</span>`;
 }
 // Reports: weekly report or (owner) the daily money report for any period
-const repTabs = cur => `<div class="fchips" style="margin:0 0 12px;padding:0">${[["week", "Weekly report"], ["money", "Daily money"]].map(([k, l]) => `<button data-repview="${k}" aria-pressed="${k === cur}">${l}</button>`).join("")}</div>`;
+const repTabs = cur => `<div class="fchips" style="margin:0 0 12px;padding:0">${[["week", "Weekly report"], ["money", "Daily money"], ["pnl", "Income statement"]].map(([k, l]) => `<button data-repview="${k}" aria-pressed="${k === cur}">${l}</button>`).join("")}</div>`;
 document.addEventListener("click", e => { const b = e.target.closest("[data-repview]"); if (!b) return; S.repView = b.dataset.repview; renderAdmin(true); });
 const MONEY_COLS = [["day", "Date"], ["orders", "Orders"], ["meals", "Meals"], ["received", "Received"], ["food", "Food"], ["vendor_fee", "ChopPool vendor fee"], ["owed_vendors", "Owed to vendors"],
   ["service", "Service fees"], ["delivery_in", "Delivery charged"], ["trips_riders", "Trips: ChopPool riders"], ["trips_apps", "Trips: Bolt/Yango/other"], ["cashback", "Cashback"], ["credits", "Credits given"], ["paystack_fees", "Paystack fees"], ["profit", "Profit"],
@@ -6841,6 +6861,129 @@ function renderMoneyReport(body) {
     $("#mCsv").onclick = () => { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([moneyCsv(S.money, from, to)], { type: "text/csv" })); a.download = "choppool-money-" + from + "-to-" + to + ".csv"; document.body.appendChild(a); a.click(); a.remove(); }; };
   if (S.money && S.moneyKey === key) { draw(S.money); go(); return; }
   api.moneyDays(from, to).then(R => { S.money = R; S.moneyKey = key; draw(R); go(); }).catch(e => { const el = $("#mBody"); if (el) el.innerHTML = `<p class="note">${esc(cleanErr(e))}</p>`; });
+}
+
+/* ---------- Income statement (owner): app revenue and direct costs + business costs, accrual by month (update 52) ---------- */
+const COST_CATS = ["Marketing & promotion", "Airtime & data", "Software & hosting", "Packaging & supplies", "Staff & wages", "Transport", "Registration & legal", "Professional fees", "Bank & MoMo charges", "Rent & utilities", "Equipment", "Other"];
+const PAID_FROM = [["momo", "Mobile money"], ["bank", "Bank"], ["cash", "Cash"], ["owner", "Paid by me (owed to me)"]];
+const ymOf = d => String(d).slice(0, 7), ymIdx = ym => Number(ym.slice(0, 4)) * 12 + Number(ym.slice(5, 7)) - 1;
+const ymAdd = (ym, n) => { const i = ymIdx(ym) + n; return String(Math.floor(i / 12)).padStart(4, "0") + "-" + String(i % 12 + 1).padStart(2, "0"); };
+const ymEnd = ym => addDays(ymAdd(ym, 1) + "-01", -1);
+// The charge for a spread cost or an asset in month k (0 = month bought): equal shares, rounding settled in the last month
+const shareOf = (total, n, k) => k < 0 || k >= n ? 0 : Math.round(total * (k + 1) / n * 100) / 100 - Math.round(total * k / n * 100) / 100;
+const chargedTo = (c, ym) => { const n = Number(c.months), base = c.treatment === "asset" ? Number(c.amount) - Number(c.residual || 0) : Number(c.amount);
+  const k = Math.min(n, ymIdx(ym) - ymIdx(ymOf(c.cost_date)) + 1); return k <= 0 ? 0 : Math.round(base * k / n * 100) / 100; };
+function pnlCompute(R, costs, from, to) {
+  const r2 = x => Math.round(x * 100) / 100, t = moneyRows(R).tot, m0 = ymOf(from), m1 = ymOf(to), months = [];
+  for (let m = m0; ymIdx(m) <= ymIdx(m1); m = ymAdd(m, 1)) months.push(m);
+  const rev = { service: r2(t.service || 0), vfee: r2(t.vendor_fee || 0), delivery: r2(t.delivery_in || 0) }; rev.total = r2(rev.service + rev.vfee + rev.delivery);
+  const dir = { trips: r2((t.trips_riders || 0) + (t.trips_apps || 0)), cashback: r2(t.cashback || 0), credits: r2(t.credits || 0), psfees: r2(t.paystack_fees || 0) };
+  dir.total = r2(dir.trips + dir.cashback + dir.credits + dir.psfees);
+  const opex = {}; let dep = 0;
+  costs.forEach(c => {
+    if (c.treatment === "expense") { if (c.cost_date >= from && c.cost_date <= to) opex[c.category] = (opex[c.category] || 0) + Number(c.amount); return; }
+    const k0 = ymIdx(ymOf(c.cost_date)), n = Number(c.months), base = c.treatment === "asset" ? Number(c.amount) - Number(c.residual || 0) : Number(c.amount);
+    const amt = months.reduce((a, m) => a + shareOf(base, n, ymIdx(m) - k0), 0);
+    if (!amt) return; if (c.treatment === "asset") dep += amt; else opex[c.category] = (opex[c.category] || 0) + amt; });
+  const opexRows = Object.entries(opex).map(([cat, amt]) => ({ cat, amt: r2(amt) })).sort((a, b) => b.amt - a.amt), opexTotal = r2(opexRows.reduce((a, x) => a + x.amt, 0));
+  const gross = r2(rev.total - dir.total), net = r2(gross - opexTotal - dep);
+  const assets = costs.filter(c => c.treatment === "asset" && c.cost_date <= to).map(c => { const acc = chargedTo(c, m1); return { ...c, monthly: r2((Number(c.amount) - Number(c.residual || 0)) / Number(c.months)), acc, nbv: r2(Number(c.amount) - acc) }; });
+  const prepaid = costs.filter(c => c.treatment === "spread" && c.cost_date <= to).map(c => { const used = chargedTo(c, m1); return { ...c, used, left: r2(Number(c.amount) - used) }; }).filter(c => c.left > 0.004);
+  const owed = r2(costs.filter(c => c.paid_from === "owner" && c.cost_date <= to).reduce((a, c) => a + Number(c.amount), 0));
+  return { rev, dir, gross, opexRows, opexTotal, dep: r2(dep), net, assets, prepaid, owed, months };
+}
+function pnlPeriod(per, a, b) {
+  const t = today(), ym = ymOf(t), q0 = ymAdd(ym.slice(0, 5) + "01", Math.floor((Number(ym.slice(5)) - 1) / 3) * 3);
+  const M = { month: [ym, ym], lastmonth: [ymAdd(ym, -1), ymAdd(ym, -1)], quarter: [q0, ymAdd(q0, 2)], lastquarter: [ymAdd(q0, -3), ymAdd(q0, -1)], year: [ym.slice(0, 5) + "01", ym.slice(0, 5) + "12"], custom: [a || ym, b || ym] };
+  let [f, l] = M[per] || M.month; if (ymIdx(l) < ymIdx(f)) [f, l] = [l, f];
+  if (ymIdx(l) - ymIdx(f) > 11) f = ymAdd(l, -11);
+  const n = ymIdx(l) - ymIdx(f) + 1, pf = ymAdd(f, -n), pl = ymAdd(f, -1);
+  const cap = d => d > t ? t : d;
+  return { from: f + "-01", to: cap(ymEnd(l)), pfrom: pf + "-01", pto: cap(ymEnd(pl)), label: n === 1 ? fmtMonth(f) : fmtMonth(f) + " – " + fmtMonth(l), plabel: n === 1 ? fmtMonth(pf) : fmtMonth(pf) + " – " + fmtMonth(pl) };
+}
+const fmtMonth = ym => new Date(ym + "-01T00:00:00Z").toLocaleDateString("en-GB", { month: "short", year: "numeric", timeZone: "UTC" });
+function pnlLines(P) {
+  const L = [["h", "Revenue"], ["l", "Service fees", P.rev.service], ["l", "ChopPool vendor fee (commission)", P.rev.vfee], ["l", "Delivery charged", P.rev.delivery], ["t", "Total revenue", P.rev.total],
+    ["h", "Direct costs"], ["l", "Trips (riders, Bolt/Yango)", -P.dir.trips], ["l", "Delivery cashback", -P.dir.cashback], ["l", "Credits given", -P.dir.credits], ["l", "Paystack fees", -P.dir.psfees], ["t", "Total direct costs", -P.dir.total],
+    ["g", "Gross profit", P.gross], ["h", "Operating expenses"]];
+  P.opexRows.forEach(x => L.push(["l", x.cat, -x.amt])); if (!P.opexRows.length) L.push(["e", "No costs in this period"]);
+  L.push(["t", "Total operating expenses", -P.opexTotal], ["l", "Depreciation", -P.dep], ["g", "Net profit", P.net]); return L;
+}
+function renderPnl(body) {
+  const per = S.pnlPer || "month", P0 = pnlPeriod(per, S.pnlA, S.pnlB), ym = ymOf(today());
+  body.innerHTML = `${repTabs("pnl")}<section class="stack" style="gap:12px"><div class="row" style="gap:8px;flex-wrap:wrap;justify-content:space-between"><h2>Income statement</h2>
+      <div class="row" style="gap:8px;flex-wrap:wrap"><select id="pPer" aria-label="Period" style="width:auto">${[["month", "This month"], ["lastmonth", "Last month"], ["quarter", "This quarter"], ["lastquarter", "Last quarter"], ["year", "This year"], ["custom", "Pick months"]].map(([k, l]) => `<option value="${k}"${k === per ? " selected" : ""}>${l}</option>`).join("")}</select>
+      ${per === "custom" ? `<input type="month" id="pA" value="${esc(S.pnlA || ym)}" max="${ym}" style="width:auto" aria-label="From month"><input type="month" id="pB" value="${esc(S.pnlB || ym)}" max="${ym}" style="width:auto" aria-label="To month">` : ""}
+      <button class="btn" id="pAdd">Add cost</button><button class="ghost" id="pCsv">Download CSV</button></div></div>
+    <p class="small muted" style="margin:0">${esc(P0.label)}, compared with ${esc(P0.plabel)}. Revenue and direct costs come from the daily money report. Costs are by month: spread costs and asset depreciation (straight-line) are charged a share each month from the month bought. Management view, not statutory accounts.</p>
+    <div id="pBody"><div class="skeleton" style="height:220px"></div></div></section>`;
+  $("#pPer").addEventListener("change", e => { S.pnlPer = e.target.value; renderAdmin(true); });
+  ["#pA", "#pB"].forEach(id => $(id)?.addEventListener("change", () => { S.pnlA = $("#pA").value; S.pnlB = $("#pB").value; renderAdmin(true); }));
+  $("#pAdd").addEventListener("click", () => openCostSheet(null));
+  Promise.all([api.moneyDays(P0.from, P0.to), api.moneyDays(P0.pfrom, P0.pto).catch(() => ({ days: [] })), api.listCosts()]).then(([R, Rp, costs]) => {
+    S.costs = costs; const P = pnlCompute(R, costs, P0.from, P0.to), Q = pnlCompute(Rp, costs, P0.pfrom, P0.pto), el = $("#pBody"); if (!el) return;
+    const L = pnlLines(P), Lq = pnlLines(Q), qv = lbl => { const x = Lq.find(r => r[1] === lbl); return x ? x[2] : 0; };
+    const amt = v => v == null ? "" : `<span class="num${v < 0 ? " neg" : ""}">${v < 0 ? "(" + money(-v) + ")" : money(v)}</span>`;
+    const pct = (v, base) => base > 0 ? ` <span class="small muted">${Math.round(v / base * 100)}%</span>` : "";
+    el.innerHTML = `<div class="dash-grid" style="margin-bottom:12px">${[["Revenue", P.rev.total], ["Gross profit", P.gross], ["Operating expenses", P.opexTotal + P.dep], ["Net profit", P.net]].map(([l, v]) => `<div class="dtile"><b class="num${v < 0 ? " neg" : ""}">${money(v)}</b><span>${l}</span></div>`).join("")}</div>
+      <div class="table-wrap"><table class="pnl"><tr><th></th><th>${esc(P0.label)}</th><th>${esc(P0.plabel)}</th></tr>
+      ${L.map(([k, l, v]) => k === "h" ? `<tr class="ph"><td colspan="3">${esc(l)}</td></tr>` : k === "e" ? `<tr><td class="muted small" colspan="3">${esc(l)}</td></tr>`
+        : `<tr class="${k === "t" ? "pt" : k === "g" ? "pg" : ""}"><td>${esc(l)}${k === "g" ? pct(v, P.rev.total) : ""}</td><td>${amt(v)}</td><td class="muted">${amt(qv(l))}</td></tr>`).join("")}</table></div>
+      <div class="grid2" style="margin-top:14px;align-items:start">
+        <section class="card stack" style="gap:8px"><h3>Assets (depreciated)</h3>${P.assets.length ? `<div class="table-wrap"><table><tr><th>Asset</th><th>Bought</th><th>Cost</th><th>Per month</th><th>To date</th><th>Book value</th></tr>${P.assets.map(c => `<tr><td>${esc(c.description || c.category)}</td><td>${esc(fmtDate(c.cost_date))}</td><td class="num">${money(c.amount)}</td><td class="num">${money(c.monthly)}</td><td class="num">${money(c.acc)}</td><td class="num"><b>${money(c.nbv)}</b></td></tr>`).join("")}</table></div>` : `<p class="small muted">No assets yet. Add a cost as an asset for equipment like a laptop, phone or delivery bags.</p>`}</section>
+        <section class="card stack" style="gap:8px"><h3>Prepaid (still to charge)</h3>${P.prepaid.length ? `<div class="table-wrap"><table><tr><th>Item</th><th>Paid</th><th>Charged</th><th>Left</th></tr>${P.prepaid.map(c => `<tr><td>${esc(c.description || c.category)}<span class="small muted"> · ${c.months} mo</span></td><td class="num">${money(c.amount)}</td><td class="num">${money(c.used)}</td><td class="num"><b>${money(c.left)}</b></td></tr>`).join("")}</table></div>` : `<p class="small muted">Nothing prepaid. Spread a cost over months for things paid upfront, like a yearly domain or subscription.</p>`}
+          ${P.owed > 0 ? `<p class="small" style="margin:6px 0 0"><b>Paid by you so far:</b> <span class="num">${money(P.owed)}</span> <span class="muted">(owed to you by the business, up to ${esc(fmtDate(P0.to))})</span></p>` : ""}</section></div>
+      <section class="card stack" style="gap:8px;margin-top:14px"><h3>Costs</h3>${costs.length ? `<div class="table-wrap"><table class="ctable"><tr><th>Date</th><th>Category</th><th>Description</th><th>Amount</th><th>How it's charged</th><th>Paid from</th><th></th></tr>${costs.map(c => `<tr data-cost="${esc(c.id)}"><td>${esc(fmtDate(c.cost_date))}</td><td>${esc(c.category)}</td><td>${esc(c.description || "")}</td><td class="num">${money(c.amount)}</td>
+          <td>${c.treatment === "expense" ? "Expense" : c.treatment === "spread" ? "Spread over " + c.months + " months" : "Asset, " + (c.months % 12 ? c.months + " months" : c.months / 12 + " yr" + (c.months > 12 ? "s" : "")) + (Number(c.residual) ? ", residual " + money(c.residual) : "")}</td>
+          <td>${esc((PAID_FROM.find(x => x[0] === c.paid_from) || [0, c.paid_from])[1])}</td><td class="row" style="gap:6px;justify-content:flex-end"><button class="ghost" data-cedit style="padding:6px 12px">Edit</button><button class="ghost" data-cdel style="padding:6px 12px">Delete</button></td></tr>`).join("")}</table></div>` : `<p class="small muted">No costs yet. Tap Add cost to record what you spend on the business.</p>`}</section>`;
+    el.querySelector(".ctable")?.addEventListener("click", async e => { const tr = e.target.closest("[data-cost]"); if (!tr) return; const c = costs.find(x => x.id === tr.dataset.cost);
+      if (e.target.closest("[data-cedit]")) return openCostSheet(c);
+      const d = e.target.closest("[data-cdel]"); if (!d) return;
+      if (!d.dataset.sure) { d.dataset.sure = "1"; d.textContent = "Tap to confirm"; d.classList.add("danger"); setTimeout(() => { if (d.isConnected) { delete d.dataset.sure; d.textContent = "Delete"; d.classList.remove("danger"); } }, 3500); return; }
+      d.disabled = true; try { await api.deleteCost(c.id); toast("Cost deleted."); renderAdmin(true); } catch (er) { d.disabled = false; toast(cleanErr(er)); } });
+    $("#pCsv").onclick = () => { const q = x => `"${String(x).replace(/"/g, '""')}"`;
+      const rows = [["ChopPool income statement", P0.label, "Compared with " + P0.plabel], [], ["", P0.label, P0.plabel]].concat(L.filter(r => r[0] !== "e").map(([k, l, v]) => k === "h" ? [l] : [l, Number(v).toFixed(2), Number(qv(l)).toFixed(2)]));
+      rows.push([], ["Assets", "Bought", "Cost", "Per month", "Depreciation to date", "Book value"]); P.assets.forEach(c => rows.push([c.description || c.category, c.cost_date, c.amount, c.monthly, c.acc, c.nbv]));
+      rows.push([], ["Prepaid", "Paid", "Charged", "Left"]); P.prepaid.forEach(c => rows.push([c.description || c.category, c.amount, c.used, c.left]));
+      if (P.owed > 0) rows.push([], ["Paid by owner so far", P.owed]);
+      const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([rows.map(r => r.map(q).join(",")).join("\n")], { type: "text/csv" })); a.download = "choppool-income-statement-" + P0.from.slice(0, 7) + "-to-" + P0.to.slice(0, 7) + ".csv"; document.body.appendChild(a); a.click(); a.remove(); };
+  }).catch(e => { const el = $("#pBody"); if (el) el.innerHTML = `<p class="note">${esc(cleanErr(e))}</p>`; });
+}
+function openCostSheet(c) {
+  const v = c || { cost_date: today(), category: "", description: "", amount: "", paid_from: "momo", treatment: "expense", months: null, residual: 0 };
+  const yrs = v.treatment === "asset" && v.months ? v.months / 12 : 3;
+  openSheet(`${sheetHead(c ? "Edit cost" : "Add a cost", "Anything you spend on the business. Choose how it's charged to profit.")}
+    <form id="cForm" class="stack" novalidate>
+      <div class="grid2"><div><label for="cDate">Date</label><input id="cDate" type="date" value="${esc(v.cost_date)}" max="${today()}"></div><div><label for="cAmt">Amount (GHS)</label><input id="cAmt" inputmode="decimal" value="${esc(v.amount)}" placeholder="0.00"></div></div>
+      <div class="grid2"><div><label for="cCat">Category</label><select id="cCat">${COST_CATS.concat(v.category && !COST_CATS.includes(v.category) ? [v.category] : []).map(x => `<option${x === (v.category || "") ? " selected" : ""}>${esc(x)}</option>`).join("")}</select></div>
+        <div><label for="cFrom">Paid from</label><select id="cFrom">${PAID_FROM.map(([k, l]) => `<option value="${k}"${k === v.paid_from ? " selected" : ""}>${esc(l)}</option>`).join("")}</select></div></div>
+      <div><label for="cDesc">What it was</label><input id="cDesc" maxlength="200" value="${esc(v.description || "")}" placeholder="e.g. Flyers for Heritage Tower"></div>
+      <div><label>How it's charged to profit</label><div class="seg3" id="cTreat">${[["expense", "Expense now"], ["spread", "Spread over months"], ["asset", "Asset (depreciate)"]].map(([k, l]) => `<button type="button" class="tog" data-tr="${k}" aria-pressed="${k === v.treatment}">${l}</button>`).join("")}</div></div>
+      <div class="grid2${v.treatment === "spread" ? "" : " hidden"}" id="cSpread"><div><label for="cMonths">Spread over (months)</label><input id="cMonths" inputmode="numeric" value="${v.treatment === "spread" ? esc(v.months) : 12}"></div><p class="small muted" style="align-self:end;margin:0 0 10px">For things paid upfront, like a yearly domain or subscription.</p></div>
+      <div class="grid2${v.treatment === "asset" ? "" : " hidden"}" id="cAsset"><div><label for="cLife">Useful life (years)</label><input id="cLife" inputmode="decimal" value="${esc(yrs)}"></div><div><label for="cRes">Value left at the end (GHS)</label><input id="cRes" inputmode="decimal" value="${esc(Number(v.residual) || "")}" placeholder="0"></div></div>
+      <p class="small muted" id="cHint" style="margin:0"></p>
+      <p class="err" id="cErr"></p><div class="sheet-foot"><button class="btn wide">${c ? "Save cost" : "Add cost"}</button></div></form>`);
+  let tr = v.treatment;
+  const hint = () => { const a = Number($("#cAmt").value);
+    $("#cHint").textContent = !(a > 0) ? "" : tr === "expense" ? "All of it is charged in " + fmtMonth(ymOf($("#cDate").value || today())) + "."
+      : tr === "spread" ? (Number($("#cMonths").value) >= 1 ? money(a / Number($("#cMonths").value)) + " a month for " + Number($("#cMonths").value) + " months." : "")
+      : (Number($("#cLife").value) > 0 ? "Depreciation " + money((a - (Number($("#cRes").value) || 0)) / Math.round(Number($("#cLife").value) * 12)) + " a month for " + Math.round(Number($("#cLife").value) * 12) + " months." : ""); };
+  $("#cTreat").addEventListener("click", e => { const b = e.target.closest("[data-tr]"); if (!b) return; tr = b.dataset.tr; $("#cTreat").querySelectorAll("[data-tr]").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+    $("#cSpread").classList.toggle("hidden", tr !== "spread"); $("#cAsset").classList.toggle("hidden", tr !== "asset"); if (tr === "asset" && $("#cCat").value !== "Equipment" && !c) $("#cCat").value = "Equipment"; hint(); });
+  $("#cForm").addEventListener("input", hint); hint();
+  $("#cForm").addEventListener("submit", async e => {
+    e.preventDefault(); const b = $("#cForm .btn"); if (b.disabled) return; const err = $("#cErr"); err.textContent = "";
+    const amount = Math.round(Number(String($("#cAmt").value).replace(/,/g, "")) * 100) / 100, date = $("#cDate").value;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return (err.textContent = "Pick the date.");
+    if (!(amount > 0)) return (err.textContent = "Enter the amount.");
+    const row = { cost_date: date, category: $("#cCat").value, description: $("#cDesc").value.trim(), amount, paid_from: $("#cFrom").value, treatment: tr, months: null, residual: 0 };
+    if (tr === "spread") { const m = Number($("#cMonths").value); if (!(Number.isInteger(m) && m >= 1 && m <= 120)) return (err.textContent = "Spread over 1 to 120 months."); row.months = m; }
+    if (tr === "asset") { const y = Number($("#cLife").value), r = Number($("#cRes").value) || 0; if (!(y > 0 && y <= 40)) return (err.textContent = "Enter a useful life from 1 month to 40 years.");
+      row.months = Math.max(1, Math.round(y * 12)); if (r < 0 || r >= amount) return (err.textContent = "The value left at the end must be less than the cost."); row.residual = Math.round(r * 100) / 100; }
+    if (c) row.id = c.id;
+    const d = busyBtn(b, "Saving…");
+    try { await api.saveCost(row); closeSheet(); toast(c ? "Cost updated." : "Cost added."); renderAdmin(true); } catch (er) { d(); err.textContent = cleanErr(er); }
+  });
 }
 function reportHtml(R, isSuper) {
   const c = (R.headline || {}).cur || {}, p = (R.headline || {}).prev || {}, M = R.money;
