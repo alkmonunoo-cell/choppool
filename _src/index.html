@@ -1154,6 +1154,7 @@ body:not(.on-home) #bell, body:not(.on-home) #theme { display: none; }
 .wcard .btn { margin-top: 8px; background: #fff; color: #23160F; }
 .glist { background: var(--surface); border-radius: 20px; box-shadow: var(--shadow); overflow: hidden; }
 .grow { display: flex; align-items: center; gap: 12px; padding: 13px 14px; width: 100%; border: none; background: none; text-align: left; color: inherit; font: inherit; font-size: 14.5px; cursor: pointer; }
+a.grow { text-decoration: none; }
 .grow + .grow { border-top: 1px solid var(--line); }
 .grow .gic { width: 36px; height: 36px; border-radius: 11px; background: var(--surface-2); display: grid; place-items: center; flex: none; color: var(--ink); }
 .grow .gic svg { width: 18px; height: 18px; }
@@ -2464,6 +2465,7 @@ const ICON = {
   heart: SV(`<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>`, 20),
   share: SV(`<path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M12 3v13"/><path d="m7 8 5-5 5 5"/>`, 18),
   phone: SV(`<rect x="7" y="3" width="10" height="18" rx="2.5"/><path d="M11 18h2"/>`, 18),
+  mail: SV(`<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3.5 6.5 8.5 6.5 8.5-6.5"/>`, 18),
   help: SV(`<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5V14M12 17.5v.01"/>`, 18),
   out: SV(`<path d="M14 4h5v16h-5M10 8l-4 4 4 4M6 12h10"/>`, 18),
   download: SV(`<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>`, 18),
@@ -4458,6 +4460,7 @@ async function renderWallet() {
       ${isStandalone() ? "" : `<button class="grow" data-install="#order"><span class="gic">${ICON.download}</span><span class="gtx">Get the app<small>One tap from your home screen${pushReady() ? ", with alerts" : ""}</small></span><span class="ch">›</span></button>`}
       <button class="grow" data-acc="feedback"><span class="gic">${ICON.chat}</span><span class="gtx">Send feedback<small>Report a problem or share an idea, with photos</small></span><span class="ch">›</span></button>
       <button class="grow" data-acc="help"><span class="gic">${ICON.help}</span><span class="gtx">How ChopPool works</span><span class="ch">›</span></button>
+      <a class="grow" href="${supportMail()}"><span class="gic">${ICON.mail}</span><span class="gtx">Contact support<small>${SUPPORT_EMAIL}</small></span><span class="ch">›</span></a>
       <button class="grow" data-acc="legal"><span class="gic">${ICON.list}</span><span class="gtx">Privacy and terms</span><span class="ch">›</span></button>
       ${S.user ? `<button class="grow" data-acc="signout"><span class="gic">${ICON.out}</span><span class="gtx">Sign out<small>${esc(S.user.email || fmtPhone(S.user.phone || ""))}</small></span></button>` : ""}
     </div>`;
@@ -4530,7 +4533,7 @@ function legalHtml(which) {
     <h3>How long we keep it</h3>
     <p>Order and payment records are kept for up to 6 years for accounting. Alert subscriptions are removed when they stop working. You can ask us to delete your account and personal details at any time; we keep only what the law requires for payments.</p>
     <h3>Your rights</h3>
-    <p>Under Ghana's Data Protection Act, 2012 (Act 843) you can ask to see, correct or delete your personal data, and object to how we use it. Contact us${contact ? ` on <strong class="num">${esc(contact)}</strong>` : ""} and we'll respond within 21 days.</p>
+    <p>Under Ghana's Data Protection Act, 2012 (Act 843) you can ask to see, correct or delete your personal data, and object to how we use it. Contact us at <a href="${supportMail("My personal data")}">${SUPPORT_EMAIL}</a>${contact ? ` or on <strong class="num">${esc(contact)}</strong>` : ""} and we'll respond within 21 days.</p>
     <h3>Security</h3>
     <p>Data is stored with our hosting provider over encrypted connections. Team access is limited, logged and signs out automatically.</p>`;
   const T = `<h3>How ChopPool works</h3>
@@ -4667,6 +4670,9 @@ function introFor(h) {
     local.set("cp_intro_" + kind, true);
   }, 400);
 }
+// ChopPool's contact address (Google Workspace alias)
+const SUPPORT_EMAIL = "support@choppool.com";
+const supportMail = (subject = "ChopPool help") => `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(subject)}`;
 function openHelp() {
   const s = S.settings;
   openSheet(`${sheetHead("How ChopPool works", "")}
@@ -4677,7 +4683,8 @@ function openHelp() {
       <p><strong>Custom orders.</strong> Something not on the menu. The vendor prices it first. You then have ${s.quote_pay_min || 15} minutes to pay, or it's released and nothing is charged.</p>
       <p><strong>If the vendor doesn't confirm.</strong> Your money comes back: to your wallet if you have an account, or ChopPool refunds your mobile money.</p>
       <p><strong>Collecting.</strong> Lunch arrives around ${fmtTime(s.delivery_time)}. Show your code at the drop point. Then tap "Got my food", or "Report a problem" if something's wrong.</p>
-      <p><strong>Cancelling.</strong> You can cancel from Orders until ${fmtTime(s.cutoff)}.</p></div>`);
+      <p><strong>Cancelling.</strong> You can cancel from Orders until ${fmtTime(s.cutoff)}.</p>
+      <p><strong>Need help?</strong> Email <a href="${supportMail()}">${SUPPORT_EMAIL}</a>.</p></div>`);
   $("#replayIntro")?.addEventListener("click", () => { closeSheet(); setTimeout(openIntro, 300); });
 }
 function openNotifSettings() {
@@ -7573,7 +7580,8 @@ async function viewVendorSetup(token) {
           <div><label for="vsNet">Network</label><select id="vsNet">${NETWORKS_MOMO.map(n => `<option${d.payout_network === n ? " selected" : ""}>${n}</option>`).join("")}</select></div></div>
         <p class="small muted">Customers never see your phone or payout number. You'll confirm ChopPool's fee terms when your page goes live.</p></section>
       <p class="err" id="vsErr"></p>
-      <div class="stack" style="gap:8px"><button class="btn wide" id="vsSend">Send to ChopPool</button><button type="button" class="ghost wide" id="vsSave">Save and finish later</button></div></form>`;
+      <div class="stack" style="gap:8px"><button class="btn wide" id="vsSend">Send to ChopPool</button><button type="button" class="ghost wide" id="vsSave">Save and finish later</button></div>
+      <p class="small muted center">Questions? Email <a href="${supportMail("Vendor sign-up")}">${SUPPORT_EMAIL}</a></p></form>`;
   $("#view").onclick = e => { menuEditorClick(e); };
   $("#vsPin").addEventListener("click", () => openPinSheet("Where do you cook?", pin, p => { pin = p; $("#vsPinTxt").textContent = pinTxt(); $("#vsPin").textContent = "Move pin"; }));
   const gather = () => ({
