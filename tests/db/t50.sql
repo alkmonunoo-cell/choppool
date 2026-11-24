@@ -1,5 +1,6 @@
 \pset tuples_only on
 begin;
+update settings set paystack_fee_from = null where id = 1;
 update settings set cutoff = '23:59' where id = 1;
 select id as s1 from sites where name like 'Pent%' \gset
 select k.id as k1, k.token as tk from kitchens k where k.active and not k.added_by_customer and k.lat is not null and k.delivery_mode <> 'runner' order by name limit 1 \gset

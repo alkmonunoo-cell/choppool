@@ -1330,7 +1330,7 @@ const isoDow = d => { const w = new Date(d + "T00:00:00Z").getUTCDay(); return w
    DEMO DATA LAYER: in-memory copy of the database logic, with simulated customers
    ===================================================================================== */
 function makeDemoApi() {
-  const settings = { reports_from: null, phone_signin: false, pay_mode: "manual", reminder_time: "09:00", tester_terms_on: true, tester_terms_version: 1, cutoff: "10:30", special_cutoff: "10:00", delivery_time: "12:30", trip_cost: 60, base_fare: 20, per_km: 6, trip_min: 10, max_fee: 10, cap_km: 8, trip_max: 80, quote_pay_min: 15, auto_receive_min: 120, admin_idle_min: 15, service_fee: 2, min_pool: 6, max_meals: 10, pool_ceiling: 15,
+  const settings = { reports_from: null, paystack_fee_from: null, phone_signin: false, pay_mode: "manual", reminder_time: "09:00", tester_terms_on: true, tester_terms_version: 1, cutoff: "10:30", special_cutoff: "10:00", delivery_time: "12:30", trip_cost: 60, base_fare: 20, per_km: 6, trip_min: 10, max_fee: 10, cap_km: 8, trip_max: 80, quote_pay_min: 15, auto_receive_min: 120, admin_idle_min: 15, service_fee: 2, min_pool: 6, max_meals: 10, pool_ceiling: 15,
     commission_rate: 0.15, vendor_fee_rate: 0, vendor_fee_free: 5, next_day_confirm_by: "08:30", countdown_start: "06:00", near_max_fee: 50, free_max_m: 1500, accept_timeout_min: 20, arrival_window_min: 10, notify_daily_cap: 5, momo_number: "024 000 0000", momo_name: "ChopPool Pilot", momo_network: "MTN" };
   const sites = [
     { id: "s1", name: "Heritage Tower, Ridge", drop_point: "Lobby security desk", handoff: "host", host_label: "the security desk in the lobby", host_token: "demoh1", lat: 5.5640, lng: -0.2010, status: "active", active: true },
@@ -1423,7 +1423,16 @@ function makeDemoApi() {
     o.wallet_used += use; if (use < total) o.momo_ref = ref.trim(); o.status = use >= total ? "paid" : "pending"; psMark(o);
     return { total, wallet_used: use, momo_due: total - use };
   }
+  // update 53: an order counts once it's paid (or a mobile money ID was sent); a pool shows once someone has paid into it
+  const committed = o => ["paid", "collected"].includes(o.status) || (o.status === "pending" && o.pay_via !== "paystack" && !!o.momo_ref && String(o.momo_ref).toUpperCase() !== "BASKET" && !o.pay_issue);
+  let liveInit = false;   // true once the sample data is in (sample orders count from when they were made)
+  function markLive() {
+    orders.forEach(o => { if (!o.committed_at && committed(o)) o.committed_at = liveInit ? nowIso() : o.created_at; });
+    pools.forEach(p => { if (p.live_at || !orders.some(o => o.pool_id === p.id && o.committed_at)) return;
+      p.live_at = liveInit ? nowIso() : p.created_at; if (liveInit && p.status === "waiting") p.created_at = nowIso(); });
+  }
   function housekeeping() {
+    markLive();
     // A delivered pool's trip cost fills itself in (update 29); own-runner vendors and free delivery owe no rider
     pools.forEach(p => { if (p.status === "delivered" && p.trip_cost == null) { const k = kitchens.find(x => x.id === p.kitchen_id);
       if (k && k.delivery_mode !== "runner" && !pfree(p.id)) p.trip_cost = tripFor(k, sites.find(x => x.id === p.site_id), settings); } });
@@ -1436,7 +1445,8 @@ function makeDemoApi() {
       if (o.wallet_used > 0 && o.user_id) ledger.push({ user_id: o.user_id, amount: o.wallet_used, reason: "Refund: payment not received", order_id: o.id, created_at: nowIso() });
       orders.filter(c => c.parent_id === o.id && c.basket && c.status === "pending").forEach(c => { c.status = "cancelled"; c.cancel_reason = "Payment not received";
         if (c.wallet_used > 0 && c.user_id) ledger.push({ user_id: c.user_id, amount: c.wallet_used, reason: "Refund: payment not received", order_id: c.id, created_at: nowIso() }); }); });
-    pools.filter(p => p.status === "waiting" && new Date() >= waitUntil(p)).forEach(p => {
+    pools.filter(p => !p.live_at && ["waiting", "collecting"].includes(p.status) && pastCutoff(p.order_date) && !orders.some(o => o.pool_id === p.id && o.status !== "cancelled")).forEach(p => { p.status = "cancelled"; });
+    pools.filter(p => p.status === "waiting" && p.live_at && new Date() >= waitUntil(p)).forEach(p => {
       p.status = "cancelled";
       orders.filter(o => o.pool_id === p.id && o.status !== "cancelled").forEach(o => {
         const wasPaid = ["paid", "collected"].includes(o.status);
@@ -1493,6 +1503,7 @@ function makeDemoApi() {
     orders.push(o);
     let payment = null;
     if (!special) { try { payment = settle(o, r.ref, r.useWallet); } catch (e) { orders.pop(); if (pl.status === "waiting" && !meals(pl.id)) pools.splice(pools.indexOf(pl), 1); throw e; } }
+    markLive();
     return { id: o.id, code, order_date: d, pool_seq: pl.seq, pool_status: pl.status, pool_id: pl.id, meals: meals(pl.id), status: o.status, payment };
   }
   // Another plate under an order already placed: same code and bag, pays the plate + its service fee, no extra delivery
@@ -1510,13 +1521,13 @@ function makeDemoApi() {
     const o = { ...par, id: "o" + uid(), created_at: nowIso(), item_id: m.id, item_name: m.name, unit_price: pr.unit, discount_pct: pr.pct, qty: r.qty, addons: add, addons_total: addT, note: (r.note || "").trim() || null,
       special_request: null, quote_price: null, momo_ref: null, wallet_used: 0, max_fee: 0, service_fee: settings.service_fee, fee_per_meal: true, parent_id: par.id, status: "pending", cancel_reason: null, refund_needed: false, collected_at: null };
     orders.push(o);
-    let payment; try { payment = settle(o, r.ref, r.useWallet); } catch (e) { orders.pop(); throw e; }
+    let payment; try { payment = settle(o, r.ref, r.useWallet); } catch (e) { orders.pop(); throw e; } markLive();
     return { id: o.id, code: o.code, order_date: o.order_date, pool_seq: pl.seq, pool_status: pl.status, pool_id: pl.id, meals: meals(pl.id), status: o.status, payment, parent_id: par.id };
   }
   const fake = (site, kitchen, back) => {
     const it = pick(items.filter(i => i.kitchen_id === kitchen));
     try { place({ site, item: it.id, qty: Math.random() < 0.85 ? 1 : 2, name: pick(names), phone: "024" + (1000000 + Math.floor(Math.random() * 8999999)), ref: "MP" + (10000000 + Math.floor(Math.random() * 89999999)) }, true);
-      const o = orders.at(-1); if (Math.random() < 0.85) o.status = "paid"; if (back) { o.created_at = new Date(Date.now() - back * 60000).toISOString(); } } catch (e) {}
+      const o = orders.at(-1); if (Math.random() < 0.85) o.status = "paid"; if (back) { o.created_at = new Date(Date.now() - back * 60000).toISOString(); if (o.committed_at) o.committed_at = o.created_at; } } catch (e) {}
   };
   const d0 = orderDate(settings);
   days.push({ kitchen_id: "k1", order_date: d0 }, { kitchen_id: "k2", order_date: d0 });
@@ -1525,8 +1536,9 @@ function makeDemoApi() {
   pools.forEach(p => { if (p.site_id !== "s2") p.rider_id = "r1"; });
   // One custom order waiting for a price, so the kitchen view shows the price box
   try { place({ site: "s1", item: "i1", qty: 1, name: "Akua", phone: "0241112222", special: "Jollof with fried fish instead of chicken, no pepper" }, true); } catch (e) {}
+  pools.forEach(p => { if (p.live_at) p.live_at = p.created_at; }); liveInit = true;
   setInterval(() => {
-    if (document.hidden) return;
+    if (document.hidden || window.__noSim) return;   // __noSim: tests that need a quiet building
     const s = pick(sites).id, k = pick(["k1", "k2"]);
     const p = pools.find(x => x.site_id === s && x.kitchen_id === k && x.order_date === orderDate(settings) && x.status === "collecting");
     if (!p || meals(p.id) < kSize(kitchens.find(x => x.id === k)) - 1) fake(s, k);
@@ -1547,8 +1559,9 @@ function makeDemoApi() {
     async board(date) {
       housekeeping();
       const load = {}; orders.filter(o => o.order_date === date && o.status !== "cancelled").forEach(o => { load[o.kitchen_id] = (load[o.kitchen_id] || 0) + o.qty; });
-      return { pools: pools.filter(p => p.order_date === date && p.status !== "cancelled").map(pub), load, open: kitchens.filter(k => k.active && isOpen(k.id, date)).map(k => k.id), off: kitchens.filter(k => k.active && (k.paused_dates || []).includes(date) && !days.some(x => x.kitchen_id === k.id && x.order_date === date)).map(k => k.id),
-        activity: orders.filter(o => !["cancelled", "quote_requested", "quoted"].includes(o.status) && minsAgo(o.created_at) < 360).map(o => ({ id: o.id, site_id: o.site_id, kitchen_id: o.kitchen_id, pool_id: o.pool_id, item_name: o.item_name, qty: o.qty, created_at: o.created_at })) };
+      const firstOf = id => (orders.filter(o => o.pool_id === id && !o.parent_id).sort((a, b) => a.created_at < b.created_at ? -1 : 1)[0] || {}).id || null;
+      return { pools: pools.filter(p => p.order_date === date && p.status !== "cancelled" && p.live_at).map(p => ({ ...pub(p), first_fp: firstOf(p.id) })), load, open: kitchens.filter(k => k.active && isOpen(k.id, date)).map(k => k.id), off: kitchens.filter(k => k.active && (k.paused_dates || []).includes(date) && !days.some(x => x.kitchen_id === k.id && x.order_date === date)).map(k => k.id),
+        activity: orders.filter(o => !["cancelled", "quote_requested", "quoted"].includes(o.status) && o.committed_at && minsAgo(o.committed_at) < 360).map(o => ({ id: o.id, site_id: o.site_id, kitchen_id: o.kitchen_id, pool_id: o.pool_id, item_name: o.item_name, qty: o.qty, created_at: o.committed_at, uid: o.user_id || null })) };
     },
     async placeOrder(r) { return place(r, false); },
     // Several dishes, one payment, one code (mirrors place_basket)
@@ -1669,7 +1682,8 @@ function makeDemoApi() {
           fee_rate: kRate(k), fee_free: kFree(k), fee_own: !!k.fee_own, next_day_confirm_by: settings.next_day_confirm_by,
           discounts: discounts.filter(d => d.kitchen_id === k.id).map(d => ({ site_id: d.site_id, name: (sites.find(x => x.id === d.site_id) || {}).name, pct: d.pct })).sort((a, b) => a.name < b.name ? -1 : 1) },
         menu: items.filter(i => i.kitchen_id === k.id && i.active !== false).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)).map(i => ({ id: i.id, name: i.name, price: i.price, addons: i.addons || [], photo_url: i.photo_url || null, icon: i.icon || null })),
-        pools: pools.filter(p => p.kitchen_id === k.id && p.order_date === date && p.status !== "cancelled" && meals(p.id) > 0).map(p => {
+        pools: pools.filter(p => p.kitchen_id === k.id && p.order_date === date && p.status !== "cancelled" && meals(p.id) > 0
+          && (p.live_at || orders.some(o => o.pool_id === p.id && ["quote_requested", "quoted"].includes(o.status)))).map(p => {
           const si = sites.find(s => s.id === p.site_id);
           return { id: p.id, seq: p.seq, status: p.status, site: si.name, drop_point: si.drop_point, handoff: si.handoff, host_label: si.host_label, created_at: p.created_at,
             wait_until: p.status === "waiting" ? waitUntil(p).toISOString() : null, free: pfree(p.id), fee_rate: p.fee_rate, fee_free: p.fee_free, fee: poolFee(p),
@@ -1755,7 +1769,8 @@ function makeDemoApi() {
             + os.filter(o => !o.parent_id && o.user_id && !o.cashback_posted && (pools.find(x => x.id === o.pool_id) || {}).status !== "cancelled" && !ledger.some(e => e.order_id === o.id && /^Delivery cashback/.test(e.reason))).reduce((t, o) => t + cashOf(o), 0)),
           cashback_estimated: os.filter(o => !o.parent_id && o.user_id && !o.cashback_posted && (pools.find(x => x.id === o.pool_id) || {}).status !== "cancelled" && !ledger.some(e => e.order_id === o.id && /^Delivery cashback/.test(e.reason)) && cashOf(o) > 0).length,
           credits: r2(ledger.filter(e => (ids.has(e.order_id) && /^Sorted:/.test(e.reason)) || (!e.order_id && e.created_by && e.created_by !== "system" && String(e.created_at).slice(0, 10) === d)).reduce((t, e) => t + e.amount, 0)),
-          paystack_fees: r2(Object.values(psRefs).filter(x => x.done === "paid" || x.done === "credited").filter(x => (orders.find(o => o.id === x.order) || {}).order_date === d).reduce((t, x) => t + x.amount, 0) * 0.0195),
+          paystack_fees: r2(Object.values(psRefs).filter(x => x.done === "paid" || x.done === "credited").filter(x => (orders.find(o => o.id === x.order) || {}).order_date === d)
+            .filter(() => !settings.paystack_fee_from || d < settings.paystack_fee_from).reduce((t, x) => t + x.amount, 0) * 0.0195),
           refunds: r2(ledger.filter(e => e.amount > 0 && /^(Refund|Money back)/.test(e.reason) && (orders.find(o => o.id === e.order_id) || {}).order_date === d).reduce((t, e) => t + e.amount, 0)),
           paid_vendors: r2(py("seller")), paid_riders: r2(py("rider")) };
         if (row.orders || row.paid_vendors || row.paid_riders || row.refunds || row.credits) days.push(row); }
@@ -1923,11 +1938,11 @@ function makeDemoApi() {
       if (pastCutoff(o.order_date)) throw new Error("Orders have closed for this day.");
       const amount = Math.round(psDue(o) * 100) / 100, reference = "CPDEMO" + uid(); psRefs[reference] = { order: o.id, amount, done: false };
       return { access_code: "demo", reference, amount }; },
-    async payCheck(ref) { const p = psRefs[ref]; if (!p) throw new Error("Payment not found."); if (p.done) return { result: p.done };
+    async payCheck(ref) { const p = psRefs[ref]; if (!p) throw new Error("Payment not found."); if (p.done) { markLive(); return { result: p.done }; }
       const o = orders.find(x => x.id === p.order);
       if (o.status === "pending" && o.pay_via === "paystack" && p.amount + 0.005 >= psDue(o)) { psGroup(o).forEach(x => { if (x.status === "pending") x.status = "paid"; }); o.momo_ref = "PSK:" + ref; p.done = "paid"; }
       else { ledger.push({ user_id: o.user_id, amount: p.amount, reason: "Money back: online payment for code " + o.code + " arrived after the order closed", order_id: o.id, created_at: nowIso() }); p.done = "credited"; }
-      return { result: p.done, order_id: o.id }; },
+      markLive(); return { result: p.done, order_id: o.id }; },
     async unpaidOnline() { housekeeping(); if (!me) return [];
       return orders.filter(o => o.user_id === me.id && o.status === "pending" && o.pay_via === "paystack" && !o.basket && !pastCutoff(o.order_date))
         .map(o => ({ id: o.id, code: o.code, order_date: o.order_date, amount: Math.round(psDue(o) * 100) / 100, parent_id: o.parent_id })); },
@@ -2368,6 +2383,8 @@ function toast(msg) {
 }
 function sysNotify(title, body) {
   try { if (!local.get("cp_push")) inboxAdd(title, body); } catch (e) {}   // with push on, the server's alert lands in the bell already
+  // update 53: while ChopPool is on screen the in-app note is enough; with push on, phone banners come from the server only
+  if (!document.hidden || local.get("cp_push")) return;
   try { if ("Notification" in window && Notification.permission === "granted") new Notification(title, { body }); } catch (e) {}
 }
 // Pop-ups slide up/down smoothly; the page behind is locked so it never scrolls with the sheet
@@ -3755,7 +3772,7 @@ function poolRow(k) {
     .sort((x, y) => (x.p.seq || 0) - (y.p.seq || 0));
   const many = byPool.length > 1, room = byPool.find(x => x.p.meals < size);
   const rows = byPool.map(({ o, p }, n) => {
-    const tag = many ? "Your pool " + p.seq : "Your pool";
+    const tag = iStarted(p) ? "Started by you" : "";
     if (p.meals >= size) return rowHtml(k, i, p, o, size, { l2: "Pool full · delivery at its lowest", ok: true, tag,
       act: st.full && n === byPool.length - 1 ? `<button class="btn" data-newpool="${esc(k.id)}">New pool</button>` : "" });
     return rowHtml(k, i, p, o, null, { ...rowInfo(k, p, st, o), tag });
@@ -3787,7 +3804,7 @@ function rowInfo(k, p, st, mo) {
 function rowHtml(k, i, p, mo, size, x) {
   const max = size || poolCap(k.id, p.meals);
   return `<article class="prow${mo ? " mine" : ""}${x.ok ? " done" : ""}"><span class="ptile" data-vendor="${esc(k.id)}" style="background:${tint(i)}">${plate(topDish(k.id), k.id)}</span>
-    <span class="ptx" data-vendor="${esc(k.id)}"><strong>${esc(k.public_name)}${mo ? ` <span class="ytag">${esc(x.tag || "Your pool")}</span>` : ""}</strong><span class="l1"><span class="num">${p.meals} of ${max} meals</span>${mo ? ` · <span class="num">code ${esc(mo.code)}</span>` : ""}</span>
+    <span class="ptx" data-vendor="${esc(k.id)}"><strong>${esc(k.public_name)}${mo && x.tag ? ` <span class="ytag">${esc(x.tag)}</span>` : ""}</strong><span class="l1"><span class="num">${p.meals} of ${max} meals</span>${mo ? ` · <span class="num">code ${esc(mo.code)}</span>` : ""}</span>
       <span class="l2${x.warn ? " warn" : ""}${x.ok ? " okl" : ""}">${esc(x.l2).replace(/GHS [\d,.]+/, m => "<b>" + m + "</b>")}</span><span class="pbar"><i style="width:${Math.min(100, Math.round(p.meals / max * 100))}%"></i></span></span>
     <span class="acts">${x.act || ""}${x.share ? `<button class="iconround" data-share="${esc(S.siteId)},${esc(k.id)}" aria-label="Share this pool">${ICON.share}</button>` : ""}</span></article>`;
 }
@@ -4734,7 +4751,7 @@ function updatesList() {
     if (t) out.push({ id: o.id + o.status + o.pool_status, t, title, body: statusLine(o), at, act: o.status === "quoted" || (t === "arriving" && o.status !== "collected") });
   });
   // Building activity is one grouped line, not one per order
-  const act = (S.board.activity || []).filter(a => a.site_id === S.siteId && !mineIds.has(a.id) && !(S.mineFp || new Set()).has(a.id));
+  const act = (S.board.activity || []).filter(a => a.site_id === S.siteId && !myAct(a));
   if (act.length) { const last = act[act.length - 1], dishes = [...new Set(act.map(a => a.item_name))]; out.push({ id: "a" + last.id + act.length, t: "building", title: act.length === 1 ? "1 new order at " + (siteOf(S.siteId).name || "your building") : act.length + " new orders at " + (siteOf(S.siteId).name || "your building"), body: "Including " + dishes.slice(0, 2).join(" and ") + (dishes.length > 2 ? " and more" : "") + ". Join a pool to share the trip.", at: last.created_at }); }
   (S.walletEntries || []).filter(e => e.amount > 0).slice(0, 3).forEach(e => out.push({ id: "w" + e.at + e.amount, t: "cashback", title: money(e.amount) + " in your wallet", body: e.reason, at: e.at }));
   return out.filter(x => notifOn(x.t));
@@ -4779,15 +4796,19 @@ async function toggleAlerts() {
 }
 // The activity feed shows a one-way fingerprint of each order (first 16 hex of SHA-256 of its ID); work out mine to hide them
 async function fpMine() {
-  const ids = (local.get("cp_orders") || []).map(o => o.id).filter(Boolean), key = ids.join(",");
-  if (!ids.length || S.mineFpKey === key || !(window.crypto && crypto.subtle)) return; S.mineFpKey = key;
-  const out = new Set();
-  for (const id of ids) { const h = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(id)); out.add([...new Uint8Array(h)].map(b => b.toString(16).padStart(2, "0")).join("").slice(0, 16)); }
-  S.mineFp = out;
+  const ids = [...new Set([...(local.get("cp_orders") || []).map(o => o.id), ...(S.mine || []).map(o => o.id)].filter(Boolean))], uid = (S.user || {}).id || "", key = ids.join(",") + "|" + uid;
+  if (S.mineFpKey === key || !(window.crypto && crypto.subtle)) return; S.mineFpKey = key;
+  const fp = async t => [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(t)))].map(b => b.toString(16).padStart(2, "0")).join("").slice(0, 16);
+  const out = new Set(); for (const id of ids) out.add(await fp(id));
+  S.mineFp = out; S.meFp = uid ? await fp(uid) : null;
 }
-function announceActivity() {
-  const mineIds = (local.get("cp_orders") || []).map(o => o.id);
-  fpMine(); const here = S.board.activity.filter(a => a.site_id === S.siteId && !mineIds.includes(a.id) && !(S.mineFp || new Set()).has(a.id));
+// An activity line that's yours: one of your orders, or anything from your account (update 53)
+const myAct = a => (local.get("cp_orders") || []).some(o => o.id === a.id) || (S.mine || []).some(o => o.id === a.id) || (S.mineFp || new Set()).has(a.id)
+  || (!!a.uid && (a.uid === S.meFp || a.uid === (S.user || {}).id));
+// You started this pool (its first order is yours)
+const iStarted = p => !!p.first_fp && ((S.mineFp || new Set()).has(p.first_fp) || (S.mine || []).some(o => o.id === p.first_fp) || (local.get("cp_orders") || []).some(o => o.id === p.first_fp));
+async function announceActivity() {
+  await fpMine(); const here = S.board.activity.filter(a => a.site_id === S.siteId && !myAct(a));
   const latest = here.reduce((t, a) => a.created_at > t ? a.created_at : t, "");
   if (!S.seen) { S.seen = latest || new Date().toISOString(); return; }
   const fresh = here.filter(a => a.created_at > S.seen).sort((a, b) => a.created_at < b.created_at ? -1 : 1);
@@ -4798,7 +4819,8 @@ function announceActivity() {
   const key = "cp_alert_count_" + today(), n = local.get(key) || 0;
   if (n >= S.settings.notify_daily_cap) return;
   const a = fresh.at(-1), p = S.board.pools.find(x => x.id === a.pool_id) || { meals: 1, seq: 1 };
-  const msg = "Someone at " + siteOf(a.site_id).name + " just ordered " + a.item_name + ". " + p.meals + " of " + poolCap(p.kitchen_id || a.kitchen_id, p.meals) + " seats taken, delivery now " + money(feeFor(p.meals, S.settings, poolTrip(p))) + ".";
+  const vendor = (menuOf(a.kitchen_id) || {}).public_name;
+  const msg = "Someone at " + siteOf(a.site_id).name + " just ordered " + (vendor ? "from " + vendor : a.item_name) + ". " + p.meals + " of " + poolCap(p.kitchen_id || a.kitchen_id, p.meals) + " seats taken, delivery now " + money(feeFor(p.meals, S.settings, poolTrip(p))) + ".";
   local.set(key, n + 1); toast(msg); sysNotify("ChopPool", msg);
 }
 
@@ -4874,7 +4896,8 @@ async function refreshMine() {
     const key = o.status + "|" + o.pool_status; S.mineStatus[o.id] = key;
     const changed = prev[o.id] && prev[o.id] !== key;
     const kind = ["arriving", "delivered"].includes(o.pool_status) ? "arriving" : o.status === "quoted" ? "priced" : "confirm";
-    if (changed && notifOn(kind) && (["arriving", "delivered"].includes(o.pool_status) || ["quoted", "cancelled"].includes(o.status) || (o.pool_status === "collecting" && prev[o.id].endsWith("|waiting"))) && o.status !== "collected") {
+    const mine = /^You cancelled/.test(o.cancel_reason || "") || o.cancel_reason === "Moved to another pool";   // your own action: no alert
+    if (changed && !mine && notifOn(kind) && (["arriving", "delivered"].includes(o.pool_status) || ["quoted", "cancelled"].includes(o.status) || (o.pool_status === "collecting" && prev[o.id].endsWith("|waiting"))) && o.status !== "collected") {
       const msg = statusLine(o); toast(msg); sysNotify("Your ChopPool lunch", msg);
     }
   });
@@ -5333,7 +5356,10 @@ const payList = () => { const pm = (S.payMethods || []).slice().sort((a, b) => (
 /* ---------- Online payment (Paystack: mobile money and card). Off until Admin › Settings › Payments switches it on ---------- */
 const payOnline = () => { const m = (S.settings || {}).pay_mode; return (DEMO || !!CONFIG.PAYSTACK_PUBLIC_KEY) && (m === "paystack" || (m === "team" && S.payTeam === true)); };
 const payByTxt = () => payOnline() ? "mobile money or card" : "mobile money";
-const payOnlineBox = due => `<div class="momo"><span class="logo ps">${ICON.wallet}</span><span style="flex:1;display:grid"><span class="small muted">Pay <strong id="dueTxt">${money(due)}</strong> online</span><strong>Mobile money or card</strong><span class="small muted">A secure Paystack window opens when you tap the button. MTN, Telecel, AirtelTigo or card.</span></span></div>`;
+// Customers pay Paystack's 1.95% from Settings › Payments (update 53): about due / (1 − 1.95%) − due
+const custPaysFee = () => { const f = (S.settings || {}).paystack_fee_from; return !!f && today() >= f; };
+const psFeeOn = due => Math.round(due * 0.0195 / (1 - 0.0195) * 100) / 100;
+const payOnlineBox = due => `<div class="momo"><span class="logo ps">${ICON.wallet}</span><span style="flex:1;display:grid"><span class="small muted">Pay <strong id="dueTxt">${money(due)}</strong> online</span><strong>Mobile money or card</strong><span class="small muted">A secure Paystack window opens when you tap the button. MTN, Telecel, AirtelTigo or card.${custPaysFee() ? ` A 1.95% payment fee (about <span class="num">${money(psFeeOn(due))}</span>) is added on the next screen.` : ""}</span></span></div>`;
 const payLeftMsg = res => res === "pending" ? "Payment received. We're confirming it now." : res === "credited" ? "Your payment went to your wallet: this order had already closed."
   : "Not paid yet. Your order is held until " + fmtTime(S.settings.cutoff) + ". Tap Pay now under Orders.";
 // How customers pay, read fresh (one small request); true if it changed
@@ -5934,8 +5960,9 @@ async function renderAdmin(cached, quiet) {   // quiet = background/refresh-butt
       const viaOf = o => o.pay_via || (o.parent_id && !o.momo_ref ? (A.orders.find(x => x.id === o.parent_id) || {}).pay_via : null);
       const pstk = paidOrders.filter(o => viaOf(o) === "paystack").reduce((t, o) => t + orderTotal(o) - Number(o.wallet_used || 0), 0);
       const momo = received - wal - pstk;
-      const psFee = pstk * 0.0195;   // Paystack keeps 1.95% (Ghana)
-      return { received: r2(received), wallet: r2(wal), paystack: r2(pstk), psFee: r2(psFee), momo: r2(Math.max(0, momo)), food: r2(foodP), vfee: r2(vfee), vendors: r2(foodP - vfee), delivery: r2(delivery), tripEst, cashback: r2(cb), service: r2(service), dmargin: r2(dmargin), profit: r2(service + vfee + dmargin - pstk * 0.0195) };
+      const psFrom = s.paystack_fee_from, weBear = o => !psFrom || String(o.order_date) < psFrom;   // from Settings › Payments the customer pays it
+      const psFee = paidOrders.filter(o => viaOf(o) === "paystack" && weBear(o)).reduce((t, o) => t + orderTotal(o) - Number(o.wallet_used || 0), 0) * 0.0195;   // Paystack keeps 1.95% (Ghana)
+      return { received: r2(received), wallet: r2(wal), paystack: r2(pstk), psFee: r2(psFee), momo: r2(Math.max(0, momo)), food: r2(foodP), vfee: r2(vfee), vendors: r2(foodP - vfee), delivery: r2(delivery), tripEst, cashback: r2(cb), service: r2(service), dmargin: r2(dmargin), profit: r2(service + vfee + dmargin - psFee) };
     })();
     const tile = (label, val, go, cls, sub) => `<button class="dtile ${cls || ""}" ${go ? `data-go="${go}"` : "disabled"}><b class="num">${val}</b><span>${esc(label)}</span>${sub ? `<small>${esc(sub)}</small>` : ""}</button>`;
     body.innerHTML = `
@@ -6330,7 +6357,9 @@ async function renderAdmin(cached, quiet) {   // quiet = background/refresh-butt
         <p class="small muted">Customers see "Order by ${fmtTime(s.cutoff)} · lunch at ${fmtTime(s.delivery_time)}". Vendors have lunch ready 30 minutes before it arrives. Changes apply from the next order.</p></section>`) : ""}
       ${isSuper && s.pay_mode !== undefined ? setForm(`<section class="card stack"><h2>Payments</h2>
         <div><label for="stPay">How customers pay</label><select id="stPay" name="pay_mode">${[["manual", "Mobile money transfer with a transaction ID (as now)"], ["team", "Online with Paystack: team only, for testing"], ["paystack", "Online with Paystack: everyone"]].map(([k, l]) => `<option value="${k}"${s.pay_mode === k ? " selected" : ""}>${l}</option>`).join("")}</select></div>
-        <p class="small muted">${DEMO || CONFIG.PAYSTACK_PUBLIC_KEY ? "Online payments open a secure Paystack window for mobile money or card, and confirm themselves. Unpaid online orders are cancelled at cut-off." : "Paystack isn't connected to this site yet, so online payment stays off whatever you pick."} Custom orders and payment fixes still use a transaction ID.</p></section>`) : ""}
+        <p class="small muted">${DEMO || CONFIG.PAYSTACK_PUBLIC_KEY ? "Online payments open a secure Paystack window for mobile money or card, and confirm themselves. Unpaid online orders are cancelled at cut-off." : "Paystack isn't connected to this site yet, so online payment stays off whatever you pick."} Custom orders and payment fixes still use a transaction ID.</p>
+        ${s.paystack_fee_from !== undefined ? `<div><label for="stPsFee">Customers pay the Paystack fee from</label><input id="stPsFee" name="paystack_fee_from" type="date" value="${esc(s.paystack_fee_from || "")}" style="max-width:220px"></div>
+        <p class="small muted">Turn "Pass fees to customers" on in Paystack first, then set the day it started. From then the 1.95% is added in the Paystack window, checkout says so, reports stop counting it as your cost, and late payments go to the wallet without the fee. Leave blank if ChopPool pays it.</p>` : ""}</section>`) : ""}
       ${isSuper && s.reports_from !== undefined ? setForm(`<section class="card stack"><h2>Reports</h2>
         <div><label for="stRepFrom">Reports start from</label><input id="stRepFrom" name="reports_from" type="date" value="${esc(s.reports_from || "")}" style="max-width:220px"></div>
         <p class="small muted">The money report, the weekly report and new-customer counts leave out days before this, such as test days. Nothing is deleted: clear the date to see everything again.</p></section>`) : ""}
@@ -6765,6 +6794,7 @@ async function adminSubmit(e) {
         if (has("reminder_time")) { const rt = v("reminder_time"); if (!ok5(rt)) return fail("Enter the reminder time."); if (hm(rt) >= hm(cut)) return fail("The reminder must go out before orders close (" + fmtTime(cut) + ")."); patch.reminder_time = rt; } }
       if (has("phone_signin")) patch.phone_signin = v("phone_signin") === "on";
       if (has("reports_from")) { const d = v("reports_from"); if (d && !/^\d{4}-\d{2}-\d{2}$/.test(d)) return fail("Pick a date."); patch.reports_from = d || null; }
+      if (has("paystack_fee_from")) { const d = v("paystack_fee_from"); if (d && !/^\d{4}-\d{2}-\d{2}$/.test(d)) return fail("Pick a date."); patch.paystack_fee_from = d || null; }
       if (has("pay_mode")) { const pm = v("pay_mode"); if (!["manual", "team", "paystack"].includes(pm)) return fail("Pick how customers pay."); patch.pay_mode = pm; }
       if (has("admin_idle_min")) { const im = num("admin_idle_min"); if (!(im >= 5 && im <= 60)) return fail("Choose 5 to 60 minutes for the team screen timeout."); patch.admin_idle_min = im; }
       if (has("vendor_fee_pct")) { const pc = num("vendor_fee_pct"), fr = num("vendor_fee_free");
@@ -6852,7 +6882,7 @@ function renderMoneyReport(body) {
       <div class="row" style="gap:8px;flex-wrap:wrap"><select id="mPer" aria-label="Period" style="width:auto">${[["week", "This week"], ["lastweek", "Last week"], ["month", "This month"], ["lastmonth", "Last month"], ["custom", "Pick dates"]].map(([k, l]) => `<option value="${k}"${k === per ? " selected" : ""}>${l}</option>`).join("")}</select>
       ${per === "custom" ? `<input type="date" id="mFrom" value="${from}" max="${t}" style="width:auto" aria-label="From"><input type="date" id="mTo" value="${to}" max="${t}" style="width:auto" aria-label="To">` : ""}
       <button class="ghost" id="mCopy">Copy for Excel</button><button class="ghost" id="mCsv">Download CSV</button></div></div>
-    <p class="small muted" style="margin:0">${fmtDate(from)} to ${fmtDate(to)} · paid orders only, by order day. Profit = service fees + ChopPool vendor fee + delivery charged − trip costs − cashback − credits given − Paystack fees (1.95%). Cashback includes what's still due on orders not received yet (est.). Credits given = wallet credit to sort problems, and credit added by hand. Paid out = payments you recorded under Money owed.</p>
+    <p class="small muted" style="margin:0">${fmtDate(from)} to ${fmtDate(to)} · paid orders only, by order day. Profit = service fees + ChopPool vendor fee + delivery charged − trip costs − cashback − credits given − Paystack fees (1.95%, only while ChopPool paid them). Cashback includes what's still due on orders not received yet (est.). Credits given = wallet credit to sort problems, and credit added by hand. Paid out = payments you recorded under Money owed.</p>
     <div id="mBody"><div class="skeleton" style="height:180px"></div></div></section>`;
   $("#mPer").addEventListener("change", e => { S.moneyPer = e.target.value; renderAdmin(true); });
   ["#mFrom", "#mTo"].forEach(id => $(id)?.addEventListener("change", () => { S.moneyFrom = $("#mFrom").value; S.moneyTo = $("#mTo").value; renderAdmin(true); }));

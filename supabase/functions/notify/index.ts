@@ -51,13 +51,17 @@ async function customerSubs(orders: any[]) {
 const kitchenSubs = async (kid: string) => forWho((await db.from("push_subs").select("*").eq("kitchen_id", kid)).data || [], { kitchen: kid });
 const riderSubs = async (rid: string) => forWho((await db.from("push_subs").select("*").eq("rider_id", rid)).data || [], { rider: rid });
 
-async function poolEvents(poolId: string, opened = false) {
+// actor: the order whose change triggered this (its customer isn't alerted about their own action)
+async function poolEvents(poolId: string, opened = false, actor: any = null) {
   const { data: p } = await db.from("pools").select("*").eq("id", poolId).single(); if (!p) return;
+  // update 53: a pool only counts once someone has paid into it (no "New pool" for the vendor, no alerts before then)
+  if ("live_at" in p && !p.live_at) return;
   const [{ data: k }, { data: site }, { data: s }, { data: orders }] = await Promise.all([
     db.from("kitchens").select("*").eq("id", p.kitchen_id).single(), db.from("sites").select("*").eq("id", p.site_id).single(),
     db.from("settings").select("*").eq("id", 1).single(), db.from("orders").select("*").eq("pool_id", p.id).neq("status", "cancelled")]);
   const live = (orders || []).filter((o: any) => !["quote_requested", "quoted"].includes(o.status)), meals = live.reduce((t: number, o: any) => t + o.qty, 0);
-  const cust = () => customerSubs(live), url = APP + "/#order";
+  const notMe = (o: any) => !actor || (actor.user_id ? o.user_id !== actor.user_id : o.id !== actor.id && o.phone !== actor.phone);
+  const cust = (skipActor = false) => customerSubs(skipActor ? live.filter(notMe) : live), url = APP + "/#order";
   if (p.status === "waiting" && await once("new_pool:" + p.id))
     await send(await kitchenSubs(k.id), "New pool at " + site.name, laterDay(p) ? "Customers want lunch from you on " + dayName(p.order_date) + ". Confirm you're cooking by " + ampm(s.next_day_confirm_by || "08:30") + " that morning."
       : "Customers want lunch from you today. Confirm you're cooking by " + hhmm(waitUntil(p, s)) + ".", APP + "/#kitchen-" + k.token, "pool-" + p.id);
@@ -68,7 +72,7 @@ async function poolEvents(poolId: string, opened = false) {
     await send(await cust(), k.public_name + " is cooking", "Your pool at " + site.name + " is open. Share it so delivery gets cheaper.", url, "pool-" + p.id, "confirm");
   const poolSize = Math.max(5, Math.min(Number(k.pool_size || s.max_meals), Number(s.pool_ceiling || 15)));   // the vendor's pool size (update 28)
   if (p.status === "collecting" && meals === poolSize - 1 && await once("seat1:" + p.id))
-    await send(await cust(), "1 seat left", "Your pool at " + site.name + " is almost full. Delivery is at its lowest.", url, "pool-" + p.id, "almost");
+    await send(await cust(true), "1 seat left", "Your pool at " + site.name + " is almost full. Delivery is at its lowest.", url, "pool-" + p.id, "almost");
   if (p.status === "arriving" && await once("arriving:" + p.id))
     await send(await cust(), "Lunch is about 5 minutes away", site.handoff === "host" ? "It's coming to " + site.drop_point + "." : "Meet the rider at " + site.drop_point + " with your code.", url, "pool-" + p.id, "arriving");
   if (p.status === "delivered" && await once("delivered:" + p.id))
@@ -104,7 +108,8 @@ async function orderEvents(orderId: string) {
   if (o.status === "quoted" && await once("quoted:" + o.id + ":" + o.quote_price))
     await send(await customerSubs([o]), "Your request is priced", k.public_name + " priced it at " + money(o.quote_price) + " a meal. Pay within " + quoteMins(o) + " minutes to keep it.", APP + "/#order", "order-" + o.id, "priced");
   // The team confirmed the mobile money payment (orders paid only from the wallet are confirmed at once and need no alert)
-  if (o.status === "paid" && o.momo_ref && o.momo_ref !== "BASKET" && await once("paidok:" + o.id)) {
+  // (not for Paystack: the customer has just paid in the app and sees it there)
+  if (o.status === "paid" && o.momo_ref && o.momo_ref !== "BASKET" && !String(o.momo_ref).startsWith("PSK:") && await once("paidok:" + o.id)) {
     const { data: pl } = await db.from("pools").select("status,order_date").eq("id", o.pool_id).single();
     const day = pl && pl.order_date > new Date().toISOString().slice(0, 10) ? "tomorrow" : "today";
     await send(await customerSubs([o]), "Payment confirmed · code " + o.code,
@@ -123,7 +128,7 @@ async function orderEvents(orderId: string) {
     await send(await customerSubs([o]), "Custom order closed", "Orders closed before your custom order was paid, so code " + o.code + " was released. Nothing was charged.", APP + "/#order", "order-" + o.id);
   if (o.status === "cancelled" && /^The seller can't/.test(o.cancel_reason || "") && await once("declined:" + o.id))
     await send(await customerSubs([o]), k.public_name + " can't do your request", (o.cancel_reason || "") + ". Nothing was charged.", APP + "/#order", "order-" + o.id, "confirm");
-  await poolEvents(o.pool_id);
+  await poolEvents(o.pool_id, false, o);
 }
 
 // Runs every minute (Supabase schedule) and whenever a vendor or team page is open:
@@ -180,6 +185,9 @@ async function tick() {
       await poolEvents(p.id);
     }
   }
+  // Pools that just got their first payment (e.g. Paystack confirmed after the customer closed the app): vendor and pool alerts
+  const { data: wentLive } = await db.from("pools").select("id").gte("live_at", new Date(now.getTime() - 30 * 6e4).toISOString()).in("status", ["waiting", "collecting"]);
+  for (const p of wentLive || []) await poolEvents(p.id);
   // Once a day: forget alert order IDs older than two days
   if (await once("prune:" + today)) { await db.rpc("prune_push_subs"); await db.rpc("prune_notifications").then(() => {}, () => {}); }   // bell keeps 7 days
   const { data: pools } = await db.from("pools").select("*").gte("order_date", since);
