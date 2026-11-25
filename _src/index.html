@@ -5359,7 +5359,7 @@ const payByTxt = () => payOnline() ? "mobile money or card" : "mobile money";
 // Customers pay Paystack's 1.95% from Settings › Payments (update 53): about due / (1 − 1.95%) − due
 const custPaysFee = () => { const f = (S.settings || {}).paystack_fee_from; return !!f && today() >= f; };
 const psFeeOn = due => Math.round(due * 0.0195 / (1 - 0.0195) * 100) / 100;
-const payOnlineBox = due => `<div class="momo"><span class="logo ps">${ICON.wallet}</span><span style="flex:1;display:grid"><span class="small muted">Pay <strong id="dueTxt">${money(due)}</strong> online</span><strong>Mobile money or card</strong><span class="small muted">A secure Paystack window opens when you tap the button. MTN, Telecel, AirtelTigo or card.${custPaysFee() ? ` A 1.95% payment fee (about <span class="num">${money(psFeeOn(due))}</span>) is added on the next screen.` : ""}</span></span></div>`;
+const payOnlineBox = due => `<div class="momo"><span class="logo ps">${ICON.wallet}</span><span style="flex:1;display:grid"><span class="small muted">Pay <strong id="dueTxt">${money(due)}</strong> online</span><strong>Mobile money or card</strong><span class="small muted">A secure payment window opens when you tap the button. MTN, Telecel, AirtelTigo or card.${custPaysFee() ? ` A 1.95% payment fee (about <span class="num">${money(psFeeOn(due))}</span>) is added on the next screen.` : ""}</span></span></div>`;
 const payLeftMsg = res => res === "pending" ? "Payment received. We're confirming it now." : res === "credited" ? "Your payment went to your wallet: this order had already closed."
   : "Not paid yet. Your order is held until " + fmtTime(S.settings.cutoff) + ". Tap Pay now under Orders.";
 // How customers pay, read fresh (one small request); true if it changed
@@ -5382,7 +5382,7 @@ const loadPaystack = () => psLoad || (psLoad = new Promise((ok, no) => {
 }));
 const demoPaySheet = amount => new Promise(res => {   // demo only: stands in for the Paystack window
   const d = document.createElement("div"); d.className = "psdemo";
-  d.innerHTML = `<div class="psbox" role="dialog" aria-label="Test payment"><p class="eyebrow">Paystack · demo</p><h3>Pay ${money(amount)}</h3><p class="small muted">Demo only: no money moves.</p><button class="btn wide" data-ps="success">Pay</button><button class="ghost wide" data-ps="cancelled">Cancel</button></div>`;
+  d.innerHTML = `<div class="psbox" role="dialog" aria-label="Test payment"><p class="eyebrow">Secure payment · demo</p><h3>Pay ${money(amount)}</h3><p class="small muted">Demo only: no money moves.</p><button class="btn wide" data-ps="success">Pay</button><button class="ghost wide" data-ps="cancelled">Cancel</button></div>`;
   document.body.appendChild(d); d.addEventListener("click", e => { const b = e.target.closest("[data-ps]"); if (b) { d.remove(); res(b.dataset.ps); } });
 });
 // Pay what an order still owes. Resolves "paid", "credited" (went to the wallet), "cancelled" (window closed) or "pending" (still confirming)
