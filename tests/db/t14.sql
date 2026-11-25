@@ -59,7 +59,10 @@ select 'cancel', cancel_order(:'oc', 'test', 'momo');
 reset role;
 select 'cancelled both', count(*) from orders where (id = :'oc' or parent_id = :'oc') and status = 'cancelled';
 select 'board', json_array_length(board_data(:'d') -> 'pools'), board_data(:'d') -> 'open';
-select 'vendor add', (add_vendor(:'s1', 'Far Away Kenkey', '0245555555', '[{"name":"Kenkey","price":20}]'::jsonb, 5.75, -0.2) ->> 'name');
+-- update 54: customers invite vendors (vendor_invite, see t54); here the vendor is created directly
+insert into kitchens (name, public_name, whatsapp, capacity, site_id, added_by_customer, lat, lng) values ('Far Away Kenkey', 'Far Away Kenkey', '0245555555', 30, :'s1', true, 5.75, -0.2);
+insert into menu_items (kitchen_id, name, price) select id, 'Kenkey', 20 from kitchens where name = 'Far Away Kenkey';
+select 'vendor add', 'Far Away Kenkey';
 select 'far pin', lat, lng from kitchens where name = 'Far Away Kenkey';
 select 'kitchen_view', (kitchen_view(:'kt', :'d') -> 'kitchen') ->> 'auto_days', json_array_length(kitchen_view(:'kt', :'d') -> 'pools');
 select 'menu set', vendor_set_menu((select token from kitchens where name = 'Far Away Kenkey'), '[{"name":"Kenkey and fish","price":35,"addons":[{"name":"Extra fish","price":10},{"name":"x","price":1}]}]'::jsonb);

@@ -16,3 +16,20 @@ There is one update file: `choppool-update.sql`. Whenever the app changes, this 
 3. You should see "ChopPool database is up to date".
 
 It's safe to run any number of times and never deletes your data. `schema.sql` is only for setting up a brand-new database.
+
+## Messages: WhatsApp and SMS (update 54)
+
+One server function, `supabase/functions/sms`, sends every code and vendor invite. Deploy it with **Verify JWT off**.
+
+Secrets (Supabase › Edge Functions › Secrets; never in the app or in chat):
+
+| Secret | What it is |
+| --- | --- |
+| `WHATSAPP_TOKEN` | Meta System User token (never expires) |
+| `WHATSAPP_PHONE_ID` | Phone number ID (defaults to the alerts number 1452676334597552) |
+| `WHATSAPP_APP_SECRET`, `WHATSAPP_VERIFY_TOKEN` | Optional: delivery receipts and auto-replies (Meta webhook) |
+| `ARKESEL_API_KEY`, `SEND_SMS_HOOK_SECRET` | SMS and the Supabase "Send SMS" hook, as before |
+
+WhatsApp templates (WhatsApp Manager): `login_code` (Authentication, copy code) and `vendor_invite` (body: vendor name, building; URL button `https://choppool.com/?v={{1}}`).
+
+Admin › Settings › Messages chooses which goes first, switches each channel on or off, and sends a test.

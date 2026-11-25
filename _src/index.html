@@ -308,6 +308,11 @@ button.hero-stat::after { right: 7px; }
 .hint { color: var(--hint); font-weight: 600; }
 .invite-card { background: var(--surface); border-radius: 24px; box-shadow: var(--shadow); padding: 18px; display: flex; gap: 14px; align-items: center; }
 .invite-card .blob { width: 52px; height: 52px; border-radius: 16px; background: var(--tint-3); display: grid; place-items: center; flex: none; color: var(--hint); }
+.drow .iconbtn { width: 36px; height: 36px; } .drow .iconbtn svg { width: 16px; height: 16px; }
+ul.ticks { list-style: none; padding-left: 0 !important; } ul.ticks li { position: relative; padding-left: 26px; } ul.ticks li::before { content: "✓"; position: absolute; left: 4px; color: var(--ok); font-weight: 800; }
+.drow { display: grid; grid-template-columns: 1fr 84px 36px; gap: 6px; align-items: center; } .drow .dcur { font-size: 13px; color: var(--muted); font-weight: 600; } .drow input[data-dp] { text-align: right; font-variant-numeric: tabular-nums; }
+.wiz { display: flex; gap: 6px; } .wiz i { flex: 1; height: 4px; border-radius: 4px; background: var(--line); } .wiz i.on { background: var(--accent); }
+.vwait { gap: 12px; padding: 12px 14px; align-items: center; } .vwait .blob { width: 40px; height: 40px; border-radius: 12px; background: var(--tint-3); display: grid; place-items: center; flex: none; color: var(--hint); }
 
 /* Chips and buttons */
 .chip { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; font-weight: 700; padding: 4px 10px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-2); white-space: nowrap; }
@@ -1079,6 +1084,7 @@ body:not(.on-home) #bell, body:not(.on-home) #theme { display: none; }
 .vbanner.o { background: var(--accent-soft); color: var(--accent-2); }
 .vbanner.w { background: var(--hint-soft); color: var(--hint); }
 .vbanner.bad { background: var(--danger-soft); color: var(--danger); }
+.vbanner.warn { background: var(--hint-soft); color: var(--hint); }
 .vbanner b { font-weight: 800; }
 .vtabs { position: -webkit-sticky; position: sticky; top: calc(8px + env(safe-area-inset-top)); z-index: 6; display: flex; gap: 4px; background: var(--surface-2); border-radius: 14px; padding: 4px; margin-top: 6px; box-shadow: 0 0 0 8px var(--bg); }
 .vtabs button { flex: 1; padding: 9px; border-radius: 11px; border: none; background: none; font: 800 13.5px var(--font-body); color: var(--muted); }
@@ -1211,6 +1217,7 @@ a.grow { text-decoration: none; }
       <a href="#admin" data-view="admin">Coordinator</a>
       <a href="#kitchen-demok1" data-view="kitchen">Vendor</a>
       <a href="#kitchen-demov1" data-view="vendor">Customer-added vendor</a>
+      <a href="#vclaim-demoinvite" data-view="vinvite">Invited vendor</a>
       <a href="#rider-demor1" data-view="rider">Rider</a>
       <a href="#host-demoh1" data-view="host">Drop-point host</a>
     </nav>
@@ -1285,6 +1292,14 @@ const intlPhone = n => { const d = String(n || "").replace(/\D/g, ""); return /^
 const localPhone = p => { const d = String(p || "").replace(/\D/g, ""); return !d ? null : /^233\d{9}$/.test(d) ? "0" + d.slice(3) : d; };
 // Phone + PIN sign-in: on once "ChopPool" is approved as the SMS sender (Admin › Settings), or on this phone for testing (#phonetest)
 const phoneOn = () => !!((S.settings || {}).phone_signin || local.get("cp_phonetest"));
+// Duplicate vendor names: "Auntie Ama's Kitchen" = "Aunty Ama" (same rule as the database's name_sim)
+const nameWords = n => String(n || "").toLowerCase().replace(/\b(auntie|aunty|aunt|mama|maame|ma|sister|sis|madam|mummy|mum|kitchen|kitchens|chop|bar|chopbar|joint|spot|food|foods|restaurant|eatery|canteen|the|and|s)\b/g, " ").replace(/[^a-z0-9]+/g, " ").trim();
+const nameKey = n => nameWords(n).replace(/ /g, "");
+const nameSim = (a, b) => { const x = nameKey(a), y = nameKey(b); if (!x || !y) return 0; if (x === y) return 1; if (Math.min(x.length, y.length) >= 4 && (x.includes(y) || y.includes(x))) return 0.8;
+  let wa = nameWords(a).split(" ").filter(Boolean), wb = nameWords(b).split(" ").filter(Boolean); if (wa.length > wb.length) [wa, wb] = [wb, wa];
+  if (wa.length && wa.every(w => wb.includes(w)) && Math.min(...wa.map(w => w.length)) >= 3) return 0.7;
+  const g = t => { const p = "  " + t + " ", o = new Set(); for (let i = 0; i < p.length - 2; i++) o.add(p.slice(i, i + 3)); return o; }, A = g(x), B = g(y); let n = 0; A.forEach(v => { if (B.has(v)) n++; }); return n / (A.size + B.size - n); };
+const pinOk = p => /^\d{4}$/.test(p) && !/^(\d)\1{3}$/.test(p) && !["1234", "2345", "3456", "4567", "5678", "6789", "4321", "9876", "0123", "1212", "2580"].includes(p);
 const fmtPhone = n => { const d = String(n || "").replace(/\D/g, ""); return d.length === 10 ? d.slice(0, 3) + " " + d.slice(3, 6) + " " + d.slice(6) : String(n || ""); };
 const newToken = () => [...crypto.getRandomValues(new Uint8Array(18))].map(b => b.toString(36).padStart(2, "0")).join("").slice(0, 24);
 const stepRank = st => ["waiting", "collecting", "accepted", "ready", "picked_up", "arriving", "delivered"].indexOf(st);
@@ -1330,7 +1345,7 @@ const isoDow = d => { const w = new Date(d + "T00:00:00Z").getUTCDay(); return w
    DEMO DATA LAYER: in-memory copy of the database logic, with simulated customers
    ===================================================================================== */
 function makeDemoApi() {
-  const settings = { reports_from: null, paystack_fee_from: null, phone_signin: false, pay_mode: "manual", reminder_time: "09:00", tester_terms_on: true, tester_terms_version: 1, cutoff: "10:30", special_cutoff: "10:00", delivery_time: "12:30", trip_cost: 60, base_fare: 20, per_km: 6, trip_min: 10, max_fee: 10, cap_km: 8, trip_max: 80, quote_pay_min: 15, auto_receive_min: 120, admin_idle_min: 15, service_fee: 2, min_pool: 6, max_meals: 10, pool_ceiling: 15,
+  const settings = { msg_first: "whatsapp", wa_ready: true, sms_ready: false, msg_reply: null, invites_per_day: 3, reports_from: null, paystack_fee_from: null, phone_signin: false, pay_mode: "manual", reminder_time: "09:00", tester_terms_on: true, tester_terms_version: 1, cutoff: "10:30", special_cutoff: "10:00", delivery_time: "12:30", trip_cost: 60, base_fare: 20, per_km: 6, trip_min: 10, max_fee: 10, cap_km: 8, trip_max: 80, quote_pay_min: 15, auto_receive_min: 120, admin_idle_min: 15, service_fee: 2, min_pool: 6, max_meals: 10, pool_ceiling: 15,
     commission_rate: 0.15, vendor_fee_rate: 0, vendor_fee_free: 5, next_day_confirm_by: "08:30", countdown_start: "06:00", near_max_fee: 50, free_max_m: 1500, accept_timeout_min: 20, arrival_window_min: 10, notify_daily_cap: 5, momo_number: "024 000 0000", momo_name: "ChopPool Pilot", momo_network: "MTN" };
   const sites = [
     { id: "s1", name: "Heritage Tower, Ridge", drop_point: "Lobby security desk", handoff: "host", host_label: "the security desk in the lobby", host_token: "demoh1", lat: 5.5640, lng: -0.2010, status: "active", active: true },
@@ -1391,6 +1406,14 @@ function makeDemoApi() {
     && kRate(k) <= Number(k.fee_ack || 0) && kFree(k) >= Number(k.fee_free_ack ?? 5))(kitchens.find(x => x.id === kid));   // automatic days need the current fee accepted
   const nowIso = () => new Date().toISOString();
   const unmatched = [], payouts = [], activity = [];
+  const vwait = [], vauth = {}, msglog = [];   // customers waiting for a vendor, vendor sign-in, messages (update 54)
+  // An invited vendor who hasn't set up yet (demo bar: "Invited vendor")
+  kitchens.push({ id: "v2", name: "Maame Esi Kenkey", public_name: "Maame Esi Kenkey", tagline: null, address: null, lat: 5.5662, lng: -0.1995, whatsapp: "0240000012", phone: "233240000012", capacity: 30, delivery_mode: "rider",
+    site_id: "s1", added_by_customer: true, added_by: "demo-other", token: "demov2", active: false, setup_status: "draft", invite_status: "sent", invite_channel: "whatsapp", invite_sent_at: new Date(Date.now() - 26 * 36e5).toISOString(),
+    suggested_dishes: ["Kenkey and fried fish", "Banku and okro"], created_at: new Date(Date.now() - 26 * 36e5).toISOString() });
+  vauth.v2 = { code: "demoinvite", used: false };
+  vwait.push({ kitchen_id: "v2", user_id: "demo-other", site_id: "s1", created_at: new Date(Date.now() - 26 * 36e5).toISOString(), reminded_at: new Date(Date.now() - 3 * 36e5).toISOString() });
+  const phoneNorm = p => { const d = String(p || "").replace(/\D/g, ""); return /^0\d{9}$/.test(d) ? "233" + d.slice(1) : /^233\d{9}$/.test(d) ? d : /^[1-9]\d{8}$/.test(d) ? "233" + d : null; };
   const pastCutoff = d => new Date() >= at(d, settings.cutoff);
   const dueOf = orderTotal;
   // Cashback per code: delivery paid once; the final share counts every meal under the code (added plates too)
@@ -1628,17 +1651,88 @@ function makeDemoApi() {
     },
     async setNamePrivacy(ids, hide) { orders.filter(o => ids.includes(o.id)).forEach(o => { o.hide_name = !!hide; reviews.filter(r => r.order_id === o.id).forEach(r => { r.name = hide ? null : o.customer_name.split(" ")[0]; }); }); return null; },
     async recordUnmatched(r) { unmatched.push({ id: "u" + uid(), created_at: nowIso(), name: r.name, phone: String(r.phone || "").replace(/\D/g, ""), amount: Number(r.amount) || 0, momo_ref: r.ref, reason: r.reason }); },
-    async addVendor(r) {
-      const wa_ = String(r.whatsapp || "").replace(/\D/g, "");
-      if ((r.name || "").trim().length < 2) throw new Error("Add the vendor's name.");
-      if (!/^0\d{9}$/.test(wa_)) throw new Error("Enter the vendor's 10-digit WhatsApp number, like 024 123 4567.");
-      const good = (r.items || []).filter(i => (i.name || "").trim().length >= 2 && Number(i.price) > 0);
-      if (!good.length) throw new Error("Add at least one dish with its price.");
-      const si0 = sites.find(x => x.id === r.site) || {};
-      const k = { id: "v" + uid(), name: r.name.trim(), public_name: r.name.trim(), tagline: "Added by a customer", address: "", lat: r.lat ?? si0.lat, lng: r.lng ?? si0.lng, whatsapp: wa_, capacity: 30, delivery_mode: "rider", site_id: r.site, added_by_customer: true, token: "demo" + uid(), active: true };
-      kitchens.push(k); good.forEach(i => items.push({ id: "i" + uid(), kitchen_id: k.id, name: i.name.trim(), price: Number(i.price), addons: [] }));
-      return { id: k.id, token: k.token, whatsapp: wa_, name: k.public_name };
+    // Customers invite a vendor; ChopPool sends the link (demo mirror of update 54)
+    async inviteVendor(r) {
+      if (!me) throw new Error("Sign in to invite a vendor.");
+      const si = sites.find(x => x.id === r.site && x.active && x.status === "active"); if (!si) throw new Error("Pick your building first.");
+      const join = k => { const w = vwait.find(x => x.kitchen_id === k.id && x.user_id === me.id); if (w) w.site_id = r.site; else vwait.push({ kitchen_id: k.id, user_id: me.id, site_id: r.site, created_at: nowIso(), reminded_at: null });
+        if (!k.setup_status && k.active !== false) return { result: !k.site_id || k.site_id === r.site ? "here" : "elsewhere", id: k.id, name: k.public_name };
+        return { result: k.setup_status ? "invited_already" : "paused", id: k.id, name: k.public_name }; };
+      if (r.same) { const k = kitchens.find(x => x.id === r.same && !x.archived && !["declined", "merged"].includes(x.invite_status)); if (!k) throw new Error("That vendor is no longer on ChopPool."); return join(k); }
+      const ph = phoneNorm(r.phone);
+      if (String(r.name || "").trim().length < 2) throw new Error("Add the vendor's name.");
+      if (!ph) throw new Error("Enter the vendor's 10-digit phone number, like 024 123 4567.");
+      if (r.lat == null) throw new Error("Search for where she cooks, or drop a pin on the map.");
+      const same = kitchens.find(k => !k.archived && (k.phone || phoneNorm(k.whatsapp)) === ph);
+      if (same) {
+        if (same.invite_status === "declined") { const until = Date.parse(same.declined_at) + 30 * 864e5;
+          if (until > Date.now()) throw new Error("This vendor asked not to be invited for now. You can invite her again from " + new Date(until).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) + ".");
+          Object.assign(same, { invite_status: "pending", declined_at: null, added_by: me.id, site_id: r.site }); vauth[same.id] = { ...(vauth[same.id] || {}), code: "demo" + uid(), used: false }; join(same); return { result: "invited", id: same.id, name: same.public_name }; }
+        return join(same); }
+      const sim = kitchens.filter(k => !k.archived && hasPin(k) && !["declined", "merged"].includes(k.invite_status) && distM(k, { lat: r.lat, lng: r.lng }) <= 300 && nameSim(k.public_name, r.name) >= 0.5)
+        .map(k => ({ id: k.id, name: k.public_name, area: k.address || null, dist: Math.round(distM(k, { lat: r.lat, lng: r.lng })), live: !k.setup_status && k.active !== false, s: nameSim(k.public_name, r.name) }))
+        .sort((a, b) => b.s - a.s || a.dist - b.dist).slice(0, 3).map(({ s: _s, ...x }) => x);
+      if (sim.length && !r.isNew) return { result: "similar", matches: sim };
+      if (kitchens.filter(k => k.added_by === me.id && k.added_by_customer && Date.now() - Date.parse(k.created_at) < 864e5).length >= (settings.invites_per_day || 3)) throw new Error("You can invite " + (settings.invites_per_day || 3) + " new vendors a day. Try again tomorrow.");
+      const dishes = [...new Map((r.dishes || []).map(d => String(d).trim()).filter(d => d.length >= 2).map(d => [d.toLowerCase(), d.slice(0, 40)])).values()].slice(0, 8);
+      const k = { id: "v" + uid(), name: r.name.trim(), public_name: r.name.trim(), tagline: null, address: null, lat: r.lat, lng: r.lng, whatsapp: "0" + ph.slice(3), phone: ph, capacity: 30, delivery_mode: "rider", site_id: r.site,
+        added_by_customer: true, added_by: me.id, token: "demo" + uid(), active: false, setup_status: "draft", invite_status: "pending", suggested_dishes: dishes, dup_of: sim.length ? sim[0].id : null, created_at: nowIso() };
+      kitchens.push(k); vauth[k.id] = { code: "demo" + uid(), used: false }; vwait.push({ kitchen_id: k.id, user_id: me.id, site_id: r.site, created_at: nowIso(), reminded_at: null });
+      return { result: "invited", id: k.id, name: k.public_name };
     },
+    // Demo: WhatsApp is "sent" for numbers ending in an even digit, otherwise it goes to the team (to show both)
+    async sendInvite(id) { const k = kitchens.find(x => x.id === id); if (!k || k.invite_status !== "pending") return { status: k && k.invite_status };
+      const ok = Number(String(k.phone).slice(-1)) % 2 === 0;
+      Object.assign(k, ok ? { invite_status: "sent", invite_channel: "whatsapp", invite_sent_at: nowIso() } : { invite_status: "team", invite_channel: "team", invite_error: "Demo: WhatsApp isn't set up" });
+      msglog.unshift({ id: uid(), created_at: nowIso(), kind: "vendor_invite", phone: k.phone, channel: ok ? "whatsapp" : null, status: ok ? "sent" : "failed", detail: ok ? null : "Demo: WhatsApp isn't set up", kitchen_id: k.id });
+      return ok ? { status: "sent", channel: "whatsapp" } : { status: "team" }; },
+    async myVendorInvites() { if (!me) return [];
+      return vwait.filter(w => w.user_id === me.id).map(w => ({ w, k: kitchens.find(x => x.id === w.kitchen_id) })).filter(x => x.k && !x.k.archived && x.k.setup_status)
+        .map(({ w, k }) => ({ id: k.id, name: k.public_name, invited_at: w.created_at, reminded_at: w.reminded_at, waiting: vwait.filter(x => x.kitchen_id === k.id).length,
+          status: k.invite_status === "declined" ? "declined" : k.setup_status === "submitted" ? "checking" : k.invite_status === "claimed" || k.setup_status === "returned" ? "setting_up" : "invited" })); },
+    async vendorRemind(id) { const w = me && vwait.find(x => x.kitchen_id === id && x.user_id === me.id); if (!w) throw new Error("You're not waiting for this vendor.");
+      if (w.reminded_at && Date.now() - Date.parse(w.reminded_at) < 20 * 36e5) throw new Error("You've already reminded us today. We're on it."); w.reminded_at = nowIso(); },
+    async vendorWaitStop(id) { const i = vwait.findIndex(x => x.kitchen_id === id && me && x.user_id === me.id); if (i >= 0) vwait.splice(i, 1); },
+    // The vendor's phone
+    async vendorClaim(code) { const kid = Object.keys(vauth).find(id => vauth[id].code === code), k = kid && kitchens.find(x => x.id === kid);
+      if (!k) throw new Error("This link isn't valid. If you've set up before, sign in with your phone number and PIN.");
+      if (k.archived || ["declined", "merged"].includes(k.invite_status)) throw new Error("This link isn't valid any more. Ask ChopPool for a new one.");
+      if (vauth[kid].used && vauth[kid].pin) throw new Error("This link has already been used. Sign in with your phone number and PIN.");
+      vauth[kid].used = true; if (["pending", "sent", "team"].includes(k.invite_status)) k.invite_status = "claimed";
+      return { token: k.token, name: k.public_name, status: k.setup_status || "live", has_pin: !!vauth[kid].pin }; },
+    async vendorDecline(code) { const kid = Object.keys(vauth).find(id => vauth[id].code === code), k = kid && kitchens.find(x => x.id === kid); if (!k) throw new Error("This link isn't valid.");
+      if (k.setup_status) Object.assign(k, { invite_status: "declined", declined_at: nowIso() }); vauth[kid].used = true; },
+    async vendorMe(t) { const k = kitchens.find(x => x.token === t && !x.archived && !["declined", "merged"].includes(x.invite_status)); if (!k) return null;
+      return { name: k.public_name, status: k.setup_status || (k.active !== false ? "live" : "paused"), note: k.setup_note || null, has_pin: !!(vauth[k.id] || {}).pin }; },
+    async vendorSetPin(t, pin) { const k = kitchens.find(x => x.token === t && !x.archived); if (!k) throw new Error("This link is not valid. Ask ChopPool for a new one.");
+      if (!/^\d{4}$/.test(pin || "")) throw new Error("Choose a 4-digit PIN."); if (!pinOk(pin)) throw new Error("Pick a PIN that's harder to guess than " + pin + ".");
+      vauth[k.id] = { ...(vauth[k.id] || {}), pin, fails: 0, locked: 0, used: true }; },
+    async vendorSetupExtra(t, wider, help) { const k = kitchens.find(x => x.token === t && !x.archived && x.setup_status); if (!k) throw new Error("Your page is already live. Open your vendor page to make changes.");
+      if (wider != null) k.wants_wider = !!wider; if (help != null) k.setup_help = !!help; },
+    async vendorLogin(phone, pin) { const ph = phoneNorm(phone), k = kitchens.find(x => !x.archived && (x.phone || phoneNorm(x.whatsapp)) === ph && !["declined", "merged"].includes(x.invite_status)), a = k && vauth[k.id];
+      if (!k) throw new Error("Wrong phone number or PIN."); if (!a || !a.pin) throw new Error("You haven't set a PIN yet. Tap Forgot PIN to get a code.");
+      if (a.locked > Date.now()) throw new Error("Too many wrong tries. Wait 15 minutes, or tap Forgot PIN.");
+      if (a.pin !== pin) { a.fails = (a.fails || 0) + 1; if (a.fails >= 5) { a.fails = 0; a.locked = Date.now() + 15 * 6e4; } throw new Error("Wrong phone number or PIN."); }
+      a.fails = 0; a.locked = 0; return { token: k.token, name: k.public_name, status: k.setup_status || "live" }; },
+    // Demo: the "Forgot PIN" code is always 123456
+    async vendorCode(phone) { if (!phoneNorm(phone)) throw new Error("Enter your 10-digit phone number, like 024 123 4567."); return { ok: true, channel: "whatsapp", demo: "123456" }; },
+    async vendorResetPin(phone, code, pin) { const ph = phoneNorm(phone), k = kitchens.find(x => !x.archived && (x.phone || phoneNorm(x.whatsapp)) === ph);
+      if (!k || code !== "123456") throw new Error("That code isn't right. Check the message and try again.");
+      if (!/^\d{4}$/.test(pin || "")) throw new Error("Choose a 4-digit PIN."); if (!pinOk(pin)) throw new Error("Pick a PIN that's harder to guess.");
+      vauth[k.id] = { ...(vauth[k.id] || {}), pin, fails: 0, locked: 0, used: true }; return { token: k.token, name: k.public_name, status: k.setup_status || "live" }; },
+    // Team
+    async vendorLink(id) { const k = kitchens.find(x => x.id === id && !x.archived); if (!k) throw new Error("Vendor not found."); const code = "demo" + uid(); vauth[id] = { ...(vauth[id] || {}), code, used: false };
+      if (k.setup_status) Object.assign(k, { invite_status: ["pending", "declined"].includes(k.invite_status) || !k.invite_status ? "team" : k.invite_status, invite_channel: "team", invite_sent_at: nowIso(), declined_at: null }); return code; },
+    async vendorMerge(from, into) { const a = kitchens.find(x => x.id === from), b = kitchens.find(x => x.id === into); if (!a || !a.setup_status) throw new Error("Only a vendor that isn't live yet can be merged."); if (!b) throw new Error("Vendor not found.");
+      vwait.filter(w => w.kitchen_id === from).forEach(w => { if (!vwait.some(x => x.kitchen_id === into && x.user_id === w.user_id)) vwait.push({ ...w, kitchen_id: into }); });
+      for (let n = vwait.length - 1; n >= 0; n--) if (vwait[n].kitchen_id === from) vwait.splice(n, 1);
+      Object.assign(a, { archived: true, active: false, invite_status: "merged", phone: null }); b.dup_of = null; },
+    async vendorNotDup(id) { const k = kitchens.find(x => x.id === id); if (k) k.dup_of = null; },
+    async vendorOpenAll(id) { const k = kitchens.find(x => x.id === id); if (k) { k.site_id = null; k.wants_wider = false; } },
+    async vendorRequestsClear(id) { const k = kitchens.find(x => x.id === id); if (!k) return; for (let n = vwait.length - 1; n >= 0; n--) if (vwait[n].kitchen_id === id && k.site_id && vwait[n].site_id !== k.site_id) vwait.splice(n, 1); k.wants_wider = false; },
+    async msgStatus() { return { whatsapp: false, sms: false, webhook: false, channels: [], demo: true }; },
+    async msgTest() { throw new Error("Messages are sent once the app is live. In the demo nothing is sent."); },
+    async msgLog() { return msglog.slice(0, 60); },
     async user() { return me; },
     // Demo: new accounts wait for the emailed code like the live app (any 6 digits work here)
     async signUp(email, pw, name) { if (users.some(u => u.email === email && !u.pending)) throw new Error("That email already has an account. Sign in instead."); if (String(pw).length < 6) throw new Error("Use at least 6 characters for the password.");
@@ -1950,7 +2044,7 @@ function makeDemoApi() {
       housekeeping();
       return { orders: orders.filter(o => o.order_date === date), pools: pools.filter(p => p.order_date === date).map(p => ({ ...p, meals: meals(p.id) })), riders, sites, kitchens,
         wallets: profiles.map(p => ({ ...p, balance: balance(p.user_id) })), items, team, payment_methods: payMethods, waiters,
-        unmatched: unmatched.slice(), problems: orders.filter(o => o.problem && !o.problem_resolved_at) };
+        unmatched: unmatched.slice(), problems: orders.filter(o => o.problem && !o.problem_resolved_at), vwait: vwait.map(w => ({ ...w })) };
     },
     async alertReach(ids) { return localStorage.getItem("cp_alerts") === "true" ? orders.filter(o => ids.includes(o.id) && (local.get("cp_orders") || []).some(x => x.id === o.id)).map(o => o.id) : []; },
     async refsSeen(refs) { const n = {}; orders.filter(o => o.status !== "cancelled" && o.momo_ref).forEach(o => { n[o.momo_ref] = (n[o.momo_ref] || 0) + 1; }); return Object.fromEntries(refs.filter(r => n[r] > 1).map(r => [r, n[r]])); },
@@ -2029,6 +2123,7 @@ function makeDemoApi() {
       if (!k.setup_status) return { live: k.active !== false, name: k.public_name };
       return { status: k.setup_status, note: k.setup_note || null, name: k.public_name, tagline: k.tagline || null, owner_name: k.owner_name || null, whatsapp: k.whatsapp, address: k.address || null, lat: k.lat ?? null, lng: k.lng ?? null,
         auto_days: k.auto_days || null, capacity: k.capacity, payout_momo: k.payout_momo || null, payout_network: k.payout_network || null,
+        invited: !!k.added_by_customer, suggested: k.suggested_dishes || [], wants_wider: !!k.wants_wider, setup_help: !!k.setup_help, has_pin: !!(vauth[k.id] || {}).pin,
         items: items.filter(i => i.kitchen_id === k.id).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)).map(i => ({ id: i.id, name: i.name, price: i.price, addons: i.addons || [], icon: i.icon || null })) }; },
     async vendorSetupSave(t, d, list, submit) { const k = kitchens.find(x => x.token === t && !x.archived); if (!k) throw new Error("This link is not valid. Ask ChopPool for a new one.");
       if (!k.setup_status) throw new Error("Your page is already live. Open your vendor page to make changes.");
@@ -2045,8 +2140,8 @@ function makeDemoApi() {
         if (k.lat == null) throw new Error("Show where you cook on the map."); if (!n) throw new Error("Add at least one dish with its price."); if (!k.payout_momo) throw new Error("Add the mobile money number we pay you on.");
         k.setup_status = "submitted"; k.setup_submitted_at = nowIso(); k.setup_note = null; }
       return { status: k.setup_status, dishes: n }; },
-    async vendorReview(id, ok, note) { const k = kitchens.find(x => x.id === id); if (!k || !k.setup_status) throw new Error("This vendor form isn't waiting for review.");
-      if (ok) { if (k.setup_status !== "submitted") throw new Error("The vendor hasn't submitted their form yet."); Object.assign(k, { setup_status: null, setup_note: null, active: true }); }
+    async vendorReview(id, ok, note, all) { const k = kitchens.find(x => x.id === id); if (!k || !k.setup_status) throw new Error("This vendor form isn't waiting for review.");
+      if (ok) { if (k.setup_status !== "submitted") throw new Error("The vendor hasn't submitted their form yet."); Object.assign(k, { setup_status: null, setup_note: null, active: true, setup_help: false, ...(k.invite_status ? { invite_status: "claimed" } : {}), ...(all ? { site_id: null, wants_wider: false } : {}) }); }
       else { if (String(note || "").trim().length < 3) throw new Error("Say what they should change."); Object.assign(k, { setup_status: "returned", setup_note: note.trim() }); } },
     async vendorRequestListing(token, listing) { const k = byToken(kitchens, "token", token); if (!k.added_by_customer || k.listing_status === "approved") throw new Error("You are already listed on ChopPool."); k.listing = listing; k.listing_status = "pending"; k.listing_requested_at = nowIso(); },
     async savePushSub() {}, async notify() {},
@@ -2080,6 +2175,15 @@ function makeSupabaseApi() {
       throw new Error(m ? m + (own || !st ? "" : " (" + st + ")") : "Payment didn't start (" + (st || error.name || "error") + "). Try again."); }
     if (data && data.error) throw new Error(data.error);
     return data;
+  }
+  // Calls the sms server function (WhatsApp/SMS messages); its refusals come back as plain sentences
+  async function msgFn(body) {
+    const { data, error } = await sb.functions.invoke("sms", { body });
+    if (error) { let m = ""; try { const b = await error.context.json(); m = b.error || b.message || ""; } catch (e) {}
+      if (!m && error.name === "FunctionsFetchError") m = "Couldn't reach ChopPool. Check your connection and try again.";
+      throw new Error(m || "Something went wrong. Try again in a minute."); }
+    if (data && data.error) throw new Error(data.error);
+    return data || {};
   }
   // A password-reset email link signs the person in for one step: choose a new password
   [sbCustomer, sbTeam].forEach(c => c.auth.onAuthStateChange(ev => { if (ev === "PASSWORD_RECOVERY") { S.recovery = true; S.recoveryTeam = c === sbTeam; if (S.appReady) showRecovery(); } }));
@@ -2122,7 +2226,12 @@ function makeSupabaseApi() {
     payQuote: (id, ref, useWallet) => rpc("pay_quote", { p_order: id, p_ref: ref || null, p_use_wallet: !!useWallet }),
     myOrders: ids => rpc("my_orders", { p_ids: ids }),
     setNamePrivacy: (ids, hide) => rpc("set_name_privacy", { p_ids: ids, p_hide: !!hide }),
-    addVendor: r => rpc("add_vendor", { p_site: r.site, p_name: r.name, p_whatsapp: r.whatsapp, p_items: r.items, p_lat: r.lat ?? null, p_lng: r.lng ?? null }),
+    // Customers invite a vendor (update 54): ChopPool sends her the link, the customer never sees it
+    inviteVendor: r => rpc("vendor_invite", { p_site: r.site, p_name: r.name, p_phone: r.phone, p_lat: r.lat ?? null, p_lng: r.lng ?? null, p_dishes: r.dishes || [], p_same: r.same || null, p_new: !!r.isNew }),
+    sendInvite: id => msgFn({ action: "invite", kitchen: id }),
+    async myVendorInvites() { const r = await sb.rpc("my_vendor_invites"); return r.error ? [] : r.data || []; },
+    vendorRemind: id => rpc("vendor_remind", { p_kitchen: id }),
+    vendorWaitStop: id => rpc("vendor_wait_stop", { p_kitchen: id }),
     // Signed in = a saved session on this phone. Checked with the server when it can be reached, so a slow
     // network or a token refresh at launch never makes you look signed out.
     async user() {
@@ -2219,7 +2328,25 @@ function makeSupabaseApi() {
     vendorInvite: (name, whatsapp) => rpc("admin_vendor_invite", { p_name: name, p_whatsapp: whatsapp || null }),
     vendorSetupGet: t => rpc("vendor_setup_get", { p_token: t }),
     vendorSetupSave: (t, d, list, submit) => rpc("vendor_setup_save", { p_token: t, p_data: d, p_items: list, p_submit: !!submit }),
-    vendorReview: (id, ok, note) => rpc("admin_vendor_review", { p_kitchen: id, p_ok: !!ok, p_note: note || null }),
+    vendorReview: (id, ok, note, all) => rpc("admin_vendor_review", { p_kitchen: id, p_ok: !!ok, p_note: note || null, p_all_sites: !!all }),
+    // A vendor's own phone: the setup link, PIN, sign-in (update 54)
+    vendorClaim: code => rpc("vendor_claim", { p_code: code }),
+    vendorDecline: code => rpc("vendor_decline", { p_code: code }),
+    vendorMe: t => rpc("vendor_me", { p_token: t }),
+    vendorSetPin: (t, pin) => rpc("vendor_set_pin", { p_token: t, p_pin: pin }),
+    vendorSetupExtra: (t, wider, help) => rpc("vendor_setup_extra", { p_token: t, p_wider: wider ?? null, p_help: help ?? null }),
+    async vendorLogin(phone, pin) { const r = await rpc("vendor_login", { p_phone: phone, p_pin: pin }); if (r && r.error) throw new Error(r.error); return r; },
+    async vendorResetPin(phone, code, pin) { const r = await rpc("vendor_reset_pin", { p_phone: phone, p_code: code, p_pin: pin }); if (r && r.error) throw new Error(r.error); return r; },
+    vendorCode: phone => msgFn({ action: "vendor_code", phone }),
+    // Team
+    vendorLink: id => rpc("admin_vendor_link", { p_kitchen: id }),
+    vendorMerge: (from, into) => rpc("admin_vendor_merge", { p_from: from, p_into: into }),
+    vendorNotDup: id => rpc("admin_vendor_not_dup", { p_kitchen: id }),
+    vendorOpenAll: id => rpc("admin_vendor_open_all", { p_kitchen: id }),
+    vendorRequestsClear: id => rpc("admin_vendor_requests_clear", { p_kitchen: id }),
+    msgStatus: () => msgFn({ action: "status" }),
+    msgTest: (phone, channel) => msgFn({ action: "test", phone, channel: channel || null }),
+    async msgLog() { const r = await sb.from("msg_log").select("*").order("created_at", { ascending: false }).limit(60); return r.error ? [] : r.data; },
     async vendorRequestListing(t, listing) { const x = await sb.rpc("vendor_request_listing", { p_token: t, p_listing: listing });
       if (x.error && /function|schema cache/i.test(x.error.message)) throw new Error("Listing isn't switched on yet. Please contact ChopPool."); return must(x); },
     savePushSub: async p => { const base = { p_endpoint: p.endpoint, p_p256dh: p.p256dh, p_auth: p.auth, p_order_ids: p.order_ids || [], p_kitchen_token: p.kitchen_token || null, p_rider_token: p.rider_token || null };
@@ -2288,7 +2415,7 @@ function makeSupabaseApi() {
     async adminData(date) {
       sb.rpc("housekeeping").then(() => {}, () => {});   // also runs on the schedule; don't make the screen wait for it
       const since14 = new Date(Date.now() - 14 * 864e5).toISOString().slice(0, 10);
-      const [orders, pools, riders, sites, kitchens, wallets, items, team, payment_methods, waiters, unmatched, problems] = await Promise.all([
+      const [orders, pools, riders, sites, kitchens, wallets, items, team, payment_methods, waiters, unmatched, problems, vwait] = await Promise.all([
         sb.from("orders").select("*").eq("order_date", date).order("created_at").then(must),
         sb.from("pools").select("*").eq("order_date", date).order("seq").then(must),
         sb.from("riders").select("*").order("name").then(must),
@@ -2300,10 +2427,11 @@ function makeSupabaseApi() {
         sb.from("payment_methods").select("*").order("sort").then(r => r.error ? [] : r.data, () => []),
         sb.from("site_waiters").select("site_id,created_at").then(r => r.error ? [] : r.data, () => []),
         sb.from("unmatched_payments").select("*").is("refunded_at", null).order("created_at", { ascending: false }).then(r => r.error ? [] : r.data, () => []),
-        sb.from("orders").select("*").not("problem", "is", null).is("problem_resolved_at", null).gte("order_date", since14).then(r => r.error ? [] : r.data, () => [])
+        sb.from("orders").select("*").not("problem", "is", null).is("problem_resolved_at", null).gte("order_date", since14).then(r => r.error ? [] : r.data, () => []),
+        sb.from("vendor_waiters").select("*").then(r => r.error ? [] : r.data, () => [])
       ]);
       const m = {}; orders.forEach(o => { if (o.status !== "cancelled") m[o.pool_id] = (m[o.pool_id] || 0) + o.qty; });
-      return { orders, pools: pools.map(p => ({ ...p, meals: m[p.id] || 0 })), riders, sites, kitchens, wallets, items, team, payment_methods, waiters, unmatched, problems };
+      return { orders, pools: pools.map(p => ({ ...p, meals: m[p.id] || 0 })), riders, sites, kitchens, wallets, items, team, payment_methods, waiters, unmatched, problems, vwait };
     },
     alertReach: ids => rpc("admin_alert_reach", { p_ids: ids }),
     async refsSeen(refs, date) { return refs.length ? rpc("admin_refs_seen", { p_refs: refs, p_date: date }) : {}; },
@@ -2760,7 +2888,8 @@ function openAccount(reason, startMode, page) {
   let how = phoneOn() && local.get("cp_signin_with") !== "email" ? "phone" : "email";   // phone + PIN first when it's on
   const put = html => page ? ($("#view").innerHTML = `<section class="recover gate" id="gate"><div class="card stack" style="gap:14px">
       <div class="pagebrand">${LOGO(30)}<p class="brand" style="font-size:18px">ChopPool</p></div>${html}
-      <p class="small muted center" style="margin:0">By continuing you agree to the <a href="#terms" data-legal="terms">terms</a> and <a href="#privacy" data-legal="privacy">privacy notice</a>.</p></div></section>`) : openSheet(html);
+      <p class="small muted center" style="margin:0">By continuing you agree to the <a href="#terms" data-legal="terms">terms</a> and <a href="#privacy" data-legal="privacy">privacy notice</a>.</p></div>
+      <p class="small center" style="margin:14px 0 0"><a href="#vendor">Are you a vendor? Sign in here</a></p></section>`) : openSheet(html);
   const head = (t, sub) => page ? `<div><h1 style="margin:0">${esc(t)}</h1><p class="muted" style="margin:6px 0 0">${esc(sub)}</p></div>` : sheetHead(t, sub);
   const finish = async () => {
     local.set("cp_had_account", true); await afterSignIn();
@@ -2972,7 +3101,7 @@ function setTab(t) {
   $("#topzone")?.classList.remove("compact");
   if (t === "orders") renderOrders();
   if (t === "wallet") renderWallet();
-  if (t === "kitchens") { syncVChips(); renderKitchens(); }
+  if (t === "kitchens") { syncVChips(); renderKitchens(); renderVendorWaits(); }
   window.scrollTo(0, 0);
   movePill();
   // Start the fade only once the new screen is drawn, so it never stutters
@@ -3017,9 +3146,10 @@ async function viewOrder() {
       <div class="vstick"><div class="vsearch">${ICON.search}<input id="vq" type="search" placeholder="Search vendors or dishes" autocomplete="off" aria-label="Search vendors or dishes"><div class="vsugg" id="vsugg" role="listbox"></div></div>
         <div class="fchips" id="vchips">${VFILTERS.map(([k, l]) => `<button data-vf="${k}" aria-pressed="false">${l}</button>`).join("")}</div></div>
       <section id="kitchensList"></section>
+      <section id="vWaiting" class="stack hidden" style="gap:8px" aria-label="Vendors you invited"></section>
       <button class="invite-card" id="addVendor" style="border:none;text-align:left;color:inherit;font:inherit;cursor:pointer;width:100%">
         <span class="blob">${ICON.store}</span>
-        <span style="display:grid;gap:2px"><strong>Know a great vendor?</strong><span class="small muted">Add your waakye, gob3 or kenkey seller so others in your building can order together.</span></span>
+        <span style="display:grid;gap:2px"><strong>Know a great vendor?</strong><span class="small muted">Invite your waakye, gob3 or kenkey seller so your building can order from her together.</span></span>
       </button>
     </section>
     <section id="tabOrders" class="stack hidden"></section>
@@ -3573,7 +3703,7 @@ const kGroup = (id, title, n, body) => `<section class="kgroup" id="kg-${id}" da
 function openKJump() {
   const groups = [...document.querySelectorAll("#tabKitchens .kgroup")];
   openSheet(`${sheetHead("Go to", "")}<div class="stack" style="gap:6px">${groups.map(g => `<button type="button" class="place-row" data-kgo="${esc(g.id)}"><span class="pdot on">${ICON.store.replace(/width="\d+" height="\d+"/, 'width="18" height="18"')}</span><span><strong>${esc(g.dataset.ktitle)}</strong><span class="small muted">${g.querySelectorAll(".kcard").length} vendors</span></span></button>`).join("")}
-    <button type="button" class="place-row" data-kgo="addVendor"><span class="pdot">${ICON.store.replace(/width="\d+" height="\d+"/, 'width="18" height="18"')}</span><span><strong>Add a vendor you know</strong><span class="small muted">Your waakye, gob3 or kenkey seller</span></span></button></div>`);
+    <button type="button" class="place-row" data-kgo="addVendor"><span class="pdot">${ICON.store.replace(/width="\d+" height="\d+"/, 'width="18" height="18"')}</span><span><strong>Invite a vendor you know</strong><span class="small muted">Your waakye, gob3 or kenkey seller</span></span></button></div>`);
   $("#sheet").onclick = e => { const b = e.target.closest("[data-kgo]"); if (!b) return; $("#sheet").onclick = null; closeSheet();
     setTimeout(() => { const t = document.getElementById(b.dataset.kgo); if (!t) return; window.scrollTo({ top: t.getBoundingClientRect().top + window.scrollY - (parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--kh")) || 0) + 1, behavior: "smooth" }); }, 380); };
 }
@@ -5286,7 +5416,6 @@ function openOrder(menuId, opt = {}) {
 // Link messages: one per situation, link last (approved 7 Nov)
 const MSG = {
   sellerPage: k => "Hello " + k.name + ", this is your ChopPool page. Confirm the days you cook, see each pool's orders, and mark food ready. Keep this link private: " + baseUrl() + "/#kitchen-" + k.token,
-  sellerAdded: (v, site) => "Hello " + v.name + ", a customer at " + site.name + " added you on ChopPool so people there can order from you together. Open your page to see orders and confirm you're cooking: " + baseUrl() + "/#kitchen-" + v.token,
   sellerConfirm: (k, siteName, d, mins) => "Hello " + k.name + ", customers at " + siteName + " want lunch from you " + (dayLabel(d) === "today" ? "today" : "for " + dayLabel(d)) + ". Please open your page and confirm you're cooking " + (dayLabel(d) === "today" ? "within " + mins + " minutes" : "by " + fmtTime(S.settings.next_day_confirm_by || "08:30") + " " + dayLabel(d)) + ": " + baseUrl() + "/#kitchen-" + k.token,
   rider: r => "Welcome to ChopPool, " + r.name + ". Your rider page shows each pickup, where to drop it, and the codes to hand over. Keep this link private: " + baseUrl() + "/#rider-" + r.token,
   host: x => "Hello, you're the ChopPool drop point for " + x.name + ". When lunch arrives, hand each meal over against the customer's code, like K-27. Your page: " + baseUrl() + "/#host-" + x.host_token
@@ -5428,59 +5557,107 @@ function openPayQuote(id) {
   });
 }
 
-/* Add a vendor you know */
+/* Invite a vendor you know (update 54): ChopPool sends her the invite itself, so nobody else ever holds her link */
+const COMMON_DISHES = ["Waakye", "Jollof", "Fried rice", "Banku & tilapia", "Kenkey & fish", "Red red", "Fufu & soup", "Omo tuo", "Gob3", "Kelewele", "Ampesi", "Plain rice & stew"];
 function openAddVendor() {
   if (S.noSite) return openSitePicker({ then: openAddVendor });
-  const site = siteOf(S.siteId);
-  openSheet(`
-    ${sheetHead("Add a vendor", "For the waakye, gob3 or kenkey seller you already buy from.")}
-    <p class="small muted">They'll get a WhatsApp link to see the order codes from ${esc(site.name)} and must confirm before any order counts.</p>
-    <form id="vForm" class="stack" novalidate>
-      <div class="grid2"><div><label for="vName">Vendor's name</label><input id="vName" placeholder="Sister Ama Waakye"></div>
-      <div><label for="vWa">Vendor's WhatsApp</label><input id="vWa" inputmode="tel" placeholder="024 123 4567"></div></div>
-      <div class="group"><p class="group-title">Their usual dishes</p><div id="vItems" class="stack"></div>
-        <button type="button" class="linkbtn" id="vMore" style="justify-self:start">+ Add another dish</button></div>
-      <div class="group"><p class="group-title">Where do they cook?</p>
-        <div class="chips"><button type="button" class="tog" id="vHere" aria-pressed="true">Near my building</button><button type="button" class="tog" id="vElse" aria-pressed="false">${ICON.pin} Somewhere else</button></div>
-        <div id="vPinBox" class="stack hidden">${searchRow("vSearch", "Search their area or landmark")}<div class="chips">${useMeChip("vMe")}</div><div id="vResults" class="stack"></div>
-          <div id="vMap" class="map" style="height:220px" aria-label="Map: tap where they cook"></div><p class="small muted" id="vPinTxt">Search, or tap the map where they cook.</p></div>
-        <p class="small" id="vEst" style="color:var(--hint)"></p></div>
-      <p class="note">Others will see "Added by a customer".</p>
-      <p class="err" id="vErr"></p><button class="btn wide" type="submit">Add vendor</button>
-    </form>`);
-  const row = () => { const d = document.createElement("div"); d.className = "dishprice"; d.innerHTML = `<input aria-label="Dish" placeholder="e.g. Waakye full"><input aria-label="Price in cedis" inputmode="decimal" placeholder="GHS">`; $("#vItems").appendChild(d); };
-  row(); row();
-  $("#vMore").addEventListener("click", row);
-  // Optional pin: vendors can be anywhere; the delivery estimate updates with the distance
-  let vPin = null, vMap = null, vMk = null;
-  const est = () => {
-    $("#vEst").textContent = "Delivery will be split as more people join the pool.";
+  if (!S.user) return openAccount("Sign in to invite a vendor. We'll tell you when she's on ChopPool.");
+  const site = siteOf(S.siteId), f = { name: "", phone: "", pin: null, dishes: [] };
+  let step = 1, vMap = null, vMk = null;
+  const bar = n => `<div class="wiz" aria-label="Step ${n} of 3">${[1, 2, 3].map(x => `<i class="${x <= n ? "on" : ""}"></i>`).join("")}</div>`;
+  const draw = () => {
+    if (step === 1) {
+      openSheet(`${sheetHead("Invite a vendor", "The waakye, gob3 or kenkey seller you already buy from.")}${bar(1)}
+        <form id="vForm" class="stack" novalidate>
+          <div><label for="vName">Her name or business name</label><input id="vName" value="${esc(f.name)}" placeholder="Auntie Ama Waakye" autocomplete="off"></div>
+          <div><label for="vPh">Her phone number</label><input id="vPh" inputmode="tel" value="${esc(f.phone)}" placeholder="024 123 4567" autocomplete="off"></div>
+          <p class="small muted">ChopPool sends her the invite on WhatsApp or SMS. You don't need to send her anything.</p>
+          <p class="err" id="vErr"></p><button class="btn wide">Next</button></form>`);
+      $("#vName").focus();
+      $("#vForm").addEventListener("submit", e => { e.preventDefault(); f.name = $("#vName").value.trim(); f.phone = $("#vPh").value.trim();
+        if (f.name.length < 2) return ($("#vErr").textContent = "Add her name.");
+        if (!/^(0\d{9}|233\d{9})$/.test(f.phone.replace(/\D/g, ""))) return ($("#vErr").textContent = "Enter her 10-digit phone number, like 024 123 4567.");
+        step = 2; draw(); });
+    } else if (step === 2) {
+      vMap = vMk = null;
+      openSheet(`${sheetHead("Where does she cook?", "Search for the area or a landmark, then tap the exact spot on the map.")}${bar(2)}
+        ${searchRow("vSearch", "Search: Osu, Madina market…")}<div id="vResults" class="stack"></div>
+        <div id="vMap" class="map" style="height:240px" aria-label="Map: tap where she cooks"></div>
+        <p class="small muted" id="vPinTxt">${f.pin ? "Pin set. Tap the map or drag the pin to adjust." : "Tap the map where she cooks."}</p>
+        <p class="err" id="vErr"></p>
+        <div class="row" style="gap:8px"><button type="button" class="ghost" id="vBack">Back</button><button type="button" class="btn" id="vNext" style="flex:1">Next</button></div>`);
+      const put = (p, z) => { f.pin = { lat: p.lat, lng: p.lng }; const L = window.L;
+        if (!vMk) { vMk = L.marker([p.lat, p.lng], { draggable: true, icon: pinIcon(L, "on") }).addTo(vMap); vMk.on("dragend", () => { const ll = vMk.getLatLng(); f.pin = { lat: ll.lat, lng: ll.lng }; }); } else vMk.setLatLng([p.lat, p.lng]);
+        if (z) vMap.setView([p.lat, p.lng], z); $("#vPinTxt").textContent = "Pin set. Tap the map or drag the pin to adjust."; $("#vErr").textContent = ""; };
+      makeMap($("#vMap"), f.pin || (hasPin(site) ? site : ACCRA), f.pin ? 17 : 14).then(m => { if (!m) return; vMap = m;
+        if (hasPin(site)) window.L.marker([site.lat, site.lng], { icon: pinIcon(window.L, "me") }).addTo(m).bindTooltip(esc(site.name));
+        if (f.pin) put(f.pin); m.on("click", e => put(e.latlng)); }).catch(e => { $("#vMap").innerHTML = `<p class="err" style="padding:12px">${esc(cleanErr(e))}</p>`; });
+      placeSearch($("#vSearch"), $("#vResults"), r => { if (vMap) { put(r, 17); $("#vResults").innerHTML = ""; $("#vSearch").value = ""; } });
+      $("#vBack").addEventListener("click", () => { step = 1; draw(); });
+      $("#vNext").addEventListener("click", () => { if (!f.pin) return ($("#vErr").textContent = "Search, or tap the map where she cooks."); step = 3; draw(); });
+    } else {
+      const chip = d => `<button type="button" class="tog" data-dish="${esc(d)}" aria-pressed="${f.dishes.includes(d)}">${esc(d)}</button>`;
+      const extra = f.dishes.filter(d => !COMMON_DISHES.includes(d));
+      openSheet(`${sheetHead("What does she sell?", "Optional. Tap any that fit. She adds her own prices.")}${bar(3)}
+        <div class="chips" id="vDishes">${[...COMMON_DISHES, ...extra].map(chip).join("")}</div>
+        <form id="vOther" class="inline" style="grid-template-columns:1fr auto;align-items:end" novalidate><div><label for="vOtherIn">Something else</label><input id="vOtherIn" placeholder="e.g. Yam and kontomire" maxlength="40"></div><button class="ghost">Add</button></form>
+        <p class="err" id="vErr"></p>
+        <div class="row" style="gap:8px"><button type="button" class="ghost" id="vBack">Back</button><button type="button" class="btn" id="vSend" style="flex:1">Send invite</button></div>`);
+      $("#vDishes").addEventListener("click", e => { const b = e.target.closest("[data-dish]"); if (!b) return; const d = b.dataset.dish, on = f.dishes.includes(d);
+        f.dishes = on ? f.dishes.filter(x => x !== d) : [...f.dishes, d]; b.setAttribute("aria-pressed", String(!on)); });
+      $("#vOther").addEventListener("submit", e => { e.preventDefault(); const d = $("#vOtherIn").value.trim(); if (d.length < 2) return;
+        if (!f.dishes.some(x => x.toLowerCase() === d.toLowerCase())) { f.dishes.push(d); $("#vDishes").insertAdjacentHTML("beforeend", chip(d)); } $("#vOtherIn").value = ""; });
+      $("#vBack").addEventListener("click", () => { step = 2; draw(); });
+      $("#vSend").addEventListener("click", () => send({}));
+    }
   };
-  const putPin = (p, z) => { vPin = { lat: p.lat, lng: p.lng }; const L = window.L;
-    if (!vMk) { vMk = L.marker([p.lat, p.lng], { draggable: true, icon: pinIcon(L, "on") }).addTo(vMap); vMk.on("dragend", () => { const ll = vMk.getLatLng(); vPin = { lat: ll.lat, lng: ll.lng }; est(); }); } else vMk.setLatLng([p.lat, p.lng]);
-    if (z) vMap.setView([p.lat, p.lng], z); $("#vPinTxt").textContent = "Pin set. Drag it or tap the map to adjust."; est(); };
-  const mode = here => { $("#vHere").setAttribute("aria-pressed", String(here)); $("#vElse").setAttribute("aria-pressed", String(!here)); $("#vPinBox").classList.toggle("hidden", here);
-    if (here) { vPin = null; est(); return; }
-    if (!vMap) makeMap($("#vMap"), hasPin(site) ? site : ACCRA, 13).then(m => { if (!m) return; vMap = m; if (hasPin(site)) window.L.marker([site.lat, site.lng], { icon: pinIcon(window.L, "me") }).addTo(m); m.on("click", e => putPin(e.latlng)); })
-      .catch(e => { $("#vMap").innerHTML = `<p class="err" style="padding:12px">${esc(cleanErr(e))}</p>`; });
-    else setTimeout(() => vMap.invalidateSize(), 50); };
-  $("#vHere").addEventListener("click", () => mode(true)); $("#vElse").addEventListener("click", () => mode(false));
-  placeSearch($("#vSearch"), $("#vResults"), r => { if (vMap) { putPin(r, 16); $("#vResults").innerHTML = ""; $("#vSearch").value = ""; } });
-  $("#vMe").addEventListener("click", async () => { try { const me = S.here = await myPosition(); if (vMap) putPin(me, 16); } catch (e) { toast(cleanErr(e)); } });
-  est();
-  $("#vForm").addEventListener("submit", async ev => {
-    ev.preventDefault();
-    const items = [...$("#vItems").children].map(d => ({ name: d.children[0].value.trim(), price: Number(d.children[1].value) })).filter(i => i.name || i.price);
+  const done = (title, body, extraBtn) => {
+    openSheet(`<div class="top" style="justify-content:flex-end"><button class="closex" data-close aria-label="Close">${ICON.close}</button></div><span class="success">${ICON.check}</span>
+      <div class="center" style="display:grid;gap:6px"><h2 id="sheetTitle">${title}</h2><p class="muted">${body}</p></div>
+      <div class="stack" style="gap:8px">${extraBtn || ""}<button class="ghost wide" data-close>Done</button></div>`);
+    renderVendorWaits();
+  };
+  const send = async opt => {
+    const b = $("#vSend") || $("#vSame") || $("#vNew"), err = $("#vErr"); if (b && b.disabled) return; const stop = b ? busyBtn(b, "Sending…") : () => {};
     try {
-      const v = await api.addVendor({ site: S.siteId, name: $("#vName").value, whatsapp: $("#vWa").value, items, lat: vPin ? vPin.lat : null, lng: vPin ? vPin.lng : null });
-      Object.assign(S, await api.load()); renderPools();
-      const link = baseUrl() + "/#kitchen-" + v.token;
-      const msg = MSG.sellerAdded(v, site); void link;
-      openSheet(`<div class="top" style="justify-content:flex-end"><button class="closex" data-close aria-label="Close">${ICON.close}</button></div><span class="success">${ICON.check}</span>
-        <div class="center" style="display:grid;gap:6px"><h2 id="sheetTitle">${esc(v.name)} is added</h2><p class="muted">Send them their link now. Nobody's order counts until they confirm.</p></div>
-        <a class="wa" href="${wa(v.whatsapp)}?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener">${ICON.wa} Send ${esc(v.name)} the link</a>`);
-    } catch (e) { $("#vErr").textContent = cleanErr(e); }
-  });
+      const r = await api.inviteVendor({ site: S.siteId, name: f.name, phone: f.phone, lat: f.pin.lat, lng: f.pin.lng, dishes: f.dishes, ...opt });
+      const nm = esc(r.name || f.name);
+      if (r.result === "similar") return similar(r.matches);
+      if (r.result === "here") { done(nm + " is already on ChopPool", "She already delivers to " + esc(site.name) + ".", `<button class="btn wide" id="vSee">See her menu</button>`); $("#vSee").addEventListener("click", () => { closeSheet(); openVendor(r.id); }); return; }
+      if (r.result === "elsewhere") return done("We've asked for " + nm, "She's on ChopPool for another building. Our team will look at adding " + esc(site.name) + " and we'll let you know.");
+      if (r.result === "paused") return done(nm + " is taking a break", "She's on ChopPool but not taking orders right now. We'll let you know when she's back.");
+      if (r.result === "invited_already") return done(nm + " is already invited", "We've added you to the people waiting for her, and we'll tell you when she's live.");
+      let st = { status: "team" }; try { st = await api.sendInvite(r.id); } catch (e) { /* the team sees it and sends it by hand */ }
+      done(st.status === "sent" ? "Invite sent to " + nm : "Thanks, we'll reach " + nm,
+        st.status === "sent" ? "We've sent her the invite on " + (st.channel === "sms" ? "SMS" : "WhatsApp") + ". We'll tell you when she's on ChopPool." : "Our team will contact her to set up. We'll tell you when she's on ChopPool.");
+    } catch (e) { stop(); if (err) err.textContent = cleanErr(e); else toast(cleanErr(e)); }
+  };
+  const similar = list => {
+    openSheet(`${sheetHead("Is this her?", "We found a vendor with a similar name close to that spot.")}
+      <div class="stack" style="gap:8px">${list.map(m => `<button type="button" class="place-row" data-same="${esc(m.id)}"><span class="pdot on">${ICON.store.replace(/width="\d+" height="\d+"/, 'width="18" height="18"')}</span>
+        <span><strong>${esc(m.name)}</strong><span class="small muted">${[m.area, m.dist != null ? (m.dist < 30 ? "same spot" : m.dist + " m away") : "", m.live ? "on ChopPool" : "invited"].filter(Boolean).map(esc).join(" · ")}</span></span></button>`).join("")}</div>
+      <p class="err" id="vErr"></p>
+      <button type="button" class="ghost wide" id="vNew">No, it's a different vendor</button>`);
+    $("#sheet").onclick = e => { const x = e.target.closest("[data-same]"); if (!x) return; $("#sheet").onclick = null; send({ same: x.dataset.same }); };
+    $("#vNew").addEventListener("click", () => send({ isNew: true }));
+  };
+  draw();
+}
+
+// "Waiting for…" cards on the Vendors tab: vendors this customer invited that aren't live yet
+async function renderVendorWaits() {
+  const el = $("#vWaiting"); if (!el) return;
+  const list = S.user ? await api.myVendorInvites().catch(() => []) : [];
+  const line = v => ({ invited: "Invited. Waiting for her to set up", setting_up: "She's setting up her menu", checking: "ChopPool is checking her menu", declined: "She's not joining for now" })[v.status]
+    + (v.waiting > 1 && v.status !== "declined" ? " · " + v.waiting + " people waiting" : "");
+  const recent = v => v.reminded_at && Date.now() - Date.parse(v.reminded_at) < 20 * 36e5;
+  el.innerHTML = list.map(v => `<div class="card row vwait" data-vw="${esc(v.id)}"><span class="blob">${ICON.store.replace(/width="\d+" height="\d+"/, 'width="20" height="20"')}</span>
+    <span style="flex:1;min-width:0;display:grid;gap:2px"><strong>${esc(v.name)}</strong><span class="small muted">${esc(line(v))}</span></span>
+    ${v.status === "declined" ? `<button class="ghost" data-vwstop>Dismiss</button>` : `<button class="ghost" data-vwremind${recent(v) ? " disabled" : ""}>${recent(v) ? "Reminded" : "Remind"}</button>`}</div>`).join("");
+  el.classList.toggle("hidden", !list.length);
+  el.onclick = async e => { const c = e.target.closest("[data-vw]"); if (!c) return; const id = c.dataset.vw;
+    const r = e.target.closest("[data-vwremind]"); if (r && !r.disabled) { r.disabled = true; try { await api.vendorRemind(id); r.textContent = "Reminded"; toast("Thanks. We'll follow up with her."); } catch (er) { r.disabled = false; toast(cleanErr(er)); } return; }
+    if (e.target.closest("[data-vwstop]")) { try { await api.vendorWaitStop(id); c.remove(); el.classList.toggle("hidden", !el.children.length); } catch (er) { toast(cleanErr(er)); } } };
 }
 
 /* =====================================================================================
@@ -5860,6 +6037,9 @@ async function renderAdmin(cached, quiet) {   // quiet = background/refresh-butt
   const livePools = A.pools.filter(p => p.status !== "cancelled" && p.meals > 0);
   const vForms = A.kitchens.filter(k => k.setup_status && !k.archived), vToCheck = vForms.filter(k => k.setup_status === "submitted");
   const listReq = A.kitchens.filter(k => k.listing_status === "pending"), riderApps = A.riders.filter(r => r.status === "pending");
+  { const nv = A.kitchens.filter(k => k.setup_status && k.setup_status !== "submitted" && !k.archived && k.added_by_customer && k.invite_status !== "declined"
+      && (k.invite_status === "pending" || (k.invite_status === "team" && k.invite_error) || k.setup_help || (A.vwait || []).some(w => w.kitchen_id === k.id && w.reminded_at && Date.now() - Date.parse(w.reminded_at) < 864e5))).length;
+    S.nvCount = nv; }
   const ridersOk = A.riders.filter(r => !r.status || r.status === "approved");
   A.pools.forEach(p => { p.runner = K(p.kitchen_id).delivery_mode === "runner"; });
 
@@ -5869,7 +6049,7 @@ async function renderAdmin(cached, quiet) {   // quiet = background/refresh-butt
   if (subs.length && !subs.some(x => x[0] === S.adminSub[tab])) S.adminSub[tab] = subs[0][0];
   const sub = S.adminSub[tab];
   const nav = $("#aSub"), frame = $("#aFrame");
-  if (nav) nav.innerHTML = subs.map(([k, l]) => `<button data-asub="${k}"${k === sub ? ' aria-current="page"' : ""}>${esc(l)}${tab === "buildings" && k === "requests" && pending.length ? " (" + pending.length + ")" : ""}${tab === "menus" && k === "requests" && listReq.length + vToCheck.length ? " (" + (listReq.length + vToCheck.length) + ")" : ""}${tab === "riders" && k === "apply" && riderApps.length ? " (" + riderApps.length + ")" : ""}</button>`).join("");
+  if (nav) nav.innerHTML = subs.map(([k, l]) => `<button data-asub="${k}"${k === sub ? ' aria-current="page"' : ""}>${esc(l)}${tab === "buildings" && k === "requests" && pending.length ? " (" + pending.length + ")" : ""}${tab === "menus" && k === "requests" && listReq.length + vToCheck.length + (S.nvCount || 0) ? " (" + (listReq.length + vToCheck.length + (S.nvCount || 0)) + ")" : ""}${tab === "riders" && k === "apply" && riderApps.length ? " (" + riderApps.length + ")" : ""}</button>`).join("");
   if (frame) frame.classList.toggle("has-sub", subs.length > 0);
   const body = $("#aBody");
   if (S.lastSub !== tab + ":" + sub) { body.classList.remove("fade-in"); void body.offsetWidth; body.classList.add("fade-in"); delete body.dataset.rvdone; }   // fade only when you change section
@@ -6155,6 +6335,12 @@ async function renderAdmin(cached, quiet) {   // quiet = background/refresh-butt
   if (tab === "menus" && sub !== "reviews" && sub !== "prices") {
     const items = A.items || [];
     const DAYN = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    // Customer invites (update 54): who's waiting, reminders, possible duplicates, how the invite went
+    const vw = A.vwait || [], agoT = t => { if (!t) return ""; const m = Math.max(0, Math.round((Date.now() - Date.parse(t)) / 6e4)); return m < 60 ? m + " min ago" : m < 1440 ? Math.round(m / 60) + " hr ago" : Math.round(m / 1440) + " d ago"; };
+    const waitOf = k => vw.filter(w => w.kitchen_id === k.id), remOf = k => waitOf(k).filter(w => w.reminded_at && Date.now() - Date.parse(w.reminded_at) < 7 * 864e5).length;
+    const inviteLine = k => !k.added_by_customer ? "" : `<p class="small muted" style="margin:4px 0 0">Invited by a customer at ${esc(sName(k.site_id))} · ${waitOf(k).length} waiting${remOf(k) ? ` · <b style="color:var(--hint)">${remOf(k)} reminder${remOf(k) === 1 ? "" : "s"}</b>` : ""}</p>`;
+    const dupLine = k => { const d = k.dup_of && A.kitchens.find(x => x.id === k.dup_of); return !d ? "" : `<div class="vbanner warn" style="margin:8px 0 0;flex-wrap:wrap;gap:8px"><span style="flex:1">Possible duplicate of <b>${esc(d.public_name || d.name)}</b>${d.address ? " (" + esc(d.address) + ")" : ""}${d.setup_status ? "" : " · live"}</span>
+      <span class="row" style="gap:6px"><button class="ghost" data-act="vform-merge">Merge into it</button><button class="ghost" data-act="vform-notdup">Not a duplicate</button></span></div>`; };
     const formCard = k => { const dishes = items.filter(i => i.kitchen_id === k.id);
       return `<article class="card" data-kitchen="${esc(k.id)}" style="border:2px solid var(--hint)"><div class="top" style="align-items:flex-start"><div><h3>${esc(k.public_name || k.name)}</h3><p class="small muted">${esc(k.tagline || "")}${k.setup_submitted_at ? " · sent " + fmtDate(String(k.setup_submitted_at).slice(0, 10)) : ""}</p></div>${pill("To check", "warn")}</div>
         <div class="grid2 small"><p><strong>Owner:</strong> ${esc(k.owner_name || "—")}</p><p><strong>WhatsApp:</strong> <span class="num">${esc(fmtPhone(k.whatsapp || "") || "—")}</span></p>
@@ -6162,13 +6348,34 @@ async function renderAdmin(cached, quiet) {   // quiet = background/refresh-butt
           <p><strong>Payout:</strong> <span class="num">${esc(fmtPhone(k.payout_momo || "") || "—")}</span> ${esc(k.payout_network || "")}</p><p><strong>Area:</strong> ${esc(k.address || "—")}</p></div>
         ${hasPin(k) ? `<a class="linkbtn" href="${osmLink(k)}" target="_blank" rel="noopener">See where they cook</a>` : ""}
         <p class="group-title">Menu</p><div class="dishline">${dishes.map(x => `<span>${esc(x.name)} · ${money(x.price)}${(x.addons || []).length ? " (+" + x.addons.map(a => esc(a.name) + (Number(a.price) ? " " + money(a.price) : "")).join(", ") + ")" : ""}</span>`).join("") || `<span>No dishes</span>`}</div>
-        <p class="small muted">Approving puts them live for nearby buildings. Call them first and, if you can, order a test meal.</p>
+        ${inviteLine(k)}${dupLine(k)}
+        ${k.added_by_customer ? `<label class="choice"><input type="checkbox" data-vall${k.wants_wider ? " checked" : ""}> <span>Serve every building${k.wants_wider ? " (she asked for this)" : `, not just ${esc(sName(k.site_id))}`}</span></label>` : ""}
+        <p class="small muted">Approving puts them live${k.added_by_customer ? "" : " for nearby buildings"}. Call them first and, if you can, order a test meal.</p>
         <div class="row" style="justify-content:flex-start;gap:8px;flex-wrap:wrap"><button class="btn" data-act="vform-approve">Approve and go live</button>${k.whatsapp ? `<a class="wa quiet" style="padding:8px 12px" href="${wa(k.whatsapp)}" target="_blank" rel="noopener">${ICON.wa} WhatsApp</a>` : ""}</div>
         <div class="inline" style="grid-template-columns:1fr auto;align-items:end"><div><label>Or send it back: what should they change?</label><input data-vnote placeholder="Add a clearer photo-worthy name for the jollof"></div><button class="ghost" data-act="vform-return">Send back</button></div></article>`; };
-    const waitRow = k => `<div class="card row" data-kitchen="${esc(k.id)}" style="justify-content:space-between;gap:10px;flex-wrap:wrap;padding:12px 14px"><span><strong>${esc(k.public_name || k.name)}</strong><span class="small muted"> · ${k.setup_status === "returned" ? "sent back: " + esc(k.setup_note || "") : "waiting for the vendor to fill it in"}</span></span>
-      <span class="row" style="gap:6px"><button class="ghost" data-act="vform-link">Share link again</button><button class="ghost" data-act="vform-remove">Remove</button></span></div>`;
+    const invState = k => k.invite_status === "declined" ? ["Said no for now", "bad"] : k.setup_help ? ["Wants help: call her to add the menu", "warn"]
+      : k.setup_status === "returned" ? ["Sent back: " + (k.setup_note || ""), "warn"] : k.invite_status === "claimed" ? ["Opened the link, setting up", "ok"]
+      : k.invite_status === "sent" ? ["Invite sent by " + (k.invite_channel === "sms" ? "SMS" : "WhatsApp") + " " + agoT(k.invite_sent_at), ""]
+      : k.invite_status === "team" && k.invite_channel === "team" && !k.invite_error ? ["Link sent by the team " + agoT(k.invite_sent_at), ""]
+      : k.added_by_customer ? ["Not sent: send her the link yourself", "bad"] : ["Waiting for the vendor to fill it in", ""];
+    const waitRow = k => { const [t, tone] = invState(k);
+      return `<div class="card stack" data-kitchen="${esc(k.id)}" style="gap:6px;padding:12px 14px${tone === "bad" && k.invite_status !== "declined" ? ";border:2px solid var(--danger)" : ""}">
+      <div class="row" style="justify-content:space-between;gap:10px;flex-wrap:wrap"><span><strong>${esc(k.public_name || k.name)}</strong> <span class="small num muted">${esc(fmtPhone(k.whatsapp || ""))}</span>
+        <span class="small" style="display:block;color:${tone === "bad" ? "var(--danger)" : tone === "warn" ? "var(--hint)" : tone === "ok" ? "var(--ok)" : "var(--muted)"}">${esc(t)}</span></span>
+      <span class="row" style="gap:6px;flex-wrap:wrap">${k.added_by_customer ? `<button class="ghost" data-act="vform-sendlink">Send setup link</button>` : `<button class="ghost" data-act="vform-link">Share link again</button>`}
+        ${k.added_by_customer && k.invite_status !== "declined" ? `<button class="ghost" data-act="vform-fill">Fill in for her</button>` : ""}<button class="ghost" data-act="vform-remove">Remove</button></span></div>
+      ${inviteLine(k)}${(k.suggested_dishes || []).length ? `<p class="small muted" style="margin:0">Customer says she sells: ${esc(k.suggested_dishes.join(", "))}</p>` : ""}${k.invite_error ? `<p class="small muted" style="margin:0">Last error: ${esc(k.invite_error)}</p>` : ""}${dupLine(k)}</div>`; };
+    // Live vendors that customers at other buildings asked for
+    const askedElsewhere = A.kitchens.filter(k => !k.archived && !k.setup_status && k.site_id && (k.wants_wider || vw.some(w => w.kitchen_id === k.id && w.site_id && w.site_id !== k.site_id)));
+    const askRow = k => { const ws = vw.filter(w => w.kitchen_id === k.id && w.site_id && w.site_id !== k.site_id), by = {}; ws.forEach(w => { by[w.site_id] = (by[w.site_id] || 0) + 1; });
+      return `<div class="card stack" data-kitchen="${esc(k.id)}" style="gap:6px;padding:12px 14px"><div class="row" style="justify-content:space-between;gap:10px;flex-wrap:wrap"><span><strong>${esc(k.public_name || k.name)}</strong><span class="small muted"> · serves ${esc(sName(k.site_id))}</span>
+        <span class="small muted" style="display:block">${[k.wants_wider ? "She asked to serve other buildings" : "", ...Object.entries(by).map(([sid, n]) => n + " at " + sName(sid) + " want her")].filter(Boolean).map(esc).join(" · ")}</span></span>
+        <span class="row" style="gap:6px"><button class="btn" data-act="vform-openall">Serve every building</button><button class="ghost" data-act="vform-clearasks">Clear</button></span></div></div>`; };
+    const sortW = (a, b) => remOf(b) - remOf(a) || waitOf(b).length - waitOf(a).length || String(b.created_at).localeCompare(String(a.created_at));
     const formsHtml = (vToCheck.length ? `<h2 style="margin:4px 0 10px">Vendor forms to check</h2><div class="stack" style="gap:10px">${vToCheck.map(formCard).join("")}</div>` : "")
-      + (vForms.length > vToCheck.length ? `<h2 style="margin:18px 0 10px">Waiting for the vendor</h2><div class="stack" style="gap:8px">${vForms.filter(k => k.setup_status !== "submitted").map(waitRow).join("")}</div>` : "")
+      + (vForms.length > vToCheck.length ? `<h2 style="margin:18px 0 10px">Waiting for the vendor</h2><div class="stack" style="gap:8px">${vForms.filter(k => k.setup_status !== "submitted" && k.invite_status !== "declined").sort(sortW).map(waitRow).join("")}</div>` : "")
+      + (askedElsewhere.length ? `<h2 style="margin:18px 0 10px">Asked for at other buildings</h2><div class="stack" style="gap:8px">${askedElsewhere.map(askRow).join("")}</div>` : "")
+      + (vForms.some(k => k.invite_status === "declined") ? `<details style="margin-top:14px"><summary class="small muted">Said no (${vForms.filter(k => k.invite_status === "declined").length})</summary><div class="stack" style="gap:8px;margin-top:8px">${vForms.filter(k => k.invite_status === "declined").map(waitRow).join("")}</div></details>` : "")
       + `<div class="row" style="justify-content:flex-start;margin:${vForms.length ? "16px" : "0"} 0 18px"><button class="ghost" data-act="vform-new">Send a vendor the form</button></div>`
       + `<h2 style="margin:0 0 10px">Listing requests</h2>`;
     if (sub === "requests") body.innerHTML = formsHtml + (listReq.length ? `<div class="stack" style="gap:10px">${listReq.map(k => { const L = k.listing || {}, dishes = items.filter(i => i.kitchen_id === k.id && i.active !== false);
@@ -6364,13 +6571,32 @@ async function renderAdmin(cached, quiet) {   // quiet = background/refresh-butt
         <div><label for="stRepFrom">Reports start from</label><input id="stRepFrom" name="reports_from" type="date" value="${esc(s.reports_from || "")}" style="max-width:220px"></div>
         <p class="small muted">The money report, the weekly report and new-customer counts leave out days before this, such as test days. Nothing is deleted: clear the date to see everything again.</p></section>`) : ""}
       ${isSuper && s.phone_signin !== undefined ? setForm(`<section class="card stack"><h2>Phone sign-in</h2>
-        <div><label for="stPhone">New customers sign in with</label><select id="stPhone" name="phone_signin"><option value="off"${s.phone_signin ? "" : " selected"}>Email and password (as now)</option><option value="on"${s.phone_signin ? " selected" : ""}>Phone number and PIN, with an SMS code</option></select></div>
-        <p class="small muted">Switch this on once "ChopPool" is approved as your SMS sender name on all networks. Email accounts keep working either way. To try it first on your own phone, open ${esc(baseUrl())}/#phonetest.</p></section>`) : ""}
+        <div><label for="stPhone">New customers sign in with</label><select id="stPhone" name="phone_signin"><option value="off"${s.phone_signin ? "" : " selected"}>Email and password (as now)</option><option value="on"${s.phone_signin ? " selected" : ""}>Phone number and PIN, with a WhatsApp or SMS code</option></select></div>
+        <p class="small muted">Switch this on once codes arrive (test it under Messages below: WhatsApp works before Arkesel approves "ChopPool" for SMS). Email accounts keep working either way. To try it first on your own phone, open ${esc(baseUrl())}/#phonetest.</p></section>`) : ""}
+      ${isSuper && s.msg_first !== undefined ? setForm(`<section class="card stack"><h2>Messages (WhatsApp and SMS)</h2>
+        <p class="small muted" style="margin:0">Sign-in codes, vendor invites and vendor PIN codes. The first channel is tried, then the other. A vendor invite neither can send goes to Vendors &amp; menus › New vendors.</p>
+        <div><label for="stMsgFirst">Send first by</label><select id="stMsgFirst" name="msg_first"><option value="whatsapp"${s.msg_first !== "sms" ? " selected" : ""}>WhatsApp, then SMS</option><option value="sms"${s.msg_first === "sms" ? " selected" : ""}>SMS, then WhatsApp (cheaper)</option></select></div>
+        <label class="choice"><input type="checkbox" name="wa_ready"${s.wa_ready !== false ? " checked" : ""}> <span>WhatsApp is on</span></label>
+        <label class="choice"><input type="checkbox" name="sms_ready"${s.sms_ready ? " checked" : ""}> <span>SMS is on (only once Arkesel has approved "ChopPool")</span></label>
+        <div><label for="stInv">New vendors one customer can invite a day</label><input id="stInv" name="invites_per_day" inputmode="numeric" value="${esc(s.invites_per_day ?? 3)}" style="max-width:120px"></div>
+        <div><label for="stReply">Auto-reply when someone messages the alerts number</label><textarea id="stReply" name="msg_reply" rows="3" placeholder="Hi! This number only sends ChopPool codes and alerts, so nobody reads replies here. For help, email support@choppool.com.">${esc(s.msg_reply || "")}</textarea></div>
+        <div class="note stack" style="gap:6px"><p class="small" id="msgChk" style="margin:0">Checking…</p>
+          <div class="inline" style="grid-template-columns:1fr auto auto;align-items:end"><div><label for="msgTo">Send a test code to</label><input id="msgTo" inputmode="tel" placeholder="024 123 4567"></div><button type="button" class="ghost" data-msgtest="whatsapp">WhatsApp</button><button type="button" class="ghost" data-msgtest="sms">SMS</button></div>
+          <button type="button" class="linkbtn" id="msgLogBtn" style="justify-self:start">See recent messages</button></div></section>`) : ""}
       ${isSuper ? setForm(`<section class="card stack"><h2>Team screens</h2><div><label for="rlIdle">Sign out after this many quiet minutes (5-60)</label><input id="rlIdle" name="admin_idle_min" inputmode="numeric" value="${esc(s.admin_idle_min ?? 15)}"></div>
         <p class="small muted">Everyone on the team is also signed out after 12 hours.</p></section>`) : ""}
       <section class="card stack"><h2>Alerts check</h2><p class="small" id="bellChk">Checking…</p><p class="small muted" style="margin:0">Every alert the app sends is saved for 7 days so customers see it in the bell on any phone. This needs choppool-update.sql version 35 or later and the latest notify function deployed.</p></section>
       <section class="card stack"><h2>Other settings</h2><p class="small muted">Each setting now sits with what it controls.</p>
         <div class="setlinks">${go("riders", "rules", "Delivery pricing", "Riders › Settings")}${go("menus", "rules", "Pool size, vendors near you, ChopPool fee", "Vendors & menus › Settings")}${go("today", "rules", "Got my food timing", "Today › Settings")}${isSuper ? go("team", "payments", "Mobile money accounts", "Team › Payment options") : ""}</div></section>`;
+      if ($("#msgChk")) {
+        api.msgStatus().then(m => { const el = $("#msgChk"); if (!el) return; const on = m.channels || [];
+          el.innerHTML = m.demo ? `<span class="chip warn">Demo</span> Nothing is sent in the demo.`
+            : `${m.whatsapp ? `<span class="chip">WhatsApp set up</span>` : `<span class="chip warn">WhatsApp token missing</span>`} ${m.sms ? `<span class="chip">SMS key set</span>` : `<span class="chip warn">SMS key missing</span>`} ${m.webhook ? `<span class="chip">Replies connected</span>` : `<span class="chip warn">Replies not connected</span>`}<br>Sending now: ${on.length ? on.map(c => c === "sms" ? "SMS" : "WhatsApp").join(", then ") : "<b>nothing</b>. Check the switches above and the secrets in Supabase."}`; })
+          .catch(e => { const el = $("#msgChk"); if (el) el.innerHTML = `<span class="chip warn">Not deployed</span> Deploy the latest sms function. (${esc(cleanErr(e))})`; });
+        document.querySelectorAll("[data-msgtest]").forEach(b => b.addEventListener("click", async () => { const to = $("#msgTo").value; if (b.disabled) return; const stop = busyBtn(b, "Sending…");
+          try { const r = await api.msgTest(to, b.dataset.msgtest); toast("Sent by " + (r.channel === "sms" ? "SMS" : "WhatsApp") + ". Check the phone."); } catch (e) { toast(cleanErr(e)); } stop(); }));
+        $("#msgLogBtn").addEventListener("click", openMsgLog);
+      }
       api.bellStatus().then(b => { const el = $("#bellChk"); if (!el) return;
         el.innerHTML = !b ? `<span class="chip warn">Not set up</span> Run the latest choppool-update.sql in Supabase, then redeploy the notify function.`
           : !b.last_at ? `<span class="chip warn">Nothing saved yet</span> If alerts have gone out since you ran the update, redeploy the notify function.`
@@ -6638,7 +6864,14 @@ async function adminClick(e) {
     const k = A.kitchens.find(x => x.id === kc.dataset.kitchen);
     if (act === "kitchen-copy") return copy(baseUrl() + "/#kitchen-" + k.token, "Link copied");
     if (act === "disc-remove") return run(async () => { await api.removeDiscount(k.id, t.dataset.site); S.admin = null; }, "Discount removed. Customers there now see full prices.");
-    if (act === "vform-approve") return run(async () => { await api.vendorReview(k.id, true); S.admin = null; }, (k.public_name || k.name) + " is live. Send them their vendor page link from the Vendors list.");
+    if (act === "vform-approve") { const all = !!(kc.querySelector("[data-vall]") || {}).checked;
+      return run(async () => { await api.vendorReview(k.id, true, null, all); S.admin = null; }, (k.public_name || k.name) + " is live" + (k.added_by_customer ? ". The customers waiting for her have been told." : ". Send them their vendor page link from the Vendors list.")); }
+    if (act === "vform-sendlink") return (async () => { try { const code = await api.vendorLink(k.id); S.admin = null; showInviteLink(k, code); renderAdmin(); } catch (e) { toast(cleanErr(e)); } })();
+    if (act === "vform-merge") return confirmRemove("Merge " + (k.public_name || k.name) + "?", "The customers waiting for her move to " + ((A.kitchens.find(x => x.id === k.dup_of) || {}).public_name || "the other vendor") + ", and this one is removed.", async () => { await api.vendorMerge(k.id, k.dup_of); S.admin = null; return "Merged"; }, "Merge");
+    if (act === "vform-fill") return window.open(baseUrl() + "/#vendor-setup-" + k.token, "_blank", "noopener");
+    if (act === "vform-notdup") return run(async () => { await api.vendorNotDup(k.id); S.admin = null; }, "Marked as a different vendor.");
+    if (act === "vform-openall") return run(async () => { await api.vendorOpenAll(k.id); S.admin = null; }, (k.public_name || k.name) + " now serves every building. The customers who asked have been told.");
+    if (act === "vform-clearasks") return run(async () => { await api.vendorRequestsClear(k.id); S.admin = null; }, "Requests cleared.");
     if (act === "vform-return") { const n = (kc.querySelector("[data-vnote]") || {}).value || ""; if (n.trim().length < 3) { toast("Say what they should change."); return kc.querySelector("[data-vnote]").focus(); }
       return run(async () => { await api.vendorReview(k.id, false, n.trim()); S.admin = null; }, "Sent back. Share their link so they see your note."); }
     if (act === "vform-link") return showVendorLink(k.public_name || k.name, k.whatsapp, k.token);
@@ -6793,6 +7026,8 @@ async function adminSubmit(e) {
         Object.assign(patch, { cutoff: cut, delivery_time: lunch, special_cutoff: spec });
         if (has("reminder_time")) { const rt = v("reminder_time"); if (!ok5(rt)) return fail("Enter the reminder time."); if (hm(rt) >= hm(cut)) return fail("The reminder must go out before orders close (" + fmtTime(cut) + ")."); patch.reminder_time = rt; } }
       if (has("phone_signin")) patch.phone_signin = v("phone_signin") === "on";
+      if (has("msg_first")) { patch.msg_first = v("msg_first") === "sms" ? "sms" : "whatsapp"; patch.wa_ready = !!f.querySelector("[name=wa_ready]").checked; patch.sms_ready = !!f.querySelector("[name=sms_ready]").checked;
+        patch.msg_reply = v("msg_reply") || null; const ip = num("invites_per_day"); if (!(Number.isInteger(ip) && ip >= 1 && ip <= 20)) return fail("Invites a day must be from 1 to 20."); patch.invites_per_day = ip; }
       if (has("reports_from")) { const d = v("reports_from"); if (d && !/^\d{4}-\d{2}-\d{2}$/.test(d)) return fail("Pick a date."); patch.reports_from = d || null; }
       if (has("paystack_fee_from")) { const d = v("paystack_fee_from"); if (d && !/^\d{4}-\d{2}-\d{2}$/.test(d)) return fail("Pick a date."); patch.paystack_fee_from = d || null; }
       if (has("pay_mode")) { const pm = v("pay_mode"); if (!["manual", "team", "paystack"].includes(pm)) return fail("Pick how customers pay."); patch.pay_mode = pm; }
@@ -7554,6 +7789,24 @@ const vendorSetupUrl = token => baseUrl() + "/#vendor-setup-" + token;
 const vendorInviteMsg = (name, token) => `Hi ${name}, this is ChopPool. Set up your ChopPool vendor page here, it takes about 10 minutes: ${vendorSetupUrl(token)}`;
 const NETWORKS_MOMO = ["MTN", "Telecel", "AirtelTigo"];
 // The team: start a vendor form and share its link
+// Recent WhatsApp/SMS messages (team): what was sent, by which channel, and whether it arrived
+async function openMsgLog() {
+  openSheet(`${sheetHead("Recent messages", "The last 60. Phone numbers are only visible to the team.")}<div id="mlBody" class="stack" style="gap:6px"><p class="small muted">Loading…</p></div>`);
+  const rows = await api.msgLog().catch(() => []), kindL = { login_code: "Sign-in code", vendor_invite: "Vendor invite", vendor_code: "Vendor PIN code", test: "Test", inbound: "Reply received", auto_reply: "Auto-reply" };
+  const el = $("#mlBody"); if (!el) return;
+  el.innerHTML = rows.length ? rows.map(r => `<div class="row small" style="justify-content:space-between;gap:8px;border-bottom:1px solid var(--line);padding:6px 0;flex-wrap:wrap">
+    <span><b>${esc(kindL[r.kind] || r.kind)}</b> · <span class="num">${esc(fmtPhone("0" + String(r.phone || "").slice(3)))}</span>${r.detail ? `<span class="muted" style="display:block">${esc(String(r.detail).slice(0, 120))}</span>` : ""}</span>
+    <span class="muted">${esc(r.channel === "sms" ? "SMS" : r.channel === "whatsapp" ? "WhatsApp" : r.channel || "")} · <span style="color:${r.status === "failed" ? "var(--danger)" : "inherit"}">${esc(r.status)}</span> · ${esc(new Date(r.created_at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }))}</span></div>`).join("")
+    : `<p class="small muted">No messages yet.</p>`;
+}
+// A setup link the team sends by hand (when WhatsApp/SMS didn't reach her). The old link stops working.
+function showInviteLink(k, code) {
+  const link = baseUrl() + "/?v=" + code, msg = "Hello " + (k.public_name || k.name) + ", this is ChopPool. Customers near you want to order lunch from you together. Set up your kitchen for free here (it's only for you): " + link;
+  openSheet(`${sheetHead("Setup link for " + esc(k.public_name || k.name), "Call her first to check it's really her number, then send this. It works until she sets her PIN.")}
+    <div class="searchrow"><input readonly value="${esc(link)}" aria-label="Setup link"><button class="ghost" type="button" id="ilCopy">Copy</button></div>
+    ${k.whatsapp ? `<a class="wa" href="${wa(k.whatsapp)}?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener">${ICON.wa} Send on WhatsApp</a>` : ""}`);
+  $("#ilCopy").addEventListener("click", () => copy(link, "Link copied"));
+}
 function openVendorInvite() {
   openSheet(`${sheetHead("Send the form to the vendor", "They fill in their details, location, menu and payout number themselves. You check it before it goes live.")}
     <form id="viForm" class="stack" novalidate>
@@ -7641,6 +7894,166 @@ async function viewVendorSetup(token) {
   };
   $("#vsForm").addEventListener("submit", e => { e.preventDefault(); save(true); });
   $("#vsSave").addEventListener("click", () => save(false));
+}
+
+/* ---------- Vendors invited by customers (update 54): open the link once, set up in 3 steps, then phone + PIN ---------- */
+const vHead = (t, sub) => `<header class="topzone pagetop"><div class="pagehead"><div class="pagebrand">${LOGO(30)}<p class="brand" style="font-size:18px">ChopPool vendors</p></div>${themeBtn()}</div><h1>${t}</h1>${sub ? `<p class="muted">${sub}</p>` : ""}</header>`;
+const vendorToken = () => (local.get("cp_vendor") || {}).token || null;
+const vendorKeep = (r) => local.set("cp_vendor", { token: r.token, name: r.name });   // stays signed in on this phone
+// The link ChopPool sent her (choppool.com/?v=CODE)
+async function viewVendorClaim(code) {
+  $("#view").innerHTML = `<div class="center muted" style="padding:40px 0">Opening your invite…</div>`;
+  let r; try { r = await api.vendorClaim(code); }
+  catch (e) {
+    if (vendorToken()) { location.hash = "#vendor"; return; }   // already set up on this phone
+    $("#view").innerHTML = vHead("This link isn't working", esc(cleanErr(e))) + `<section class="card stack"><button class="btn wide" onclick="location.hash='#vendor'">Sign in with phone and PIN</button></section>`; return;
+  }
+  vendorKeep(r);
+  if (r.status !== "draft") { location.hash = "#vendor"; return; }
+  $("#view").innerHTML = vHead("Welcome, " + esc(r.name), "Customers near you want to order lunch from you together. ChopPool brings you the orders and the rider. Setting up takes about 2 minutes, and it's free.")
+    + `<section class="card stack"><ul class="ticks small" style="margin:0;padding-left:18px;display:grid;gap:6px"><li>Add your dishes and prices</li><li>Choose the days you cook</li><li>Get paid on mobile money</li></ul>
+      <button class="btn wide" id="vcGo">Set up my kitchen</button><button class="linkbtn" id="vcNo" style="justify-self:center">Not interested</button></section>`;
+  $("#vcGo").addEventListener("click", () => { location.hash = "#vendor"; });
+  $("#vcNo").addEventListener("click", () => {
+    openSheet(`${sheetHead("Not interested?", "No problem. We won't invite you again for 30 days.")}<p class="err" id="vdErr"></p>
+      <div class="sheet-foot" style="display:grid;gap:8px"><button class="btn wide" id="vdYes">Yes, no thanks</button><button class="ghost wide" data-close>Go back</button></div>`);
+    $("#vdYes").addEventListener("click", async () => { try { await api.vendorDecline(code); local.set("cp_vendor", null); closeSheet();
+      $("#view").innerHTML = vHead("Thank you", "We won't send you another invite for 30 days. If you change your mind, a customer can invite you again after that."); } catch (e) { $("#vdErr").textContent = cleanErr(e); } });
+  });
+}
+// The vendor's home on her phone: setup until approved, then her vendor page
+async function viewVendorHome() {
+  const t = vendorToken();
+  if (!t) return viewVendorSignIn();
+  $("#view").innerHTML = `<div class="center muted" style="padding:40px 0">Opening…</div>`;
+  let me; try { me = await api.vendorMe(t); } catch (e) { $("#view").innerHTML = vHead("Can't connect", esc(cleanErr(e))) + `<section class="card"><button class="btn wide" onclick="location.reload()">Try again</button></section>`; return; }
+  if (!me) { local.set("cp_vendor", null); return viewVendorSignIn(); }
+  if (me.status === "live") { location.replace("#kitchen-" + t); return; }
+  if (me.status === "paused") { $("#view").innerHTML = vHead(esc(me.name), "Your page is paused. Call or email ChopPool to switch it back on.") + vendorOut(); wireVendorOut(); return; }
+  return viewVendorStart(t);
+}
+const vendorOut = () => `<p class="center small" style="margin-top:8px"><button class="linkbtn" id="vOut">Sign out on this phone</button></p>`;
+const wireVendorOut = () => $("#vOut")?.addEventListener("click", () => { local.set("cp_vendor", null); toast("Signed out"); viewVendorSignIn(); });
+// Three short steps: confirm, menu, finish
+async function viewVendorStart(token, startStep) {
+  let d; try { d = await api.vendorSetupGet(token); }
+  catch (e) { $("#view").innerHTML = vHead("Link not working", esc(cleanErr(e))); return; }
+  if (!d.status) { location.replace("#kitchen-" + token); return; }
+  if (d.status === "draft" && d.setup_help && !startStep) {
+    $("#view").innerHTML = vHead("We'll call you", "ChopPool will call you soon to add your menu, then put you live.")
+      + `<section class="card stack"><button class="ghost wide" id="vsEdit">Add my menu myself</button></section>` + vendorOut();
+    $("#vsEdit").addEventListener("click", () => viewVendorStart(token, 2)); wireVendorOut(); return;
+  }
+  if (d.status === "submitted" && !startStep) {
+    $("#view").innerHTML = vHead("Sent to ChopPool", d.setup_help && !(d.items || []).length ? "We'll call you to add your menu, then put you live." : "We're checking your menu and will call you, usually within a day. You'll get a message when you're live.")
+      + `<section class="card stack"><button class="ghost wide" id="vsEdit">Make changes</button></section>` + vendorOut();
+    $("#vsEdit").addEventListener("click", () => viewVendorStart(token, 1)); wireVendorOut(); return;
+  }
+  const f = { name: d.name || "", pin: d.lat != null ? { lat: d.lat, lng: d.lng } : null, help: !!d.setup_help, wider: !!d.wants_wider,
+    days: (d.auto_days && d.auto_days.length) ? d.auto_days.slice() : [1, 2, 3, 4, 5], momo: fmtPhone(d.payout_momo || d.whatsapp || ""), net: d.payout_network || "MTN",
+    dishes: (d.items || []).map(x => ({ name: x.name, price: String(x.price), addons: x.addons || [], icon: x.icon || null })) };
+  let step = startStep || 1, map;
+  const bar = n => `<div class="wiz" style="margin:0 0 4px" aria-label="Step ${n} of 3">${[1, 2, 3].map(x => `<i class="${x <= n ? "on" : ""}"></i>`).join("")}</div>`;
+  const note = d.status === "returned" ? `<div class="vbanner bad" style="margin-bottom:12px"><span><b>ChopPool asked for a change:</b> ${esc(d.note || "")}</span></div>` : "";
+  const readDishes = () => [...document.querySelectorAll("[data-drow]")].map(r => ({ name: r.querySelector("[data-dn]").value.trim(), price: r.querySelector("[data-dp]").value.replace(/[^\d.]/g, "") }));
+  const draw = () => {
+    window.scrollTo(0, 0);
+    if (step === 1) {
+      $("#view").innerHTML = vHead("Is this right?", "Check your name and where you cook.") + note + `<section class="card stack">${bar(1)}
+        <div><label for="vsName">Name customers see</label><input id="vsName" value="${esc(f.name)}" placeholder="Auntie Ama Waakye"></div>
+        <div><p class="group-title" style="margin:0 0 6px">Where you cook</p><div id="vsMap" class="map" style="height:200px"></div>
+          <button type="button" class="linkbtn" id="vsMove" style="margin-top:6px">${f.pin ? "Move the pin" : "Set it on the map"}</button></div>
+        <p class="err" id="vsErr"></p><button class="btn wide" id="vsOk">Looks right</button></section>` + vendorOut();
+      const show = () => { if (!f.pin) { $("#vsMap").innerHTML = `<p class="small muted" style="padding:14px">Not set yet.</p>`; return; }
+        makeMap($("#vsMap"), f.pin, 16).then(m => { if (!m) return; map = m; window.L.marker([f.pin.lat, f.pin.lng], { icon: pinIcon(window.L, "on") }).addTo(m); }).catch(() => {}); };
+      show();
+      $("#vsMove").addEventListener("click", () => openPinSheet("Where do you cook?", f.pin, p => { f.name = $("#vsName").value.trim() || f.name; f.pin = p; draw(); }));
+      $("#vsOk").addEventListener("click", () => { f.name = $("#vsName").value.trim(); if (f.name.length < 2) return ($("#vsErr").textContent = "Add your name or business name.");
+        if (!f.pin) return ($("#vsErr").textContent = "Show where you cook on the map."); step = 2; draw(); });
+    } else if (step === 2) {
+      const have = new Set(f.dishes.map(x => x.name.toLowerCase()));
+      const quick = [...new Set([...(d.suggested || []), ...COMMON_DISHES])].filter(x => !have.has(x.toLowerCase())).slice(0, 12);
+      const row = (x, n) => `<div class="drow" data-drow><input data-dn aria-label="Dish" value="${esc(x.name)}" placeholder="Dish name"><input data-dp aria-label="Price in cedis" inputmode="decimal" value="${esc(x.price || "")}" placeholder="GHS"><button type="button" class="iconbtn sm" data-drm="${n}" aria-label="Remove dish">${ICON.close}</button></div>`;
+      $("#view").innerHTML = vHead("Your menu", "Tap a dish to add it, then type your price.") + note + `<section class="card stack">${bar(2)}
+        ${quick.length ? `<div class="chips" id="vsQuick">${quick.map(x => `<button type="button" class="tog" data-quick="${esc(x)}">+ ${esc(x)}</button>`).join("")}</div>` : ""}
+        <div class="stack" id="vsRows" style="gap:8px">${f.dishes.map(row).join("")}</div>
+        <button type="button" class="ghost" id="vsAdd" style="justify-self:start">+ Another dish</button>
+        <p class="err" id="vsErr"></p>
+        <div class="row" style="gap:8px"><button type="button" class="ghost" id="vsBack">Back</button><button class="btn" id="vsNext" style="flex:1">Next</button></div>
+        <button type="button" class="linkbtn" id="vsHelp" style="justify-self:center">Too busy? Let ChopPool set it up for me</button></section>`;
+      const sync = () => { f.dishes = readDishes().map((x, i) => ({ ...(f.dishes[i] || {}), ...x })); };
+      const addRow = name => { sync(); f.dishes.push({ name, price: "" }); draw(); const ins = document.querySelectorAll("[data-dp]"); (name ? ins[ins.length - 1] : document.querySelectorAll("[data-dn]")[ins.length - 1])?.focus(); };
+      $("#vsQuick")?.addEventListener("click", e => { const b = e.target.closest("[data-quick]"); if (b) addRow(b.dataset.quick); });
+      $("#vsAdd").addEventListener("click", () => addRow(""));
+      $("#vsRows").addEventListener("click", e => { const b = e.target.closest("[data-drm]"); if (!b) return; sync(); f.dishes.splice(+b.dataset.drm, 1); draw(); });
+      $("#vsBack").addEventListener("click", () => { sync(); step = 1; draw(); });
+      $("#vsNext").addEventListener("click", () => { sync(); const ok = f.dishes.filter(x => x.name.length >= 2 && Number(x.price) > 0);
+        if (f.dishes.some(x => x.name && !(Number(x.price) > 0))) return ($("#vsErr").textContent = "Add a price for each dish.");
+        if (!ok.length) return ($("#vsErr").textContent = "Add at least one dish with its price, or tap \"Let ChopPool set it up for me\".");
+        f.help = false; step = 3; draw(); });
+      $("#vsHelp").addEventListener("click", () => { sync(); f.help = true; step = 3; draw(); });
+    } else {
+      $("#view").innerHTML = vHead("Last step", f.help ? "We'll call you to add your menu. Just finish these." : "Almost done.") + note + `<section class="card stack">${bar(3)}
+        <div data-autopick><p class="group-title" style="margin:0 0 6px">Days you cook</p><div class="chips">${DOW.map(([n, l]) => `<button type="button" class="tog" data-adow="${n}" aria-pressed="${f.days.includes(n)}">${l}</button>`).join("")}</div></div>
+        <div class="grid2"><div><label for="vsMomo">Mobile money for payments</label><input id="vsMomo" inputmode="tel" value="${esc(f.momo)}" placeholder="024 123 4567"></div>
+          <div><label for="vsNet">Network</label><select id="vsNet">${NETWORKS_MOMO.map(n => `<option${f.net === n ? " selected" : ""}>${n}</option>`).join("")}</select></div></div>
+        <div><label for="vsPin">${d.has_pin ? "Your 4-digit PIN (leave blank to keep it)" : "Choose a 4-digit PIN"}</label><input id="vsPin" class="codein" type="password" inputmode="numeric" maxlength="4" autocomplete="new-password" placeholder="4 digits">
+          <p class="small muted" style="margin:6px 0 0">You stay signed in on this phone. You only need the PIN on a new phone.</p></div>
+        <label class="choice"><input type="checkbox" id="vsWide"${f.wider ? " checked" : ""}> <span>Also serve other buildings near me</span></label>
+        <p class="err" id="vsErr"></p>
+        <div class="row" style="gap:8px"><button type="button" class="ghost" id="vsBack">Back</button><button class="btn" id="vsSend" style="flex:1">Send to ChopPool</button></div></section>`;
+      $("#vsBack").addEventListener("click", () => { f.momo = $("#vsMomo").value; f.net = $("#vsNet").value; f.wider = $("#vsWide").checked; f.days = pickedDays($("[data-autopick]")); step = 2; draw(); });
+      $("#vsSend").addEventListener("click", async () => {
+        const err = $("#vsErr"), pin = $("#vsPin").value.trim(), momo = $("#vsMomo").value.replace(/\D/g, ""); f.days = pickedDays($("[data-autopick]")); f.wider = $("#vsWide").checked; err.textContent = "";
+        if (!f.days.length) return (err.textContent = "Tap the days you cook.");
+        if (!/^0\d{9}$/.test(momo)) return (err.textContent = "Enter the 10-digit mobile money number we pay you on.");
+        if (!d.has_pin || pin) { if (!/^\d{4}$/.test(pin)) return (err.textContent = "Choose a 4-digit PIN."); if (!pinOk(pin)) return (err.textContent = "Pick a PIN that's harder to guess than " + pin + "."); }
+        const b = $("#vsSend"); if (b.disabled) return; const stop = busyBtn(b, "Sending…");
+        try {
+          if (pin) await api.vendorSetPin(token, pin);
+          await api.vendorSetupExtra(token, f.wider, f.help);
+          const items = f.help ? null : f.dishes.filter(x => x.name.length >= 2 && Number(x.price) > 0).map(x => ({ name: x.name, price: Number(x.price), addons: (x.addons || []).map(({ orig_name, orig_price, pending, ...a }) => a), icon: x.icon || null }));
+          await api.vendorSetupSave(token, { name: f.name, tagline: d.tagline || "", owner_name: d.owner_name || "", whatsapp: String(d.whatsapp || "").replace(/\D/g, ""), address: d.address || "",
+            lat: f.pin.lat, lng: f.pin.lng, auto_days: f.days, capacity: d.capacity || 30, payout_momo: momo, payout_network: $("#vsNet").value }, items, !f.help);
+          $("#view").innerHTML = vHead(f.help ? "Thank you" : "Sent to ChopPool", f.help ? "We'll call you soon to add your menu. Then we put you live." : "We're checking your menu and will call you, usually within a day. You'll get a message when you're live.")
+            + `<section class="card stack center"><span class="success">${ICON.check}</span><p class="small muted">You're signed in on this phone. Open choppool.com any time to see your page.</p></section>`;
+          window.scrollTo(0, 0);
+        } catch (e) { stop(); err.textContent = cleanErr(e); }
+      });
+    }
+  };
+  draw();
+}
+// Sign in on a new phone: phone number + 4-digit PIN. Forgot PIN: a code by WhatsApp or SMS.
+function viewVendorSignIn() {
+  $("#view").innerHTML = vHead("Vendor sign in", "Use the phone number ChopPool has for you and your 4-digit PIN.") + `<section class="card stack">
+    <form id="vlForm" class="stack" novalidate>
+      <div><label for="vlPh">Phone number</label><input id="vlPh" inputmode="tel" autocomplete="tel" placeholder="024 123 4567"></div>
+      <div><label for="vlPin">PIN</label><input id="vlPin" class="codein" type="password" inputmode="numeric" maxlength="4" autocomplete="current-password" placeholder="4 digits"></div>
+      <p class="err" id="vlErr"></p><button class="btn wide">Sign in</button></form>
+    <button class="linkbtn" id="vlForgot" style="justify-self:center">Forgot PIN?</button></section>
+    <p class="small muted center">New to ChopPool? Ask a customer to invite you, or email <a href="${supportMail("Vendor sign-up")}">${SUPPORT_EMAIL}</a>.</p>`;
+  $("#vlForm").addEventListener("submit", async e => { e.preventDefault(); const b = e.submitter || $("#vlForm .btn"), err = $("#vlErr"); err.textContent = ""; if (b.disabled) return; const stop = busyBtn(b, "Signing in…");
+    try { const r = await api.vendorLogin($("#vlPh").value, $("#vlPin").value.trim()); vendorKeep(r); location.hash === "#vendor" ? viewVendorHome() : (location.hash = "#vendor"); }
+    catch (er) { stop(); err.textContent = cleanErr(er); } });
+  $("#vlForgot").addEventListener("click", () => vendorForgot($("#vlPh").value));
+}
+function vendorForgot(phone) {
+  openSheet(`${sheetHead("Reset your PIN", "We'll send a code to your phone on WhatsApp or SMS.")}<form id="vfForm" class="stack" novalidate>
+    <div><label for="vfPh">Phone number</label><input id="vfPh" inputmode="tel" value="${esc(phone || "")}" placeholder="024 123 4567"></div><p class="err" id="vfErr"></p><button class="btn wide">Send code</button></form>`);
+  $("#vfForm").addEventListener("submit", async e => { e.preventDefault(); const ph = $("#vfPh").value, b = $("#vfForm .btn"); if (b.disabled) return; const stop = busyBtn(b, "Sending…");
+    try { const r = await api.vendorCode(ph);
+      openSheet(`${sheetHead("Check your messages", "Enter the 6-digit code we sent, then choose a new PIN." + (r.demo ? " Demo code: " + r.demo + "." : ""))}<form id="vrForm" class="stack" novalidate>
+        <div><label for="vrCode">Code</label><input id="vrCode" class="codein" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="6 digits"></div>
+        <div><label for="vrPin">New 4-digit PIN</label><input id="vrPin" class="codein" type="password" inputmode="numeric" maxlength="4" autocomplete="new-password" placeholder="4 digits"></div>
+        <p class="err" id="vrErr"></p><button class="btn wide">Save and sign in</button></form>`);
+      $("#vrForm").addEventListener("submit", async ev => { ev.preventDefault(); const pin = $("#vrPin").value.trim(), err = $("#vrErr"), bb = $("#vrForm .btn");
+        if (!/^\d{6}$/.test($("#vrCode").value.trim())) return (err.textContent = "Enter the 6-digit code.");
+        if (!pinOk(pin)) return (err.textContent = /^\d{4}$/.test(pin) ? "Pick a PIN that's harder to guess." : "Choose a 4-digit PIN.");
+        if (bb.disabled) return; const st = busyBtn(bb, "Saving…");
+        try { const x = await api.vendorResetPin(ph, $("#vrCode").value.trim(), pin); vendorKeep(x); closeSheet(); toast("PIN saved"); location.hash === "#vendor" ? viewVendorHome() : (location.hash = "#vendor"); }
+        catch (er) { st(); err.textContent = cleanErr(er); } });
+    } catch (er) { stop(); $("#vfErr").textContent = cleanErr(er); } });
 }
 
 /* ---------- Free listing for sellers customers added ---------- */
@@ -7742,6 +8155,8 @@ async function route() {
   clearTimers(); closeSheet();
   if ($("#demoBar")) $("#demoBar").open = false;
   const old = $("#view"), fresh = old.cloneNode(false); old.replaceWith(fresh);   // drops old listeners
+  const qv = new URLSearchParams(location.search).get("v");   // a vendor's invite link: choppool.com/?v=CODE
+  if (qv) history.replaceState(null, "", location.pathname + "#vclaim-" + encodeURIComponent(qv));
   const h = location.hash.slice(1);
   if (h === "phonetest" || h === "phonetest-off") {   // try phone + PIN sign-in on this phone before it's switched on for everyone
     local.set("cp_phonetest", h === "phonetest" ? true : null); history.replaceState(null, "", location.pathname + location.search);
@@ -7756,11 +8171,13 @@ async function route() {
   }
   document.body.classList.remove("is-admin");
   // The browser tab says which page this is
-  document.title = h === "rider-signup" ? "Rider sign-up · ChopPool" : h.startsWith("vendor-setup-") ? "Vendor sign-up · ChopPool" : h.startsWith("kitchen-") ? "Vendor · ChopPool" : h.startsWith("rider-") ? "Rider · ChopPool"
+  document.title = h === "rider-signup" ? "Rider sign-up · ChopPool" : h.startsWith("vendor-setup-") || h.startsWith("vclaim-") || h === "vendor" ? "Vendor · ChopPool" : h.startsWith("kitchen-") ? "Vendor · ChopPool" : h.startsWith("rider-") ? "Rider · ChopPool"
     : h.startsWith("host-") ? "Drop point · ChopPool" : h === "admin" ? "Admin · ChopPool" : "ChopPool · " + TAGLINE;
   if (S.recovery) return viewRecovery();   // nothing else until the new password is set
   if (h === "rider-signup") return viewRiderSignup();
   if (h.startsWith("vendor-setup-")) return viewVendorSetup(h.slice(13));
+  if (h.startsWith("vclaim-")) return viewVendorClaim(decodeURIComponent(h.slice(7)));
+  if (h === "vendor") return viewVendorHome();
   if (h === "privacy" || h === "terms") return viewLegal(h);
   const view = h.startsWith("kitchen-") ? "kitchen" : h.startsWith("rider-") ? "rider" : h.startsWith("host-") ? "host" : h === "admin" ? "admin" : "order";
   document.querySelectorAll("#demoBar a").forEach(a => { if (a.getAttribute("href") === "#" + h || (view === "order" && a.dataset.view === "order")) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
