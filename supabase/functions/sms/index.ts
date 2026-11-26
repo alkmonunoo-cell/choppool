@@ -1,4 +1,4 @@
-// ChopPool messages: sign-in codes, vendor invites and vendor "Forgot PIN" codes, by WhatsApp or SMS (update 54).
+// ChopPool messages: sign-in codes, vendor invites, branch checks and vendor "Forgot PIN" codes, by WhatsApp or SMS (updates 54-55).
 //
 // Who calls it:
 //   1. Supabase Auth, through its "Send SMS" hook, whenever a customer needs a phone code (signed by Supabase).
@@ -106,15 +106,23 @@ const codeMsg = (to: string, code: string, kind: string) =>
 
 // ---------- vendor invite ----------
 async function sendInvite(kitchenId: string, skip: string[] = []) {
-  const { data: k } = await db.from("kitchens").select("id, public_name, phone, site_id, invite_status").eq("id", kitchenId).single();
-  if (!k || !k.phone) return { status: "team", error: "no vendor" };
+  const { data: k } = await db.from("kitchens").select("id, public_name, phone, site_id, invite_status, parent_id").eq("id", kitchenId).single();
+  if (!k) return { status: "team", error: "no vendor" };
+  if (k.parent_id) {   // a branch: ask the owner on her own number (update 55)
+    const { data: m } = await db.from("kitchens").select("public_name, phone").eq("id", k.parent_id).single();
+    k.phone = m?.phone || null; k.public_name = m?.public_name || k.public_name;
+  }
+  if (!k.phone) return { status: "team", error: "no vendor phone" };
   const [{ data: site }, { data: a }] = await Promise.all([
     db.from("sites").select("name").eq("id", k.site_id).maybeSingle(),
     db.from("vendor_auth").select("invite_code").eq("kitchen_id", k.id).maybeSingle()]);
   const code = a?.invite_code, siteName = site?.name || "a ChopPool building";
   if (!code) return { status: "team", error: "no setup code" };
-  const text = `Hello ${k.public_name}, a customer at ${siteName} invited your kitchen to ChopPool so their building can order lunch from you together. Set up your menu for free: ${APP}/?v=${code}`;
-  const r = await deliver("vendor_invite", k.phone, [env("WA_TEMPLATE_INVITE", "vendor_invite"), [k.public_name, siteName], code], text, k.id, skip);
+  const r = k.parent_id
+    ? await deliver("vendor_invite", k.phone, [env("WA_TEMPLATE_BRANCH", "branch_check"), [k.public_name, siteName], code],
+        `Hello ${k.public_name}, a ChopPool customer wants to order from your branch near ${siteName}. Is it your branch? Add it or say it's not yours: ${APP}/?v=${code}`, k.id, skip)
+    : await deliver("vendor_invite", k.phone, [env("WA_TEMPLATE_INVITE", "vendor_invite"), [k.public_name, siteName], code],
+        `Hello ${k.public_name}, a customer at ${siteName} invited your kitchen to ChopPool so their building can order lunch from you together. Set up your menu for free: ${APP}/?v=${code}`, k.id, skip);
   await db.from("kitchens").update(r.ok
     ? { invite_status: "sent", invite_channel: r.channel, invite_sent_at: new Date().toISOString(), invite_error: null }
     : { invite_status: "team", invite_channel: "team", invite_error: (r.error || "").slice(0, 300) }).eq("id", k.id).in("invite_status", ["pending", "sent", "team"]);

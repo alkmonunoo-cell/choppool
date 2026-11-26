@@ -30,6 +30,6 @@ Secrets (Supabase › Edge Functions › Secrets; never in the app or in chat):
 | `WHATSAPP_APP_SECRET`, `WHATSAPP_VERIFY_TOKEN` | Optional: delivery receipts and auto-replies (Meta webhook) |
 | `ARKESEL_API_KEY`, `SEND_SMS_HOOK_SECRET` | SMS and the Supabase "Send SMS" hook, as before |
 
-WhatsApp templates (WhatsApp Manager): `login_code` (Authentication, copy code) and `vendor_invite` (body: vendor name, building; URL button `https://choppool.com/?v={{1}}`).
+WhatsApp templates (WhatsApp Manager): `login_code` (Authentication, copy code), `vendor_invite` (body: vendor name, building; URL button `https://choppool.com/?v={{1}}`) and `branch_check` (body: vendor name, building; same URL button).
 
 Admin › Settings › Messages chooses which goes first, switches each channel on or off, and sends a test.

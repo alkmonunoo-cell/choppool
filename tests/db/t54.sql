@@ -84,8 +84,8 @@ select 'V27 both waiting customers get a bell alert', (select count(*) from noti
 -- K: a live vendor that serves one building: someone elsewhere asks for her
 update kitchens set site_id = :'s1' where id = :'k1';
 set request.jwt.claims = '{"sub":"a0a0a0a0-0000-0000-0000-000000005403","email":"c3@x.com"}'; set role authenticated;
-select 'V28 live elsewhere: request recorded for the team', vendor_invite(:'s2', 'Ama', '0241110001', 5.65, -0.18, null) ->> 'result' = 'elsewhere' as ok;
-select 'V29 live here', vendor_invite(:'s1', 'Ama', '0241110001', 5.65, -0.18, null) ->> 'result' = 'here' as ok;
+select 'V28 live elsewhere: request recorded for the team', vendor_invite(:'s2', 'Ama', '0241110001', 5.5651, -0.2021, null) ->> 'result' = 'elsewhere' as ok;
+select 'V29 live here', vendor_invite(:'s1', 'Ama', '0241110001', 5.5651, -0.2021, null) ->> 'result' = 'here' as ok;
 reset role;
 -- L: declining pauses invites for 30 days
 select invite_code as c3 from vendor_auth a join kitchens k on k.id = a.kitchen_id where k.phone = '233241110003' \gset
